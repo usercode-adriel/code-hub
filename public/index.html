@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/css/pages.css">
   <link rel="stylesheet" href="/css/chat.css">
   <link rel="stylesheet" href="/css/life.css">
+  <link rel="stylesheet" href="/css/shell.css">
   <link rel="stylesheet" href="/custom.css">
   <script type="module">
     import { applyTheme } from '/js/theme.js';
@@ -24,15 +25,16 @@
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar" id="sidebar"></aside>
+    <aside class="rail-left" id="sidebar" aria-label="Menu"></aside>
     <main class="main">
       <header class="topbar" id="topbar"></header>
       <div class="content"><div id="view"></div></div>
     </main>
-    <aside class="assistant" id="assistant"></aside>
+    <aside class="rail-right" id="rail" aria-label="Atalhos"></aside>
   </div>
+  <aside class="assistant" id="assistant" aria-label="Assistente"></aside>
+  <nav class="bottom-nav" id="bottomNav" aria-label="Navegação"></nav>
   <div class="overlay"></div>
-  <button class="fab-capture" id="fabCapture" aria-label="Captura rápida"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
   <div class="toasts" id="toasts"></div>
   <script type="module" src="/js/app.js"></script>
 </body>

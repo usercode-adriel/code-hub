@@ -1,4 +1,4 @@
-CODENIAC 1.4 — seu hub pessoal
+CODENIAC 1.5 — seu hub pessoal
 ==============================
 
 COMO ABRIR
@@ -11,7 +11,17 @@ PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
 
-O QUE HÁ DE NOVO NA 1.4
+O QUE HÁ DE NOVO NA 1.5
+- Visual novo: menu de ícones à esquerda, projetos à direita e barra inferior no celular.
+- Temas: cores básicas (azul escuro, azul claro, preto, vermelho escuro, roxo, verde, neutro)
+  e temas prontos (Gamer, Escola de magia, Batcaverna, Retrô 80s, Grafite e azul elétrico,
+  Matrix, Oceano, Café, Harvard).
+- Assistente: "Criar chat" com personagens (nome, foto, personalidade e características).
+- Livros: painel de leitura e biblioteca de PDF/EPUB (clique para baixar; nome e capa editáveis).
+  Os arquivos ficam em %APPDATA%\Codeniac\library, com banco próprio (library.json).
+- A Garagem agora fica dentro do InDrive (projeto Trabalhos > InDrive > botão Garagem).
+
+NA 1.4
 - Gemini no assistente: crie uma chave grátis em aistudio.google.com e cole em
   Configurações > Assistente > Gemini. A chave fica só no seu computador.
 

@@ -16,7 +16,7 @@ export const USER_COLLECTIONS = [
   'projects', 'tasks', 'notes', 'links', 'notifications', 'pages', 'finance',
   'events', 'agenda', 'habits', 'inbox', 'decisions', 'journal', 'dayClose',
   'fuel', 'services', 'docs', 'shifts', 'cards', 'snippets', 'trail', 'books', 'studyLog', 'enJournal',
-  'money', 'bills', 'subscriptions',
+  'money', 'bills', 'subscriptions', 'bots',
 ];
 
 const EMPTY = () => ({

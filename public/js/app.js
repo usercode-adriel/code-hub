@@ -11,62 +11,107 @@ if (!auth.token) location.replace('/login');
 
 // Menu: chave da rota, rótulo, ícone
 export const NAV = [
-  ['Principal', [['hoje', 'Hoje', 'sun'], ['dashboard', 'Dashboard', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['atividade', 'Atividade', 'activity']]],
-  ['Rotina', [['tasks', 'Minhas tarefas', 'tasks'], ['garagem', 'Garagem', 'car'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['diario', 'Diário', 'feather'], ['decisoes', 'Decisões', 'scale']]],
+  ['Principal', [['dashboard', 'Início', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
   ['Sistema', [['notifications', 'Notificações', 'bell'], ['achievements', 'Conquistas', 'trophy'], ['settings', 'Configurações', 'settings']]],
 ];
 export const NAV_KEYS = NAV.flatMap(([, items]) => items.map(([k, l]) => [k, l]));
 
+// Telas que saíram do menu continuam funcionando pelo endereço, pelos links e pela busca.
 const VIEWS = {
   hoje: () => import('./views/hoje.js'), dashboard: () => import('./views/dashboard.js'), assistente: () => import('./views/assistant.js'),
   atividade: () => import('./views/atividade.js'), tasks: () => import('./views/tasks.js'), garagem: () => import('./views/garagem.js'),
   financeiro: () => import('./views/financeiro.js'), estudos: () => import('./views/estudos.js'), diario: () => import('./views/diario.js'),
   decisoes: () => import('./views/decisoes.js'), notifications: () => import('./views/notifications.js'), achievements: () => import('./views/achievements.js'),
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
+  livros: () => import('./views/livros.js'),
 };
 const FULL_PAGE = new Set(['assistente', 'diario']);
+// item do menu que fica aceso em cada tela
+const NAV_OF = { garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
-// ---------- Shell ----------
-function logoHtml() {
-  const custom = store.images.logo;
-  return `<img class="brand-mark ${custom ? 'custom' : ''}" src="${esc(custom || '/assets/logo.png')}" alt="${esc(store.appName)}">`;
+// ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
+const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';
+const navLabel = (k, l) => store.menu?.labels?.[k] || l;
+const visibleNav = () => NAV.map(([g, items]) => [g, items.filter(([k]) => k === 'settings' || !(store.menu?.hidden || []).includes(k))]);
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
 }
 
 function renderSidebar() {
-  const { hidden = [], labels = {} } = store.menu || {};
-  const cur = (location.hash.slice(2) || '').split('/')[0];
-  const groups = NAV.map(([g, items]) => {
-    const vis = items.filter(([k]) => !hidden.includes(k) || (k === 'settings'));
-    if (!vis.length) return '';
-    return `<div class="nav-group">${esc(g)}</div>${vis.map(([k, l, ic]) => `<a class="nav-item ${cur === k ? 'active' : ''}" href="#/${k}" data-k="${k}">${icon(ic, 17)}<span>${esc(labels[k] || l)}</span>${k === 'notifications' && store.unread ? `<span class="nav-badge">${store.unread}</span>` : ''}</a>`).join('')}`;
-  }).join('');
+  const cur = NAV_OF[currentRoute()] || currentRoute();
+  const btn = ([k, l, ic]) => `<a class="rail-btn ${cur === k ? 'active' : ''}" href="#/${k}" data-tip="${esc(navLabel(k, l))}" aria-label="${esc(navLabel(k, l))}">${icon(ic, 19)}${k === 'notifications' && store.unread ? '<i class="rail-dot"></i>' : ''}</a>`;
+  const [main, sys] = visibleNav();
+  $('#sidebar').innerHTML = `<a class="rail-logo" href="#/dashboard" aria-label="${esc(store.appName)}"><img src="${esc(store.images.logoIcon || '/assets/icon.png')}" alt=""></a>
+    <nav class="rail-nav">${main[1].map(btn).join('')}<span class="rail-sep"></span>${sys[1].map(btn).join('')}
+      <button class="rail-btn rail-only-mid" id="railProjects" data-tip="Projetos" aria-label="Projetos">${icon('folder', 19)}</button></nav>
+    <button class="rail-add" id="railAdd" data-tip="Capturar (Alt+N)" aria-label="Captura rápida">${icon('plus', 18)}</button>`;
+  $('#railAdd').onclick = () => openCapture();
+  $('#railProjects').onclick = () => openSheet();
+  renderRightRail();
+  renderBottomNav();
+}
+
+function renderRightRail() {
   const slug = location.hash.startsWith('#/project/') ? location.hash.split('/')[2] : null;
-  const projects = store.projects.map((p) => `<a class="project-link ${slug === p.slug ? 'active' : ''}" href="#/project/${esc(p.slug)}"><span class="mini-ico" style="--c:${esc(p.color)}">${icon(p.icon, 12)}</span>${esc(p.name)}<span class="count">${p.pages || ''}</span></a>`).join('');
-  const u = store.user;
-  $('#sidebar').innerHTML = `<a class="brand" href="#/${store.settings.homePage || 'hoje'}">${logoHtml()}<span class="brand-sub">hub pessoal</span></a>
-    <nav class="nav">${groups}
-      <div class="nav-section"><div class="nav-section-title" role="button" tabindex="0" id="projToggle" aria-expanded="true">${icon('folder', 17)} Projetos ${icon('chevDown', 14, 'class="chev"')}</div>
-        <div class="nav-sub open" id="projList">${projects}<a class="project-link add" href="#" id="newProj"><span class="mini-ico">${icon('plus', 12)}</span>Novo projeto</a></div></div></nav>
-    <div class="profile-card">${avatar(u, 'lg')}<div class="name">${esc(u.name)}</div><div class="role">${u.role === 'admin' ? 'Administrador' : 'Membro'}</div>
-      <div style="display:flex;gap:6px;justify-content:center"><a class="btn sm outline" href="#/profile">${icon('user', 13)} Perfil</a><button class="icon-btn sm" id="logout" title="Sair">${icon('logout', 14)}</button></div></div>`;
-  $('#newProj').onclick = (e) => { e.preventDefault(); openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; }); };
-  $('#logout').onclick = () => { auth.clear(); localStorage.removeItem('codeniac.conv'); location.href = '/login'; };
-  const tg = $('#projToggle');
-  const toggle = () => { const open = $('#projList').classList.toggle('open'); tg.setAttribute('aria-expanded', open); };
-  tg.onclick = toggle; tg.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+  const fresh = (p) => Date.now() - new Date(p.updatedAt || 0).getTime() < 3 * 86400000;
+  $('#rail').innerHTML = `<div class="rail-card"><a class="rail-me" href="#/profile" data-tip="Meu perfil" aria-label="Meu perfil">${avatar(store.user, '', 44)}</a></div>
+    <div class="rail-card rail-projects">${store.projects.map((p) => `<a class="rail-proj ${slug === p.slug ? 'on' : ''}" href="#/project/${esc(p.slug)}" data-tip="${esc(p.name)}" aria-label="${esc(p.name)}" style="--c:${esc(p.color)}">
+        <span class="rp-ico">${p.cover ? `<img src="${esc(p.cover)}" alt="">` : icon(p.icon, 17)}</span>${fresh(p) ? '<i class="rp-st"></i>' : ''}${slug === p.slug ? '<em>aberto</em>' : ''}</a>`).join('')}
+      <button class="rail-proj add" id="railNewProj" data-tip="Novo projeto" aria-label="Novo projeto"><span class="rp-ico">${icon('plus', 16)}</span></button></div>
+    <div class="rail-card"><button class="rail-proj" id="railBot" data-tip="${esc(store.settings.assistantName || 'Assistente')}" aria-label="Abrir assistente">${botAvatar(40)}</button>
+      <a class="rail-proj" href="#/settings" data-tip="Configurações" aria-label="Configurações"><span class="rp-ico plain">${icon('settings', 17)}</span></a></div>`;
+  $('#railNewProj').onclick = () => openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; });
+  $('#railBot').onclick = toggleAssistant;
+}
+
+function renderBottomNav() {
+  const cur = NAV_OF[currentRoute()] || currentRoute();
+  const b = (k, l, ic) => `<a class="bn-btn ${cur === k ? 'on' : ''}" href="#/${k}">${icon(ic, 20)}<span>${esc(navLabel(k, l))}</span></a>`;
+  $('#bottomNav').innerHTML = `${b('dashboard', 'Início', 'dashboard')}${b('tasks', 'Tarefas', 'tasks')}
+    <button class="bn-main" id="bnAdd" aria-label="Captura rápida">${icon('plus', 24)}</button>
+    ${b('financeiro', 'Finanças', 'wallet')}<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>`;
+  $('#bnAdd').onclick = () => openCapture();
+  $('#bnMenu').onclick = () => openSheet();
+}
+
+// Menu completo (celular e tablet): telas, projetos e conta.
+function openSheet() {
+  closeSheet();
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet-back';
+  const [main, sys] = visibleNav();
+  sheet.innerHTML = `<div class="sheet" role="dialog" aria-label="Menu"><div class="sheet-grip"></div>
+    <div class="sheet-grid">${[...main[1], ...sys[1]].map(([k, l, ic]) => `<a class="sheet-item" href="#/${k}"><span>${icon(ic, 20)}</span>${esc(navLabel(k, l))}</a>`).join('')}
+      <button class="sheet-item" data-act="bot"><span>${botAvatar(30)}</span>${esc(store.settings.assistantName || 'Assistente')}</button></div>
+    <h6>Projetos</h6><div class="sheet-grid">${store.projects.map((p) => `<a class="sheet-item" href="#/project/${esc(p.slug)}"><span style="background:${esc(p.color)};color:#fff">${icon(p.icon, 18)}</span>${esc(p.name)}</a>`).join('')}
+      <button class="sheet-item" data-act="proj"><span>${icon('plus', 18)}</span>Novo projeto</button></div>
+    <div class="sheet-foot"><a class="btn sm outline" href="#/profile">${icon('user', 13)} Perfil</a><button class="btn sm outline" data-act="logout">${icon('logout', 13)} Sair</button></div></div>`;
+  document.body.append(sheet);
+  requestAnimationFrame(() => sheet.classList.add('open'));
+  sheet.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (e.target === sheet || e.target.closest('a')) closeSheet();
+    if (act === 'bot') { closeSheet(); toggleAssistant(); }
+    if (act === 'proj') { closeSheet(); openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; }); }
+    if (act === 'logout') { auth.clear(); localStorage.removeItem('codeniac.conv'); location.href = '/login'; }
+  });
+}
+function closeSheet() { document.querySelectorAll('.sheet-back').forEach((x) => x.remove()); }
+function toggleAssistant() {
+  if (store.settings.assistantEnabled === false) { location.hash = '#/settings/assistente'; return; }
+  document.body.classList.toggle('assistant-open');
+  if (document.body.classList.contains('assistant-open')) setTimeout(() => $('#msg')?.focus(), 250);
 }
 
 function renderTopbar() {
-  $('#topbar').innerHTML = `<button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu">${icon('menu', 18)}</button>
-    <div class="search" id="search">${icon('search', 15)}<input id="q" placeholder="Buscar projetos, tarefas, páginas, cartões..." autocomplete="off" aria-label="Buscar"><span class="kbd">Ctrl K</span><div class="search-results" id="results"></div></div>
-    <div class="spacer"></div>
-    <button class="btn sm primary" id="captureBtn" title="Captura rápida (Alt+N)">${icon('plus', 14)}<span class="hide-sm">Capturar</span></button>
-    <div class="rel"><button class="icon-btn" id="bell" aria-label="Notificações">${icon('bell', 17)}<span class="dot" id="bellDot" ${store.unread ? '' : 'hidden'}>${store.unread}</span></button><div class="dropdown" id="notifDrop"></div></div>
-    <button class="icon-btn assistant-toggle" id="asToggle" aria-label="Assistente">${icon('bot', 17)}</button>
-    <a href="#/profile" class="hide-sm" title="Perfil">${avatar(store.user, '', 36)}</a>`;
-  $('#menuBtn').onclick = () => document.body.classList.toggle('sidebar-open');
-  $('#asToggle').onclick = () => document.body.classList.toggle('assistant-open');
-  $('#captureBtn').onclick = openCapture;
+  const first = (store.user.name || '').split(' ')[0];
+  $('#topbar').innerHTML = `<div class="greet"><span>${greeting()},</span> <b>${esc(first)}</b></div>
+    <div class="search" id="search">${icon('search', 15)}<input id="q" placeholder="Buscar..." autocomplete="off" aria-label="Buscar"><span class="kbd">Ctrl K</span><div class="search-results" id="results"></div></div>
+    <button class="round-btn" id="asToggle" title="Assistente" aria-label="Assistente">${icon('bot', 17)}</button>
+    <div class="rel"><button class="round-btn" id="bell" aria-label="Notificações">${icon('bell', 17)}<span class="dot" id="bellDot" ${store.unread ? '' : 'hidden'}>${store.unread}</span></button><div class="dropdown" id="notifDrop"></div></div>
+    <a class="top-avatar" href="#/profile" title="Perfil">${avatar(store.user, '', 38)}</a>`;
+  $('#asToggle').onclick = toggleAssistant;
   $('#bell').onclick = toggleNotifDrop;
   bindSearch();
 }
@@ -314,11 +359,14 @@ async function route() {
   const raw = location.hash.slice(2);
   const [path, query = ''] = raw.split('?');
   const parts = path.split('/').filter(Boolean);
-  let name = parts[0] || store.settings.homePage || 'hoje';
-  if (!VIEWS[name]) name = 'hoje';
+  let name = parts[0] || store.settings.homePage || 'dashboard';
+  if (!VIEWS[name]) name = 'dashboard';
+  if (name === 'estudos' && parts[1] === 'livros') { location.replace('#/livros'); return; }
   if (store.menu?.hidden?.includes(name) && !['settings', 'profile', 'project'].includes(name)) name = 'dashboard';
   document.body.classList.remove('sidebar-open', 'assistant-open');
+  closeSheet();
   document.body.classList.toggle('on-full-page', FULL_PAGE.has(name));
+  document.body.dataset.route = name;
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* ignore */ } }
   cleanup = null;
   const view = $('#view');
@@ -353,11 +401,10 @@ async function boot() {
   try { store.aiMode = (await api.get('/assistant/status')).mode; } catch { /* ok */ }
   await Promise.all([refreshProjects(), refreshUnread()]);
   renderSidebar(); renderTopbar();
-  if (me.settings.assistantEnabled !== false) renderAssistantPanel(); else document.body.classList.add('no-assistant');
+  renderAssistantPanel();
   on('projects', renderSidebar);
   on('user', () => { renderSidebar(); renderTopbar(); });
   on('unread', (n) => { const d = $('#bellDot'); if (d) { d.hidden = !n; d.textContent = n; } renderSidebar(); });
-  on('settings', (s) => { document.body.classList.toggle('no-assistant', s.showAssistantPanel === false || s.assistantEnabled === false); });
   on('system', (sys) => { store.images = sys.images || store.images; store.menu = sys.menu || store.menu; store.appName = sys.appName || store.appName; renderSidebar(); });
   window.addEventListener('hashchange', route);
   document.addEventListener('keydown', (e) => {
@@ -365,7 +412,7 @@ async function boot() {
     if (e.altKey && e.key.toLowerCase() === 'n') { e.preventDefault(); openCapture(); }
   });
   $('.overlay').onclick = () => document.body.classList.remove('sidebar-open', 'assistant-open');
-  $('#fabCapture').onclick = () => openCapture();
+  setInterval(() => { const g = $('.greet span'); if (g) g.textContent = `${greeting()},`; }, 600000);
   bindVocab();
   connectStream();
   route();

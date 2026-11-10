@@ -38,18 +38,21 @@ function bindCommon(box, redraw) {
 function appearance(box) {
   const s = store.settings;
   const { vars } = resolveTheme(s);
-  box.innerHTML = `<section class="card"><h3 class="title">${icon('palette', 15)} Temas</h3><p class="sub">Cada tema muda cores, cantos e alguns efeitos. Você pode ajustar tudo abaixo.</p>
-      <div class="theme-grid">${Object.entries(THEMES).map(([k, t]) => `<button class="theme-card ${s.theme === k ? 'on' : ''}" data-theme="${k}" style="--p-bg:${t.vars.bg};--p-side:${t.vars.sidebar};--p-card:${t.vars.card};--p-accent:${t.vars.accent};--p-text:${t.vars.text};--p-muted:${t.vars.muted};border-radius:${Math.min(t.radius ?? 14, 16)}px">
-        <div class="preview"><div class="side"><i></i><i></i><i></i><i></i></div><div class="main"><div class="hero-p"><b></b></div><div class="row"><span></span><span></span><span></span></div></div></div><div class="label">${esc(t.name)}<small>${esc(t.desc)}</small></div></button>`).join('')}</div></section>
+  const card = ([k, t]) => `<button class="theme-card ${s.theme === k ? 'on' : ''}" data-theme="${k}" style="--p-bg:${t.vars.bg};--p-side:${t.vars.sidebar};--p-card:${t.vars.card};--p-accent:${t.vars.accent};--p-text:${t.vars.text};--p-muted:${t.vars.muted}">
+        <div class="preview"><div class="side"><i></i><i></i><i></i><i></i></div><div class="main"><div class="hero-p"><b></b></div><div class="row"><span></span><span></span><span></span></div></div></div><div class="label">${esc(t.name)}<small>${esc(t.desc)}</small></div></button>`;
+  const group = (g) => Object.entries(THEMES).filter(([, t]) => t.group === g).map(card).join('');
+  box.innerHTML = `<section class="card"><h3 class="title">${icon('palette', 15)} Cores básicas</h3><p class="sub">Mudam só as cores do sistema.</p>
+      <div class="theme-grid">${group('basic')}</div></section>
+    <section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('sparkles', 15)} Temas prontos</h3><p class="sub">Cores com efeitos e personalidade (Matrix tem chuva de código, Gamer tem neon...). Desligue os efeitos em “Layout” se preferir algo mais calmo.</p>
+      <div class="theme-grid">${group('preset')}</div></section>
     <section class="card" style="margin-top:var(--gap)"><div class="section-head"><h3>${icon('edit', 14)} Cores personalizadas</h3><button class="see-more" id="resetColors">${icon('refresh', 12)} Restaurar cores do tema</button></div>
       <div class="color-grid">${Object.entries(COLOR_LABELS).map(([k, l]) => `<label class="color-field"><input type="color" data-color="${k}" value="${vars[k]}"><span>${l}<small>${vars[k]}</small></span></label>`).join('')}</div></section>
     <section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('columns', 15)} Layout</h3>
-      ${row('Cantos arredondados', '', `<div class="range-row" style="width:240px"><input type="range" min="0" max="24" value="${s.radius}" data-range="radius"><output>${s.radius}px</output></div>`)}
+      ${row('Cantos arredondados', '', `<div class="range-row" style="width:240px"><input type="range" min="0" max="28" value="${s.radius}" data-range="radius"><output>${s.radius}px</output></div>`)}
       ${row('Tamanho do texto', '', `<div class="range-row" style="width:240px"><input type="range" min="85" max="120" step="5" value="${s.fontScale}" data-range="fontScale"><output>${s.fontScale}%</output></div>`)}
-      ${row('Fonte', '', seg('fontFamily', [['poppins', 'Poppins'], ['system', 'Sistema'], ['mono', 'Mono'], ['serif', 'Serifada'], ['retro', 'Retrô']], s.fontFamily))}
+      ${row('Fonte', '', seg('fontFamily', [['poppins', 'Poppins'], ['system', 'Sistema'], ['mono', 'Mono'], ['serif', 'Serifada']], s.fontFamily))}
       ${row('Densidade', '', seg('density', [['comfortable', 'Confortável'], ['compact', 'Compacta']], s.density))}
-      ${row('Tela inicial', 'O que abre quando você entra', seg('homePage', [['hoje', 'Hoje'], ['dashboard', 'Dashboard']], s.homePage))}
-      ${sw('effects', 'Efeitos do tema', 'Neve, chuva, neon, brilhos e animações')}${sw('showHero', 'Banner no dashboard')}${sw('heroAutoplay', 'Banner muda sozinho')}${sw('showAssistantPanel', 'Painel do assistente à direita')}</section>`;
+      ${sw('effects', 'Efeitos do tema', 'Neve, chuva, neon, brilhos e animações')}${sw('heroAutoplay', 'Destaque do início muda sozinho')}</section>`;
   box.querySelectorAll('[data-theme]').forEach((b) => { b.onclick = () => { patch({ theme: b.dataset.theme, themeVars: {}, ...presetLayout(b.dataset.theme) }); appearance(box); }; });
   box.querySelectorAll('[data-color]').forEach((i) => {
     i.oninput = () => { i.nextElementSibling.querySelector('small').textContent = i.value; applySettings({ ...store.settings, themeVars: { ...store.settings.themeVars, [i.dataset.color]: i.value } }); };

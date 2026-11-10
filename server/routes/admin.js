@@ -19,7 +19,8 @@ const bad = (res, msg, code = 400) => res.status(code).json({ error: msg });
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const admins = () => db().users.filter((u) => u.role === 'admin');
 export const IMAGE_SLOTS = {
-  logo: 'Logo do sistema (menu e login)',
+  logo: 'Logo do sistema (tela de login)',
+  logoIcon: 'Ícone do menu (quadrado)',
   loginBg: 'Fundo da tela de login',
   loginArt: 'Imagem lateral da tela de login',
   heroDefault: 'Banner principal do dashboard',
@@ -28,6 +29,7 @@ export const IMAGE_SLOTS = {
   cardSoon: 'Card "Próximos prazos"',
   cardNews: 'Card "Últimas atualizações"',
   hojeBanner: 'Banner da aba Hoje',
+  booksHero: 'Banner da aba Livros',
 };
 
 // O servidor principal registra aqui a função de reinício (precisa do objeto do servidor HTTP).

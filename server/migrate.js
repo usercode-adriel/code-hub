@@ -1,8 +1,8 @@
 // Migrações de dados entre versões. Roda no início do servidor e é idempotente.
 import { db, id, now, save } from './db.js';
-import { ensureRootPage, ensureInDrive, DEFAULT_SETTINGS, systemConfig, seedStudy } from './seed.js';
+import { ensureRootPage, ensureInDrive, DEFAULT_SETTINGS, systemConfig, seedStudy, THEMES, THEME_REPLACED } from './seed.js';
 
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 // Converte o conteúdo de uma nota (markdown simples) em blocos.
 function noteToBlocks(note) {
@@ -65,6 +65,18 @@ function toV3(d) {
   for (const [uid, s] of Object.entries(d.settings)) d.settings[uid] = { ...DEFAULT_SETTINGS, ...s };
 }
 
+// 1.5: temas novos, tela inicial = dashboard, cantos mais arredondados.
+function toV4(d) {
+  for (const s of Object.values(d.settings)) {
+    if (!THEMES.includes(s.theme)) { s.theme = THEME_REPLACED[s.theme] || 'padrao'; s.themeVars = {}; }
+    if (s.homePage === 'hoje') s.homePage = 'dashboard';
+    if (s.radius === 14 || s.radius == null) s.radius = 20;
+    if (s.fontFamily === 'retro') s.fontFamily = 'poppins';
+  }
+  const sys = systemConfig();
+  if (!THEMES.includes(sys.defaultTheme)) sys.defaultTheme = THEME_REPLACED[sys.defaultTheme] || 'padrao';
+}
+
 export function migrate() {
   const d = db();
   d.system = systemConfig();
@@ -72,6 +84,7 @@ export function migrate() {
   if (from >= SCHEMA) return;
   if (from < 2) toV2(d);
   if (from < 3) toV3(d);
+  if (from < 4) toV4(d);
   d.meta.schema = SCHEMA;
   save();
   console.log(`» Dados migrados do formato ${from} para ${SCHEMA}`);

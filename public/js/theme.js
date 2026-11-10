@@ -1,20 +1,23 @@
 // Motor de temas: presets + cores personalizadas + layout (raio, fonte, escala, densidade, efeitos).
 export const THEMES = {
-  padrao: { name: 'Padrão', desc: 'Grafite e azul elétrico', vars: { surface: '#2b2e34', bg: '#17181c', sidebar: '#1a1b1f', card: '#212328', card2: '#26292f', input: '#2a2d33', border: '#2d3037', text: '#f4f5f7', text2: '#b4b8c0', muted: '#7d828c', accent: '#1f8fff' } },
-  batcaverna: { name: 'Batcaverna', desc: 'Escuridão e sinal amarelo', radius: 10, vars: { surface: '#050506', bg: '#0b0b0d', sidebar: '#0e0e10', card: '#141417', card2: '#19191d', input: '#1d1d22', border: '#2a2a30', text: '#ececec', text2: '#a9a9b0', muted: '#6f6f78', accent: '#f5c518' } },
-  nerds: { name: 'Nerds', desc: 'Terminal verde', radius: 6, font: 'mono', vars: { surface: '#060a07', bg: '#0d1117', sidebar: '#0b0f14', card: '#111821', card2: '#16202b', input: '#1a2532', border: '#243244', text: '#d7f5dd', text2: '#9fd3aa', muted: '#5f8a6a', accent: '#39d353' } },
-  minimalista: { name: 'Minimalista', desc: 'Claro e limpo', radius: 10, effects: false, vars: { surface: '#e9e9ec', bg: '#fafafa', sidebar: '#f4f4f5', card: '#ffffff', card2: '#f4f4f6', input: '#efeff2', border: '#e2e2e6', text: '#18181b', text2: '#52525b', muted: '#8b8b95', accent: '#18181b' } },
-  gamers: { name: 'Gamers', desc: 'Neon RGB', radius: 12, vars: { surface: '#07020f', bg: '#0c0618', sidebar: '#0e0720', card: '#150b2a', card2: '#1b0f36', input: '#20123f', border: '#3a1f6e', text: '#f5f0ff', text2: '#c6b6ff', muted: '#8a76c2', accent: '#ff2e88' } },
-  oceano: { name: 'Oceano', desc: 'Azul profundo', vars: { surface: '#041821', bg: '#071a24', sidebar: '#08202c', card: '#0c2a38', card2: '#103343', input: '#133b4d', border: '#1d4e63', text: '#e6f7ff', text2: '#a6d4e6', muted: '#6c9fb3', accent: '#22d3ee' } },
-  cafe: { name: 'Café', desc: 'Tons quentes', radius: 16, head: 'serif', vars: { surface: '#2a211c', bg: '#1c1612', sidebar: '#201914', card: '#2a211b', card2: '#31271f', input: '#382c23', border: '#4a3a2e', text: '#f6ece3', text2: '#d1bba8', muted: '#9a8371', accent: '#d4a373' } },
-  natal: { name: 'Natal', desc: 'Neve, verde e vermelho', radius: 16, vars: { surface: '#0a1f15', bg: '#0f2a1d', sidebar: '#0c2418', card: '#153a28', card2: '#1a4530', input: '#1f4f37', border: '#2c6247', text: '#fdf6e3', text2: '#d9e8d5', muted: '#94b39f', accent: '#e23b3b' } },
-  chuva: { name: 'Chuva', desc: 'Dia cinza e aconchegante', radius: 14, vars: { surface: '#1b2330', bg: '#202a38', sidebar: '#1c2532', card: '#263243', card2: '#2c394c', input: '#324156', border: '#3a4a61', text: '#e8eef7', text2: '#b4c2d6', muted: '#7d8ea8', accent: '#6aa9ff' } },
-  pixel: { name: 'Pixel', desc: '8 bits, sem curvas', radius: 0, font: 'retro', head: 'pixel', vars: { surface: '#10101c', bg: '#1b1b2f', sidebar: '#16162a', card: '#24243e', card2: '#2c2c4a', input: '#33335a', border: '#000000', text: '#f8f8f2', text2: '#c9c9e0', muted: '#8a8ab0', accent: '#ffcc00' } },
-  console: { name: 'Console retrô', desc: 'Portátil vermelho e branco', radius: 18, vars: { surface: '#d9d9de', bg: '#f2f2f4', sidebar: '#e60012', card: '#ffffff', card2: '#f6f6f8', input: '#ececf0', border: '#dddde3', text: '#1c1c22', text2: '#4b4b55', muted: '#8a8a95', accent: '#e60012' } },
-  fazenda: { name: 'Fazenda', desc: 'Madeira, papel e plantação', radius: 8, vars: { surface: '#a8d06a', bg: '#f3e2b3', sidebar: '#6b4423', card: '#fbf0d0', card2: '#f5e3b5', input: '#efdcab', border: '#c9a46a', text: '#4a2f17', text2: '#6e4a2a', muted: '#9a7a52', accent: '#4c9a2a' } },
-  magia: { name: 'Escola de magia', desc: 'Vinho, ouro e pergaminho', radius: 10, head: 'magic', vars: { surface: '#16070a', bg: '#22090e', sidebar: '#1c070b', card: '#2f0f16', card2: '#38141c', input: '#421822', border: '#5c2a2f', text: '#f3e6c4', text2: '#d9c79c', muted: '#a68e68', accent: '#d4af37' } },
-  blocos: { name: 'Blocos', desc: 'Grama, terra e pedra', radius: 0, head: 'retro', vars: { surface: '#1f1f1f', bg: '#2b2b2b', sidebar: '#6b4a2b', card: '#3c3c3c', card2: '#454545', input: '#4f4f4f', border: '#1b1b1b', text: '#f2f2f2', text2: '#cfcfcf', muted: '#9a9a9a', accent: '#5fa83a' } },
-  retro80: { name: 'Retrô 80s', desc: 'Neon e pôr do sol', radius: 6, head: 'retro', vars: { surface: '#0b0018', bg: '#12002b', sidebar: '#0f0024', card: '#1e0546', card2: '#250856', input: '#2c0b66', border: '#4a1a8c', text: '#fbeaff', text2: '#d8b8ff', muted: '#9a7cc9', accent: '#ff2fd1' } },
+  // ---- Cores básicas: mudam só as cores ----
+  azul: { group: 'basic', name: 'Azul escuro', desc: 'Marinho profundo', vars: { surface: '#070f22', bg: '#0b1630', sidebar: '#0e1b3a', card: '#13244a', card2: '#172b57', input: '#1b3263', border: '#24407a', text: '#eaf1ff', text2: '#b3c4e6', muted: '#7286b0', accent: '#3b82f6' } },
+  azulclaro: { group: 'basic', name: 'Azul claro', desc: 'Céu sobre fundo escuro', vars: { surface: '#08131c', bg: '#0c1a26', sidebar: '#0f2130', card: '#13293b', card2: '#183247', input: '#1c3a52', border: '#26506e', text: '#e8f6ff', text2: '#aed4ea', muted: '#7aa3bb', accent: '#38bdf8' } },
+  preto: { group: 'basic', name: 'Preto', desc: 'Preto puro, ótimo em tela OLED', vars: { surface: '#000000', bg: '#050505', sidebar: '#0b0b0b', card: '#121212', card2: '#181818', input: '#1e1e1e', border: '#2a2a2a', text: '#f2f2f2', text2: '#b0b0b0', muted: '#767676', accent: '#f2f2f2' } },
+  vermelho: { group: 'basic', name: 'Vermelho escuro', desc: 'Vinho e coral', vars: { surface: '#2a0c0f', bg: '#4a1d22', sidebar: '#3a1418', card: '#3d161a', card2: '#45191e', input: '#3a1418', border: '#5c262c', text: '#fdeff0', text2: '#e2bcc0', muted: '#b88a8f', accent: '#e5484d' } },
+  roxo: { group: 'basic', name: 'Roxo', desc: 'Violeta noturno', vars: { surface: '#110a22', bg: '#1a1030', sidebar: '#170d2b', card: '#21143d', card2: '#281849', input: '#2e1c55', border: '#3d2870', text: '#f3edff', text2: '#c9b8f2', muted: '#8f7cbd', accent: '#a855f7' } },
+  verde: { group: 'basic', name: 'Verde', desc: 'Floresta escura', vars: { surface: '#06140f', bg: '#0b1f17', sidebar: '#0d2419', card: '#112d21', card2: '#153628', input: '#193f2f', border: '#22533f', text: '#e9fff4', text2: '#a9dcc2', muted: '#6fa58a', accent: '#22c55e' } },
+  neutro: { group: 'basic', name: 'Neutro', desc: 'Cinzas equilibrados', vars: { surface: '#131315', bg: '#1c1c1e', sidebar: '#19191b', card: '#232326', card2: '#29292d', input: '#2e2e33', border: '#38383e', text: '#f1f1f3', text2: '#b9b9c0', muted: '#85858d', accent: '#9ca3af' } },
+  // ---- Temas prontos: cores + efeitos e personalidade ----
+  padrao: { group: 'preset', name: 'Grafite e azul elétrico', desc: 'O visual original do Codeniac', vars: { surface: '#2b2e34', bg: '#17181c', sidebar: '#1a1b1f', card: '#212328', card2: '#26292f', input: '#2a2d33', border: '#2d3037', text: '#f4f5f7', text2: '#b4b8c0', muted: '#7d828c', accent: '#1f8fff' } },
+  gamers: { group: 'preset', name: 'Gamer', desc: 'Neon RGB', vars: { surface: '#07020f', bg: '#0c0618', sidebar: '#0e0720', card: '#150b2a', card2: '#1b0f36', input: '#20123f', border: '#3a1f6e', text: '#f5f0ff', text2: '#c6b6ff', muted: '#8a76c2', accent: '#ff2e88' } },
+  magia: { group: 'preset', name: 'Escola de magia', desc: 'Vinho, ouro e pergaminho', head: 'magic', vars: { surface: '#16070a', bg: '#22090e', sidebar: '#1c070b', card: '#2f0f16', card2: '#38141c', input: '#421822', border: '#5c2a2f', text: '#f3e6c4', text2: '#d9c79c', muted: '#a68e68', accent: '#d4af37' } },
+  batcaverna: { group: 'preset', name: 'Batcaverna', desc: 'Escuridão e sinal amarelo', vars: { surface: '#050506', bg: '#0b0b0d', sidebar: '#0e0e10', card: '#141417', card2: '#19191d', input: '#1d1d22', border: '#2a2a30', text: '#ececec', text2: '#a9a9b0', muted: '#6f6f78', accent: '#f5c518' } },
+  retro80: { group: 'preset', name: 'Retrô 80s', desc: 'Neon e pôr do sol', head: 'retro', vars: { surface: '#0b0018', bg: '#12002b', sidebar: '#0f0024', card: '#1e0546', card2: '#250856', input: '#2c0b66', border: '#4a1a8c', text: '#fbeaff', text2: '#d8b8ff', muted: '#9a7cc9', accent: '#ff2fd1' } },
+  nerds: { group: 'preset', name: 'Nerd (Matrix)', desc: 'Chuva de código verde', font: 'mono', vars: { surface: '#000300', bg: '#020a04', sidebar: '#030d06', card: '#06140a', card2: '#091b0e', input: '#0c2312', border: '#11361b', text: '#c8ffd9', text2: '#7fe0a0', muted: '#3f9a5e', accent: '#00ff66' } },
+  oceano: { group: 'preset', name: 'Oceano', desc: 'Azul profundo e turquesa', vars: { surface: '#041821', bg: '#071a24', sidebar: '#08202c', card: '#0c2a38', card2: '#103343', input: '#133b4d', border: '#1d4e63', text: '#e6f7ff', text2: '#a6d4e6', muted: '#6c9fb3', accent: '#22d3ee' } },
+  cafe: { group: 'preset', name: 'Café', desc: 'Tons quentes de torra', head: 'serif', vars: { surface: '#2a211c', bg: '#1c1612', sidebar: '#201914', card: '#2a211b', card2: '#31271f', input: '#382c23', border: '#4a3a2e', text: '#f6ece3', text2: '#d1bba8', muted: '#9a8371', accent: '#d4a373' } },
+  harvard: { group: 'preset', name: 'Harvard', desc: 'Carmesim acadêmico e serifas', head: 'serif', vars: { surface: '#0e0607', bg: '#170b0d', sidebar: '#1d0d10', card: '#241114', card2: '#2c1519', input: '#33191e', border: '#4a2228', text: '#f6ece6', text2: '#d8bfb6', muted: '#a3867e', accent: '#c4122f' } },
 };
 
 export const COLOR_LABELS = {
@@ -56,7 +59,7 @@ export function applyTheme(settings) {
   set('--accent', vars.accent); set('--on-accent', contrastText(vars.accent));
   set('--tint', mode === 'light' ? '0, 0, 0' : '255, 255, 255');
   set('--media', mode === 'light' ? `color-mix(in srgb, ${vars.card2} 80%, ${vars.border})` : `color-mix(in srgb, ${vars.bg} 85%, #000)`);
-  const radius = Number.isFinite(settings.radius) ? settings.radius : 14;
+  const radius = Number.isFinite(settings.radius) ? settings.radius : 20;
   set('--radius', `${radius}px`); set('--radius-lg', `${radius + 4}px`); set('--radius-sm', `${Math.max(radius - 4, 0)}px`);
   set('--font', FONTS[settings.fontFamily] || FONTS.poppins);
   set('--font-head', FONTS[preset.head] || 'var(--font)');
@@ -72,5 +75,5 @@ export function applyTheme(settings) {
 // Valores de layout que um tema sugere ao ser escolhido.
 export function presetLayout(themeId) {
   const p = THEMES[themeId] || THEMES.padrao;
-  return { radius: p.radius ?? 14, fontFamily: p.font ?? 'poppins', effects: p.effects ?? true };
+  return { radius: p.radius ?? 20, fontFamily: p.font ?? 'poppins', effects: p.effects ?? true };
 }

@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -32,6 +32,12 @@ export const CHANGELOG = [
     message: 'O assistente pode usar o Gemini, a IA gratuita do Google: conversa sobre qualquer assunto, sem pesar o computador. '
       + 'Configure em Configurações → Assistente. Os comandos rápidos continuam funcionando.',
   },
+  {
+    version: '1.5.0',
+    title: 'Codeniac 1.5: visual novo, personagens e biblioteca 📚',
+    message: 'Layout novo com menu de ícones e versão para celular com barra inferior; 16 temas (cores básicas e temas prontos); '
+      + 'crie chats com personagens (foto, personalidade e características); e a aba Livros virou um painel com biblioteca de PDF e EPUB.',
+  },
 ];
 
 export const DEFAULT_PROJECTS = [
@@ -47,8 +53,13 @@ export const DEFAULT_PROJECTS = [
     tasks: [['Praticar speaking 20 min', 'high', 'todo']] },
 ];
 
-export const THEMES = ['padrao', 'batcaverna', 'nerds', 'minimalista', 'gamers', 'oceano', 'cafe',
-  'natal', 'chuva', 'pixel', 'console', 'fazenda', 'magia', 'blocos', 'retro80'];
+export const THEMES = [
+  // cores básicas (só mudam as cores)
+  'azul', 'azulclaro', 'preto', 'vermelho', 'roxo', 'verde', 'neutro',
+  // temas prontos
+  'padrao', 'gamers', 'magia', 'batcaverna', 'retro80', 'nerds', 'oceano', 'cafe', 'harvard'];
+// temas antigos (1.3) que saíram: viram o mais parecido
+export const THEME_REPLACED = { minimalista: 'neutro', console: 'vermelho', fazenda: 'verde', natal: 'vermelho', chuva: 'azul', pixel: 'padrao', blocos: 'verde' };
 export const THEME_VAR_KEYS = ['bg', 'surface', 'sidebar', 'card', 'card2', 'input', 'border', 'text', 'text2', 'muted', 'accent'];
 export const PERSONALITIES = ['amigavel', 'profissional', 'divertido', 'mentor', 'zen', 'nerd'];
 
@@ -56,7 +67,7 @@ export const DEFAULT_SETTINGS = {
   // Aparência
   theme: 'padrao',
   themeVars: {},
-  radius: 14,
+  radius: 20,
   fontScale: 100,
   fontFamily: 'poppins',       // poppins | system | mono | serif
   density: 'comfortable',
@@ -64,7 +75,7 @@ export const DEFAULT_SETTINGS = {
   showHero: true,
   heroAutoplay: true,
   language: 'pt-BR',
-  homePage: 'hoje',            // hoje | dashboard
+  homePage: 'dashboard',       // hoje | dashboard
   // Rotina
   briefingTime: '07:00',
   briefingEnabled: true,

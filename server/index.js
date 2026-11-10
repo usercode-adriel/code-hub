@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import express from 'express';
-import { load, saveNow, UPLOAD_DIR, APP_ROOT, DATA_DIR } from './db.js';
+import { load, saveNow, UPLOAD_DIR, APP_ROOT, DATA_DIR, db } from './db.js';
 import { bootstrap, systemConfig } from './seed.js';
 import { migrate } from './migrate.js';
 import { requireAuth } from './auth.js';
@@ -13,12 +13,14 @@ import pages from './routes/pages.js';
 import life from './routes/life.js';
 import admin, { setRestart } from './routes/admin.js';
 import aiRoutes from './ai.js';
+import library, { loadLibrary, saveLibraryNow } from './library.js';
 import {
   chat, assistantMode, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
 } from './assistant.js';
 import { startScheduler } from './scheduler.js';
 
 load();
+loadLibrary();
 migrate();
 bootstrap();
 
@@ -42,13 +44,16 @@ app.get('/custom.css', (_req, res) => {
 app.get('/api/assistant/status', requireAuth, (_req, res) => res.json({ mode: assistantMode() }));
 app.get('/api/assistant/conversations', requireAuth, (req, res) => res.json(listConversations(req.user.id)));
 app.post('/api/assistant/conversations', requireAuth, (req, res) => {
-  const c = createConversation(req.user.id, req.body?.title || 'Nova conversa');
-  res.status(201).json({ id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt, count: 0, last: null });
+  const bot = req.body?.botId ? db().bots.find((b) => b.id === req.body.botId && b.userId === req.user.id) : null;
+  if (req.body?.botId && !bot) return res.status(404).json({ error: 'Personagem não encontrado' });
+  const c = createConversation(req.user.id, req.body?.title || (bot ? `Chat com ${bot.name}` : 'Nova conversa'), bot);
+  const last = c.display.at(-1);
+  res.status(201).json({ id: c.id, title: c.title, botId: c.botId, createdAt: c.createdAt, updatedAt: c.updatedAt, count: c.display.length, last: last ? { role: last.role, text: last.text } : null });
 });
 app.get('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = getConversation(req.user.id, req.params.id);
   if (!c) return res.status(404).json({ error: 'Conversa não encontrada' });
-  res.json({ id: c.id, title: c.title, messages: c.display });
+  res.json({ id: c.id, title: c.title, botId: c.botId || null, messages: c.display });
 });
 app.put('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = renameConversation(req.user.id, req.params.id, req.body?.title);
@@ -90,6 +95,7 @@ app.post('/api/system/shutdown', (req, res) => {
 });
 
 app.use('/api/ai', aiRoutes);
+app.use('/api/library', requireAuth, library);
 app.use('/api', api);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
@@ -126,6 +132,7 @@ startScheduler();
 
 function shutdown() {
   saveNow();
+  saveLibraryNow();
   fs.rmSync(TOKEN_FILE, { force: true });
   server.close();
   process.exit(0);
@@ -134,6 +141,7 @@ function shutdown() {
 // Reinício pelo painel de administração: inicia um novo processo com os mesmos argumentos e encerra este.
 setRestart(() => {
   saveNow();
+  saveLibraryNow();
   server.close();
   const env = { ...process.env, CODENIAC_RESTARTED: '1' };
   delete env.HOST; // o novo processo relê o .env (acesso pela rede pode ter mudado)

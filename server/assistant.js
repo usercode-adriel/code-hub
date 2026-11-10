@@ -159,9 +159,25 @@ function contextBlock(user) {
 
 const EXPERTISE = `Você conversa sobre qualquer assunto e domina: inglês (se o usuário escrever em inglês ou pedir para praticar, responda em inglês e, no fim, uma linha "✍️ Correções:" em português com os erros), programação (exemplos curtos em blocos \`\`\`), criptomoedas, economia, finanças pessoais e investimentos (de forma educativa, sem recomendar compra/venda de ativos específicos), trabalho como motorista de aplicativo, livros e produtividade. Você não tem acesso à internet: não invente cotações nem notícias atuais.`;
 
-function systemPrompt(user, mode = 'claude') {
+// Personagem do chat (criado em "Novo chat"): muda nome, personalidade e características.
+export function botOf(user, conv) {
+  if (!conv?.botId) return null;
+  return db().bots.find((b) => b.id === conv.botId && b.userId === user.id) || null;
+}
+
+function systemPrompt(user, mode = 'claude', bot = null) {
   const s = prefs(user);
-  const p = PERSONALITY[s.assistantPersonality] || PERSONALITY.amigavel;
+  const p = PERSONALITY[bot?.personality || s.assistantPersonality] || PERSONALITY.amigavel;
+  if (bot) {
+    return `Você é ${bot.name}, um personagem criado pelo usuário dentro do Codeniac (hub pessoal de projetos, rotina, InDrive, finanças e estudos).
+Fique sempre no personagem.
+Personalidade: ${p.prompt}
+${bot.traits ? `Características, jeito de falar e história do personagem (definidas pelo usuário):\n${bot.traits}\n` : ''}Chame o usuário de "${callName(user, s)}". ${LENGTH[s.assistantLength] || LENGTH.media}
+Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual do hub; use se for útil e não o mencione.
+Responda em português do Brasil, a menos que o personagem ou o usuário peçam outro idioma.
+${EXPERTISE}
+O próprio sistema executa comandos como "/gasto 50 gasolina" e "/tarefa Estudar SQL"; nunca diga que registrou algo.`;
+  }
   return `Você é ${s.assistantName}, o assistente integrado do Codeniac, um hub pessoal (projetos, rotina, InDrive, finanças, estudos).
 Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual; use-o e não o mencione.
 Personalidade: ${p.prompt}
@@ -216,13 +232,14 @@ function store(userId) {
   return d.threads[userId];
 }
 const summary = (c) => ({
-  id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt, count: c.display.length,
+  id: c.id, title: c.title, botId: c.botId || null, createdAt: c.createdAt, updatedAt: c.updatedAt, count: c.display.length,
   last: c.display.at(-1) ? { role: c.display.at(-1).role, text: c.display.at(-1).text.slice(0, 120) } : null,
 });
 export function listConversations(userId) { return store(userId).conversations.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(summary); }
 export function getConversation(userId, convId) { return store(userId).conversations.find((c) => c.id === convId) || null; }
-export function createConversation(userId, title = 'Nova conversa') {
-  const c = { id: id(), title: String(title).slice(0, 80), api: [], display: [], createdAt: now(), updatedAt: now() };
+export function createConversation(userId, title = 'Nova conversa', bot = null) {
+  const c = { id: id(), title: String(title).slice(0, 80), botId: bot?.id || null, api: [], display: [], createdAt: now(), updatedAt: now() };
+  if (bot?.greeting) c.display.push({ role: 'assistant', text: bot.greeting, at: now(), mode: 'local', tools: [] });
   store(userId).conversations.push(c);
   save();
   return c;
@@ -248,7 +265,7 @@ async function runClaude(user, conv, text, write) {
   try {
     for (let step = 0; step < 6; step++) {
       const stream = getClient().beta.messages.stream({
-        model: MODEL, max_tokens: 16000, system: systemPrompt(user, 'claude'), tools: TOOLS,
+        model: MODEL, max_tokens: 16000, system: systemPrompt(user, 'claude', botOf(user, conv)), tools: TOOLS,
         output_config: { effort: EFFORT }, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default', messages: conv.api,
       });
       stream.on('text', (delta) => { answer += delta; write({ type: 'text', text: delta }); });
@@ -275,7 +292,7 @@ async function runOllama(user, conv, text, write) {
   const { ollamaUrl } = aiConfig();
   const history = conv.display.slice(0, -1).slice(-OLLAMA_HISTORY).filter((m) => m.text)
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
-  const messages = [{ role: 'system', content: `${systemPrompt(user, 'ollama')}\n\n${contextBlock(user)}` }, ...history, { role: 'user', content: text }];
+  const messages = [{ role: 'system', content: `${systemPrompt(user, 'ollama', botOf(user, conv))}\n\n${contextBlock(user)}` }, ...history, { role: 'user', content: text }];
   const res = await fetch(`${ollamaUrl}/api/chat`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: effectiveModel(), messages, stream: true, keep_alive: '5m', options: { temperature: 0.7, num_ctx: 4096 } }),
@@ -349,7 +366,7 @@ async function runGemini(user, conv, text, write) {
   const kb = searchKB(text);
   const manual = kb && kb.score >= 1.5 ? `\n\n<manual_codeniac>\n${kb.answer}\n</manual_codeniac>\nSe a pergunta for sobre o sistema, baseie-se nesse trecho do manual.` : '';
   const body = {
-    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini')}\n\n${contextBlock(user)}${manual}` }] },
+    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', botOf(user, conv))}\n\n${contextBlock(user)}${manual}` }] },
     contents: [...history, { role: 'user', parts: [{ text }] }],
     generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
   };
@@ -527,9 +544,9 @@ function naturalAction(user, text, strict) {
   return null;
 }
 
-function smallTalk(user, text) {
+function smallTalk(user, text, bot = null) {
   const s = prefs(user);
-  const P = PERSONALITY[s.assistantPersonality] || PERSONALITY.amigavel;
+  const P = PERSONALITY[bot?.personality || s.assistantPersonality] || PERSONALITY.amigavel;
   const name = callName(user, s);
   const q = norm(text);
   const fill = (t) => t.replace('{n}', name).replace('{g}', timeGreeting());
@@ -539,7 +556,7 @@ function smallTalk(user, text) {
   }
   if (/tudo bem|como (voce|vc) esta|beleza\??$/.test(q)) return `Tudo ótimo por aqui! E com você, ${name}? Como posso ajudar hoje?`;
   if (/obrigad|valeu|vlw|brigad/.test(q)) return pick([`Por nada, ${name}!`, 'Imagina! Estou aqui pra isso.', 'Sempre que precisar!']);
-  if (/quem (e|é) voce|o que voce faz|^ajuda$/.test(q)) return `Sou ${s.assistantName}, seu assistente aqui no Codeniac. ${HELP}`;
+  if (/quem (e|é) voce|o que voce faz|^ajuda$/.test(q)) return `Sou ${bot?.name || s.assistantName}, ${bot ? 'um personagem' : 'seu assistente'} aqui no Codeniac. ${HELP}`;
   return null;
 }
 
@@ -582,7 +599,7 @@ export async function chat(user, text, convId, write) {
     catch (err) { console.error('[assistente] Claude falhou:', err?.message); write({ type: 'notice', text: 'IA indisponível. Respondendo no modo básico.' }); mode = 'local'; }
   }
   if (!result) {
-    const talk = smallTalk(user, text);
+    const talk = smallTalk(user, text, botOf(user, conv));
     const kb = searchKB(text);
     result = { text: talk || kb?.answer || pick([
       `Não tenho certeza se entendi, ${callName(user, s)}. Pergunte sobre o sistema ("como importo o extrato?") ou use um comando — mande /ajuda para ver todos.`,

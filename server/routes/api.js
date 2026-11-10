@@ -176,7 +176,7 @@ const SETTINGS_SCHEMA = {
     if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
     return Object.fromEntries(Object.entries(v).filter(([k, c]) => THEME_VAR_KEYS.includes(k) && HEX.test(c)));
   },
-  radius: intIn(0, 24),
+  radius: intIn(0, 28),
   fontScale: intIn(85, 120),
   fontFamily: oneOf(['poppins', 'system', 'mono', 'serif', 'retro']),
   density: oneOf(['comfortable', 'compact']),

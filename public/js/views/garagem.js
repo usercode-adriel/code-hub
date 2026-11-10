@@ -12,6 +12,7 @@ const num = (v, d = 1) => (v == null || !Number.isFinite(v) ? '—' : v.toLocale
 const hm = (h) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
 let clockTimer = null;
 
+let backPage = null;
 async function draw(el) {
   const [sum, shifts, fuel] = await Promise.all([api.get('/garage/summary'), api.get('/shifts'), coll('fuel').list()]);
   const g = sum.garage || {};
@@ -22,8 +23,8 @@ async function draw(el) {
   const bestPeriod = periods.filter((x) => x.hours > 0).sort((a, b) => b.net / b.hours - a.net / a.hours)[0];
 
   el.innerHTML = `
-    <div class="page-head"><div><h1>Garagem</h1><p>Carro, turnos e lucro real do InDrive${g.model ? ` · ${esc(g.model)}` : ''}${g.km ? ` · ${Number(g.km).toLocaleString('pt-BR')} km` : ''}</p></div>
-      <div style="display:flex;gap:8px"><a class="btn outline" href="#/project/trabalhos">${icon('wallet', 14)} Lançamentos do InDrive</a><button class="btn outline" id="carBtn">${icon('car', 14)} Dados do carro</button></div></div>
+    <div class="page-head"><div><h1>Garagem <small class="muted" style="font-size:13px;font-weight:400">· InDrive</small></h1><p>Carro, turnos e lucro real do InDrive${g.model ? ` · ${esc(g.model)}` : ''}${g.km ? ` · ${Number(g.km).toLocaleString('pt-BR')} km` : ''}</p></div>
+      <div style="display:flex;gap:8px"><a class="btn outline" href="#/project/trabalhos${backPage ? `/p/${esc(backPage)}` : ''}">${icon('chevLeft', 14)} Voltar ao InDrive</a><button class="btn outline" id="carBtn">${icon('car', 14)} Dados do carro</button></div></div>
     <section class="card shift-card ${running ? 'running' : ''}">
       <div><small class="muted">${running ? `Turno em andamento · ${running.period}` : 'Nenhum turno em andamento'}</small><div class="clock" id="clock">${running ? hm(running.hours) : '0h00'}</div></div>
       <div class="grow">${running ? `<div class="tag-row" style="font-size:12px"><span>Bruto <b>${brl(running.gross)}</b></span><span>Custos <b>${brl(running.costs)}</b></span><span>Líquido <b>${brl(running.net)}</b></span><span><b>${brl(running.perHour)}</b>/h</span><span>${running.rides} corrida(s)</span></div><small class="muted">Registre corridas no chat: <code>/corrida 35 12km</code></small>`
@@ -139,7 +140,8 @@ async function draw(el) {
   el.querySelectorAll('[data-f]').forEach((row) => { row.querySelector('[data-edit]').onclick = () => fuelForm(fuel.find((x) => x.id === row.dataset.f)); });
 }
 
-export default async function render(el) {
+export default async function render(el, _parts, query) {
+  backPage = query?.get('from') || backPage;
   await draw(el);
   const off = on('data-changed', () => draw(el));
   return () => { off(); clearInterval(clockTimer); };

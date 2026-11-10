@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { saveLibraryNow, replaceLibrary, LIBRARY_DB, LIBRARY_DIR } from './library.js';
 import { db, saveNow, replaceState, DB_FILE, UPLOAD_DIR, DATA_DIR, localDate, now, save } from './db.js';
 import { systemConfig } from './seed.js';
 
@@ -33,6 +34,14 @@ export function runBackup(reason = 'automático') {
     const target = path.join(dir, name);
     fs.mkdirSync(target, { recursive: true });
     fs.copyFileSync(DB_FILE, path.join(target, 'db.json'));
+    saveLibraryNow();
+    if (fs.existsSync(LIBRARY_DB)) fs.copyFileSync(LIBRARY_DB, path.join(target, 'library.json'));
+    // livros digitais: pasta compartilhada entre os backups, copia só os arquivos novos
+    const libDir = path.join(dir, 'library');
+    fs.mkdirSync(libDir, { recursive: true });
+    for (const f of fs.existsSync(LIBRARY_DIR) ? fs.readdirSync(LIBRARY_DIR) : []) {
+      if (!fs.existsSync(path.join(libDir, f))) fs.copyFileSync(path.join(LIBRARY_DIR, f), path.join(libDir, f));
+    }
     const ai = path.join(DATA_DIR, 'ai.json');
     if (fs.existsSync(ai)) fs.copyFileSync(ai, path.join(target, 'ai.json'));
     // imagens: pasta compartilhada entre os backups, copia só o que ainda não existe
@@ -75,6 +84,13 @@ export function restoreBackup(name) {
   const next = JSON.parse(fs.readFileSync(file, 'utf8'));
   const keepSecret = db().meta?.jwtSecret;
   replaceState({ ...next, meta: { ...(next.meta || {}), jwtSecret: next.meta?.jwtSecret || keepSecret } });
+  const libFile = path.join(dir, name, 'library.json');
+  if (fs.existsSync(libFile)) replaceLibrary(JSON.parse(fs.readFileSync(libFile, 'utf8')));
+  const libDir = path.join(dir, 'library');
+  if (fs.existsSync(libDir)) {
+    fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+    for (const f of fs.readdirSync(libDir)) if (!fs.existsSync(path.join(LIBRARY_DIR, f))) fs.copyFileSync(path.join(libDir, f), path.join(LIBRARY_DIR, f));
+  }
   const up = path.join(dir, 'uploads');
   if (fs.existsSync(up)) for (const f of fs.readdirSync(up)) if (!fs.existsSync(path.join(UPLOAD_DIR, f))) fs.copyFileSync(path.join(up, f), path.join(UPLOAD_DIR, f));
   return true;

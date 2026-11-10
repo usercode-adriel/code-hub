@@ -67,7 +67,7 @@ export function mountFinance(box, pageId) {
     const catMax = Math.max(1, ...Object.values(cats));
     box.innerHTML = `<div class="fin"><div class="fin-head"><span class="fin-title">${icon('wallet', 16)} <b>Financeiro do InDrive</b></span>
         <div class="seg fin-periods">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}" class="${k === period ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <div class="fin-actions"><button type="button" class="btn sm fin-in" data-add="in">${icon('plus', 12)} Entrada</button><button type="button" class="btn sm fin-out" data-add="out">${icon('minus', 12)} Saída</button></div></div>
+        <div class="fin-actions"><a class="btn sm outline" href="#/garagem?from=${esc(pageId)}" title="Turno, carro, manutenção e custo por km">${icon('car', 12)} Garagem</a><button type="button" class="btn sm fin-in" data-add="in">${icon('plus', 12)} Entrada</button><button type="button" class="btn sm fin-out" data-add="out">${icon('minus', 12)} Saída</button></div></div>
       <div class="fin-kpis"><div class="card fin-kpi"><span>Entradas</span><b style="color:${COLORS.in}">${brl(inV)}</b><small>${list.filter((e) => e.type === 'in').length} lançamento(s)</small></div>
         <div class="card fin-kpi"><span>Saídas</span><b style="color:${COLORS.out}">${brl(outV)}</b><small>${list.filter((e) => e.type === 'out').length} lançamento(s)</small></div>
         <div class="card fin-kpi"><span>Saldo</span><b style="color:${inV - outV >= 0 ? 'var(--ok)' : 'var(--danger)'}">${brl(inV - outV)}</b><small>${inV ? `margem de ${Math.round(((inV - outV) / inV) * 100)}%` : '—'}</small></div>

@@ -1,9 +1,11 @@
-# Codeniac 1.4
+# Codeniac 1.5
 
 Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu computador (Windows), com dados guardados localmente.
 
 ## Abas principais
 
+- **Início**: destaque em carrossel, próximos prazos, projetos, foco agora e estatística.
+- **Livros**: painel de leitura (estante, estatísticas, últimas leituras) e biblioteca digital de PDF/EPUB com banco próprio (`library.json`).
 - **Hoje**: briefing automático da manhã, agenda, prioridades, detector de procrastinação, hábitos, pomodoro, caixa de entrada e encerramento do dia.
 - **Garagem**: turno do InDrive (valor por hora, manhã × tarde × noite), "vale a pena essa corrida?", custo por km, mapa de melhores horários, abastecimentos, manutenção, documentos e reservas.
 - **Financeiro**: lançamentos, importação de extrato CSV, orçamento por categoria, contas a pagar e assinaturas.
@@ -11,7 +13,7 @@ Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu compu
 - **Diário** (estilo caderno de viagem do velho oeste), **Decisões** (passo a passo com critérios e pesos) e **Atividade** (feed automático).
 - **Projetos** com páginas estilo Notion e o controle financeiro do InDrive.
 - **Assistente** estilo Telegram, sem IA por padrão ou com o Gemini (Google, grátis), com comandos: `/gasto 50 gasolina`, `/corrida 35 12km`, `/tarefa Estudar SQL`, `/nota`, `/agenda`, `/briefing`, `/ajuda`.
-- 15 temas, painel de administração, backup automático diário e acesso pelo celular (Wi-Fi ou Tailscale).
+- 16 temas escuros (7 de cores básicas e 9 prontos), chats com personagens, painel de administração, backup automático diário e acesso pelo celular (Wi-Fi ou Tailscale).
 
 ## Rodar em modo desenvolvimento
 

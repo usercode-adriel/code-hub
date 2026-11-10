@@ -25,8 +25,10 @@ const F = {
   bool: (v) => Boolean(v),
   oneOf: (...l) => (v) => (v == null || v === '' ? null : l.includes(v) ? v : undefined),
   arr: (n) => (v) => (Array.isArray(v) ? v.slice(0, n).map((x) => String(x).trim().slice(0, 60)).filter(Boolean) : undefined),
+  img: (v) => (v == null || v === '' ? null : /^\/uploads\/[\w.-]+$/.test(v) ? v : undefined),
   json: (max) => (v) => { if (v == null) return null; const s = JSON.stringify(v); return s.length <= max ? JSON.parse(s) : undefined; },
 };
+// Personagens do assistente (criar chat): nome, foto, personalidade e características.
 const MOODS = ['otimo', 'bem', 'neutro', 'cansado', 'mal'];
 
 // Coleções com CRUD genérico: campos válidos, obrigatórios, rótulo para o feed e valores iniciais.
@@ -60,13 +62,16 @@ const COLL = {
     fields: { title: F.str(120), lang: F.str(24), code: F.str(30000), tags: F.arr(12), notes: F.str(1000) } },
   trail: { kind: 'study', label: 'Etapa da trilha', title: 'title', link: '#/estudos/programacao', required: ['title'],
     fields: { title: F.str(160), area: F.str(40), done: F.bool, order: F.int(0, 9999), notes: F.str(1000) } },
-  books: { kind: 'study', label: 'Livro', title: 'title', link: '#/estudos/livros', required: ['title'],
-    fields: { title: F.str(160), author: F.str(120), status: F.oneOf('quero', 'lendo', 'lido'), pages: F.int(0, 20000), current: F.int(0, 20000),
+  books: { kind: 'study', label: 'Livro', title: 'title', link: '#/livros', required: ['title'],
+    fields: { title: F.str(160), author: F.str(120), cover: F.img, category: F.str(40), status: F.oneOf('quero', 'lendo', 'lido'), pages: F.int(0, 20000), current: F.int(0, 20000),
       startedAt: F.date, finishedAt: F.date, rating: F.int(0, 5), quotes: F.json(30000), notes: F.str(4000) } },
   studyLog: { kind: 'study', label: 'Sessão de estudo', title: 'area', link: '#/estudos', required: ['minutes'],
     fields: { area: F.oneOf('ingles', 'programacao', 'livros', 'foco', 'outro'), minutes: F.int(1, 1440), date: F.date, note: F.str(300) } },
   enJournal: { kind: 'study', label: 'Diário em inglês', title: 'date', link: '#/estudos', required: ['text'], quietUpdate: true,
     fields: { date: F.date, text: F.str(30000) } },
+  bots: { kind: 'system', label: 'Personagem do chat', title: 'name', link: '#/assistente', required: ['name'],
+    fields: { name: F.str(40), avatar: F.img, personality: F.oneOf('amigavel', 'profissional', 'divertido', 'mentor', 'zen', 'nerd'),
+      traits: F.str(2000), greeting: F.str(400), color: F.str(9) } },
   money: { kind: 'money', label: 'Lançamento', title: 'desc', link: '#/financeiro', required: ['date', 'desc', 'amount'],
     fields: { date: F.date, desc: F.str(160), amount: F.num, category: F.str(40), account: F.str(40), notes: F.str(500) } },
   bills: { kind: 'money', label: 'Conta a pagar', title: 'name', link: '#/financeiro', required: ['name', 'due'],
