@@ -4,6 +4,7 @@ import { notify } from './notify.js';
 import { briefing, prefs } from './briefing.js';
 import { dailyReminders } from './routes/life.js';
 import { backupIfDue } from './backup.js';
+import { runProactive } from './assistant.js';
 
 const hm = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -27,6 +28,7 @@ export function tick() {
     }
   }
   backupIfDue();
+  runProactive().catch((e) => console.error('[automático]', e.message));
 }
 
 export function startScheduler() {

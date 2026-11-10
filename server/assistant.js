@@ -10,7 +10,8 @@ import { DEFAULT_SETTINGS } from './seed.js';
 import { createTask, updateTask } from './routes/api.js';
 import { addFinanceEntry } from './routes/pages.js';
 import { guessCategory } from './routes/life.js';
-import { logEvent } from './notify.js';
+import { logEvent, emit } from './notify.js';
+import { chatFile } from './routes/chatfiles.js';
 import { briefing, procrastination, financeTotals, indrivePage } from './briefing.js';
 import { searchKB } from './kb.js';
 
@@ -165,6 +166,16 @@ export function botOf(user, conv) {
   return db().bots.find((b) => b.id === conv.botId && b.userId === user.id) || null;
 }
 
+// Jeito de escrever: humano, como conversa de mensageiro (vale para a IA em qualquer personagem).
+const STYLE = `Jeito de escrever: como uma pessoa conversando por mensagem, nunca como robô ou manual.
+- Frases naturais e variadas. Use o português falado do dia a dia ("tá", "pra", "né", "bora") quando combinar com a personalidade.
+- Vá direto ao ponto. Não comece com "Claro!", "Com certeza!", "Ótima pergunta!" nem diga que é uma IA.
+- Evite listas, títulos e negrito em excesso; prefira um ou dois parágrafos curtos. Use lista só se a pessoa pedir passo a passo ou muitos dados.
+- Mostre que lembra do que foi conversado e reaja com emoção quando fizer sentido (comemore, se preocupe, brinque).
+- No máximo uma pergunta por mensagem e não repita o nome da pessoa em toda resposta.
+- Escreva valores sempre com R$ e números (ex.: R$ 180,50) e datas no formato 12/11 — nada de valores por extenso ou gírias para dinheiro.
+- Se a pessoa enviar foto ou PDF, leia com atenção e responda exatamente o que ela pediu; cite números e trechos do arquivo quando ajudar.`;
+
 function systemPrompt(user, mode = 'claude', bot = null) {
   const s = prefs(user);
   const p = PERSONALITY[bot?.personality || s.assistantPersonality] || PERSONALITY.amigavel;
@@ -176,15 +187,17 @@ ${bot.traits ? `Características, jeito de falar e história do personagem (defi
 Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual do hub; use se for útil e não o mencione.
 Responda em português do Brasil, a menos que o personagem ou o usuário peçam outro idioma.
 ${EXPERTISE}
-O próprio sistema executa comandos como "/gasto 50 gasolina" e "/tarefa Estudar SQL"; nunca diga que registrou algo.`;
+${STYLE}
+Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado", "ganhei 35 numa corrida de 12 km" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.`;
   }
   return `Você é ${s.assistantName}, o assistente integrado do Codeniac, um hub pessoal (projetos, rotina, InDrive, finanças, estudos).
 Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual; use-o e não o mencione.
 Personalidade: ${p.prompt}
 Chame o usuário de "${callName(user, s)}". ${LENGTH[s.assistantLength] || LENGTH.media} ${s.assistantEmoji ? 'Use emojis com moderação.' : 'Não use emojis.'}
-Converse como uma pessoa: reaja ao que foi dito, no máximo uma pergunta por vez. Responda em português do Brasil, exceto na prática de inglês.
+Responda em português do Brasil, exceto na prática de inglês.
+${STYLE}
 ${EXPERTISE}
-${mode === 'claude' ? 'Use as ferramentas para criar/concluir tarefas e registrar entradas/saídas do InDrive; confirme em uma frase.' : 'O próprio sistema executa comandos como "/gasto 50 gasolina", "/corrida 35 12km", "/tarefa Estudar SQL". Ensine o comando se o usuário pedir uma ação; nunca diga que registrou algo.'}${s.assistantInstructions ? `\n\nInstruções pessoais do usuário:\n${s.assistantInstructions}` : ''}`;
+${mode === 'claude' ? 'Use as ferramentas para criar/concluir tarefas e registrar entradas/saídas do InDrive; confirme em uma frase.' : 'Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado", "ganhei 35 numa corrida de 12 km" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.'}${s.assistantInstructions ? `\n\nInstruções pessoais do usuário:\n${s.assistantInstructions}` : ''}`;
 }
 
 // ---------- Ferramentas (Claude) ----------
@@ -232,13 +245,15 @@ function store(userId) {
   return d.threads[userId];
 }
 const summary = (c) => ({
-  id: c.id, title: c.title, botId: c.botId || null, createdAt: c.createdAt, updatedAt: c.updatedAt, count: c.display.length,
-  last: c.display.at(-1) ? { role: c.display.at(-1).role, text: c.display.at(-1).text.slice(0, 120) } : null,
+  id: c.id, title: c.title, botId: c.botId || null, unread: c.unread || 0,
+  group: c.group ? { name: c.group.name, avatar: c.group.avatar || null, members: c.group.members } : null, createdAt: c.createdAt, updatedAt: c.updatedAt, count: c.display.length,
+  last: c.display.at(-1) ? { role: c.display.at(-1).role, botId: c.display.at(-1).botId || null, text: (c.display.at(-1).text || (c.display.at(-1).files?.length ? '📎 Arquivo' : '')).slice(0, 120) } : null,
 });
 export function listConversations(userId) { return store(userId).conversations.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(summary); }
 export function getConversation(userId, convId) { return store(userId).conversations.find((c) => c.id === convId) || null; }
-export function createConversation(userId, title = 'Nova conversa', bot = null) {
+export function createConversation(userId, title = 'Nova conversa', bot = null, group = null) {
   const c = { id: id(), title: String(title).slice(0, 80), botId: bot?.id || null, api: [], display: [], createdAt: now(), updatedAt: now() };
+  if (group) c.group = group;
   if (bot?.greeting) c.display.push({ role: 'assistant', text: bot.greeting, at: now(), mode: 'local', tools: [] });
   store(userId).conversations.push(c);
   save();
@@ -359,22 +374,27 @@ async function geminiStream(model, body, write) {
   return answer.trim();
 }
 
-async function runGemini(user, conv, text, write) {
-  const history = conv.display.slice(0, -1).slice(-GEMINI_HISTORY).filter((m) => m.text)
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
-  while (history.length && history[0].role !== 'user') history.shift();
-  const kb = searchKB(text);
-  const manual = kb && kb.score >= 1.5 ? `\n\n<manual_codeniac>\n${kb.answer}\n</manual_codeniac>\nSe a pergunta for sobre o sistema, baseie-se nesse trecho do manual.` : '';
-  const body = {
-    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', botOf(user, conv))}\n\n${contextBlock(user)}${manual}` }] },
-    contents: [...history, { role: 'user', parts: [{ text }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-  };
+// Monta as partes de uma mensagem: texto + fotos/PDFs (enquanto couber no limite de envio).
+function partsOf(user, m, budget) {
+  const parts = [];
+  for (const f of m.files || []) {
+    const info = chatFile(user.id, f.file);
+    if (info && budget.left >= info.size) {
+      budget.left -= info.size;
+      parts.push({ inlineData: { mimeType: info.mime, data: fs.readFileSync(info.full).toString('base64') } });
+    } else parts.push({ text: `[anexo enviado antes: ${f.name || f.file}]` });
+  }
+  if (m.text) parts.push({ text: m.text });
+  if (!parts.length) parts.push({ text: '(mensagem vazia)' });
+  return parts;
+}
+
+async function geminiCall(body, write = () => {}) {
   const wanted = aiConfig().geminiModel || GEMINI_FALLBACK[0];
   const models = [wanted, ...GEMINI_FALLBACK.filter((m) => m !== wanted)];
   let lastErr;
   for (const model of models) {
-    try { return { text: await geminiStream(model, body, write), tools: [] }; }
+    try { return await geminiStream(model, body, write); }
     catch (err) {
       lastErr = err;
       console.error(`[assistente] Gemini ${model}: ${err.status || ''} ${err.message}`);
@@ -383,6 +403,26 @@ async function runGemini(user, conv, text, write) {
     }
   }
   throw lastErr;
+}
+
+async function runGemini(user, conv, text, write) {
+  const budget = { left: 14 * 1024 * 1024 }; // limite seguro de anexos por pedido
+  const recent = conv.display.slice(-GEMINI_HISTORY).filter((m) => m.text || m.files?.length);
+  // do mais novo para o mais antigo, para os anexos recentes terem prioridade
+  const contents = [];
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const m = recent[i];
+    contents.unshift({ role: m.role === 'user' ? 'user' : 'model', parts: partsOf(user, m, budget) });
+  }
+  while (contents.length && contents[0].role !== 'user') contents.shift();
+  const kb = searchKB(text);
+  const manual = kb && kb.score >= 1.5 ? `\n\n<manual_codeniac>\n${kb.answer}\n</manual_codeniac>\nSe a pergunta for sobre o sistema, baseie-se nesse trecho do manual.` : '';
+  const body = {
+    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', botOf(user, conv))}\n\n${contextBlock(user)}${manual}` }] },
+    contents,
+    generationConfig: { temperature: 0.85, maxOutputTokens: 4096 },
+  };
+  return { text: await geminiCall(body, write), tools: [] };
 }
 
 // Confere se uma chave funciona (usado ao salvar a chave nas Configurações).
@@ -522,6 +562,13 @@ function naturalAction(user, text, strict) {
     return command(user, `/corrida ${text.replace(/.*?(\d)/, '$1')}`);
   }
   if (money && !offTopic && /(gastei|paguei|abasteci|despesa|custo)/.test(q) && CAR_COSTS.test(q)) return command(user, `/gasto ${text.replace(/.*?(\d)/, '$1')}`);
+  // finanças pessoais em linguagem natural: "gastei 87,63 no mercado", "recebi 2000 de salário"
+  if (money && !/\?\s*$/.test(text) && /(gastei|paguei|comprei)/.test(q) && !CAR_COSTS.test(q)) return command(user, `/despesa ${text.replace(/.*?(\d)/, '$1').replace(/^([\d.,]+)\s+(?:reais\s+)?(?:n[oa]s?|em|com|de)\s+/i, '$1 ')}`);
+  if (money && !/\?\s*$/.test(text) && /(recebi|ganhei|entrou)/.test(q) && !RIDE_WORDS.test(q) && /(salari|freela|pix|pagamento|venda|reembolso|extra)/.test(q)) return command(user, `/receita ${text.replace(/.*?(\d)/, '$1').replace(/^([\d.,]+)\s+(?:reais\s+)?(?:n[oa]s?|em|com|de)\s+/i, '$1 ')}`);
+  const note = text.match(/^\s*(?:anota|anote|lembra|lembre(?:-me)?|me lembra)\s+(?:que|de|pra|para)?\s*(.{3,})$/i);
+  if (note) return command(user, `/nota ${note[1]}`);
+  const quick = text.match(/^\s*(?:nova\s+)?tarefa\s*:\s*(.{3,})$/i);
+  if (quick) return command(user, `/tarefa ${quick[1]}`);
   if (/quanto (eu )?(ganhei|lucrei|gastei|faturei)|saldo (do |no )?indrive|resumo (do |no )?indrive|meu saldo/.test(q)) {
     const period = /hoje/.test(q) ? 'today' : /semana/.test(q) ? 'week' : /tudo|total|geral/.test(q) ? 'all' : 'month';
     const today = localDate();
@@ -567,22 +614,209 @@ async function typeOut(result, write) {
   for (const chunk of result.text.match(/\S+\s*/g) || []) { write({ type: 'text', text: chunk }); await sleep(10 + Math.random() * 14); }
 }
 
-export async function chat(user, text, convId, write) {
+// ---------- Grupos: vários personagens conversando entre si (Gemini) ----------
+const NIAC = (user) => { const s = prefs(user); return { id: 'niac', name: s.assistantName || 'Niac', personality: s.assistantPersonality, traits: 'O assistente oficial do Codeniac: conhece todo o sistema do usuário.', avatar: null, isNiac: true }; };
+export function groupMembers(user, conv) {
+  return (conv.group?.members || []).map((mid) => (mid === 'niac' ? NIAC(user) : db().bots.find((b) => b.id === mid && b.userId === user.id))).filter(Boolean);
+}
+const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+
+async function groupTurn(user, conv, bot, members, write, nudge) {
+  const s = prefs(user);
+  const others = members.filter((m) => m.id !== bot.id).map((m) => m.name);
+  const nameOf = (m) => (m.role === 'user' ? callName(user, s) : (members.find((x) => x.id === m.botId)?.name || 'Alguém'));
+  const recent = conv.display.slice(-30);
+  const transcript = recent.map((m) => `${nameOf(m)}: ${m.text || ''}${m.files?.length ? ` [enviou ${m.files.map((f) => f.name).join(', ')}]` : ''}`).join('\n');
+  const lastUser = [...recent].reverse().find((m) => m.role === 'user');
+  const budget = { left: 10 * 1024 * 1024 };
+  const fileParts = lastUser?.files?.length ? partsOf(user, { files: lastUser.files }, budget).filter((p) => p.inlineData) : [];
+  const body = {
+    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', bot.isNiac ? null : bot)}
+
+Você está num grupo de mensagens chamado "${conv.group.name}" com ${callName(user, s)} e ${others.join(', ') || 'mais ninguém'}.
+Cada um tem sua personalidade: ${members.map((m) => `${m.name} (${(PERSONALITY[m.personality] || PERSONALITY.amigavel).label}${m.traits ? `: ${m.traits.slice(0, 120)}` : ''})`).join('; ')}.
+Escreva SOMENTE a sua próxima mensagem no grupo, como ${bot.name}: curta (1 a 3 frases), natural, sem colocar seu nome na frente.
+Pode concordar, discordar, brincar, perguntar ou responder diretamente a outro participante pelo nome. Não repita o que já foi dito.
+
+${contextBlock(user)}` }] },
+    contents: [{ role: 'user', parts: [...fileParts, { text: `Conversa até agora:\n${transcript || '(o grupo acabou de ser criado)'}\n\n${nudge || ''}Agora é a vez de ${bot.name}.` }] }],
+    generationConfig: { temperature: 0.95, maxOutputTokens: 2048 },
+  };
+  let text = await geminiCall(body);
+  text = text.replace(new RegExp(`^\\s*\\**${bot.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\**\\s*:\\s*`, 'i'), '').trim();
+  write({ type: 'speaker', botId: bot.id, name: bot.name });
+  await sleep(Math.min(1400, 350 + text.length * 6));
+  for (const chunk of text.match(/\S+\s*/g) || []) { write({ type: 'text', text: chunk }); await sleep(8 + Math.random() * 12); }
+  write({ type: 'speaker_end' });
+  conv.display.push({ role: 'assistant', botId: bot.id, text, at: now(), mode: 'gemini' });
+  conv.updatedAt = now();
+  save();
+}
+
+async function runGroup(user, conv, text, write, auto) {
+  const members = groupMembers(user, conv);
+  if (!members.length) { write({ type: 'notice', text: 'Este grupo não tem participantes. Adicione personagens nas configurações do grupo.' }); return; }
+  if (!hasGemini()) {
+    write({ type: 'notice', text: 'Grupos precisam do Gemini para os personagens conversarem. Ligue em Configurações → Assistente.' });
+    return;
+  }
+  let order;
+  if (auto) {
+    // os personagens conversam entre si por algumas rodadas
+    const n = Math.min(4, Math.max(2, members.length + 1));
+    order = [];
+    for (let i = 0; i < n; i++) {
+      const pool = members.filter((m) => m.id !== order.at(-1)?.id);
+      order.push(pool[Math.floor(Math.random() * pool.length)] || members[0]);
+    }
+  } else {
+    const q = norm(text);
+    const named = members.filter((m) => q.includes(norm(m.name).split(' ')[0]));
+    order = [...named, ...shuffle(members.filter((m) => !named.includes(m)))].slice(0, Math.min(3, members.length));
+  }
+  for (const [i, bot] of order.entries()) {
+    try {
+      await groupTurn(user, conv, bot, members, write, auto && i === 0 ? 'Puxem um assunto entre vocês (algo do dia do usuário, de interesse dos personagens ou uma brincadeira). ' : '');
+    } catch (err) {
+      console.error('[grupo]', err.message);
+      write({ type: 'notice', text: err.status === 429 ? 'Cota do Gemini esgotada por agora. Tente de novo em alguns minutos.' : 'O Gemini não respondeu agora.' });
+      break;
+    }
+    if (i < order.length - 1) await sleep(500 + Math.random() * 700);
+  }
+}
+
+// ---------- Mensagens automáticas dos personagens ----------
+export const FOCUS = { geral: 'Rotina em geral', financas: 'Finanças pessoais', indrive: 'InDrive e carro', tarefas: 'Tarefas e prazos', estudos: 'Estudos e leitura', ingles: 'Inglês', habitos: 'Hábitos e bem-estar' };
+const brlx = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function focusData(user, focus) {
+  const b = briefing(user.id);
+  const today = localDate();
+  const month = today.slice(0, 7);
+  const money = mine('money', user).filter((m) => m.date.startsWith(month));
+  const inc = money.filter((m) => m.amount > 0).reduce((a, m) => a + m.amount, 0);
+  const exp = -money.filter((m) => m.amount < 0).reduce((a, m) => a + m.amount, 0);
+  const allBills = mine('bills', user).filter((x) => !x.paid).sort((x, y) => (x.due || '').localeCompare(y.due || '')).slice(0, 5);
+  const lines = {
+    financas: [`Mês: entradas ${brlx(inc)}, saídas ${brlx(exp)}, saldo ${brlx(inc - exp)}.`,
+      allBills.length ? `Contas a pagar: ${allBills.map((x) => `${x.name} ${x.amount ? brlx(x.amount) : ''} vence ${x.due.split('-').reverse().join('/')}${x.due < today ? ' (ATRASADA)' : ''}`).join('; ')}.` : 'Nenhuma conta pendente cadastrada.',
+      b.subs.length ? `Assinaturas cobrando em breve: ${b.subs.map((x) => `${x.name} ${brlx(x.amount)} em ${x.next.split('-').reverse().join('/')}`).join('; ')}.` : '',
+      b.finMonth?.count ? `InDrive no mês: saldo ${brlx(b.finMonth.net)}.` : ''],
+    indrive: [b.finYesterday?.count ? `Ontem no InDrive: entradas ${brlx(b.finYesterday.in)}, saldo ${brlx(b.finYesterday.net)}.` : 'Ontem não teve lançamento no InDrive.',
+      b.finMonth?.count ? `Mês: entradas ${brlx(b.finMonth.in)}, saídas ${brlx(b.finMonth.out)}, saldo ${brlx(b.finMonth.net)}, ${b.finMonth.km || 0} km.` : 'Sem lançamentos no mês ainda.',
+      b.services.length ? `Manutenção: ${b.services.map((x) => x.label).join('; ')}.` : '', b.docs.length ? `Documentos vencendo: ${b.docs.map((x) => `${x.name} em ${x.days} dias`).join('; ')}.` : ''],
+    tarefas: [b.overdue.length ? `Atrasadas: ${b.overdue.slice(0, 4).map((t) => t.title).join('; ')}.` : 'Nada atrasado.', b.dueToday.length ? `Vencem hoje: ${b.dueToday.map((t) => t.title).join('; ')}.` : '',
+      b.priorities.length ? `Prioridades: ${b.priorities.slice(0, 3).map((t) => t.title).join('; ')}.` : '', b.procrastination.length ? `Vem adiando: "${b.procrastination[0].title}".` : '',
+      b.agenda.length ? `Agenda de hoje: ${b.agenda.map((a) => `${a.time || ''} ${a.title}`).join('; ')}.` : ''],
+    estudos: [b.cardsDue ? `${b.cardsDue} cartões de inglês para revisar.` : 'Cartões de inglês em dia.', (() => { const r = mine('books', user).find((x) => x.status === 'lendo'); return r ? `Lendo "${r.title}" (página ${r.current || 0}${r.pages ? ` de ${r.pages}` : ''}).` : ''; })()],
+    ingles: [b.cardsDue ? `${b.cardsDue} cartões de inglês para revisar hoje.` : 'Cartões em dia.', 'Proponha uma mini prática: uma pergunta simples em inglês para o usuário responder.'],
+    habitos: [b.habits.length ? `Hábitos: ${b.habits.map((h) => `${h.name} ${h.done ? 'feito hoje' : 'pendente'} (sequência ${h.streak})`).join('; ')}.` : 'Nenhum hábito cadastrado.'],
+    geral: [b.text],
+  };
+  return (lines[focus] || lines.geral).filter(Boolean).join('\n');
+}
+
+function localProactive(user, bot, focus) {
+  const s = prefs(user);
+  const P = PERSONALITY[bot.personality] || PERSONALITY.amigavel;
+  const hi = pick(P.hello).replace('{n}', callName(user, s)).replace('{g}', timeGreeting());
+  const b = briefing(user.id);
+  const today = localDate();
+  if (focus === 'financas') {
+    const bill = mine('bills', user).filter((x) => !x.paid && x.due).sort((x, y) => x.due.localeCompare(y.due))[0];
+    if (bill) return `${hi} Passando pra lembrar: ${bill.name}${bill.amount ? ` (${brlx(bill.amount)})` : ''} ${bill.due < today ? 'já venceu, hein' : bill.due === today ? 'vence hoje' : `vence dia ${bill.due.split('-').reverse().slice(0, 2).join('/')}`}. ${pick(P.close)}`;
+    if (b.subs.length) return `${hi} Daqui a pouco tem cobrança de ${b.subs[0].name} (${brlx(b.subs[0].amount)}). Ainda vale a pena manter?`;
+    return `${hi} Suas contas estão em dia por aqui. Que tal lançar os gastos de hoje antes de esquecer?`;
+  }
+  if (focus === 'indrive') return b.finYesterday?.count ? `${hi} Ontem você fechou o InDrive com ${brlx(b.finYesterday.net)} de saldo. Bora pra mais um dia?` : `${hi} Vai rodar hoje? Lembra de iniciar o turno na Garagem pra eu calcular quanto rende por hora.`;
+  if (focus === 'tarefas') return b.overdue.length ? `${hi} Tem ${b.overdue.length} tarefa(s) atrasada(s), começando por "${b.overdue[0].title}". Que tal resolver essa primeiro?` : b.priorities[0] ? `${hi} Sua prioridade agora é "${b.priorities[0].title}". Consegue dar um passo nela hoje?` : `${hi} Nenhuma tarefa pendente. Dia livre pra adiantar algo importante!`;
+  if (focus === 'estudos' || focus === 'ingles') return b.cardsDue ? `${hi} Tem ${b.cardsDue} cartões de inglês te esperando. Uns 10 minutinhos e já era!` : `${hi} Que tal 15 minutos de leitura ou inglês agora?`;
+  if (focus === 'habitos') { const p = b.habits.find((h) => !h.done); return p ? `${hi} Ainda falta "${p.name}" hoje. Sua sequência tá em ${p.streak} dia(s), não deixa quebrar!` : `${hi} Todos os hábitos de hoje feitos. Mandou muito bem! 🔥`; }
+  return `${hi} ${b.text.split('. ').slice(1, 3).join('. ')}`;
+}
+
+async function proactiveText(user, bot) {
+  const focus = FOCUS[bot.focus] ? bot.focus : 'geral';
+  if (!hasGemini()) return localProactive(user, bot, focus);
+  const body = {
+    systemInstruction: { parts: [{ text: systemPrompt(user, 'gemini', bot) }] },
+    contents: [{ role: 'user', parts: [{ text: `[Mensagem automática — o usuário NÃO escreveu nada.]
+Sua função neste chat: ${FOCUS[focus]}. Agora são ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} de ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}.
+Dados atuais do usuário:
+${focusData(user, focus)}
+
+Escreva UMA mensagem espontânea que você mandaria agora no chat, como alguém que acompanha a vida dele nesse assunto: curta (1 a 3 frases), natural, focando no ponto mais importante (lembrete, alerta, parabéns ou incentivo). Não liste todos os dados e não diga que é automática.` }] }],
+    generationConfig: { temperature: 0.95, maxOutputTokens: 2048 },
+  };
+  try { return await geminiCall(body); } catch (err) { console.error('[automático]', err.message); return localProactive(user, bot, focus); }
+}
+
+export async function sendProactive(user, bot) {
+  const text = (await proactiveText(user, bot)).trim();
+  if (!text) return null;
+  const st = store(user.id);
+  let conv = st.conversations.filter((c) => c.botId === bot.id && !c.group).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  if (!conv) conv = createConversation(user.id, `Chat com ${bot.name}`, bot);
+  conv.display.push({ role: 'assistant', text, at: now(), mode: hasGemini() ? 'gemini' : 'local', auto: true });
+  conv.unread = (conv.unread || 0) + 1;
+  conv.updatedAt = now();
+  save();
+  emit(user.id, 'chat', { conversationId: conv.id, botId: bot.id, name: bot.name, avatar: bot.avatar, color: bot.color, text: text.slice(0, 200) });
+  return { conversationId: conv.id, text };
+}
+
+const validTimes = (t) => String(t || '').split(/[,;\s]+/).filter((x) => /^([01]\d|2[0-3]):[0-5]\d$/.test(x)).sort();
+let proactiveBusy = false;
+export async function runProactive() {
+  if (proactiveBusy) return;
+  proactiveBusy = true;
+  try {
+    const d = new Date();
+    const today = localDate(d);
+    const hmNow = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    for (const bot of db().bots.filter((b) => b.proactive)) {
+      const due = validTimes(bot.times).filter((t) => t <= hmNow).map((t) => `${today}_${t}`);
+      const pending = due.filter((k) => !(bot.sentSlots || []).includes(k));
+      if (!pending.length) continue;
+      bot.sentSlots = [...(bot.sentSlots || []), ...pending].slice(-20);
+      save();
+      const user = db().users.find((u) => u.id === bot.userId);
+      if (user) await sendProactive(user, bot).catch((e) => console.error('[automático]', e.message));
+    }
+  } finally { proactiveBusy = false; }
+}
+
+export async function chat(user, text, convId, write, opts = {}) {
   const s = prefs(user);
   if (!s.assistantEnabled) { write({ type: 'text', text: 'O assistente está desativado nas Configurações.' }); return { conversationId: convId }; }
   let conv = convId ? getConversation(user.id, convId) : null;
   if (!conv) conv = createConversation(user.id);
   write({ type: 'conversation', id: conv.id });
-  if (conv.title === 'Nova conversa' && !conv.display.length) conv.title = text.length > 42 ? `${text.slice(0, 40).trim()}…` : text;
-  conv.display.push({ role: 'user', text, at: now() });
+  const files = (opts.files || []).map((f) => ({ ...chatFile(user.id, f.file), name: String(f.name || '').slice(0, 160) })).filter((f) => f.file)
+    .map(({ file, name, mime, size }) => ({ file, name: name || file, mime, size })).slice(0, 6);
+  if (!opts.auto) {
+    if (conv.title === 'Nova conversa' && !conv.display.length) conv.title = (text || files[0]?.name || 'Conversa').slice(0, 42);
+    conv.display.push({ role: 'user', text, at: now(), ...(files.length ? { files } : {}) });
+  }
+  conv.unread = 0;
   conv.updatedAt = now();
   write({ type: 'typing' });
 
+  if (conv.group) {
+    await runGroup(user, conv, text, write, opts.auto);
+    conv.updatedAt = now();
+    save();
+    return { conversationId: conv.id };
+  }
+
   let mode = assistantMode();
-  let result = command(user, text) || naturalAction(user, text, mode !== 'local');
-  if (!result) {
+  let result = files.length ? null : command(user, text) || naturalAction(user, text, mode !== 'local');
+  if (!result && !files.length) {
     const kb = searchKB(text);
     if (kb && (mode === 'local' || kb.score >= 3)) result = { text: kb.answer, tools: [], link: kb.link };
+  }
+  if (!result && files.length && mode !== 'gemini') {
+    result = { text: `Recebi ${files.length > 1 ? 'os arquivos' : `"${files[0].name}"`}, mas pra eu ler fotos e PDFs preciso do Gemini ligado. É grátis: Configurações → Assistente → Gemini.`, tools: [], link: '#/settings/assistente' };
   }
   if (!result && mode === 'ollama') {
     try { result = await runOllama(user, conv, text, write); result.streamed = true; }
@@ -591,7 +825,7 @@ export async function chat(user, text, convId, write) {
     try { result = await runGemini(user, conv, text, write); result.streamed = true; }
     catch (err) {
       console.error('[assistente] Gemini falhou:', err?.message);
-      write({ type: 'notice', text: err.status === 429 ? 'Cota gratuita do Gemini esgotada por agora. Respondendo no modo básico.' : 'Gemini indisponível agora. Respondendo no modo básico.' });
+      write({ type: 'notice', text: err.status === 429 ? 'A cota grátis do Gemini acabou por agora. Respondo no modo básico até ela voltar.' : 'O Gemini não respondeu agora. Respondo no modo básico.' });
       mode = 'local';
     }
   } else if (!result && mode === 'claude') {
@@ -601,10 +835,10 @@ export async function chat(user, text, convId, write) {
   if (!result) {
     const talk = smallTalk(user, text, botOf(user, conv));
     const kb = searchKB(text);
-    result = { text: talk || kb?.answer || pick([
-      `Não tenho certeza se entendi, ${callName(user, s)}. Pergunte sobre o sistema ("como importo o extrato?") ou use um comando — mande /ajuda para ver todos.`,
-      'Hmm, essa eu não sei responder sem IA. Tente /ajuda para ver o que eu faço, ou uma pergunta sobre o Codeniac.',
-    ]), tools: [], link: talk ? null : kb?.link };
+    result = { text: talk || kb?.answer || (files.length ? 'Recebi seu arquivo, mas não consegui ler agora. Tenta de novo daqui a pouco?' : pick([
+      `Hmm, essa eu não peguei, ${callName(user, s)}. Me pergunta sobre o Codeniac ("como importo o extrato?") ou me diz o que quer registrar, tipo "gastei 50 de gasolina".`,
+      'Essa eu não sei responder sem IA. Se quiser conversar sobre qualquer assunto, liga o Gemini em Configurações → Assistente, é grátis.',
+    ])), tools: [], link: talk ? null : kb?.link };
   }
   if (!s.assistantEmoji) result.text = result.text.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/ {2,}/g, ' ').trim();
   if (!result.streamed) await typeOut(result, write);

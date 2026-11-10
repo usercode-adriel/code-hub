@@ -41,11 +41,11 @@ export const coll = (name) => ({
 });
 
 // Lê uma resposta em streaming (SSE sobre POST) do assistente.
-export async function streamChat(message, conversationId, onEvent, signal) {
+export async function streamChat(message, conversationId, onEvent, signal, extra = {}) {
   const res = await fetch('/api/assistant/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
-    body: JSON.stringify({ message, conversationId }),
+    body: JSON.stringify({ message, conversationId, ...extra }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || 'Falha no assistente');

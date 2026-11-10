@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.6.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -37,6 +37,12 @@ export const CHANGELOG = [
     title: 'Codeniac 1.5: visual novo, personagens e biblioteca 📚',
     message: 'Layout novo com menu de ícones e versão para celular com barra inferior; 16 temas (cores básicas e temas prontos); '
       + 'crie chats com personagens (foto, personalidade e características); e a aba Livros virou um painel com biblioteca de PDF e EPUB.',
+  },
+  {
+    version: '1.6.0',
+    title: 'Codeniac 1.6: chats vivos 💬',
+    message: 'Mande fotos e PDFs no chat e pergunte sobre eles; personagens mandam mensagens sozinhos sobre a função deles, com balãozinho flutuante; '
+      + 'crie grupos em que os personagens conversam entre si; respostas mais naturais e celular 100% ajustado.',
   },
 ];
 

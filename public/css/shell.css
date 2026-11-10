@@ -353,3 +353,67 @@ body[data-route="assistente"] .tg { height: auto !important; flex: 1; min-height
   body[data-route="assistente"] .content { padding-bottom: calc(86px + env(safe-area-inset-bottom)); }
   body[data-route="assistente"] .tg { height: auto !important; }
 }
+
+/* ---------- 1.6: chat em tela cheia no celular ---------- */
+.tg-hide-sm { }
+@media (max-width: 760px) {
+  body.chat-full .topbar, body.chat-full .bottom-nav, body.chat-full .chat-heads { display: none !important; }
+  body.chat-full .content { padding: 0 !important; }
+  body.chat-full .tg { position: fixed; inset: 0; z-index: 70; height: 100dvh !important; min-height: 0; border-radius: 0 !important; border: 0; }
+  .tg-head { padding: 8px 8px 8px 4px; gap: 6px; }
+  .tg-peer { gap: 8px; }
+  .tg-peer b { font-size: 13.5px; }
+  .tg-peer .tg-persona { display: none; }
+  .tg-peer small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+  .tg-peer > div { min-width: 0; }
+  .tg-head-actions { gap: 0; }
+  .tg-head-actions .btn { padding: 0 10px; }
+  .tg-hide-sm { display: none !important; }
+  .tg-messages { padding: 12px 10px; }
+  .tg-msg { max-width: 88%; }
+  .tg-composer { padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 4px; }
+  .tg-composer .icon-btn { width: 36px; height: 36px; }
+  .tg-composer textarea { font-size: 15px; padding: 9px 12px; }
+  .tg-send { width: 40px; height: 40px; }
+  .tg-img { max-width: 220px; }
+  .tg-file { min-width: 0; max-width: 220px; }
+  .tg-list-head { padding: 14px 14px 10px; }
+  .tg-item { padding: 10px 6px; }
+}
+
+/* ---------- 1.6: correções de responsivo ---------- */
+.d-top > *, .d-mid > *, .bk-top > *, .bk-mid > *, .bk-bot > *, .two-col > *, .fin-grid > *, .kpi-row > *, .stats > * { min-width: 0; }
+.hscroll-wrap { min-width: 0; max-width: 100%; }
+.project-hero .hero-actions { flex-wrap: wrap; row-gap: 6px; }
+@media (max-width: 760px) {
+  .project-hero .hero-body { max-width: 100%; }
+  .project-hero .hero-actions { border-radius: calc(var(--radius) + 4px); padding: 6px; width: 100%; }
+  .project-hero .hero-actions .btn { flex: 1 1 auto; }
+  .hero-art { display: none; }
+  .page-head { gap: 10px; }
+  .page-head > div:last-child:not(:first-child) { width: 100%; }
+  .toolbar > * { max-width: 100%; }
+  .toolbar .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { white-space: nowrap; flex: none; }
+  .modal { padding: 18px 16px; border-radius: 22px 22px 0 0; width: 100% !important; max-height: 92dvh; align-self: end; }
+  .modal-backdrop { padding: 0 !important; place-items: end center; }
+  .form-actions { flex-wrap: wrap; }
+  .form-actions .btn { flex: 1 1 auto; }
+  .dl-row { flex-wrap: wrap; }
+  .dl-row .tx { min-width: 160px; }
+  .setting-row { flex-wrap: wrap; }
+  .setting-row .seg, .setting-row .range-row { max-width: 100%; }
+  .color-grid, .theme-grid, .persona-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table td, .table th { padding: 9px 8px; }
+  .kpi b { font-size: 17px; }
+  .hero2 h1 { font-size: 30px; }
+  .greet { font-size: 16px; }
+  .round-btn { width: 38px; height: 38px; }
+}
+@media (max-width: 380px) {
+  .bn-btn { min-width: 48px; font-size: 9px; }
+  .sheet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bk-grid { gap: 10px; }
+}

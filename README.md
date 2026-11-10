@@ -1,4 +1,4 @@
-# Codeniac 1.5
+# Codeniac 1.6
 
 Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu computador (Windows), com dados guardados localmente.
 
@@ -12,7 +12,7 @@ Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu compu
 - **Estudos**: flashcards de inglês com repetição espaçada, connected speech, shadowing, pares mínimos, ditado, diário em inglês, banco de vocabulário, snippets, trilha de programação e estante de livros.
 - **Diário** (estilo caderno de viagem do velho oeste), **Decisões** (passo a passo com critérios e pesos) e **Atividade** (feed automático).
 - **Projetos** com páginas estilo Notion e o controle financeiro do InDrive.
-- **Assistente** estilo Telegram, sem IA por padrão ou com o Gemini (Google, grátis), com comandos: `/gasto 50 gasolina`, `/corrida 35 12km`, `/tarefa Estudar SQL`, `/nota`, `/agenda`, `/briefing`, `/ajuda`.
+- **Assistente** estilo Telegram: personagens, grupos em que eles conversam entre si, fotos e PDFs no chat, mensagens automáticas por função; sem IA ou com o Gemini (Google, grátis). Também entende comandos: `/gasto 50 gasolina`, `/corrida 35 12km`, `/tarefa Estudar SQL`, `/nota`, `/agenda`, `/briefing`, `/ajuda`.
 - 16 temas escuros (7 de cores básicas e 9 prontos), chats com personagens, painel de administração, backup automático diário e acesso pelo celular (Wi-Fi ou Tailscale).
 
 ## Rodar em modo desenvolvimento

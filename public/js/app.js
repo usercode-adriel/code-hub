@@ -40,7 +40,7 @@ function greeting() {
 
 function renderSidebar() {
   const cur = NAV_OF[currentRoute()] || currentRoute();
-  const btn = ([k, l, ic]) => `<a class="rail-btn ${cur === k ? 'active' : ''}" href="#/${k}" data-tip="${esc(navLabel(k, l))}" aria-label="${esc(navLabel(k, l))}">${icon(ic, 19)}${k === 'notifications' && store.unread ? '<i class="rail-dot"></i>' : ''}</a>`;
+  const btn = ([k, l, ic]) => `<a class="rail-btn ${cur === k ? 'active' : ''}" href="#/${k}" data-tip="${esc(navLabel(k, l))}" aria-label="${esc(navLabel(k, l))}">${icon(ic, 19)}${(k === 'notifications' && store.unread) || (k === 'assistente' && store.chatUnread) ? '<i class="rail-dot"></i>' : ''}</a>`;
   const [main, sys] = visibleNav();
   $('#sidebar').innerHTML = `<a class="rail-logo" href="#/dashboard" aria-label="${esc(store.appName)}"><img src="${esc(store.images.logoIcon || '/assets/icon.png')}" alt=""></a>
     <nav class="rail-nav">${main[1].map(btn).join('')}<span class="rail-sep"></span>${sys[1].map(btn).join('')}
@@ -68,9 +68,9 @@ function renderRightRail() {
 function renderBottomNav() {
   const cur = NAV_OF[currentRoute()] || currentRoute();
   const b = (k, l, ic) => `<a class="bn-btn ${cur === k ? 'on' : ''}" href="#/${k}">${icon(ic, 20)}<span>${esc(navLabel(k, l))}</span></a>`;
-  $('#bottomNav').innerHTML = `${b('dashboard', 'Início', 'dashboard')}${b('tasks', 'Tarefas', 'tasks')}
+  $('#bottomNav').innerHTML = `<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>${b('dashboard', 'Início', 'dashboard')}
     <button class="bn-main" id="bnAdd" aria-label="Captura rápida">${icon('plus', 24)}</button>
-    ${b('financeiro', 'Finanças', 'wallet')}<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>`;
+    ${b('financeiro', 'Finanças', 'wallet')}<a class="bn-btn ${cur === 'assistente' ? 'on' : ''}" href="#/assistente" style="position:relative">${icon('chat', 20)}<span>Chat</span>${store.chatUnread ? '<i class="rail-dot" style="top:4px;right:14px"></i>' : ''}</a>`;
   $('#bnAdd').onclick = () => openCapture();
   $('#bnMenu').onclick = () => openSheet();
 }
@@ -188,11 +188,16 @@ function connectStream() {
     emit('notification', n);
   });
   es.addEventListener('event', (e) => emit('event', JSON.parse(e.data)));
+  es.addEventListener('chat', (e) => {
+    const ev = JSON.parse(e.data);
+    emit('chat', ev);
+    showChatHead(ev);
+  });
   es.onerror = () => { es.close(); setTimeout(connectStream, 5000); };
 }
 
 // ---------- Painel lateral do assistente ----------
-const convKey = 'codeniac.conv';
+const convKey = 'codeniac.panelConv';
 let busy = false;
 function msgHtml(m) {
   const me = m.role === 'user';
@@ -209,12 +214,10 @@ async function renderAssistantPanel() {
       <span style="display:flex;gap:4px"><button class="icon-btn sm ghost" id="asNew" title="Nova conversa">${icon('plus', 14)}</button><a class="icon-btn sm ghost" href="#/assistente" title="Abrir em tela cheia">${icon('columns', 14)}</a><button class="icon-btn sm ghost assistant-close" id="asClose">${icon('x', 14)}</button></span></h3>
       <small class="muted" id="asMode">Assistente do Codeniac · ${MODE_LABEL[store.aiMode] || 'sem IA'}</small></div>
       <div class="chat" id="chat"></div>
-      <div class="suggestions" id="sugs">${['/briefing', 'O que tenho hoje?', '/corrida 35 12km', 'Como funciona o backup?'].map((s) => `<button>${esc(s)}</button>`).join('')}</div>
       <form class="composer" id="composer"><input id="msg" placeholder="Pergunte ou use /comandos..." autocomplete="off"><button type="button" class="icon-btn sm ghost" id="mic" aria-label="Ditado">${icon('mic', 14)}</button><button class="icon-btn sm" aria-label="Enviar" style="background:var(--accent);color:var(--on-accent)">${icon('send', 14)}</button></form></div>`;
   $('#asClose').onclick = () => document.body.classList.remove('assistant-open');
   $('#asNew').onclick = () => { localStorage.removeItem(convKey); loadPanelConversation(); };
   $('#composer').onsubmit = (e) => { e.preventDefault(); sendPanel($('#msg').value); };
-  $('#sugs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; if (b.textContent.endsWith(' ')) { $('#msg').value = b.textContent; $('#msg').focus(); } else sendPanel(b.textContent); };
   bindDictation($('#mic'), $('#msg'));
   loadPanelConversation();
 }
@@ -227,7 +230,7 @@ async function loadPanelConversation() {
   if (id) { try { messages = (await api.get(`/assistant/conversations/${id}`)).messages; } catch { localStorage.removeItem(convKey); } }
   const first = (store.user.name || '').split(' ')[0];
   chat.innerHTML = messages.length ? messages.slice(-30).map(msgHtml).join('')
-    : msgHtml({ role: 'assistant', text: `Oi, ${first}! Sou ${store.settings.assistantName || 'o Niac'}. Posso montar seu **briefing**, registrar gastos e corridas (\`/gasto 50 gasolina\`, \`/corrida 35 12km\`), criar tarefas (\`/tarefa Estudar SQL\`) e explicar qualquer parte do hub. Digite **/ajuda** para ver tudo.` });
+    : msgHtml({ role: 'assistant', text: `Oi, ${first}! Sou ${store.settings.assistantName || 'o Niac'}. Pode falar comigo normalmente: "gastei 50 de gasolina", "tarefa: estudar SQL", "como foi meu mês?". Pra fotos, PDFs, personagens e grupos, abre a tela do **Assistente**.` });
   chat.scrollTop = chat.scrollHeight;
 }
 
@@ -257,6 +260,43 @@ export async function sendPanel(text) {
   pending.removeAttribute('id');
   busy = false;
   emit('data-changed');
+}
+
+// ---------- Balão flutuante: mensagem nova de um personagem ----------
+function headFace(ev) {
+  if (ev.avatar) return `<span class="ch-img"><img src="${esc(ev.avatar)}" alt=""></span>`;
+  return `<span class="ch-img" style="background:${esc(ev.color || 'var(--accent)')}">${esc((ev.name || '?')[0].toUpperCase())}</span>`;
+}
+function showChatHead(ev) {
+  const viewing = document.body.dataset.route === 'assistente' && localStorage.getItem('codeniac.conv') === ev.conversationId && document.visibilityState === 'visible';
+  if (viewing) return;
+  store.chatUnread = (store.chatUnread || 0) + 1;
+  renderSidebar();
+  let wrap = $('#chatHeads');
+  if (!wrap) { wrap = document.createElement('div'); wrap.id = 'chatHeads'; wrap.className = 'chat-heads'; document.body.append(wrap); }
+  let head = wrap.querySelector(`[data-c="${ev.conversationId}"]`);
+  if (!head) {
+    head = document.createElement('div');
+    head.className = 'chat-head';
+    head.dataset.c = ev.conversationId;
+    head.innerHTML = `<div class="ch-balloon" role="button" tabindex="0"><button class="ch-x" aria-label="Fechar">${icon('x', 12)}</button><b></b><p></p></div><button class="ch-face" aria-label="Abrir conversa">${headFace(ev)}<span class="ch-count">0</span></button>`;
+    wrap.prepend(head);
+    const open = () => { localStorage.setItem('codeniac.conv', ev.conversationId); head.remove(); if (location.hash.startsWith('#/assistente')) route(); else location.hash = '#/assistente'; };
+    head.querySelector('.ch-face').onclick = open;
+    head.querySelector('.ch-balloon').onclick = (e) => { if (!e.target.closest('.ch-x')) open(); };
+    head.querySelector('.ch-x').onclick = () => head.remove();
+  }
+  const count = head.querySelector('.ch-count');
+  count.textContent = String(Number(count.textContent) + 1);
+  head.querySelector('.ch-balloon b').textContent = ev.name;
+  head.querySelector('.ch-balloon p').textContent = ev.text;
+  head.classList.remove('mini');
+  head.classList.add('pop');
+  setTimeout(() => head.classList.remove('pop'), 600);
+  clearTimeout(head._t);
+  head._t = setTimeout(() => head.classList.add('mini'), 10000);
+  while (wrap.children.length > 3) wrap.lastElementChild.remove();
+  if (store.settings.notifySound) beep();
 }
 
 // ---------- Captura rápida ----------
@@ -367,6 +407,7 @@ async function route() {
   closeSheet();
   document.body.classList.toggle('on-full-page', FULL_PAGE.has(name));
   document.body.dataset.route = name;
+  if (name === 'assistente') { store.chatUnread = 0; document.querySelectorAll('.chat-head').forEach((h) => h.remove()); }
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* ignore */ } }
   cleanup = null;
   const view = $('#view');
@@ -400,6 +441,7 @@ async function boot() {
   applySettings(me.settings);
   try { store.aiMode = (await api.get('/assistant/status')).mode; } catch { /* ok */ }
   await Promise.all([refreshProjects(), refreshUnread()]);
+  try { store.chatUnread = (await api.get('/assistant/conversations')).reduce((a, c) => a + (c.unread || 0), 0); } catch { /* ok */ }
   renderSidebar(); renderTopbar();
   renderAssistantPanel();
   on('projects', renderSidebar);

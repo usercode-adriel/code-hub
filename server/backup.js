@@ -42,6 +42,11 @@ export function runBackup(reason = 'automático') {
     for (const f of fs.existsSync(LIBRARY_DIR) ? fs.readdirSync(LIBRARY_DIR) : []) {
       if (!fs.existsSync(path.join(libDir, f))) fs.copyFileSync(path.join(LIBRARY_DIR, f), path.join(libDir, f));
     }
+    // anexos do chat: também incrementais
+    const cfDir = path.join(dir, 'chat-files');
+    fs.mkdirSync(cfDir, { recursive: true });
+    const CF = path.join(DATA_DIR, 'chat-files');
+    for (const f of fs.existsSync(CF) ? fs.readdirSync(CF) : []) if (!fs.existsSync(path.join(cfDir, f))) fs.copyFileSync(path.join(CF, f), path.join(cfDir, f));
     const ai = path.join(DATA_DIR, 'ai.json');
     if (fs.existsSync(ai)) fs.copyFileSync(ai, path.join(target, 'ai.json'));
     // imagens: pasta compartilhada entre os backups, copia só o que ainda não existe
@@ -90,6 +95,12 @@ export function restoreBackup(name) {
   if (fs.existsSync(libDir)) {
     fs.mkdirSync(LIBRARY_DIR, { recursive: true });
     for (const f of fs.readdirSync(libDir)) if (!fs.existsSync(path.join(LIBRARY_DIR, f))) fs.copyFileSync(path.join(libDir, f), path.join(LIBRARY_DIR, f));
+  }
+  const cfDir = path.join(dir, 'chat-files');
+  if (fs.existsSync(cfDir)) {
+    const CF = path.join(DATA_DIR, 'chat-files');
+    fs.mkdirSync(CF, { recursive: true });
+    for (const f of fs.readdirSync(cfDir)) if (!fs.existsSync(path.join(CF, f))) fs.copyFileSync(path.join(cfDir, f), path.join(CF, f));
   }
   const up = path.join(dir, 'uploads');
   if (fs.existsSync(up)) for (const f of fs.readdirSync(up)) if (!fs.existsSync(path.join(UPLOAD_DIR, f))) fs.copyFileSync(path.join(up, f), path.join(UPLOAD_DIR, f));

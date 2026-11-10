@@ -14,8 +14,9 @@ import life from './routes/life.js';
 import admin, { setRestart } from './routes/admin.js';
 import aiRoutes from './ai.js';
 import library, { loadLibrary, saveLibraryNow } from './library.js';
+import chatFiles from './routes/chatfiles.js';
 import {
-  chat, assistantMode, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
+  chat, assistantMode, sendProactive, groupMembers, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
 } from './assistant.js';
 import { startScheduler } from './scheduler.js';
 
@@ -44,6 +45,12 @@ app.get('/custom.css', (_req, res) => {
 app.get('/api/assistant/status', requireAuth, (_req, res) => res.json({ mode: assistantMode() }));
 app.get('/api/assistant/conversations', requireAuth, (req, res) => res.json(listConversations(req.user.id)));
 app.post('/api/assistant/conversations', requireAuth, (req, res) => {
+  if (req.body?.group) {
+    const g = cleanGroup(req.user.id, req.body.group);
+    if (g.error) return res.status(400).json({ error: g.error });
+    const c = createConversation(req.user.id, g.name, null, g);
+    return res.status(201).json({ id: c.id, title: c.title, botId: null, group: g, createdAt: c.createdAt, updatedAt: c.updatedAt, count: 0, unread: 0, last: null });
+  }
   const bot = req.body?.botId ? db().bots.find((b) => b.id === req.body.botId && b.userId === req.user.id) : null;
   if (req.body?.botId && !bot) return res.status(404).json({ error: 'Personagem não encontrado' });
   const c = createConversation(req.user.id, req.body?.title || (bot ? `Chat com ${bot.name}` : 'Nova conversa'), bot);
@@ -53,11 +60,17 @@ app.post('/api/assistant/conversations', requireAuth, (req, res) => {
 app.get('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = getConversation(req.user.id, req.params.id);
   if (!c) return res.status(404).json({ error: 'Conversa não encontrada' });
-  res.json({ id: c.id, title: c.title, botId: c.botId || null, messages: c.display });
+  if (c.unread) { c.unread = 0; saveNow(); }
+  res.json({ id: c.id, title: c.title, botId: c.botId || null, group: c.group || null, members: c.group ? groupMembers(req.user, c).map(({ id: mid, name, avatar, color, personality }) => ({ id: mid, name, avatar, color, personality })) : null, messages: c.display });
 });
 app.put('/api/assistant/conversations/:id', requireAuth, (req, res) => {
-  const c = renameConversation(req.user.id, req.params.id, req.body?.title);
+  const c = renameConversation(req.user.id, req.params.id, req.body?.title || getConversation(req.user.id, req.params.id)?.title);
   if (!c) return res.status(404).json({ error: 'Conversa não encontrada' });
+  if (c.group && req.body?.group) {
+    const g = cleanGroup(req.user.id, req.body.group);
+    if (g.error) return res.status(400).json({ error: g.error });
+    c.group = g; c.title = g.name; saveNow();
+  }
   res.json({ id: c.id, title: c.title });
 });
 app.delete('/api/assistant/conversations/:id', requireAuth, (req, res) => {
@@ -66,12 +79,14 @@ app.delete('/api/assistant/conversations/:id', requireAuth, (req, res) => {
 });
 app.post('/api/assistant/chat', requireAuth, async (req, res) => {
   const text = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 4000) : '';
-  if (!text) return res.status(400).json({ error: 'Mensagem vazia' });
+  const files = Array.isArray(req.body.files) ? req.body.files.slice(0, 6).filter((f) => f && typeof f.file === 'string') : [];
+  const auto = req.body.auto === true;
+  if (!text && !files.length && !auto) return res.status(400).json({ error: 'Mensagem vazia' });
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   res.flushHeaders();
   const write = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
   try {
-    await chat(req.user, text, typeof req.body.conversationId === 'string' ? req.body.conversationId : null, write);
+    await chat(req.user, text, typeof req.body.conversationId === 'string' ? req.body.conversationId : null, write, { files, auto });
     write({ type: 'done' });
   } catch (err) {
     console.error('[assistente]', err);
@@ -79,6 +94,23 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
   }
   res.end();
 });
+
+// Anexos do chat (fotos e PDFs) e "mandar mensagem agora" de um personagem.
+app.use('/api/assistant/files', requireAuth, chatFiles);
+app.post('/api/assistant/bots/:id/ping', requireAuth, async (req, res) => {
+  const bot = db().bots.find((b) => b.id === req.params.id && b.userId === req.user.id);
+  if (!bot) return res.status(404).json({ error: 'Personagem não encontrado' });
+  try { res.json(await sendProactive(req.user, bot)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+function cleanGroup(userId, g) {
+  const name = String(g.name || '').trim().slice(0, 60);
+  if (!name) return { error: 'Dê um nome ao grupo' };
+  const ids = new Set(db().bots.filter((b) => b.userId === userId).map((b) => b.id));
+  const members = [...new Set((Array.isArray(g.members) ? g.members : []).filter((m) => m === 'niac' || ids.has(m)))].slice(0, 8);
+  if (members.length < 2) return { error: 'Escolha pelo menos 2 participantes' };
+  const avatar = /^\/uploads\/[\w.-]+$/.test(g.avatar || '') ? g.avatar : null;
+  return { name, members, avatar, description: String(g.description || '').slice(0, 300) };
+}
 
 // Encerramento local seguro (atalho "Parar Codeniac"): só da própria máquina e com o token da pasta de dados.
 const CONTROL_TOKEN = crypto.randomBytes(24).toString('hex');
