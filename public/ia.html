@@ -21,7 +21,7 @@
     if (!token) location.replace('/login');
     const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-    const MODES = { local: 'Sem IA (rápido e leve)', ollama: 'IA local (Ollama)', auto: 'Automático', claude: 'Claude (internet)' };
+    const MODES = { local: 'Sem IA (rápido e leve)', gemini: 'Gemini (Google, grátis)', ollama: 'IA local (Ollama)', auto: 'Automático', claude: 'Claude (internet)' };
     let s;
     async function load(refresh) {
       s = await fetch(`/api/ai/status${refresh ? '?refresh=1' : ''}`, { headers: H }).then((r) => r.json());

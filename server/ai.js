@@ -1,9 +1,14 @@
 // Rotas da página "IA local" (opcional): status do Ollama, escolha do modelo e download com progresso.
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
+import { DATA_DIR } from './db.js';
+import { logEvent } from './notify.js';
 import { requireAuth, requireAdmin } from './auth.js';
 import {
   aiConfig, saveAiConfig, ollamaState, refreshOllama, assistantMode, effectiveModel, CATALOG, recommendModel, PROVIDERS,
+  hasGemini, testGeminiKey, GEMINI_MODELS,
 } from './assistant.js';
 
 const router = express.Router();
@@ -15,6 +20,7 @@ function status(req) {
     mode: assistantMode(), config: aiConfig(), providers: PROVIDERS, model: effectiveModel(), ollama: ollamaState,
     ramGb: Math.round((os.totalmem() / 1024 ** 3) * 10) / 10, recommended: recommendModel(), catalog: CATALOG,
     claudeKey: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN), isAdmin: req.user.role === 'admin',
+    gemini: { configured: hasGemini(), hint: hasGemini() && req.user.role === 'admin' ? `…${process.env.GEMINI_API_KEY.slice(-4)}` : null, models: GEMINI_MODELS },
   };
 }
 
@@ -26,6 +32,35 @@ router.get('/status', async (req, res) => {
 router.put('/config', requireAdmin, async (req, res) => {
   saveAiConfig(req.body || {});
   if (['auto', 'ollama'].includes(aiConfig().provider)) await refreshOllama();
+  res.json(status(req));
+});
+
+// ---------- Chave do Gemini (só administrador). Fica no .env da pasta de dados, fora do banco e dos backups. ----------
+const ENV_FILE = () => path.join(DATA_DIR, '.env');
+function setEnvVar(name, value) {
+  let env = fs.existsSync(ENV_FILE()) ? fs.readFileSync(ENV_FILE(), 'utf8') : '';
+  env = env.replace(new RegExp(`^[ \\t]*${name}[ \\t]*=.*(\\r?\\n)?`, 'gm'), '');
+  if (value) env = `${env}${env && !/\n$/.test(env) ? '\r\n' : ''}${name}=${value}\r\n`;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(ENV_FILE(), env, { mode: 0o600 });
+  if (value) process.env[name] = value; else delete process.env[name];
+}
+
+router.put('/gemini-key', requireAdmin, async (req, res) => {
+  const key = String(req.body?.key || '').trim();
+  if (!/^[\w.\-]{20,200}$/.test(key)) return res.status(400).json({ error: 'Chave inválida. Copie a chave inteira do Google AI Studio.' });
+  const test = await testGeminiKey(key).catch((e) => ({ ok: false, error: e.message }));
+  if (!test.ok) return res.status(400).json({ error: `O Google recusou a chave: ${test.error}` });
+  setEnvVar('GEMINI_API_KEY', key);
+  if (aiConfig().provider === 'local') saveAiConfig({ provider: 'gemini' });
+  logEvent(req.user.id, 'system', 'update', 'Chave do Gemini configurada');
+  res.json(status(req));
+});
+
+router.delete('/gemini-key', requireAdmin, (req, res) => {
+  setEnvVar('GEMINI_API_KEY', '');
+  if (aiConfig().provider === 'gemini') saveAiConfig({ provider: 'local' });
+  logEvent(req.user.id, 'system', 'update', 'Chave do Gemini removida');
   res.json(status(req));
 });
 

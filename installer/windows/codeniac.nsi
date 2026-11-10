@@ -1,7 +1,7 @@
 ; Instalador do Codeniac para Windows (por usuário, sem precisar de administrador).
 Unicode true
 !define APP "Codeniac"
-!define VERSION "1.3.0"
+!define VERSION "1.4.0"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Codeniac"
 !include MUI2.nsh
 !include FileFunc.nsh
@@ -18,7 +18,7 @@ BrandingText "Codeniac ${VERSION}"
 !define MUI_UNICON "codeniac.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Codeniac ${VERSION}"
-!define MUI_WELCOMEPAGE_TEXT "Seu hub pessoal de projetos, rotina, InDrive, finanças e estudos.$\r$\n$\r$\nNovidades: abas Hoje, Garagem, Financeiro, Estudos, Diário, Decisões e Atividade, 8 temas novos, backup automático e muito mais.$\r$\n$\r$\nSe você já usa o Codeniac, seus dados e seu logo são mantidos."
+!define MUI_WELCOMEPAGE_TEXT "Seu hub pessoal de projetos, rotina, InDrive, finanças e estudos.$\r$\n$\r$\nNovidades: o assistente agora pode usar o Gemini, a IA gratuita do Google (Configurações → Assistente).$\r$\n$\r$\nSe você já usa o Codeniac, seus dados e seu logo são mantidos."
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION OpenNow
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o Codeniac agora"

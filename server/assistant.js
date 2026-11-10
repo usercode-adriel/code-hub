@@ -33,8 +33,19 @@ const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 const AI_FILE = path.join(DATA_DIR, 'ai.json');
 const DEFAULT_OLLAMA = (process.env.OLLAMA_HOST && /^https?:\/\//.test(process.env.OLLAMA_HOST))
   ? process.env.OLLAMA_HOST.replace(/\/$/, '') : 'http://127.0.0.1:11434';
-const AI_DEFAULT = { provider: 'local', model: '', ollamaUrl: DEFAULT_OLLAMA };
-export const PROVIDERS = ['auto', 'ollama', 'claude', 'local'];
+const AI_DEFAULT = { provider: 'local', model: '', ollamaUrl: DEFAULT_OLLAMA, geminiModel: 'gemini-flash-latest' };
+export const PROVIDERS = ['auto', 'gemini', 'ollama', 'claude', 'local'];
+
+// Gemini (Google AI Studio): a chave fica no .env da pasta de dados (GEMINI_API_KEY), nunca no banco nem no backup.
+export const GEMINI_MODELS = [
+  { name: 'gemini-flash-latest', label: 'Gemini Flash (recomendado)', desc: 'rápido e inteligente, sempre a versão mais nova' },
+  { name: 'gemini-flash-lite-latest', label: 'Gemini Flash-Lite', desc: 'o mais rápido e com a maior cota gratuita' },
+  { name: 'gemini-pro-latest', label: 'Gemini Pro', desc: 'o mais inteligente, mais lento e com cota menor' },
+];
+// Se um modelo estiver ocupado, sem cota ou aposentado pelo Google, tenta o próximo.
+const GEMINI_FALLBACK = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-pro-latest'];
+const GEMINI_HISTORY = 20;
+export const hasGemini = () => Boolean(process.env.GEMINI_API_KEY);
 
 export const CATALOG = [
   { name: 'gemma3:1b', label: 'Gemma 3 · 1B', size: '0,8 GB', ram: 4, desc: 'Bem leve. Para computadores com pouca memória; respostas mais simples.' },
@@ -64,6 +75,7 @@ export function saveAiConfig(patch) {
   const c = { ...aiConfig() };
   if (PROVIDERS.includes(patch.provider)) c.provider = patch.provider;
   if (typeof patch.model === 'string' && /^[\w.\-:/]{0,80}$/.test(patch.model)) c.model = patch.model;
+  if (typeof patch.geminiModel === 'string' && /^[\w.\-]{1,60}$/.test(patch.geminiModel)) c.geminiModel = patch.geminiModel;
   if (typeof patch.ollamaUrl === 'string' && /^https?:\/\/[\w.\-:[\]]+\/?$/.test(patch.ollamaUrl)) c.ollamaUrl = patch.ollamaUrl.replace(/\/$/, '');
   configCache = c;
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -109,6 +121,8 @@ export function assistantMode() {
   if (provider === 'local') return 'local';
   if (provider === 'ollama') return ollamaOk ? 'ollama' : 'local';
   if (provider === 'claude') return hasCredentials() ? 'claude' : 'local';
+  if (provider === 'gemini') return hasGemini() ? 'gemini' : 'local';
+  if (hasGemini()) return 'gemini';
   if (ollamaOk) return 'ollama';
   if (hasCredentials()) return 'claude';
   return 'local';
@@ -286,6 +300,80 @@ async function runOllama(user, conv, text, write) {
   }
   if (!answer.trim()) throw new Error('A IA local não respondeu');
   return { text: answer.trim(), tools: [] };
+}
+
+// ---------- Gemini (Google) ----------
+async function geminiStream(model, body, write) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok || !res.body) {
+    const err = await res.json().catch(() => ({}));
+    const e = new Error(err.error?.message || `Gemini respondeu ${res.status}`);
+    e.status = res.status;
+    throw e;
+  }
+  let answer = '';
+  let buf = '';
+  let blocked = null;
+  const decoder = new TextDecoder();
+  for await (const chunk of res.body) {
+    buf += decoder.decode(chunk, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0 || (i = buf.indexOf('\r\n\r\n')) >= 0) {
+      const block = buf.slice(0, i);
+      buf = buf.slice(i + (buf[i] === '\r' ? 4 : 2));
+      const line = block.split(/\r?\n/).find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      const obj = JSON.parse(line.slice(5).trim());
+      if (obj.error) throw new Error(obj.error.message);
+      const cand = obj.candidates?.[0];
+      if (obj.promptFeedback?.blockReason) blocked = obj.promptFeedback.blockReason;
+      if (cand?.finishReason === 'SAFETY') blocked = 'SAFETY';
+      const piece = (cand?.content?.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
+      if (piece) { answer += piece; write({ type: 'text', text: piece }); }
+    }
+  }
+  if (!answer.trim() && blocked) return 'Prefiro não responder a esse pedido. Posso ajudar com outra coisa?';
+  if (!answer.trim()) throw new Error('O Gemini não respondeu');
+  return answer.trim();
+}
+
+async function runGemini(user, conv, text, write) {
+  const history = conv.display.slice(0, -1).slice(-GEMINI_HISTORY).filter((m) => m.text)
+    .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+  while (history.length && history[0].role !== 'user') history.shift();
+  const kb = searchKB(text);
+  const manual = kb && kb.score >= 1.5 ? `\n\n<manual_codeniac>\n${kb.answer}\n</manual_codeniac>\nSe a pergunta for sobre o sistema, baseie-se nesse trecho do manual.` : '';
+  const body = {
+    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini')}\n\n${contextBlock(user)}${manual}` }] },
+    contents: [...history, { role: 'user', parts: [{ text }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+  };
+  const wanted = aiConfig().geminiModel || GEMINI_FALLBACK[0];
+  const models = [wanted, ...GEMINI_FALLBACK.filter((m) => m !== wanted)];
+  let lastErr;
+  for (const model of models) {
+    try { return { text: await geminiStream(model, body, write), tools: [] }; }
+    catch (err) {
+      lastErr = err;
+      console.error(`[assistente] Gemini ${model}: ${err.status || ''} ${err.message}`);
+      // chave inválida ou sem permissão: não adianta trocar de modelo
+      if ([401, 403].includes(err.status) || /api key/i.test(err.message)) throw err;
+    }
+  }
+  throw lastErr;
+}
+
+// Confere se uma chave funciona (usado ao salvar a chave nas Configurações).
+export async function testGeminiKey(key) {
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
+  if (res.ok) return { ok: true };
+  const err = await res.json().catch(() => ({}));
+  return { ok: false, error: err.error?.message || `O Google respondeu ${res.status}` };
 }
 
 // ---------- Comandos rápidos ----------
@@ -482,6 +570,13 @@ export async function chat(user, text, convId, write) {
   if (!result && mode === 'ollama') {
     try { result = await runOllama(user, conv, text, write); result.streamed = true; }
     catch (err) { console.error('[assistente] IA local falhou:', err?.message); refreshOllama(); write({ type: 'notice', text: 'IA local indisponível. Respondendo no modo básico.' }); mode = 'local'; }
+  } else if (!result && mode === 'gemini') {
+    try { result = await runGemini(user, conv, text, write); result.streamed = true; }
+    catch (err) {
+      console.error('[assistente] Gemini falhou:', err?.message);
+      write({ type: 'notice', text: err.status === 429 ? 'Cota gratuita do Gemini esgotada por agora. Respondendo no modo básico.' : 'Gemini indisponível agora. Respondendo no modo básico.' });
+      mode = 'local';
+    }
   } else if (!result && mode === 'claude') {
     try { result = await runClaude(user, conv, text, write); result.streamed = true; }
     catch (err) { console.error('[assistente] Claude falhou:', err?.message); write({ type: 'notice', text: 'IA indisponível. Respondendo no modo básico.' }); mode = 'local'; }

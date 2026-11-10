@@ -93,12 +93,34 @@ async function assistantTab(box) {
       <div class="field" style="margin-top:14px"><label>Personalidade</label><div class="persona-grid">${Object.entries(PERSONA).map(([k, p]) => `<button class="persona ${s.assistantPersonality === k ? 'on' : ''}" data-pe="${k}"><span class="pe">${p.emoji}</span><b>${p.label}</b><small>${p.desc}</small></button>`).join('')}</div></div>
       <div class="field" style="margin-top:14px"><label>Instruções extras</label><textarea class="input" data-set="assistantInstructions" rows="3" maxlength="600" placeholder="Ex.: sempre me lembre de beber água; responda em tom motivador.">${esc(s.assistantInstructions || '')}</textarea></div></section>
     <section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('cpu', 15)} Modo de resposta</h3>
-      <p class="sub">Atual: <b>${ai?.mode === 'ollama' ? 'IA local (Ollama)' : ai?.mode === 'claude' ? 'Claude (internet)' : 'Sem IA — base de conhecimento + comandos (rápido e leve)'}</b></p>
-      ${ai?.isAdmin ? `<div class="seg" id="prov">${[['local', 'Sem IA (recomendado)'], ['ollama', 'IA local (Ollama)'], ['auto', 'Automático'], ['claude', 'Claude']].map(([v, l]) => `<button data-v="${v}" class="${ai.config.provider === v ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <p class="muted" style="font-size:11.5px;margin-top:10px">“Sem IA” não usa memória extra e responde na hora. A IA local precisa do Ollama instalado e de um modelo baixado (página <a href="/ia" style="color:var(--accent)">IA local</a>); ela é mais lenta e usa vários GB de RAM.${ai.claudeKey ? '' : ' Claude precisa de uma chave de API no arquivo .env.'}</p>` : '<p class="muted">Somente o administrador pode trocar o modo.</p>'}</section>`;
+      <p class="sub">Atual: <b>${{ gemini: 'Gemini (Google, pela internet)', ollama: 'IA local (Ollama)', claude: 'Claude (internet)' }[ai?.mode] || 'Sem IA — base de conhecimento + comandos (rápido e leve)'}</b></p>
+      ${ai?.isAdmin ? `<div class="seg" id="prov">${[['local', 'Sem IA'], ['gemini', 'Gemini (grátis)'], ['ollama', 'IA local (Ollama)'], ['auto', 'Automático'], ['claude', 'Claude']].map(([v, l]) => `<button data-v="${v}" class="${ai.config.provider === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <p class="muted" style="font-size:11.5px;margin-top:10px">“Sem IA” responde na hora sobre o sistema e executa comandos. <b>Gemini</b> conversa sobre qualquer assunto usando a cota gratuita do Google (precisa de internet e da chave abaixo). Os comandos (/gasto, /corrida, /tarefa...) continuam funcionando em qualquer modo.</p>` : '<p class="muted">Somente o administrador pode trocar o modo.</p>'}</section>
+    ${ai?.isAdmin ? `<section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('sparkles', 15)} Gemini (Google)</h3>
+      <p class="sub">${ai.gemini.configured ? `Chave configurada <span class="chip ok">${esc(ai.gemini.hint || '')}</span>` : 'Crie uma chave grátis em <b>aistudio.google.com</b> → “Get API key” e cole aqui.'}</p>
+      <form class="form" id="gemForm"><div class="form-row"><div class="field"><label>${ai.gemini.configured ? 'Trocar a chave' : 'Chave da API'}</label><input type="password" name="key" autocomplete="off" placeholder="Cole a chave aqui"></div>
+        <div class="field"><label>Modelo</label><select id="gemModel">${ai.gemini.models.map((m) => `<option value="${m.name}" ${ai.config.geminiModel === m.name ? 'selected' : ''}>${esc(m.label)} — ${esc(m.desc)}</option>`).join('')}</select></div></div>
+        <div class="form-actions">${ai.gemini.configured ? '<button type="button" class="btn danger" id="gemDel" style="margin-right:auto">Remover chave</button>' : ''}<button class="btn primary" id="gemSave">Salvar e testar</button></div></form>
+      <p class="muted" style="font-size:11px;margin:10px 0 0">A chave fica só no seu computador (arquivo .env da pasta de dados) e não vai para os backups. No plano gratuito, o Google pode usar as conversas para melhorar os produtos dele: o assistente envia sua mensagem e um resumo do dia (prioridades, agenda e saldo do InDrive). Se o Gemini estiver ocupado ou a cota acabar, o assistente tenta outro modelo grátis e, por fim, volta ao modo sem IA.</p></section>` : ''}`;
   box.querySelectorAll('[data-av]').forEach((b) => { b.onclick = () => { patch({ assistantAvatar: b.dataset.av }); box.querySelectorAll('[data-av]').forEach((x) => x.classList.toggle('on', x === b)); }; });
   box.querySelectorAll('[data-pe]').forEach((b) => { b.onclick = () => { patch({ assistantPersonality: b.dataset.pe }); box.querySelectorAll('[data-pe]').forEach((x) => x.classList.toggle('on', x === b)); }; });
-  box.querySelectorAll('#prov [data-v]').forEach((b) => { b.onclick = async () => { const r = await api.put('/ai/config', { provider: b.dataset.v }); store.aiMode = r.mode; toast('Modo do assistente', `Agora: ${r.mode === 'local' ? 'sem IA' : r.mode}`, 'success'); assistantTab(box); }; });
+  box.querySelectorAll('#prov [data-v]').forEach((b) => { b.onclick = async () => {
+    if (b.dataset.v === 'gemini' && !ai.gemini.configured) { toast('Falta a chave do Gemini', 'Cole a chave no quadro abaixo e clique em “Salvar e testar”.', 'error'); return; }
+    const r = await api.put('/ai/config', { provider: b.dataset.v }); store.aiMode = r.mode; toast('Modo do assistente', `Agora: ${r.mode === 'local' ? 'sem IA' : r.mode}`, 'success'); assistantTab(box);
+  }; });
+  box.querySelector('#gemModel')?.addEventListener('change', async (e) => { await api.put('/ai/config', { geminiModel: e.target.value }); toast('Modelo do Gemini salvo', '', 'success'); });
+  box.querySelector('#gemForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const key = e.target.key.value.trim();
+    if (!key) return toast('Cole a chave primeiro', '', 'error');
+    const btn = box.querySelector('#gemSave'); btn.disabled = true; btn.textContent = 'Testando...';
+    try { const r = await api.put('/ai/gemini-key', { key }); store.aiMode = r.mode; toast('Gemini conectado! ✨', 'O assistente agora conversa sobre qualquer assunto.', 'success'); assistantTab(box); }
+    catch (err) { toast('Não funcionou', err.message, 'error'); btn.disabled = false; btn.textContent = 'Salvar e testar'; }
+  });
+  box.querySelector('#gemDel')?.addEventListener('click', async () => {
+    if (!(await confirmDialog('Remover chave do Gemini', 'O assistente volta ao modo sem IA.', 'Remover'))) return;
+    const r = await api.del('/ai/gemini-key'); store.aiMode = r.mode; toast('Chave removida'); assistantTab(box);
+  });
   bindCommon(box);
 }
 

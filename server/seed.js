@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -25,6 +25,12 @@ export const CHANGELOG = [
     title: 'Codeniac 1.3: sua rotina no automático ☀️',
     message: 'Novas abas Hoje, Garagem, Estudos, Financeiro, Diário, Decisões e Atividade; briefing da manhã, detector de procrastinação, '
       + 'flashcards de inglês, captura rápida, comandos no chat, backup automático diário, 8 temas novos e ferramentas de administrador.',
+  },
+  {
+    version: '1.4.0',
+    title: 'Codeniac 1.4: Gemini no assistente ✨',
+    message: 'O assistente pode usar o Gemini, a IA gratuita do Google: conversa sobre qualquer assunto, sem pesar o computador. '
+      + 'Configure em Configurações → Assistente. Os comandos rápidos continuam funcionando.',
   },
 ];
 
@@ -94,13 +100,18 @@ export const DEFAULT_SYSTEM = {
   backup: { enabled: true, dir: '', keep: 14, lastAt: null, lastFile: null, lastError: null },
 };
 
+// Completa os valores que faltam SEM trocar os objetos: quem guardou uma referência (ex.: o backup
+// gravando lastAt) continua alterando o objeto que vai para o banco.
 export function systemConfig() {
   const d = db();
-  d.system = { ...DEFAULT_SYSTEM, ...(d.system || {}) };
-  d.system.backup = { ...DEFAULT_SYSTEM.backup, ...(d.system.backup || {}) };
-  d.system.menu = { ...DEFAULT_SYSTEM.menu, ...(d.system.menu || {}) };
-  d.system.images ??= {};
-  return d.system;
+  const sys = (d.system ??= {});
+  for (const [k, v] of Object.entries(DEFAULT_SYSTEM)) if (sys[k] === undefined) sys[k] = structuredClone(v);
+  for (const k of ['backup', 'menu']) {
+    if (!sys[k] || typeof sys[k] !== 'object') sys[k] = {};
+    for (const [kk, vv] of Object.entries(DEFAULT_SYSTEM[k])) if (sys[k][kk] === undefined) sys[k][kk] = structuredClone(vv);
+  }
+  sys.images ??= {};
+  return sys;
 }
 
 // ---------- Páginas (estilo Notion) ----------

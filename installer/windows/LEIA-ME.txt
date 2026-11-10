@@ -1,4 +1,4 @@
-CODENIAC 1.3 — seu hub pessoal
+CODENIAC 1.4 — seu hub pessoal
 ==============================
 
 COMO ABRIR
@@ -11,7 +11,11 @@ PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
 
-O QUE HÁ DE NOVO NA 1.3
+O QUE HÁ DE NOVO NA 1.4
+- Gemini no assistente: crie uma chave grátis em aistudio.google.com e cole em
+  Configurações > Assistente > Gemini. A chave fica só no seu computador.
+
+NA 1.3
 - Hoje: briefing automático da manhã, agenda, prioridades, detector de procrastinação,
   hábitos com sequência, pomodoro, caixa de entrada e encerramento do dia.
 - Captura rápida: botão "Capturar" ou Alt+N em qualquer tela.
