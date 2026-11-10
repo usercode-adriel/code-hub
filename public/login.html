@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17181c">
+  <title>Entrar · Codeniac</title>
+  <link rel="icon" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/fonts/fonts.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/themes.css">
+  <style>
+    body { display: grid; place-items: center; min-height: 100vh; padding: 20px; background: radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%), var(--bg-outer); background-size: cover; background-position: center; }
+    body.has-bg { background: linear-gradient(rgba(5,6,8,.55), rgba(5,6,8,.7)), var(--login-bg) center / cover no-repeat; }
+    .login { width: min(920px, 100%); display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0,0,0,.7); }
+    .login-art { position: relative; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; min-height: 520px; overflow: hidden;
+      background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 35%, var(--bg-app)), var(--bg-app) 70%); }
+    .login-art.img { background: linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.75)), var(--login-art) center / cover no-repeat; }
+    .login-art .orb { position: absolute; right: -60px; top: 30%; width: 280px; height: 280px; border-radius: 50%; border: 1px dashed rgba(255,255,255,.18); }
+    .login-art .orb::after { content: ''; position: absolute; inset: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--accent) 80%, #fff), var(--accent) 45%, transparent 72%); opacity: .55; filter: blur(2px); }
+    .login-art img.logo { height: 58px; width: auto; position: relative; }
+    .login-art h2 { font-size: 26px; margin: 0 0 8px; line-height: 1.25; position: relative; color: #fff; font-family: var(--font-head, var(--font)); }
+    .login-art p { margin: 0; color: rgba(255,255,255,.75); font-size: 13px; line-height: 1.6; position: relative; max-width: 340px; }
+    .login-art ul { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 8px; position: relative; color: rgba(255,255,255,.85); font-size: 12.5px; }
+    .login-form { padding: 44px 40px; display: flex; flex-direction: column; justify-content: center; }
+    .login-form h1 { margin: 0 0 4px; font-size: 22px; }
+    .login-form .sub { margin: 0 0 22px; color: var(--muted); font-size: 12.5px; }
+    .login-tabs { display: flex; gap: 4px; background: var(--bg-input); padding: 4px; border-radius: var(--pill); margin-bottom: 20px; }
+    .login-tabs button { flex: 1; border: 0; background: none; padding: 8px; border-radius: var(--pill); font-size: 12px; color: var(--muted); }
+    .login-tabs button.on { background: var(--accent); color: var(--on-accent); }
+    .login-form .btn.primary { height: 42px; width: 100%; margin-top: 6px; }
+    .msg-box { margin-top: 14px; font-size: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-card-2); color: var(--text-2); }
+    .msg-box.err { background: rgba(239,68,68,.12); color: #ff8a8a; }
+    .demo { margin-top: 18px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--border-soft); padding-top: 14px; }
+    .demo code { color: var(--text-2); }
+    @media (max-width: 760px) { .login { grid-template-columns: 1fr; } .login-art { min-height: 200px; padding: 26px; } .login-art ul, .login-art .orb { display: none; } .login-form { padding: 28px 24px; } }
+  </style>
+</head>
+<body>
+  <main class="login">
+    <section class="login-art" id="art"><div class="orb"></div><img class="logo brand-mark" id="logo" src="/assets/logo.png" alt="Codeniac">
+      <div><h2>Seu hub pessoal de projetos, rotina e estudos.</h2><p id="loginMsg">Tudo no seu computador: tarefas, InDrive, finanças, inglês, diário e decisões.</p>
+        <ul><li>☀️ Briefing automático toda manhã</li><li>🚗 Turnos e lucro real do InDrive</li><li>🇺🇸 Inglês com repetição espaçada</li><li>🤖 Assistente que entende todo o sistema</li></ul></div></section>
+    <section class="login-form">
+      <h1 id="hTitle">Bem-vindo de volta</h1><p class="sub" id="hSub">Entre para continuar</p>
+      <div class="login-tabs" id="tabs" hidden><button type="button" data-tab="login" class="on">Entrar</button><button type="button" data-tab="register">Criar conta</button></div>
+      <form class="form" id="form">
+        <div class="field" id="nameField" hidden><label for="name">Nome</label><input id="name" name="name" autocomplete="name"></div>
+        <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required></div>
+        <div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" required minlength="6"></div>
+        <button class="btn primary" id="go">Entrar</button>
+      </form>
+      <div class="msg-box err" id="err" hidden></div>
+      <div class="demo" id="demo" hidden>Primeiro acesso: <code>admin@codeniac.dev</code> / <code>codeniac123</code>. Depois, troque o e-mail e a senha em <b>Perfil</b>.</div>
+    </section>
+  </main>
+  <script type="module">
+    import { applyTheme } from '/js/theme.js';
+    const $ = (s) => document.querySelector(s);
+    try { const l = JSON.parse(localStorage.getItem('codeniac.look') || 'null'); applyTheme(l || {}); } catch { applyTheme({}); }
+    if (localStorage.getItem('codeniac.token')) {
+      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } }).then((r) => { if (r.ok) location.replace('/'); });
+    }
+    let mode = 'login';
+    const info = await fetch('/api/system/info').then((r) => r.json()).catch(() => ({}));
+    document.title = `Entrar · ${info.appName || 'Codeniac'}`;
+    if (info.images?.logo) { $('#logo').src = info.images.logo; $('#logo').classList.add('custom'); }
+    if (info.images?.loginBg) { document.body.style.setProperty('--login-bg', `url('${info.images.loginBg}')`); document.body.classList.add('has-bg'); }
+    if (info.images?.loginArt) { $('#art').style.setProperty('--login-art', `url('${info.images.loginArt}')`); $('#art').classList.add('img'); }
+    if (info.loginMessage) $('#loginMsg').textContent = info.loginMessage;
+    if (info.allowRegistration) $('#tabs').hidden = false;
+    if (info.demoAccount) $('#demo').hidden = false;
+    const setMode = (m) => {
+      mode = m;
+      document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === m));
+      $('#nameField').hidden = m !== 'register';
+      $('#name').required = m === 'register';
+      $('#go').textContent = m === 'register' ? 'Criar conta' : 'Entrar';
+      $('#hTitle').textContent = m === 'register' ? 'Criar sua conta' : 'Bem-vindo de volta';
+      $('#hSub').textContent = m === 'register' ? 'Leva menos de um minuto' : 'Entre para continuar';
+      $('#password').autocomplete = m === 'register' ? 'new-password' : 'current-password';
+    };
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.tab)));
+    $('#form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#err').hidden = true; $('#go').disabled = true;
+      const body = { email: $('#email').value.trim(), password: $('#password').value, name: $('#name').value.trim() };
+      try {
+        const res = await fetch(`/api/auth/${mode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Não foi possível entrar');
+        localStorage.setItem('codeniac.token', data.token);
+        location.replace('/');
+      } catch (err) { $('#err').textContent = err.message; $('#err').hidden = false; $('#go').disabled = false; }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+CODENIAC 1.3 — seu hub pessoal
+==============================
+
+COMO ABRIR
+- Clique em "Codeniac" na área de trabalho ou no menu Iniciar.
+  O navegador abre sozinho em http://localhost:3000 (sem janela preta de terminal).
+- Para fechar de verdade: menu Iniciar > Codeniac > "Parar Codeniac".
+  Fechar só a aba do navegador deixa o Codeniac ligado em segundo plano (ele usa pouca memória).
+
+PRIMEIRO ACESSO
+- E-mail: admin@codeniac.dev   Senha: codeniac123
+- Depois entre em Perfil e troque o e-mail e a senha.
+
+O QUE HÁ DE NOVO NA 1.3
+- Hoje: briefing automático da manhã, agenda, prioridades, detector de procrastinação,
+  hábitos com sequência, pomodoro, caixa de entrada e encerramento do dia.
+- Captura rápida: botão "Capturar" ou Alt+N em qualquer tela.
+- Garagem: turno do InDrive (início/fim, valor por hora, manhã x tarde x noite),
+  "vale a pena essa corrida?", custo por km, mapa de melhores horários, abastecimentos,
+  manutenção por km/data, documentos com vencimento e reservas.
+- Financeiro: lançamentos, importar extrato do banco (CSV), orçamento por categoria,
+  contas a pagar com aviso de vencimento, assinaturas com custo mensal/anual.
+- Estudos: flashcards de inglês com repetição espaçada, connected speech, shadowing com
+  teste de pronúncia, pares mínimos, ditado, diário em inglês, banco de vocabulário
+  (selecione uma palavra em inglês e clique em "+ Vocabulário"), snippets de código,
+  trilha de programação e estante de livros.
+- Diário de reflexão no estilo caderno de viagem do velho oeste.
+- Decisões: passo a passo com alternativas, critérios com peso, ranking, perguntas-guia
+  e lembrete para avaliar o resultado depois.
+- Atividade: tudo que acontece no hub registrado automaticamente.
+- Comandos no chat: /gasto 50 gasolina · /corrida 35 12km · /tarefa Estudar SQL ·
+  /nota ideia... · /agenda 15/11 14:00 Dentista · /briefing · /ajuda
+- 8 temas novos: Natal, Chuva, Pixel, Console retrô, Fazenda, Escola de magia, Blocos, Retrô 80s.
+- Administração: trocar logo, tela de login e imagens dos cards, backup automático diário
+  (pode apontar para o OneDrive), restaurar backup, menu lateral, CSS personalizado,
+  log do servidor, acesso pela rede e reiniciar — tudo pelo próprio sistema.
+
+ASSISTENTE SEM IA (PADRÃO)
+- Responde sobre todo o sistema e executa comandos na hora, sem gastar memória.
+- A IA local (Ollama) continua opcional: menu Iniciar > Codeniac > "IA local".
+
+BACKUP AUTOMÁTICO
+- Todo dia uma cópia vai para OneDrive\Codeniac-Backups (ou Documentos\Codeniac-Backups).
+- Mude a pasta em Configurações > Administração > Backup.
+
+CELULAR
+- Menu Iniciar > Codeniac > "Codeniac no celular": QR code e instruções.
+- Mesma rede Wi-Fi: ligue o acesso pela rede e permita no Firewall (Redes privadas).
+- De qualquer lugar: Tailscale (gratuito), mesma conta no PC e no celular.
+
+ONDE FICAM OS DADOS
+- %APPDATA%\Codeniac  (db.json, imagens enviadas, log, backups de segurança)
+- Atualizar ou reinstalar o Codeniac NÃO apaga seus dados.
+
+INICIAR COM O WINDOWS
+- Opção no instalador. Ou crie um atalho para "Codeniac.exe /background" na pasta
+  shell:startup.
+
+PROBLEMAS?
+- "Não conseguiu iniciar": veja %APPDATA%\Codeniac\codeniac.log. Talvez outro programa use
+  a porta 3000. Use "Parar Codeniac" e abra de novo.

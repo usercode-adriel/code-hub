@@ -1,0 +1,9 @@
+{
+  "name": "Codeniac",
+  "short_name": "Codeniac",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#17181c",
+  "theme_color": "#17181c",
+  "icons": [{ "src": "/assets/icon.png", "sizes": "512x512", "type": "image/png" }]
+}

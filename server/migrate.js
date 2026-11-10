@@ -1,0 +1,78 @@
+// Migrações de dados entre versões. Roda no início do servidor e é idempotente.
+import { db, id, now, save } from './db.js';
+import { ensureRootPage, ensureInDrive, DEFAULT_SETTINGS, systemConfig, seedStudy } from './seed.js';
+
+const SCHEMA = 3;
+
+// Converte o conteúdo de uma nota (markdown simples) em blocos.
+function noteToBlocks(note) {
+  const blocks = [{ id: id(), type: 'h2', text: note.title || 'Nota' }];
+  let buffer = [];
+  const flush = () => {
+    if (buffer.length) blocks.push({ id: id(), type: 'text', text: buffer.join('\n').trim() });
+    buffer = [];
+  };
+  for (let line of String(note.content || '').split('\n')) {
+    const img = line.match(/^\s*!\[([^\]]*)\]\((\/uploads\/[\w.-]+|https?:\/\/\S+)\)\s*$/);
+    const bullet = line.match(/^\s*[-•]\s+(.*)$/);
+    const link = line.match(/^\s*\[([^\]]+)\]\((https?:\/\/\S+)\)\s*$/);
+    line = line.replace(/\*\*(.+?)\*\*/g, '$1');
+    if (link) { flush(); blocks.push({ id: id(), type: 'link', url: link[2], text: link[1] }); }
+    else if (img) { flush(); blocks.push({ id: id(), type: 'image', url: img[2], caption: img[1] === 'imagem' ? '' : img[1] }); }
+    else if (bullet) { flush(); blocks.push({ id: id(), type: 'bullet', text: bullet[1].replace(/\*\*(.+?)\*\*/g, '$1') }); }
+    else buffer.push(line);
+  }
+  flush();
+  return blocks;
+}
+
+function toV2(d) {
+  for (const project of d.projects) {
+    const root = ensureRootPage(project);
+    const notes = d.notes.filter((n) => n.projectId === project.id);
+    const links = d.links.filter((l) => l.projectId === project.id);
+    for (const n of notes) root.blocks.push(...noteToBlocks(n));
+    if (links.length) {
+      root.blocks.push({ id: id(), type: 'h2', text: 'Links' });
+      for (const l of links) root.blocks.push({ id: id(), type: 'link', url: l.url, text: l.title });
+    }
+    if (project.slug === 'trabalhos') ensureInDrive(project);
+  }
+  for (const [uid, s] of Object.entries(d.settings)) {
+    const merged = { ...DEFAULT_SETTINGS, ...s };
+    if (s.accent && s.accent.toLowerCase() !== '#1f8fff') merged.themeVars = { ...(merged.themeVars || {}), accent: s.accent };
+    delete merged.accent;
+    d.settings[uid] = merged;
+  }
+  for (const [uid, t] of Object.entries(d.threads)) {
+    if (t && !t.conversations) {
+      d.threads[uid] = {
+        conversations: (t.display?.length ? [{
+          id: id(), title: 'Conversa principal', api: t.api || [], display: t.display || [],
+          createdAt: t.display[0]?.at || now(), updatedAt: t.display.at(-1)?.at || now(),
+        }] : []),
+      };
+    }
+  }
+}
+
+function toV3(d) {
+  for (const t of d.tasks) {
+    t.postponed ??= 0;
+    t.statusAt ??= t.updatedAt || t.createdAt;
+  }
+  for (const u of d.users) seedStudy(u.id);
+  for (const [uid, s] of Object.entries(d.settings)) d.settings[uid] = { ...DEFAULT_SETTINGS, ...s };
+}
+
+export function migrate() {
+  const d = db();
+  d.system = systemConfig();
+  const from = d.meta.schema || 1;
+  if (from >= SCHEMA) return;
+  if (from < 2) toV2(d);
+  if (from < 3) toV3(d);
+  d.meta.schema = SCHEMA;
+  save();
+  console.log(`» Dados migrados do formato ${from} para ${SCHEMA}`);
+}

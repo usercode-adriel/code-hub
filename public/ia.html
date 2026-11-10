@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IA local · Codeniac</title>
+  <link rel="icon" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/themes.css">
+  <style> body { overflow: auto; } .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 60px; } .card + .card { margin-top: 16px; } h2 { font-size: 15px; margin: 0 0 10px; } .model { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-soft); } .model:last-child { border: 0; } .model .grow { flex: 1; } .model small { color: var(--muted); display: block; font-size: 11.5px; } ol { padding-left: 20px; line-height: 1.9; color: var(--text-2); font-size: 13px; margin: 0; } </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-head"><div><h1>IA local (opcional)</h1><p>O assistente já funciona sem IA: responde sobre o sistema e executa comandos na hora, sem gastar memória. Use esta página só se quiser conversas livres com um modelo no seu PC.</p></div><a class="btn outline" href="/">Voltar ao Codeniac</a></div>
+    <div class="card" id="st">Verificando...</div>
+    <div class="card"><h2>Modelos</h2><div id="models"></div></div>
+    <div class="card"><h2>Como instalar o Ollama</h2><ol><li>Baixe em <b>ollama.com/download</b> e instale (Windows).</li><li>Abra o Ollama (ícone de lhama perto do relógio).</li><li>Volte aqui, clique em “Verificar de novo” e baixe um modelo <b>leve</b> (Qwen 2.5 1.5B é o mais rápido).</li><li>Escolha “IA local” no modo do assistente. Para voltar ao modo rápido sem IA, clique em “Sem IA”.</li></ol></div>
+  </div>
+  <script type="module">
+    import { applyTheme } from '/js/theme.js';
+    try { applyTheme(JSON.parse(localStorage.getItem('codeniac.look') || '{}')); } catch { applyTheme({}); }
+    const token = localStorage.getItem('codeniac.token');
+    if (!token) location.replace('/login');
+    const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const MODES = { local: 'Sem IA (rápido e leve)', ollama: 'IA local (Ollama)', auto: 'Automático', claude: 'Claude (internet)' };
+    let s;
+    async function load(refresh) {
+      s = await fetch(`/api/ai/status${refresh ? '?refresh=1' : ''}`, { headers: H }).then((r) => r.json());
+      const o = s.ollama;
+      document.getElementById('st').innerHTML = `<h2>Situação</h2><p style="font-size:13px;margin:0 0 10px">Modo atual: <b>${MODES[s.mode] || s.mode}</b> · Ollama: ${o.running ? `<span class="chip ok">aberto (v${esc(o.version || '?')})</span>` : '<span class="chip">não encontrado</span>'} · Memória do PC: <b>${s.ramGb} GB</b></p>
+        ${s.isAdmin ? `<div class="seg" id="prov">${Object.entries(MODES).map(([k, l]) => `<button data-v="${k}" class="${s.config.provider === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '<p class="muted">Somente o administrador altera estas opções.</p>'}
+        <div style="margin-top:12px"><button class="btn sm outline" id="re">Verificar de novo</button></div>`;
+      document.getElementById('re').onclick = () => load(true);
+      document.querySelectorAll('#prov [data-v]').forEach((b) => { b.onclick = async () => { await fetch('/api/ai/config', { method: 'PUT', headers: H, body: JSON.stringify({ provider: b.dataset.v }) }); load(); }; });
+      const installed = new Set(o.models.map((m) => m.name || m));
+      document.getElementById('models').innerHTML = s.catalog.map((m) => `<div class="model" data-m="${esc(m.name)}"><div class="grow"><b>${esc(m.label)}</b> ${m.name === s.recommended ? '<span class="chip ok">recomendado para seu PC</span>' : ''}<small>${esc(m.desc)} · ${esc(m.size)} · pede ${m.ram} GB de RAM</small><div class="progress" hidden style="margin-top:6px"><span style="width:0"></span></div><small data-p></small></div>
+        ${installed.has(m.name) ? `${s.config.model === m.name ? '<span class="chip ok">em uso</span>' : `<button class="btn sm outline" data-use>Usar</button>`}${s.isAdmin ? '<button class="icon-btn sm ghost" data-del title="Apagar">✕</button>' : ''}` : (s.isAdmin && o.running ? '<button class="btn sm primary" data-pull>Baixar</button>' : '')}</div>`).join('');
+      document.querySelectorAll('[data-m]').forEach((row) => {
+        const name = row.dataset.m;
+        row.querySelector('[data-use]')?.addEventListener('click', async () => { await fetch('/api/ai/config', { method: 'PUT', headers: H, body: JSON.stringify({ model: name, provider: 'ollama' }) }); load(); });
+        row.querySelector('[data-del]')?.addEventListener('click', async () => { if (confirm(`Apagar o modelo ${name}?`)) { await fetch(`/api/ai/models/${encodeURIComponent(name)}`, { method: 'DELETE', headers: H }); load(); } });
+        row.querySelector('[data-pull]')?.addEventListener('click', async (e) => {
+          e.target.disabled = true; e.target.textContent = 'Baixando...';
+          const bar = row.querySelector('.progress'); const lab = row.querySelector('[data-p]'); bar.hidden = false;
+          const res = await fetch('/api/ai/pull', { method: 'POST', headers: H, body: JSON.stringify({ model: name }) });
+          const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+          for (;;) { const { value, done } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true }); let i;
+            while ((i = buf.indexOf('\n\n')) >= 0) { const line = buf.slice(0, i).replace(/^data: /, ''); buf = buf.slice(i + 2); const ev = JSON.parse(line);
+              if (ev.type === 'progress') { const pct = ev.total ? Math.round((ev.completed / ev.total) * 100) : 0; bar.firstElementChild.style.width = `${pct}%`; lab.textContent = `${ev.status}${ev.total ? ` · ${pct}%` : ''}`; }
+              if (ev.type === 'error') lab.textContent = `Erro: ${ev.text}`;
+              if (ev.type === 'done') { lab.textContent = ev.text; setTimeout(load, 800); } } }
+        });
+      });
+    }
+    load(true);
+  </script>
+</body>
+</html>

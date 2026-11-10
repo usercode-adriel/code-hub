@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codeniac no celular</title>
+  <link rel="icon" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/themes.css">
+  <style>
+    body { overflow: auto; } .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 60px; }
+    .qr { background: #fff; border-radius: 16px; padding: 12px; display: inline-block; } .qr svg { display: block; }
+    .addr { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; } .addr .grow { flex: 1; min-width: 240px; }
+    .url { font-size: 20px; font-weight: 600; word-break: break-all; color: var(--accent); }
+    ol { padding-left: 20px; line-height: 1.9; color: var(--text-2); font-size: 13px; margin: 0; } h2 { font-size: 15px; margin: 0 0 10px; }
+    .card + .card { margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-head"><div><img src="/assets/logo.png" alt="Codeniac" class="brand-mark" id="logo" style="height:40px;margin-bottom:10px"><h1>Codeniac no celular</h1><p>Use o hub no celular enquanto o computador estiver ligado com o Codeniac aberto.</p></div><a class="btn outline" href="/">Voltar ao Codeniac</a></div>
+    <div id="status" class="card">Carregando...</div>
+    <div class="card"><h2>📶 Na mesma rede Wi-Fi (casa)</h2><ol>
+      <li>Ligue “Permitir acesso pela rede” acima (ou em Configurações → Administração → Rede) e reinicie quando pedir.</li>
+      <li>Se o Windows perguntar sobre o Firewall, marque <b>Redes privadas</b> e clique em <b>Permitir</b>.</li>
+      <li>No celular, conectado ao mesmo Wi-Fi, aponte a câmera para o QR code ou digite o endereço.</li>
+      <li>No Chrome do celular, menu ⋮ → <b>Adicionar à tela inicial</b> para abrir como um app.</li></ol></div>
+    <div class="card"><h2>🌎 De qualquer lugar (4G / outra rede) — Tailscale, grátis</h2><ol>
+      <li>Instale o <b>Tailscale</b> no computador (tailscale.com/download) e entre com sua conta Google ou Microsoft.</li>
+      <li>Instale o app <b>Tailscale</b> no celular (Play Store / App Store) e entre com a <b>mesma conta</b>.</li>
+      <li>Deixe o acesso pela rede ligado. Um endereço começando com <b>100.</b> aparece aqui na lista: use-o no celular.</li>
+      <li>Só os seus aparelhos conectados ao Tailscale conseguem acessar. Nada fica aberto na internet.</li></ol></div>
+    <div class="card"><h2>🔒 Segurança</h2><ol><li>Troque a senha padrão da conta de demonstração (Perfil → Senha).</li><li>Desligue o acesso pela rede quando não precisar.</li><li>Evite ligar em Wi-Fi público (shopping, aeroporto) sem o Tailscale.</li></ol></div>
+  </div>
+  <script type="module">
+    import { applyTheme } from '/js/theme.js';
+    import { qrSvg } from '/js/qr.js';
+    try { applyTheme(JSON.parse(localStorage.getItem('codeniac.look') || '{}')); } catch { applyTheme({}); }
+    const token = localStorage.getItem('codeniac.token');
+    if (!token) location.replace('/login');
+    const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const KIND = { wifi: 'Wi-Fi', ethernet: 'Cabo de rede', tailscale: 'Tailscale (de qualquer lugar)', other: 'Rede', virtual: 'Adaptador virtual' };
+    async function load() {
+      const [net, me] = await Promise.all([fetch('/api/network', { headers: H }).then((r) => r.json()), fetch('/api/auth/me', { headers: H }).then((r) => r.json())]);
+      if (me.system?.images?.logo) { document.getElementById('logo').src = me.system.images.logo; document.getElementById('logo').classList.add('custom'); }
+      const admin = me.user?.role === 'admin';
+      const list = net.addresses.filter((a) => a.kind !== 'virtual');
+      const box = document.getElementById('status');
+      if (!net.enabled) {
+        box.innerHTML = `<h2>Acesso pela rede: <span class="chip">desligado</span></h2><p class="muted" style="font-size:13px">Hoje só este computador abre o Codeniac.</p>
+          ${admin ? '<button class="btn primary" id="on">Ligar acesso pelo celular</button>' : '<p class="muted">Peça ao administrador para ligar.</p>'}`;
+        document.getElementById('on')?.addEventListener('click', async (e) => {
+          e.target.disabled = true; e.target.textContent = 'Ligando e reiniciando...';
+          await fetch('/api/admin/network', { method: 'PUT', headers: H, body: JSON.stringify({ enabled: true }) });
+          await fetch('/api/admin/restart', { method: 'POST', headers: H });
+          const wait = async (n = 0) => { try { const r = await fetch('/api/health'); if (r.ok) return load(); } catch {} if (n < 40) setTimeout(() => wait(n + 1), 1000); };
+          setTimeout(wait, 2500);
+        });
+        return;
+      }
+      box.innerHTML = `<h2>Acesso pela rede: <span class="chip ok">ligado</span></h2>${list.map((a, i) => `<div class="addr" style="margin-top:14px"><div class="qr">${qrSvg(a.url, i === 0 ? 200 : 140)}</div><div class="grow"><small class="muted">${KIND[a.kind] || 'Rede'} · ${esc(a.iface)}</small><div class="url">${esc(a.url)}</div></div></div>`).join('') || '<p class="muted">Nenhuma rede encontrada. Conecte o computador ao Wi-Fi.</p>'}
+        ${admin ? '<div style="margin-top:16px"><button class="btn sm outline" id="off">Desligar acesso pela rede</button></div>' : ''}`;
+      document.getElementById('off')?.addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        await fetch('/api/admin/network', { method: 'PUT', headers: H, body: JSON.stringify({ enabled: false }) });
+        await fetch('/api/admin/restart', { method: 'POST', headers: H });
+        box.innerHTML = '<h2>Desligado.</h2><p class="muted">O Codeniac reiniciou e agora só aceita acesso deste computador.</p>';
+      });
+    }
+    load();
+  </script>
+</body>
+</html>
