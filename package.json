@@ -1,6 +1,6 @@
 {
   "name": "codeniac",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Codeniac — hub pessoal de projetos, finanças, estudos e rotina",
   "type": "module",
   "main": "server/index.js",

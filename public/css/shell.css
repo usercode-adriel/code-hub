@@ -417,3 +417,16 @@ body[data-route="assistente"] .tg { height: auto !important; flex: 1; min-height
   .sheet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .bk-grid { gap: 10px; }
 }
+
+/* ---------- 1.6.1: chat em tela cheia respeita o tamanho do texto e o teclado do celular ---------- */
+@media (max-width: 760px) {
+  body.chat-full .tg {
+    inset: auto !important; top: calc(var(--vvt, 0px) / var(--zoom)) !important; left: 0 !important;
+    width: calc(100vw / var(--zoom)) !important;
+    height: calc(100vh / var(--zoom)) !important;
+    height: calc(var(--vvh, 100dvh) / var(--zoom)) !important;
+  }
+  body.chat-full .tg-chat { min-height: 0; height: 100%; }
+  body.chat-full .tg-messages { min-height: 0; }
+  body.chat-full .tg-composer { flex: none; }
+}

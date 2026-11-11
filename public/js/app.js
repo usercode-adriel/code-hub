@@ -429,6 +429,20 @@ async function route() {
 }
 
 // ---------- Início ----------
+// Altura visível de verdade (descontando barra do navegador e teclado do celular).
+function trackViewport() {
+  const vv = window.visualViewport;
+  const set = () => {
+    document.documentElement.style.setProperty('--vvh', `${Math.round(vv ? vv.height : innerHeight)}px`);
+    document.documentElement.style.setProperty('--vvt', `${Math.round(vv ? vv.offsetTop : 0)}px`);
+  };
+  set();
+  vv?.addEventListener('resize', set);
+  vv?.addEventListener('scroll', set);
+  addEventListener('resize', set);
+}
+trackViewport();
+
 async function boot() {
   let me;
   try { me = await api.get('/auth/me'); } catch { return; }
