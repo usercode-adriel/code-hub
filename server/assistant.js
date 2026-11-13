@@ -332,6 +332,7 @@ async function runOllama(user, conv, text, write) {
   let buf = '';
   const decoder = new TextDecoder();
   for await (const chunk of res.body) {
+    idle();
     buf += decoder.decode(chunk, { stream: true });
     let nl;
     while ((nl = buf.indexOf('\n')) >= 0) {
@@ -350,12 +351,27 @@ async function runOllama(user, conv, text, write) {
 
 // ---------- Gemini (Google) ----------
 async function geminiStream(model, body, write, full = false) {
+  // tempos curtos: se o modelo travar (sobrecarga), desiste logo e tenta o próximo modelo
+  const ctrl = new AbortController();
+  let timer = setTimeout(() => ctrl.abort(new Error('O Gemini demorou para começar a responder')), 25000);
+  const idle = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(new Error('O Gemini parou de responder')), 30000); };
+  const total = setTimeout(() => ctrl.abort(new Error('Resposta longa demais')), 180000);
+  try {
+    return await geminiStreamInner(model, body, write, full, ctrl.signal, idle);
+  } catch (err) {
+    if (ctrl.signal.aborted) { const e = new Error(ctrl.signal.reason?.message || 'Tempo esgotado'); e.status = 504; throw e; }
+    throw err;
+  } finally { clearTimeout(timer); clearTimeout(total); }
+}
+
+async function geminiStreamInner(model, body, write, full, signal, idle) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120000),
+    signal,
   });
+  idle();
   if (!res.ok || !res.body) {
     const err = await res.json().catch(() => ({}));
     const e = new Error(err.error?.message || `Gemini respondeu ${res.status}`);

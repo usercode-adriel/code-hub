@@ -37,7 +37,7 @@ router.put('/config', requireAdmin, async (req, res) => {
 
 // ---------- Chave do Gemini (só administrador). Fica no .env da pasta de dados, fora do banco e dos backups. ----------
 const ENV_FILE = () => path.join(DATA_DIR, '.env');
-function setEnvVar(name, value) {
+export function setEnvVar(name, value) {
   let env = fs.existsSync(ENV_FILE()) ? fs.readFileSync(ENV_FILE(), 'utf8') : '';
   env = env.replace(new RegExp(`^[ \\t]*${name}[ \\t]*=.*(\\r?\\n)?`, 'gm'), '');
   if (value) env = `${env}${env && !/\n$/.test(env) ? '\r\n' : ''}${name}=${value}\r\n`;

@@ -15,6 +15,9 @@ import admin, { setRestart } from './routes/admin.js';
 import aiRoutes from './ai.js';
 import library, { loadLibrary, saveLibraryNow } from './library.js';
 import automations from './automations.js';
+import connect from './routes/connect.js';
+import { startTelegram } from './telegram.js';
+import './push.js';
 import chatFiles from './routes/chatfiles.js';
 import { confirmAction, undoAction, actionStatuses } from './agent.js';
 import {
@@ -32,6 +35,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(APP_ROOT, 'public');
 
 app.disable('x-powered-by');
+// atrás de um proxy (Tailscale serve, hospedagem na nuvem): confia no IP repassado
+if (process.env.TRUST_PROXY || process.env.HOST === '0.0.0.0') app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 app.use(express.json({ limit: '4mb' }));
 app.use((_req, res, next) => {
   res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' });
@@ -160,6 +165,7 @@ app.use('/api', api);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
+app.use('/api', requireAuth, connect);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
 
@@ -190,6 +196,7 @@ function listen(attempt = 0) {
 }
 listen();
 startScheduler();
+startTelegram();
 
 function shutdown() {
   saveNow();
