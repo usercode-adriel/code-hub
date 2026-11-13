@@ -5,6 +5,7 @@ import { store, on, emit, refreshProjects, refreshUnread, setUser, applySettings
 import { icon } from './icons.js';
 import { $, $$, esc, avatar, chatMd, toast, timeAgo, notifIcon, modal, brl, todayISO } from './ui.js';
 import { openProjectModal } from './components.js';
+import { animateView } from './fx.js';
 import { TOOL_LABEL, botAvatar, bindDictation, COMMANDS, MODE_LABEL } from './chatui.js';
 
 if (!auth.token) location.replace('/login');
@@ -12,7 +13,7 @@ if (!auth.token) location.replace('/login');
 // Menu: chave da rota, rótulo, ícone
 export const NAV = [
   ['Principal', [['dashboard', 'Início', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
-  ['Sistema', [['notifications', 'Notificações', 'bell'], ['achievements', 'Conquistas', 'trophy'], ['settings', 'Configurações', 'settings']]],
+  ['Sistema', [['automacoes', 'Automações', 'zap'], ['notifications', 'Notificações', 'bell'], ['achievements', 'Conquistas', 'trophy'], ['settings', 'Configurações', 'settings']]],
 ];
 export const NAV_KEYS = NAV.flatMap(([, items]) => items.map(([k, l]) => [k, l]));
 
@@ -23,7 +24,7 @@ const VIEWS = {
   financeiro: () => import('./views/financeiro.js'), estudos: () => import('./views/estudos.js'), diario: () => import('./views/diario.js'),
   decisoes: () => import('./views/decisoes.js'), notifications: () => import('./views/notifications.js'), achievements: () => import('./views/achievements.js'),
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
-  livros: () => import('./views/livros.js'),
+  livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
 };
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
@@ -45,8 +46,10 @@ function renderSidebar() {
   $('#sidebar').innerHTML = `<a class="rail-logo" href="#/dashboard" aria-label="${esc(store.appName)}"><img src="${esc(store.images.logoIcon || '/assets/icon.png')}" alt=""></a>
     <nav class="rail-nav">${main[1].map(btn).join('')}<span class="rail-sep"></span>${sys[1].map(btn).join('')}
       <button class="rail-btn rail-only-mid" id="railProjects" data-tip="Projetos" aria-label="Projetos">${icon('folder', 19)}</button></nav>
+    <button class="rail-btn rail-out" id="railOut" data-tip="Sair da conta" aria-label="Sair da conta">${icon('logout', 18)}</button>
     <button class="rail-add" id="railAdd" data-tip="Capturar (Alt+N)" aria-label="Captura rápida">${icon('plus', 18)}</button>`;
   $('#railAdd').onclick = () => openCapture();
+  $('#railOut').onclick = logout;
   $('#railProjects').onclick = () => openSheet();
   renderRightRail();
   renderBottomNav();
@@ -75,6 +78,21 @@ function renderBottomNav() {
   $('#bnMenu').onclick = () => openSheet();
 }
 
+// Sair da conta (também cancela as notificações deste aparelho).
+export async function logout() {
+  const { confirmDialog } = await import('./ui.js');
+  if (!(await confirmDialog('Sair da conta', 'Você vai voltar para a tela de login. Seus dados continuam salvos.', 'Sair'))) return;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub) { await api.post('/push/unsubscribe', { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+  } catch { /* sem notificações */ }
+  auth.clear();
+  localStorage.removeItem('codeniac.conv');
+  localStorage.removeItem('codeniac.panelConv');
+  location.href = '/login';
+}
+
 // Menu completo (celular e tablet): telas, projetos e conta.
 function openSheet() {
   closeSheet();
@@ -94,7 +112,7 @@ function openSheet() {
     if (e.target === sheet || e.target.closest('a')) closeSheet();
     if (act === 'bot') { closeSheet(); toggleAssistant(); }
     if (act === 'proj') { closeSheet(); openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; }); }
-    if (act === 'logout') { auth.clear(); localStorage.removeItem('codeniac.conv'); location.href = '/login'; }
+    if (act === 'logout') logout();
   });
 }
 function closeSheet() { document.querySelectorAll('.sheet-back').forEach((x) => x.remove()); }
@@ -297,6 +315,12 @@ function showChatHead(ev) {
   head._t = setTimeout(() => head.classList.add('mini'), 10000);
   while (wrap.children.length > 3) wrap.lastElementChild.remove();
   if (store.settings.notifySound) beep();
+  navigator.vibrate?.([30, 40, 30]);
+  updateBadge();
+}
+function updateBadge() {
+  const n = (store.chatUnread || 0) + (store.unread || 0);
+  try { if (n) navigator.setAppBadge?.(n); else navigator.clearAppBadge?.(); } catch { /* sem suporte */ }
 }
 
 // ---------- Captura rápida ----------
@@ -402,6 +426,7 @@ async function route() {
   let name = parts[0] || store.settings.homePage || 'dashboard';
   if (!VIEWS[name]) name = 'dashboard';
   if (name === 'estudos' && parts[1] === 'livros') { location.replace('#/livros'); return; }
+  if (parts[0] === 'capturar') { location.replace('#/dashboard'); setTimeout(() => openCapture(), 300); return; }
   if (store.menu?.hidden?.includes(name) && !['settings', 'profile', 'project'].includes(name)) name = 'dashboard';
   document.body.classList.remove('sidebar-open', 'assistant-open');
   closeSheet();
@@ -419,6 +444,7 @@ async function route() {
     el.className = 'view';
     view.replaceChildren(el);
     cleanup = await mod.default(el, parts.slice(1), new URLSearchParams(query));
+    if (seq === routeSeq) animateView(el);
   } catch (err) {
     console.error(err);
     if (seq === routeSeq) view.innerHTML = `<div class="empty-state"><b>Não foi possível abrir esta tela</b><p>${esc(err.message)}</p></div>`;
@@ -442,6 +468,36 @@ function trackViewport() {
   addEventListener('resize', set);
 }
 trackViewport();
+
+// Sugestão de turno do InDrive e outros avisos rápidos em cartão.
+function promptCard({ icon: ic = 'car', title, text, actions }) {
+  document.querySelector('.prompt-card')?.remove();
+  const el = document.createElement('div');
+  el.className = 'prompt-card';
+  el.innerHTML = `<span class="pc-ico">${icon(ic, 20)}</span><div class="pc-body"><b>${esc(title)}</b><p>${esc(text)}</p><div class="pc-acts">${actions.map((a, i) => `<button class="btn sm ${i === 0 ? 'primary' : 'outline'}" data-i="${i}">${esc(a.label)}</button>`).join('')}</div></div>`;
+  document.body.append(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  el.querySelectorAll('[data-i]').forEach((b) => { b.onclick = async () => { el.remove(); await actions[Number(b.dataset.i)].run?.(); }; });
+}
+async function checkShift() {
+  try {
+    const r = await api.get('/shifts/suggest');
+    if (!r.suggest) return;
+    promptCard({ title: 'Hora de rodar?', text: r.message, actions: [
+      { label: 'Iniciar turno', run: async () => { await api.post('/shifts/start', {}); toast('Turno iniciado', 'Boa sorte nas corridas! 🚗', 'success'); emit('data-changed'); } },
+      { label: 'Hoje não', run: () => api.post('/shifts/suggest/dismiss') },
+    ] });
+  } catch { /* ok */ }
+}
+
+// App no celular: registra o service worker (precisa de HTTPS ou do próprio PC).
+async function registerSW() {
+  if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+    navigator.serviceWorker.addEventListener('message', (e) => { if (e.data?.type === 'open' && e.data.url) location.href = e.data.url; });
+  } catch (err) { console.warn('service worker', err); }
+}
 
 async function boot() {
   let me;
@@ -472,5 +528,9 @@ async function boot() {
   bindVocab();
   connectStream();
   route();
+  registerSW();
+  setTimeout(checkShift, 2500);
+  on('unread', updateBadge);
+  updateBadge();
 }
 boot();

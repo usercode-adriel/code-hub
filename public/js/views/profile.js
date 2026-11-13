@@ -17,7 +17,8 @@ export default async function render(el) {
           <div class="form-actions"><button class="btn primary">Salvar</button></div></form></section>
         <section class="card"><h3 class="title">${icon('shield', 15)} Senha</h3><p class="sub">${u.email === 'admin@codeniac.dev' ? '⚠️ Você ainda usa a conta de demonstração. Troque o e-mail e a senha.' : 'Use pelo menos 6 caracteres.'}</p>
           <form class="form" id="pw"><div class="form-row"><div class="field"><label>Senha atual</label><input type="password" name="current" autocomplete="current-password"></div><div class="field"><label>Nova senha</label><input type="password" name="next" autocomplete="new-password"></div></div><div class="form-actions"><button class="btn primary">Alterar senha</button></div></form></section>
-        <section class="card"><h3 class="title">${icon('download', 15)} Meus dados</h3><p class="sub">Baixe tudo (tarefas, páginas, finanças, diário, cartões...) em um arquivo JSON.</p><button class="btn outline" id="exp">${icon('download', 14)} Exportar dados</button></section></div></div>`;
+        <section class="card"><h3 class="title">${icon('download', 15)} Meus dados</h3><p class="sub">Baixe tudo (tarefas, páginas, finanças, diário, cartões...) em um arquivo JSON.</p><button class="btn outline" id="exp">${icon('download', 14)} Exportar dados</button></section>
+        <section class="card"><h3 class="title">${icon('logout', 15)} Sair da conta</h3><p class="sub">Volta para a tela de login neste aparelho. Seus dados continuam salvos.</p><button class="btn danger" id="out">${icon('logout', 14)} Sair</button></section></div></div>`;
     bindUploadZone(el.querySelector('#zone'), el.querySelector('#file'), async (file) => {
       if (!validateImage(file)) return;
       const r = await api.upload('/profile/avatar', file);
@@ -26,6 +27,7 @@ export default async function render(el) {
     el.querySelector('#rmAv')?.addEventListener('click', async () => { const r = await api.del('/profile/avatar'); setUser(r.user); draw(); });
     el.querySelector('#pf').onsubmit = async (e) => { e.preventDefault(); try { const r = await api.put('/profile', formData(e.target)); setUser(r.user); toast('Perfil salvo', '', 'success'); draw(); } catch (err) { toast('Erro', err.message, 'error'); } };
     el.querySelector('#pw').onsubmit = async (e) => { e.preventDefault(); try { await api.put('/profile/password', formData(e.target)); toast('Senha alterada', '', 'success'); e.target.reset(); } catch (err) { toast('Erro', err.message, 'error'); } };
+    el.querySelector('#out').onclick = () => import('../app.js').then((m) => m.logout());
     el.querySelector('#exp').onclick = async () => {
       const res = await fetch('/api/export', { headers: { Authorization: `Bearer ${auth.token}` } });
       const blob = await res.blob();

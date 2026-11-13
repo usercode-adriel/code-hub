@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.6.1';
+export const APP_VERSION = '1.7.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -43,6 +43,13 @@ export const CHANGELOG = [
     title: 'Codeniac 1.6: chats vivos 💬',
     message: 'Mande fotos e PDFs no chat e pergunte sobre eles; personagens mandam mensagens sozinhos sobre a função deles, com balãozinho flutuante; '
       + 'crie grupos em que os personagens conversam entre si; respostas mais naturais e celular 100% ajustado.',
+  },
+  {
+    version: '1.7.0',
+    title: 'Codeniac 1.7: a IA agora age por você 🤖',
+    message: 'Peça em uma frase e a IA registra, cria, paga e marca no sistema (com confirmação e desfazer), consulta seus dados, lê notas fiscais e lança, '
+      + 'e guarda memórias suas. Novas automações (rotinas, plano do dia, revisão semanal, assinaturas detectadas, sugestão de turno), voz e modo ligação, '
+      + 'debate de decisões, cápsula do tempo, personagens no Telegram e app no celular com notificações.',
   },
 ];
 

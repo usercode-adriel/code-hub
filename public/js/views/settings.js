@@ -8,7 +8,7 @@ import { THEMES, COLOR_LABELS, resolveTheme, presetLayout } from '../theme.js';
 import { PERSONA } from '../chatui.js';
 import { NAV_KEYS } from '../app.js';
 
-const TABS = [['aparencia', 'Aparência', 'palette'], ['rotina', 'Rotina', 'sun'], ['assistente', 'Assistente', 'bot'], ['notificacoes', 'Notificações', 'bell'], ['dados', 'Dados', 'download'], ['admin', 'Administração', 'shield']];
+const TABS = [['aparencia', 'Aparência', 'palette'], ['rotina', 'Rotina', 'sun'], ['assistente', 'Assistente', 'bot'], ['conexoes', 'Conexões', 'link'], ['notificacoes', 'Notificações', 'bell'], ['dados', 'Dados', 'download'], ['admin', 'Administração', 'shield']];
 const AVATARS = ['🤖', '🦉', '🐱', '🦊', '🐼', '🧠', '👾', '🚀', '🌵', '🧙', '🐉', '⚡'];
 const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
@@ -72,6 +72,7 @@ function routine(box) {
   const num = (k, min, max, step = 1) => `<input class="input" type="number" min="${min}" max="${max}" step="${step}" data-set="${k}" value="${s[k]}" style="width:90px">`;
   box.innerHTML = `<section class="card"><h3 class="title">${icon('sun', 15)} Briefing e rotina</h3><p class="sub">Tudo calculado no seu computador, sem IA e sem internet.</p>
     ${sw('briefingEnabled', 'Briefing automático', 'Todo dia, no horário abaixo, chega uma notificação com agenda, pendências, contas e prioridades')}
+    ${sw('weeklyReview', 'Revisão semanal', 'Domingo, no horário de encerramento do dia, o assistente manda o resumo da semana e os focos da próxima')}
     ${row('Horário do briefing', '', `<input class="input" type="time" data-set="briefingTime" value="${s.briefingTime}">`)}
     ${row('Encerramento do dia', 'Lembrete para registrar o que fez e planejar amanhã', `<input class="input" type="time" data-set="dayCloseTime" value="${s.dayCloseTime}">`)}
     ${row('Pomodoro (minutos)', '', num('pomodoroMinutes', 5, 90))}
@@ -87,7 +88,7 @@ async function assistantTab(box) {
   const s = store.settings;
   let ai = null;
   try { ai = await api.get('/ai/status'); } catch { /* sem acesso */ }
-  box.innerHTML = `<section class="card"><h3 class="title">${icon('bot', 15)} Assistente</h3><p class="sub">Responde sobre todo o sistema e executa comandos como /gasto, /corrida, /tarefa e /nota.</p>
+  box.innerHTML = `<section class="card"><h3 class="title">${icon('bot', 15)} Assistente</h3><p class="sub">Com o Gemini ligado, ele conversa, consulta seus dados e faz coisas no sistema por você (registrar, criar, pagar, marcar...).</p>
       ${sw('assistantEnabled', 'Assistente ligado')}
       ${row('Nome', '', `<input class="input" data-set="assistantName" value="${esc(s.assistantName)}" maxlength="40" style="width:200px">`)}
       ${row('Como ele te chama', 'Apelido (opcional)', `<input class="input" data-set="assistantNickname" value="${esc(s.assistantNickname || '')}" maxlength="40" style="width:200px">`)}
@@ -125,6 +126,92 @@ async function assistantTab(box) {
     const r = await api.del('/ai/gemini-key'); store.aiMode = r.mode; toast('Chave removida'); assistantTab(box);
   });
   bindCommon(box);
+  // memórias de longo prazo
+  const mem = document.createElement('section');
+  mem.className = 'card';
+  mem.style.marginTop = 'var(--gap)';
+  box.append(mem);
+  const paintMem = async () => {
+    const list = await api.get('/assistant/memories');
+    mem.innerHTML = `<h3 class="title">${icon('sparkles', 15)} Memórias</h3><p class="sub">O que a IA guardou sobre você para conversas mais pessoais. Valem para todos os personagens. Apague o que não quiser.</p>
+      <form class="inbox-input" id="memForm"><input class="input" name="t" maxlength="300" placeholder="Adicionar: ex. Tenho uma filha chamada Ana"><button class="btn sm primary">${icon('plus', 12)}</button></form>
+      <div class="list">${list.map((m) => `<div class="row-item"><span class="kind-ico">🧠</span><div class="grow"><b style="white-space:normal">${esc(m.text)}</b><small>${m.source === 'usuario' ? 'você adicionou' : 'guardada pela IA'} · ${new Date(m.createdAt).toLocaleDateString('pt-BR')}</small></div><button class="icon-btn sm ghost" data-mdel="${m.id}" aria-label="Apagar">${icon('trash', 13)}</button></div>`).join('') || '<div class="empty-mini">Nenhuma memória ainda. Conte sobre você no chat (metas, gostos, rotina) e ela aparece aqui.</div>'}</div>`;
+    mem.querySelector('#memForm').onsubmit = async (e) => { e.preventDefault(); const t = e.target.t.value.trim(); if (!t) return; await api.post('/assistant/memories', { text: t }); paintMem(); };
+    mem.querySelectorAll('[data-mdel]').forEach((b) => { b.onclick = async () => { await api.del(`/assistant/memories/${b.dataset.mdel}`); paintMem(); }; });
+  };
+  paintMem();
+}
+
+// ---------------- Conexões: Telegram e app no celular ----------------
+const b64ToBytes = (b64) => { const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (b64.length % 4)) % 4)); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+async function connectTab(box) {
+  const [tgi, tsi] = await Promise.all([api.get('/telegram'), store.user.role === 'admin' ? api.get('/admin/tailscale').catch(() => null) : null]);
+  const secure = window.isSecureContext;
+  const reg = secure && 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+  const sub = await reg?.pushManager?.getSubscription().catch(() => null);
+  const standalone = matchMedia('(display-mode: standalone)').matches;
+  box.innerHTML = `
+    <section class="card"><h3 class="title">${icon('send', 15)} Telegram</h3><p class="sub">Converse com o assistente e seus personagens pelo Telegram do celular, mesmo com o Codeniac fechado no navegador. As mensagens automáticas também chegam lá. O computador precisa estar ligado com o Codeniac aberto.</p>
+      ${tgi.configured ? `<div class="kv" style="margin-bottom:14px"><div><span>Robô</span><b>${tgi.bot ? `@${esc(tgi.bot.username)}` : '—'} ${tgi.running ? '<span class="chip ok">ligado</span>' : '<span class="chip">parado</span>'}</b></div>${tgi.error ? `<div><span>Aviso</span><b style="color:var(--warn)">${esc(tgi.error)}</b></div>` : ''}</div>` : ''}
+      ${!tgi.configured ? (tgi.isAdmin ? `<ol class="steps"><li>No Telegram, abra o <b>@BotFather</b>, envie <b>/newbot</b>, escolha um nome e um usuário terminado em “bot”.</li><li>Ele te manda um <b>token</b> (ex.: 123456789:AAH...). Cole abaixo.</li></ol>
+          <form class="inbox-input" id="tgTok"><input class="input" type="password" name="t" placeholder="Token do @BotFather" autocomplete="off"><button class="btn primary sm">Salvar e testar</button></form>` : '<p class="muted">Peça ao administrador para configurar o robô do Telegram.</p>')
+        : tgi.linked ? `<div class="setting-row"><div class="txt"><b>Conectado como ${esc(tgi.username || 'você')}</b><small>Comandos no Telegram: /com Nome (falar com um personagem), /quem, /desvincular</small></div><button class="btn sm outline" id="tgUnlink">Desconectar</button></div>
+          ${row('Receber mensagens automáticas no Telegram', 'Rotinas, lembretes, revisão semanal, cápsulas e recados dos personagens', `<label class="switch"><input type="checkbox" id="tgFwd" ${tgi.forward ? 'checked' : ''}><span></span></label>`)}`
+        : `<ol class="steps"><li>No Telegram, abra <b>${tgi.bot ? `@${esc(tgi.bot.username)}` : 'o seu robô'}</b> e toque em <b>Iniciar</b>.</li><li>Gere o código abaixo e envie para ele: <b>/vincular CÓDIGO</b> (vale 15 minutos).</li></ol>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary sm" id="tgCode">Gerar código</button><b id="tgCodeOut" style="font-size:22px;letter-spacing:4px"></b>${tgi.bot ? `<a class="btn sm outline" href="https://t.me/${esc(tgi.bot.username)}" target="_blank" rel="noopener">Abrir no Telegram</a>` : ''}</div>`}
+      ${tgi.configured && tgi.isAdmin ? '<div class="form-actions"><button class="btn sm danger" id="tgOff">Remover robô</button></div>' : ''}
+      ${tgi.configured && tgi.mode !== 'gemini' ? '<p class="hint" style="margin-top:10px">Dica: ligue o Gemini para conversas livres e ações pelo Telegram.</p>' : ''}</section>
+
+    <section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('bell', 15)} App no celular e notificações</h3>
+      <p class="sub">Instale o Codeniac como app no celular: ícone na tela inicial, atalhos (Capturar, Chat, Finanças, Turno) ao segurar o ícone e notificações de verdade, mesmo com a tela bloqueada. Os dados são os mesmos do computador, porque o app conversa com o Codeniac do seu PC.</p>
+      ${secure ? `${row('Notificações neste aparelho', sub ? 'Ligadas: mensagens dos personagens e lembretes chegam aqui' : 'Desligadas', `<button class="btn sm ${sub ? 'outline' : 'primary'}" id="pushBtn">${sub ? 'Desligar' : 'Ligar notificações'}</button>`)}
+          ${sub ? row('Testar', 'Manda uma notificação de teste para os aparelhos ligados', '<button class="btn sm outline" id="pushTest">Enviar teste</button>') : ''}
+          ${row('Instalar o app', standalone ? 'Você já está usando o app instalado ✨' : 'Android (Chrome): menu ⋮ → “Instalar app” ou “Adicionar à tela inicial”. iPhone (Safari): Compartilhar → “Adicionar à Tela de Início”.', '')}`
+        : `<div class="honest">Para instalar como app e receber notificações, o navegador exige uma conexão segura (HTTPS). Neste endereço (${esc(location.host)}) isso não está disponível. Use o endereço HTTPS do Tailscale abaixo no celular.</div>`}
+      <p class="hint" style="margin-top:10px">Widget na tela inicial não é permitido para apps web no Android/iPhone; no lugar dele, use os atalhos do ícone e as notificações.</p></section>
+
+    ${store.user.role === 'admin' ? `<section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('shield', 15)} Endereço seguro (HTTPS) pelo Tailscale</h3>
+      <p class="sub">Cria um endereço https://… só para os seus aparelhos do Tailscale, com cadeado. É ele que permite instalar o app e receber notificações no celular, de qualquer lugar.</p>
+      ${!tsi ? '<p class="muted">Não consegui verificar o Tailscale.</p>' : !tsi.installed ? '<div class="honest">O Tailscale não está instalado neste computador. Baixe em tailscale.com/download, entre na sua conta e volte aqui.</div>'
+        : `<div class="kv"><div><span>Situação</span><b>${tsi.running ? 'conectado' : 'desconectado'}</b></div>${tsi.url ? `<div><span>Endereço</span><b>${esc(tsi.url)}</b></div>` : ''}<div><span>HTTPS</span><b>${tsi.serving ? '<span class="chip ok">ligado</span>' : 'desligado'}</b></div></div>
+          <div class="form-actions" style="justify-content:flex-start;margin-top:12px">${tsi.serving ? `<a class="btn sm primary" href="${esc(tsi.url)}" target="_blank" rel="noopener">Abrir endereço seguro</a><button class="btn sm outline" id="tsOff">Desligar HTTPS</button>` : '<button class="btn sm primary" id="tsOn">Ligar HTTPS</button>'}</div>
+          <p class="hint" style="margin-top:10px">Na primeira vez, o Tailscale pode pedir para ativar “HTTPS Certificates” no painel dele (login.tailscale.com → DNS). Se aparecer um link, abra, ative e clique em “Ligar HTTPS” de novo. No celular, use o endereço com o Tailscale ligado.</p>`}</section>` : ''}`;
+
+  box.querySelector('#tgTok')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try { const r = await api.put('/telegram/token', { token: e.target.t.value.trim() }); toast('Telegram conectado', `@${r.bot.username}`, 'success'); connectTab(box); } catch (err) { toast('Não funcionou', err.message, 'error'); }
+  });
+  box.querySelector('#tgCode')?.addEventListener('click', async () => {
+    const r = await api.post('/telegram/code');
+    box.querySelector('#tgCodeOut').textContent = r.code;
+    const poll = setInterval(async () => { if (!document.body.contains(box)) return clearInterval(poll); const st = await api.get('/telegram'); if (st.linked) { clearInterval(poll); toast('Telegram conectado! 🎉', '', 'success'); connectTab(box); } }, 3000);
+    setTimeout(() => clearInterval(poll), 15 * 60 * 1000);
+  });
+  box.querySelector('#tgUnlink')?.addEventListener('click', async () => { await api.del('/telegram/link'); connectTab(box); });
+  box.querySelector('#tgFwd')?.addEventListener('change', (e) => api.put('/telegram/prefs', { forward: e.target.checked }));
+  box.querySelector('#tgOff')?.addEventListener('click', async () => { if (await confirmDialog('Remover robô do Telegram', 'Ninguém mais vai conseguir conversar pelo Telegram até configurar de novo.', 'Remover')) { await api.del('/telegram/token'); connectTab(box); } });
+  box.querySelector('#pushBtn')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      const r = reg || await navigator.serviceWorker.register('/sw.js');
+      if (sub) { await api.post('/push/unsubscribe', { endpoint: sub.endpoint }); await sub.unsubscribe(); toast('Notificações desligadas neste aparelho'); return connectTab(box); }
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('Permissão negada', 'Libere as notificações do site nas configurações do navegador.', 'error'); e.target.disabled = false; return; }
+      const { publicKey } = await api.get('/push/key');
+      const ns = await (await navigator.serviceWorker.ready).pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+      await api.post('/push/subscribe', { subscription: ns.toJSON(), device: navigator.userAgent.slice(0, 80) });
+      toast('Notificações ligadas! 🔔', 'Mandei um teste.', 'success');
+      api.post('/push/test');
+      connectTab(box);
+    } catch (err) { toast('Não deu para ligar', err.message, 'error'); e.target.disabled = false; }
+  });
+  box.querySelector('#pushTest')?.addEventListener('click', async () => { const r = await api.post('/push/test'); toast(r.sent ? 'Notificação enviada' : 'Nenhum aparelho recebeu', r.sent ? '' : 'Ligue as notificações de novo.', r.sent ? 'success' : 'error'); });
+  box.querySelector('#tsOn')?.addEventListener('click', async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Ligando...';
+    try { await api.post('/admin/tailscale/serve', { enable: true }); toast('HTTPS ligado', 'Use o endereço seguro no celular.', 'success'); connectTab(box); }
+    catch (err) { modal({ title: 'O Tailscale pediu uma ação', body: `<p style="white-space:pre-wrap;font-size:12px">${esc(err.message)}</p><p class="muted" style="font-size:12px">Se apareceu um link, abra no navegador, ative e tente de novo.</p>` }); e.target.disabled = false; e.target.textContent = 'Ligar HTTPS'; }
+  });
+  box.querySelector('#tsOff')?.addEventListener('click', async () => { await api.post('/admin/tailscale/serve', { enable: false }); connectTab(box); });
 }
 
 // ---------------- Notificações ----------------
@@ -260,7 +347,7 @@ export default async function render(el, [tab = 'aparencia']) {
     <div class="tabs settings-tabs" style="flex-wrap:wrap;width:auto">${tabs.map(([k, l, ic]) => `<button data-t="${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 13)} ${l}</button>`).join('')}</div><div id="tab"></div>`;
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => { location.hash = `#/settings/${b.dataset.t}`; }; });
   const box = el.querySelector('#tab');
-  const fn = { aparencia: appearance, rotina: routine, assistente: assistantTab, notificacoes: notifTab, dados: dataTab, admin: adminTab }[cur];
+  const fn = { aparencia: appearance, rotina: routine, assistente: assistantTab, conexoes: connectTab, notificacoes: notifTab, dados: dataTab, admin: adminTab }[cur];
   await fn(box);
   return () => { if (Object.keys(pending).length) patch({}, true); };
 }

@@ -99,7 +99,7 @@ function importModal(done) {
 }
 
 async function draw(el) {
-  const [sum, all, subsAll, billsAll] = await Promise.all([api.get(`/money/summary?month=${month}`), coll('money').list(), coll('subscriptions').list(), coll('bills').list()]);
+  const [sum, all, subsAll, billsAll, recurring] = await Promise.all([api.get(`/money/summary?month=${month}`), coll('money').list(), coll('subscriptions').list(), coll('bills').list(), api.get('/money/recurring').catch(() => [])]);
   const list = all.filter((x) => x.date.startsWith(month));
   const months = [...new Set([todayISO().slice(0, 7), ...sum.months, month])].sort().reverse();
   const cats = Object.entries(sum.byCat).sort((a, b) => b[1] - a[1]);
@@ -117,6 +117,9 @@ async function draw(el) {
       ${kpi('Assinaturas e fixos', `${brl(sum.subscriptions.monthly)}/mês`, `${brl(sum.subscriptions.yearly)} por ano · ${sum.subscriptions.count} ativa(s)`)}
       ${kpi('InDrive no mês', brl(sum.indrive?.net || 0), `${brl(sum.indrive?.in || 0)} entrou · <a href="#/garagem" style="color:var(--accent)">Garagem</a>`)}
     </section>
+    ${recurring.length ? `<section class="card" style="margin-bottom:var(--gap)"><div class="section-head"><h3>${icon('refresh', 14)} Gastos que se repetem todo mês</h3><small class="muted">encontrados nos seus lançamentos</small></div>
+      ${recurring.map((r, i) => `<div class="recur" data-rc="${i}"><span class="kind-ico">🔁</span><div class="grow"><b>${esc(r.name)}</b><br><small class="muted">${brl(r.amount)} por mês · por volta do dia ${r.day} · apareceu em ${r.months} meses</small></div><button class="btn sm primary" data-add>Virar assinatura</button><button class="btn sm outline" data-ign>Ignorar</button></div>`).join('')}
+      <p class="hint" style="margin:10px 0 0">Cadastrando como assinatura, você vê o custo por ano e recebe aviso antes de cada cobrança.</p></section>` : ''}
     <div class="cols-21">
       <section class="card"><div class="section-head"><h3>${icon('list', 14)} Lançamentos</h3><input class="input" id="filter" placeholder="Filtrar..." style="height:30px;max-width:200px"></div>
         <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="rows">
@@ -136,6 +139,15 @@ async function draw(el) {
   const reload = () => draw(el);
   el.querySelector('#month').onchange = (e) => { month = e.target.value; reload(); };
   el.querySelector('#imp').onclick = () => importModal(reload);
+  el.querySelectorAll('[data-rc]').forEach((row) => {
+    const r = recurring[Number(row.dataset.rc)];
+    row.querySelector('[data-add]').onclick = async () => {
+      const d = new Date(); d.setDate(Math.min(r.day, 28)); if (d < new Date()) d.setMonth(d.getMonth() + 1);
+      await coll('subscriptions').add({ name: r.name, amount: r.amount, cycle: 'monthly', nextCharge: d.toISOString().slice(0, 10), category: r.category, active: true });
+      toast('Assinatura cadastrada', `${r.name} — ${brl(r.amount)}/mês`, 'success'); reload();
+    };
+    row.querySelector('[data-ign]').onclick = async () => { await api.post('/money/recurring/ignore', { key: r.key }); reload(); };
+  });
   el.querySelector('#filter').oninput = (e) => { const q = e.target.value.toLowerCase(); el.querySelectorAll('#rows tr[data-m]').forEach((tr) => { tr.hidden = q && !tr.dataset.s.includes(q); }); };
   const moneyForm = (m = {}) => formModal({ title: m.id ? 'Editar lançamento' : 'Novo lançamento', fields: [
     { name: 'type', label: 'Tipo', type: 'select', value: m.amount > 0 ? 'in' : 'out', options: [['out', 'Saída (gasto)'], ['in', 'Entrada']] },

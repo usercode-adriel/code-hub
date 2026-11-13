@@ -1,7 +1,7 @@
 ; Instalador do Codeniac para Windows (por usuário, sem precisar de administrador).
 Unicode true
 !define APP "Codeniac"
-!define VERSION "1.6.1"
+!define VERSION "1.7.0"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Codeniac"
 !include MUI2.nsh
 !include FileFunc.nsh
@@ -18,7 +18,7 @@ BrandingText "Codeniac ${VERSION}"
 !define MUI_UNICON "codeniac.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Codeniac ${VERSION}"
-!define MUI_WELCOMEPAGE_TEXT "Seu hub pessoal de projetos, rotina, InDrive, finanças e estudos.$\r$\n$\r$\nNovidades: fotos e PDFs no chat, personagens que mandam mensagens sozinhos, grupos de personagens e celular 100% ajustado.$\r$\n$\r$\nSe você já usa o Codeniac, seus dados e seu logo são mantidos."
+!define MUI_WELCOMEPAGE_TEXT "Seu hub pessoal de projetos, rotina, InDrive, finanças e estudos.$\r$\n$\r$\nNovidades: a IA age no sistema por você, automações, voz e modo ligação, personagens no Telegram e app no celular com notificações.$\r$\n$\r$\nSe você já usa o Codeniac, seus dados e seu logo são mantidos."
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION OpenNow
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o Codeniac agora"

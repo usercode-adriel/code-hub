@@ -8,10 +8,10 @@ OutFile "${OUT}"
 Icon "codeniac.ico"
 SilentInstall silent
 RequestExecutionLevel user
-VIProductVersion "1.6.1.0"
+VIProductVersion "1.7.0.0"
 VIAddVersionKey "ProductName" "Codeniac"
 VIAddVersionKey "FileDescription" "Codeniac"
-VIAddVersionKey "FileVersion" "1.6.1"
+VIAddVersionKey "FileVersion" "1.7.0"
 VIAddVersionKey "LegalCopyright" "Codeniac"
 Section
   ${GetParameters} $0

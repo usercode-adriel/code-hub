@@ -51,6 +51,8 @@ export default async function render(el) {
             <div class="meta">${focus.dueDate ? dmy(focus.dueDate) : 'sem prazo'}<small>${isLate(focus) ? 'atrasada' : focus.status === 'doing' ? 'em andamento' : 'a fazer'}</small></div>
             <div class="acts"><button class="round-btn go" id="fDone" title="Concluir">${icon('check', 14)}</button><button class="round-btn" id="fOpen" title="Abrir">${icon('edit', 13)}</button></div></div>`
           : `<div class="dl-row"><span class="th">${icon('trophy', 26)}</span><div class="tx"><b>Tudo em dia!</b><span class="chip">nenhuma tarefa aberta</span></div><div class="acts"><button class="round-btn go" id="fNew" title="Nova tarefa">${icon('plus', 14)}</button></div></div>`}
+        <div class="section-head" style="margin-top:26px"><h3 style="font-size:17px">Plano do dia</h3><button class="see-more" id="planNew">${icon('sparkles', 12)} Montar com IA</button></div>
+        <div class="card plan-card" id="plan"></div>
       </div>
       <div class="stat-card"><div class="section-head"><h3 style="font-size:17px">Sua estatística</h3><a class="see-more" href="#/achievements">${icon('chevRight', 14)}</a></div>
         <div class="blob"><div class="blob-in"><small>Tarefas concluídas</small><b>${d.totals.done.toLocaleString('pt-BR')}</b><small>${d.totals.progress}% do total</small></div></div>
@@ -71,6 +73,36 @@ export default async function render(el) {
   el.querySelector('#fDone')?.addEventListener('click', async () => { await api.put(`/tasks/${focus.id}`, { status: 'done' }); toast('Tarefa concluída ✅', focus.title, 'success'); render(el); });
   el.querySelector('#fOpen')?.addEventListener('click', () => openTaskModal(focus).then(() => render(el)));
   el.querySelector('#fNew')?.addEventListener('click', () => openTaskModal().then(() => render(el)));
+
+  // plano do dia
+  const planBox = el.querySelector('#plan');
+  const paintPlan = (p, proposal = false) => {
+    if (!p) {
+      planBox.innerHTML = `<div class="empty-mini" style="border:0">Deixe a IA montar seu dia: ela olha prazos, agenda, hábitos e sua energia e propõe uma ordem.<br><button class="btn sm primary" id="planGo" style="margin-top:10px">${icon('sparkles', 12)} Montar meu plano</button></div>`;
+      planBox.querySelector('#planGo').onclick = makePlan;
+      return;
+    }
+    planBox.innerHTML = `${p.items.map((i, k) => `<div class="plan-item ${i.done ? 'done' : ''}" data-k="${k}">${proposal ? '' : `<button class="check ${i.done ? 'on' : ''}" data-chk aria-label="Feito">${i.done ? icon('check', 11) : ''}</button>`}<span class="pill-time">${esc(i.start || '—')}</span><div class="grow"><b>${esc(i.title)}</b><small>${esc(i.why || '')}</small></div></div>`).join('') || '<div class="empty-mini">Nada para planejar.</div>'}
+      ${p.text ? `<p class="plan-tip">${esc(p.text)}</p>` : ''}
+      ${proposal ? `<div class="form-actions" style="margin-top:12px"><button class="btn sm outline" id="planRedo">${icon('refresh', 12)} Refazer</button><button class="btn sm primary" id="planOk">${icon('check', 12)} Aceitar plano</button></div>` : ''}`;
+    if (proposal) {
+      planBox.querySelector('#planRedo').onclick = makePlan;
+      planBox.querySelector('#planOk').onclick = async () => { paintPlan(await api.put('/plan', { ...p, accept: true })); toast('Plano aceito', 'As tarefas escolhidas ficaram para hoje.', 'success'); };
+    } else {
+      planBox.querySelectorAll('[data-chk]').forEach((b) => { b.onclick = async () => {
+        const item = p.items[Number(b.closest('[data-k]').dataset.k)];
+        item.done = !item.done;
+        if (item.taskId && item.done) await api.put(`/tasks/${item.taskId}`, { status: 'done' }).catch(() => {});
+        paintPlan(await api.put('/plan', p));
+      }; });
+    }
+  };
+  const makePlan = async () => {
+    planBox.innerHTML = '<div class="empty-mini" style="border:0"><span class="typing"><i></i><i></i><i></i></span> Montando seu dia...</div>';
+    try { paintPlan(await api.post('/plan'), true); } catch (err) { toast('Erro', err.message, 'error'); paintPlan(null); }
+  };
+  el.querySelector('#planNew').onclick = makePlan;
+  api.get('/plan').then((p) => paintPlan(p)).catch(() => paintPlan(null));
 
   // carrossel do destaque
   let idx = 0;

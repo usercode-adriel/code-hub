@@ -1,4 +1,4 @@
-CODENIAC 1.6.1 — seu hub pessoal
+CODENIAC 1.7 — seu hub pessoal
 ==============================
 
 COMO ABRIR
@@ -11,7 +11,23 @@ PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
 
-O QUE HÁ DE NOVO NA 1.6.1
+O QUE HÁ DE NOVO NA 1.7
+- A IA age por você (com o Gemini): "paguei a luz, adia a reunião pra sexta e cria uma tarefa"
+  vira ações de verdade. Excluir, pagar e valores altos pedem confirmação; tudo pode ser desfeito.
+- Consultas: "quanto gastei com mercado nos últimos 3 meses?", "qual dia eu mais lucro no InDrive?".
+- Foto de nota fiscal ou PDF de fatura: a IA lê e lança. Livros em PDF: "Perguntar à IA".
+- Memórias: a IA guarda suas metas e preferências (Configurações > Assistente > Memórias).
+- Personagens com permissões (ex.: a das finanças só mexe em finanças), voz própria e modo ligação.
+- Automações (menu Automações): rotinas "se isso, então aquilo", revisão semanal no domingo,
+  assinaturas detectadas no extrato, plano do dia no Início e sugestão de iniciar o turno.
+- Decisões: personagens debatem e votam. Cápsula do tempo: carta para o seu eu do futuro.
+- Grupos podem comentar o seu dia à noite. Exportar/importar personagens.
+- Telegram: converse com seus personagens pelo Telegram (Configurações > Conexões).
+- App no celular com notificações de verdade (precisa do HTTPS do Tailscale, em Conexões).
+- Botão Sair no menu e no Perfil. Transições e números animados.
+- Nuvem: veja HOSPEDAR.md no código-fonte para rodar num servidor sempre ligado.
+
+NA 1.6.1
 - Celular: a caixa de mensagem do chat aparecia fora da tela quando o tamanho do texto
   estava acima de 100%. Corrigido, e o chat agora acompanha o teclado do celular.
 

@@ -1,9 +1,9 @@
 // Assistente de decisões: passos guiados, alternativas com vantagens/riscos/consequências,
 // critérios com peso, matriz de notas, ranking, perguntas-guia e lembrete de revisão.
 // Ele organiza o raciocínio — quem decide é você.
-import { coll } from '../api.js';
+import { api, coll } from '../api.js';
 import { icon } from '../icons.js';
-import { esc, dmy, toast, todayISO, confirmDialog } from '../ui.js';
+import { esc, dmy, toast, todayISO, confirmDialog, modal } from '../ui.js';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const STEPS = ['Problema', 'Alternativas', 'Critérios', 'Notas', 'Resultado'];
@@ -16,6 +16,17 @@ const GUIDE = [
   ['info', 'Que informação me falta, e como consigo em poucos dias?'],
   ['fear', 'Estou evitando alguma opção só por medo ou comodidade?'],
 ];
+function debateHtml(db) {
+  if (!db) return '<p class="muted" style="font-size:12px;margin:0">Seus personagens (ou 3 conselheiros: Otimista, Advogado do diabo e Analista de riscos) debatem as alternativas, respondem uns aos outros e votam. Precisa do Gemini.</p>';
+  const color = (n) => db.debaters.find((x) => x.name === n)?.color || 'var(--accent)';
+  const count = {};
+  for (const v of db.votes) count[v.choice] = (count[v.choice] || 0) + 1;
+  const winner = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+  return `<div class="debate">${db.lines.map((l) => `<div class="dl"><span class="avatar bot-face" style="--s:30px;background:${esc(color(l.name))}">${esc(l.name[0])}</span><div class="bub"><b style="color:${esc(color(l.name))}">${esc(l.name)}</b>${esc(l.text)}</div></div>`).join('')}
+    <div class="votes">${db.votes.map((v) => `<div class="vote">${esc(v.name)} votou em <b>${esc(v.choice)}</b><br><small class="muted">${esc(v.reason)}</small></div>`).join('')}</div>
+    ${winner ? `<div class="honest">Placar: <b>${esc(winner[0])}</b> com ${winner[1]} voto(s). ${esc(db.summary || '')}</div>` : ''}</div>`;
+}
+
 const STATUS = { rascunho: ['Rascunho', ''], decidida: ['Decidida', 'ok'], avaliada: ['Avaliada', 'yellow'] };
 
 function ranking(d) {
@@ -79,6 +90,8 @@ async function wizard(el, id) {
         <div class="card"><div class="section-head"><h3>${icon('trophy', 14)} Ranking ponderado</h3><small class="muted">nota média ponderada (0 a 10)</small></div>
           ${rank.map((a, i) => `<div class="rank ${i === 0 ? 'win' : ''}"><span class="pos">${i + 1}º</span><div><b>${esc(a.name || '—')}</b><div class="progress"><span style="width:${a.score * 10}%"></span></div></div><b>${a.score.toFixed(1).replace('.', ',')}</b></div>`).join('') || '<div class="empty-mini">Sem alternativas.</div>'}
           ${best ? `<div class="honest" style="margin-top:10px">${tie ? `<b>Empate técnico</b> entre “${esc(best.name)}” e “${esc(rank[1].name)}”. Os números não resolvem sozinhos: use as perguntas ao lado e veja qual risco você prefere correr.` : `Pelos seus critérios, “<b>${esc(best.name)}</b>” se sai melhor. Se isso te incomoda, talvez falte um critério importante — volte ao passo 3.`}</div>` : ''}</div>
+        <div class="card"><div class="section-head"><h3>${icon('users', 14)} Debate dos personagens</h3><button class="btn sm ${d.debate ? 'outline' : 'primary'}" id="debateBtn">${icon('play', 12)} ${d.debate ? 'Debater de novo' : 'Começar debate'}</button></div>
+          <div id="debateBox">${debateHtml(d.debate)}</div></div>
         <div class="card"><div class="section-head"><h3>${icon('flag', 14)} Minha decisão</h3></div>
           <div class="form"><div class="field"><label>Escolhi</label><select id="chosen"><option value="">— ainda não decidi —</option>${d.alternatives.map((a) => `<option value="${a.id}" ${d.chosen === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
           <div class="field"><label>Revisar como foi em</label><input type="date" id="reviewAt" value="${reviewDefault}"><span class="hint">Você recebe um lembrete nesse dia para avaliar o resultado.</span></div>
@@ -132,6 +145,18 @@ async function wizard(el, id) {
     }));
     // passo 5
     el.querySelectorAll('[data-g]').forEach((t) => t.addEventListener('input', () => { d.guide[t.dataset.g] = t.value; save(); }));
+    el.querySelector('#debateBtn')?.addEventListener('click', async () => {
+      const bots = await coll('bots').list();
+      const pick = bots.length >= 2 ? await new Promise((resolve) => modal({ title: 'Quem participa do debate?', body: `<p class="muted" style="font-size:12px;margin:0 0 10px">Escolha 2 a 4 personagens, ou use os conselheiros padrão.</p><div class="bot-grid pick">${bots.map((b) => `<button type="button" class="bot-card" data-b="${b.id}"><span class="avatar bot-face" style="--s:40px;background:${esc(b.color || 'var(--accent)')}">${esc(b.name[0])}</span><b>${esc(b.name)}</b><span class="tick">${icon('check', 12)}</span></button>`).join('')}</div>
+          <div class="form-actions"><button class="btn outline" id="defs">Conselheiros padrão</button><button class="btn primary" id="go">Debater</button></div>`,
+      onMount: (m, close) => { const sel = new Set(); m.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => { if (sel.has(b.dataset.b)) sel.delete(b.dataset.b); else if (sel.size < 4) sel.add(b.dataset.b); b.classList.toggle('on', sel.has(b.dataset.b)); }; });
+        m.querySelector('#defs').onclick = () => { close(); resolve([]); }; m.querySelector('#go').onclick = () => { if (sel.size === 1) return toast('Escolha pelo menos 2', '', 'error'); close(); resolve([...sel]); }; } })) : [];
+      const box = el.querySelector('#debateBox');
+      box.innerHTML = '<p class="muted"><span class="typing"><i></i><i></i><i></i></span> Os personagens estão debatendo...</p>';
+      await save(true);
+      try { d.debate = await api.post(`/decisions/${d.id}/debate`, { bots: pick }); box.innerHTML = debateHtml(d.debate); }
+      catch (err) { box.innerHTML = debateHtml(d.debate); toast('Não deu para debater', err.message, 'error'); }
+    });
     el.querySelector('#decide')?.addEventListener('click', async () => {
       d.chosen = el.querySelector('#chosen').value;
       if (!d.chosen) return toast('Escolha uma alternativa', 'Se ainda não decidiu, tudo bem: o rascunho fica salvo.', 'error');

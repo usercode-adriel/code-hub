@@ -13,6 +13,41 @@ const hhmm = (iso) => new Date(iso || Date.now()).toLocaleTimeString('pt-BR', { 
 const dayOf = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
 const fileUrl = (f) => `/api/assistant/files/${encodeURIComponent(f.file)}?token=${encodeURIComponent(auth.token)}`;
 const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+export const AREAS = { tarefas: 'Tarefas', financeiro: 'Gastos, receitas e contas', indrive: 'InDrive', agenda: 'Agenda', livros: 'Livros', habitos: 'Hábitos', notas: 'Notas', ingles: 'Cartões de inglês', memoria: 'Memória' };
+const FOCUS_AREAS = { geral: Object.keys(AREAS), financas: ['financeiro', 'memoria'], indrive: ['indrive', 'memoria'], tarefas: ['tarefas', 'agenda', 'notas', 'memoria'], estudos: ['livros', 'ingles', 'tarefas', 'memoria'], ingles: ['ingles', 'memoria'], habitos: ['habitos', 'memoria'] };
+
+// ---------- voz (sintetizador do próprio navegador: grátis e funciona sem internet) ----------
+export const voicesReady = () => new Promise((resolve) => {
+  const v = speechSynthesis?.getVoices() || [];
+  if (v.length) return resolve(v);
+  speechSynthesis?.addEventListener('voiceschanged', () => resolve(speechSynthesis.getVoices()), { once: true });
+  setTimeout(() => resolve(speechSynthesis?.getVoices() || []), 1500);
+});
+export async function speakAs(bot, text, onEnd) {
+  if (!('speechSynthesis' in window)) { onEnd?.(); return; }
+  speechSynthesis.cancel();
+  const clean = String(text || '').replace(/[*_`#>]/g, '').replace(/\p{Extended_Pictographic}/gu, '').replace(/https?:\/\/\S+/g, 'link').slice(0, 1500);
+  const u = new SpeechSynthesisUtterance(clean);
+  const voices = await voicesReady();
+  const english = bot?.focus === 'ingles';
+  u.voice = voices.find((v) => v.name === bot?.voice) || voices.find((v) => v.lang?.startsWith(english ? 'en' : 'pt-BR')) || voices.find((v) => v.lang?.startsWith(english ? 'en' : 'pt')) || null;
+  u.lang = u.voice?.lang || (english ? 'en-US' : 'pt-BR');
+  u.rate = Number(bot?.voiceRate) || 1;
+  u.pitch = Number(bot?.voicePitch) || 1;
+  u.onend = () => onEnd?.();
+  u.onerror = () => onEnd?.();
+  speechSynthesis.speak(u);
+}
+
+function actionHtml(a, status) {
+  const st = status || (a.kind === 'confirm' ? 'pending' : 'done');
+  if (a.kind === 'confirm' || st === 'pending' || st === 'canceled') {
+    return `<div class="tg-confirm ${st}" data-aid="${esc(a.id)}"><b>${st === 'pending' ? 'Confirma?' : st === 'canceled' ? 'Cancelado' : 'Feito'}</b><span>${esc(a.summary)}</span>
+      ${st === 'pending' ? `<div class="tg-confirm-acts"><button type="button" class="btn sm primary" data-yes>${icon('check', 12)} Confirmar</button><button type="button" class="btn sm outline" data-no>Cancelar</button></div>` : st === 'done' ? `<button type="button" class="tg-undo" data-undo>Desfazer</button>` : ''}</div>`;
+  }
+  return `<div class="tg-action ${st}" data-aid="${esc(a.id)}">${icon(st === 'undone' ? 'refresh' : 'check', 11)} <span>${esc(a.summary)}</span>${st === 'done' ? '<button type="button" class="tg-undo" data-undo>Desfazer</button>' : st === 'undone' ? '<em>desfeito</em>' : ''}</div>`;
+}
+
 const BOT_COLORS = ['#e5484d', '#7c3aed', '#0ea5e9', '#22c55e', '#f59e0b', '#ec4899', '#14b8a6'];
 
 // Rosto do personagem: foto enviada ou a inicial do nome.
@@ -47,8 +82,14 @@ export function botForm(bot = null) {
         <div class="bot-auto"><div class="field"><label>Função deste chat</label><select name="focus">${Object.entries(FOCUS).map(([k, l]) => `<option value="${k}" ${(bot?.focus || 'geral') === k ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="hint">É sobre isso que ele vai puxar assunto sozinho.</span></div>
           <div class="field"><label>Mensagens automáticas</label><div class="setting-row" style="padding:6px 0;border:0"><div class="txt"><small>Ele te manda mensagem sem você pedir</small></div><label class="switch"><input type="checkbox" name="proactive" ${bot?.proactive ? 'checked' : ''}><span></span></label></div></div>
           <div class="field"><label>Horários</label><input name="times" value="${esc(bot?.times || '09:00')}" placeholder="09:00, 19:30"><span class="hint">Separe com vírgula. Funciona enquanto o Codeniac estiver ligado.</span></div></div>
+        <div class="field"><label>O que ele pode fazer no sistema (com o Gemini)</label><div class="perm-grid">${Object.entries(AREAS).map(([k, l]) => `<label class="perm"><input type="checkbox" name="perm" value="${k}" ${(Array.isArray(bot?.permissions) ? bot.permissions : FOCUS_AREAS[bot?.focus || 'geral']).includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+          <span class="hint">Consultar seus dados é sempre permitido. Excluir, pagar contas e valores a partir de R$ 1.000 sempre pedem sua confirmação.</span></div>
+        <div class="bot-auto"><div class="field"><label>Voz</label><select name="voice"><option value="">Automática</option></select></div>
+          <div class="field"><label>Velocidade da fala</label><input type="range" name="voiceRate" min="0.6" max="1.6" step="0.1" value="${bot?.voiceRate || 1}"></div>
+          <div class="field"><label>Tom</label><input type="range" name="voicePitch" min="0.5" max="1.6" step="0.1" value="${bot?.voicePitch || 1}"></div></div>
+        <div class="setting-row" style="padding:4px 0"><div class="txt"><b>Ler as respostas em voz alta</b><small>Você também pode tocar no alto-falante de cada mensagem ou usar o modo ligação.</small></div><label class="switch"><input type="checkbox" name="autoSpeak" ${bot?.autoSpeak ? 'checked' : ''}><span></span></label><button type="button" class="btn sm outline" id="bfHear">${icon('volume', 12)} Ouvir</button></div>
         <p class="hint" style="margin:0">Com o Gemini ligado, o personagem segue a personalidade e as características. Sem IA, ele aparece com nome e foto e manda lembretes simples.</p>
-        <div class="form-actions">${bot ? `<button type="button" class="btn danger" id="bfDel" style="margin-right:auto">${icon('trash', 13)} Excluir</button><button type="button" class="btn outline" id="bfPing">${icon('send', 13)} Mandar mensagem agora</button>` : ''}<button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">${bot ? 'Salvar' : 'Criar e conversar'}</button></div></form>`,
+        <div class="form-actions">${bot ? `<button type="button" class="btn danger" id="bfDel" style="margin-right:auto">${icon('trash', 13)} Excluir</button><button type="button" class="btn outline" id="bfExport">${icon('download', 13)} Exportar</button><button type="button" class="btn outline" id="bfPing">${icon('send', 13)} Mandar mensagem agora</button>` : ''}<button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">${bot ? 'Salvar' : 'Criar e conversar'}</button></div></form>`,
       onMount: (m, close) => {
         const photo = m.querySelector('#bfPhoto');
         photo.onclick = () => pickImage(async (file) => {
@@ -59,7 +100,19 @@ export function botForm(bot = null) {
         });
         m.querySelectorAll('[data-pe]').forEach((b) => { b.onclick = () => { personality = b.dataset.pe; m.querySelectorAll('[data-pe]').forEach((x) => x.classList.toggle('on', x === b)); }; });
         const body = (f) => ({ name: f.name.value.trim(), greeting: f.greeting.value.trim(), traits: f.traits.value.trim(), personality, avatar: avatar || '',
-          focus: f.focus.value, proactive: f.proactive.checked, times: f.times.value, color: bot?.color || BOT_COLORS[Math.floor(Math.random() * BOT_COLORS.length)] });
+          focus: f.focus.value, proactive: f.proactive.checked, times: f.times.value, color: bot?.color || BOT_COLORS[Math.floor(Math.random() * BOT_COLORS.length)],
+          permissions: [...f.querySelectorAll('[name=perm]:checked')].map((x) => x.value), voice: f.voice.value, voiceRate: f.voiceRate.value, voicePitch: f.voicePitch.value, autoSpeak: f.autoSpeak.checked });
+        voicesReady().then((vs) => {
+          const sel = m.querySelector('[name=voice]');
+          const sorted = [...vs].sort((a, b) => (b.lang.startsWith('pt') - a.lang.startsWith('pt')) || a.lang.localeCompare(b.lang));
+          sel.innerHTML = `<option value="">Automática</option>${sorted.map((v) => `<option value="${esc(v.name)}" ${bot?.voice === v.name ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}`;
+        });
+        m.querySelector('#bfHear').onclick = () => { const f = m.querySelector('form'); speakAs({ ...body(f), focus: f.focus.value }, f.greeting.value || `Oi! Eu sou ${f.name.value || 'seu personagem'}. Prazer em conversar com você.`); };
+        m.querySelector('#bfExport')?.addEventListener('click', async () => {
+          const res = await fetch(`/api/bots/${bot.id}/export`, { headers: { Authorization: `Bearer ${auth.token}` } });
+          const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: `${bot.name.replace(/[^\w-]+/g, '_')}.codeniac-personagem.json` });
+          a.click();
+        });
         m.querySelector('form').onsubmit = async (e) => {
           e.preventDefault();
           const data = body(e.target);
@@ -94,6 +147,7 @@ function groupForm(bots, niacName, group = null) {
         <div class="field" style="margin-top:10px"><label>Sobre o grupo (opcional)</label><input name="description" maxlength="300" value="${esc(group?.description || '')}" placeholder="Ex.: decisões de dinheiro e carreira"></div></div></div>
         <div class="field"><label>Participantes (escolha 2 ou mais)</label><div class="bot-grid pick">${people.map((p) => `<button type="button" class="bot-card ${chosen.has(p.id) ? 'on' : ''}" data-m="${p.id}">${faceOf(p, 46)}<b>${esc(p.name)}</b><small>${p.id === 'niac' ? 'Assistente do Codeniac' : esc((PERSONA[p.personality] || PERSONA.amigavel).label)}</small><span class="tick">${icon('check', 12)}</span></button>`).join('')}</div>
           ${bots.length ? '' : '<span class="hint">Você ainda não tem personagens. Crie alguns em “Criar chat → Criar personagem” para montar um grupo animado.</span>'}</div>
+        <div class="setting-row" style="padding:6px 0"><div class="txt"><b>Comentar meu dia à noite</b><small>Os participantes conversam sobre o seu dia (tarefas, InDrive, gastos, hábitos) no horário escolhido</small></div><input type="time" name="observeTime" class="input" value="${esc(group?.observeTime || '21:00')}" style="width:110px"><label class="switch"><input type="checkbox" name="observe" ${group?.observe ? 'checked' : ''}><span></span></label></div>
         <p class="hint" style="margin:0">No grupo, cada personagem responde do seu jeito e eles conversam entre si (precisa do Gemini).</p>
         <div class="form-actions"><button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">${group ? 'Salvar' : 'Criar grupo'}</button></div></form>`,
       onMount: (m, close) => {
@@ -103,7 +157,7 @@ function groupForm(bots, niacName, group = null) {
         m.querySelector('form').onsubmit = (e) => {
           e.preventDefault();
           if (chosen.size < 2) return toast('Escolha pelo menos 2 participantes', '', 'error');
-          close(); resolve({ name: e.target.name.value.trim(), description: e.target.description.value.trim(), members: [...chosen], avatar: avatar || '' });
+          close(); resolve({ name: e.target.name.value.trim(), description: e.target.description.value.trim(), members: [...chosen], avatar: avatar || '', observe: e.target.observe.checked, observeTime: e.target.observeTime.value });
         };
       },
     });
@@ -154,9 +208,10 @@ export default async function render(el) {
       const b = peer();
       const p = PERSONA[b?.personality || store.settings.assistantPersonality] || PERSONA.amigavel;
       peerEl.innerHTML = `${faceOf(b, 40)}<div><b>${esc(b?.name || name)} <span class="chip tg-persona">${p.emoji} ${p.label}</span></b><small id="status">${b ? (b.proactive ? 'manda mensagens sozinho' : 'personagem') : 'online'} · ${MODE_LABEL[store.aiMode] || 'sem IA'}</small></div>`;
-      acts.innerHTML = `${c ? `<button class="icon-btn sm ghost" id="ren" title="Renomear">${icon('edit', 15)}</button>` : ''}<button class="icon-btn sm ghost" id="pEdit" title="${b ? 'Editar personagem' : 'Personalidade'}">${icon('settings', 15)}</button>${c ? `<button class="icon-btn sm ghost" id="del" title="Apagar">${icon('trash', 15)}</button>` : ''}`;
+      acts.innerHTML = `<button class="icon-btn sm ghost" id="callBtn" title="Modo ligação: converse por voz">${icon('mic', 15)}</button>${c ? `<button class="icon-btn sm ghost tg-hide-sm" id="ren" title="Renomear">${icon('edit', 15)}</button>` : ''}<button class="icon-btn sm ghost" id="pEdit" title="${b ? 'Editar personagem' : 'Personalidade'}">${icon('settings', 15)}</button>${c ? `<button class="icon-btn sm ghost" id="del" title="Apagar">${icon('trash', 15)}</button>` : ''}`;
     }
     acts.querySelector('#talk')?.addEventListener('click', () => send('', { auto: true }));
+    acts.querySelector('#callBtn')?.addEventListener('click', () => (call.on ? stopCall() : startCall()));
     acts.querySelector('#gEdit')?.addEventListener('click', async () => {
       const g = await groupForm(bots, name, convOf(current).group);
       if (!g) return;
@@ -196,7 +251,8 @@ export default async function render(el) {
     return `<div class="tg-msg ${out ? 'out' : 'in'}">${face}<div class="tg-bubble">${who ? `<div class="tg-sender" style="color:${esc(color)}">${esc(who.name)}</div>` : ''}${m.auto ? `<div class="tg-auto">${icon('bell', 10)} mensagem automática</div>` : ''}
       ${filesHtml(m.files)}${m.text ? `<div class="tg-text">${out ? esc(m.text) : chatMd(m.text)}</div>` : ''}
       ${(m.tools || []).map((t) => `<div class="tg-tool">${icon('check', 11)} ${esc(TOOL_LABEL[t] || t)}</div>`).join('')}${m.link ? `<a class="tg-go" href="${esc(m.link)}">${icon('chevRight', 11)} Abrir</a>` : ''}
-      <div class="tg-meta">${hhmm(m.at)}${out ? ticks : ''}</div></div></div>`;
+      ${(m.actions || []).map((a) => actionHtml(a, detail?.actionStatus?.[a.id])).join('')}${m.pron ? `<div class="tg-pron">🎙️ pronúncia ~ ${m.pron}%</div>` : ''}
+      <div class="tg-meta">${!out && m.text ? `<button type="button" class="tg-say" data-say title="Ouvir">${icon('volume', 11)}</button>` : ''}${hhmm(m.at)}${out ? ticks : ''}</div></div></div>`;
   };
   const welcome = () => {
     const c = convOf(current);
@@ -250,7 +306,7 @@ export default async function render(el) {
   };
 
   // ---------- envio ----------
-  const send = async (text, { auto = false } = {}) => {
+  const send = async (text, { auto = false, pron = null } = {}) => {
     text = (text || '').trim();
     if (pending.some((f) => !f.done)) return toast('Aguarde o envio dos anexos', '', 'info');
     const files = pending.filter((f) => f.done).map(({ file, name: n, mime, size }) => ({ file, name: n, mime, size }));
@@ -258,7 +314,7 @@ export default async function render(el) {
     busy = true;
     input.value = ''; input.style.height = ''; pending = []; paintAttach();
     if (msgs.querySelector('.tg-welcome')) msgs.innerHTML = '';
-    if (!auto) msgs.insertAdjacentHTML('beforeend', bubble({ role: 'user', text, files, at: new Date().toISOString() }));
+    if (!auto) msgs.insertAdjacentHTML('beforeend', bubble({ role: 'user', text, files, at: new Date().toISOString(), pron }));
     const status = el.querySelector('#status');
     const statusText = status?.textContent;
     let pend = null; let txt = null; let meta = null; let acc = '';
@@ -279,6 +335,7 @@ export default async function render(el) {
         if (ev.type === 'text' && txt) { acc += ev.text; txt.innerHTML = chatMd(acc); }
         if (ev.type === 'tool' && meta) { meta.insertAdjacentHTML('beforebegin', `<div class="tg-tool">${icon('check', 11)} ${esc(TOOL_LABEL[ev.name] || ev.name)}</div>`); emit('data-changed'); }
         if (ev.type === 'link' && meta) meta.insertAdjacentHTML('beforebegin', `<a class="tg-go" href="${esc(ev.href)}">${icon('chevRight', 11)} Abrir</a>`);
+        if ((ev.type === 'action' || ev.type === 'confirm') && meta) { meta.insertAdjacentHTML('beforebegin', actionHtml({ id: ev.id, summary: ev.summary, kind: ev.type === 'confirm' ? 'confirm' : 'action' })); emit('data-changed'); navigator.vibrate?.(20); }
         if (ev.type === 'notice') msgs.insertAdjacentHTML('beforeend', `<div class="tg-notice">${esc(ev.text)}</div>`);
         if (ev.type === 'error' && txt) txt.textContent = ev.text;
         msgs.scrollTop = msgs.scrollHeight;
@@ -287,6 +344,8 @@ export default async function render(el) {
     msgs.querySelectorAll('.tg-msg.pend').forEach((p) => { if (p.querySelector('.typing')) p.remove(); else p.classList.remove('pend'); });
     if (status) { status.textContent = statusText; status.classList.remove('typing-txt'); }
     busy = false;
+    if ((call.on || peer()?.autoSpeak) && !isGroup() && acc.trim()) speakAs(peer() || { focus: 'geral' }, acc, () => { if (call.on) callListen(); });
+    else if (call.on) callListen();
     await refresh();
     emit('data-changed');
   };
@@ -310,7 +369,11 @@ export default async function render(el) {
       <button class="bot-card" data-pick="">${botAvatar(54)}<b>${esc(name)}</b><small>Assistente do Codeniac</small></button>
       ${bots.map((b) => `<div class="bot-card" data-pick="${b.id}" role="button" tabindex="0">${faceOf(b, 54)}<b>${esc(b.name)}</b><small>${esc(FOCUS[b.focus] || FOCUS.geral)}${b.proactive ? ' · automático' : ''}</small><button class="icon-btn sm ghost bot-edit" data-edit="${b.id}" title="Editar">${icon('edit', 13)}</button></div>`).join('')}
       <button class="bot-card new" data-create>${icon('plus', 26)}<b>Criar personagem</b><small>Nome, foto, personalidade, função e mensagens automáticas</small></button>
-      <button class="bot-card new" data-group>${icon('users', 26)}<b>Criar grupo</b><small>Vários personagens conversando entre si</small></button></div>`,
+      <button class="bot-card new" data-group>${icon('users', 26)}<b>Criar grupo</b><small>Vários personagens conversando entre si</small></button>
+      <button class="bot-card new" data-import>${icon('upload', 24)}<b>Importar personagem</b><small>De um arquivo .codeniac-personagem.json</small></button>
+      <button class="bot-card new" data-capsule>${icon('clock', 24)}<b>Cápsula do tempo</b><small>Uma carta para o seu eu do futuro</small></button>
+      <a class="bot-card new" href="#/decisoes" data-close>${icon('scale', 24)}<b>Debater uma decisão</b><small>Os personagens debatem e votam</small></a></div>
+      <input type="file" id="impFile" accept=".json,application/json" hidden>`,
     onMount: (m, close) => {
       m.querySelectorAll('[data-pick]').forEach((c) => {
         const go = (e) => { if (e.target.closest('[data-edit]')) return; close(); startChat(c.dataset.pick ? { botId: c.dataset.pick } : { title: 'Nova conversa' }); };
@@ -320,8 +383,95 @@ export default async function render(el) {
       m.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = async () => { close(); await editBot(bots.find((x) => x.id === b.dataset.edit)); openNew(); }; });
       m.querySelector('[data-create]').onclick = async () => { close(); const b = await botForm(); if (b?.id) { bots = await coll('bots').list(); startChat({ botId: b.id }); } };
       m.querySelector('[data-group]').onclick = async () => { close(); const g = await groupForm(bots, name); if (g) startChat({ group: g }); };
+      m.querySelector('[data-capsule]').onclick = () => { close(); capsuleModal(); };
+      const imp = m.querySelector('#impFile');
+      m.querySelector('[data-import]').onclick = () => imp.click();
+      imp.onchange = async () => {
+        try {
+          const data = JSON.parse(await imp.files[0].text());
+          const b = await api.post('/bots/import', data);
+          close(); bots = await coll('bots').list(); toast('Personagem importado', b.name, 'success'); startChat({ botId: b.id });
+        } catch (err) { toast('Não deu para importar', err.message, 'error'); }
+      };
     },
   });
+
+  // ---------- cápsula do tempo ----------
+  const capsuleModal = async () => {
+    const caps = await coll('capsules').list();
+    const sealed = caps.filter((c) => !c.opened).sort((a, b) => a.openAt.localeCompare(b.openAt));
+    const days = (d) => Math.max(0, Math.round((new Date(`${d}T12:00:00`) - new Date()) / 86400000));
+    const inYear = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+    modal({
+      title: 'Cápsula do tempo 📦', wide: true,
+      body: `<form class="form"><p class="muted" style="margin:0;font-size:12px">Escreva para o seu “eu” do futuro. A carta fica lacrada até a data escolhida; no dia, um personagem entrega e compara com a sua vida naquele momento.</p>
+        <div class="form-row"><div class="field"><label>Título</label><input name="title" maxlength="120" required placeholder="Ex.: Para o Adriel de 2027"></div><div class="field"><label>Abrir em</label><input type="date" name="openAt" value="${inYear}" min="${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}"></div></div>
+        <div class="field"><label>Carta</label><textarea name="text" rows="7" maxlength="10000" required placeholder="Como está sua vida hoje? O que você espera ter conquistado? Quais conselhos dá para você mesmo?"></textarea></div>
+        <div class="field"><label>Quem entrega</label><select name="botId"><option value="">${esc(name)} (assistente)</option>${bots.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></div>
+        <div class="form-actions"><button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">${icon('clock', 13)} Lacrar cápsula</button></div></form>
+        ${sealed.length ? `<h6 class="auto-h6">Cápsulas lacradas</h6><div class="list">${sealed.map((c) => `<div class="row-item"><span class="kind-ico">📦</span><div class="grow"><b>${esc(c.title)}</b><small>abre em ${c.openAt.split('-').reverse().join('/')} · faltam ${days(c.openAt)} dia(s)</small></div></div>`).join('')}</div>` : ''}`,
+      onMount: (m, close) => {
+        m.querySelector('form').onsubmit = async (e) => {
+          e.preventDefault();
+          const f = e.target;
+          try { await coll('capsules').add({ title: f.title.value, text: f.text.value, openAt: f.openAt.value, botId: f.botId.value || '' }); close(); toast('Cápsula lacrada 📦', `Abre em ${f.openAt.value.split('-').reverse().join('/')}.`, 'success'); }
+          catch (err) { toast('Erro', err.message, 'error'); }
+        };
+      },
+    });
+  };
+
+  msgs.addEventListener('click', async (e) => {
+    const box = e.target.closest('[data-aid]');
+    const say = e.target.closest('[data-say]');
+    if (say) { const t = say.closest('.tg-bubble').querySelector('.tg-text')?.innerText || ''; const who = isGroup() ? null : peer(); speakAs(who || { focus: 'geral' }, t); return; }
+    if (!box) return;
+    const aid = box.dataset.aid;
+    try {
+      if (e.target.closest('[data-undo]')) { await api.post(`/assistant/actions/${aid}/undo`); box.outerHTML = actionHtml({ id: aid, summary: box.querySelector('span').textContent, kind: 'action' }, 'undone'); toast('Desfeito', '', 'success'); }
+      if (e.target.closest('[data-yes]')) { const r = await api.post(`/assistant/actions/${aid}/confirm`, { accept: true }); box.outerHTML = actionHtml({ id: aid, summary: r.summary, kind: 'confirm' }, 'done'); toast('Feito ✅', r.summary, 'success'); }
+      if (e.target.closest('[data-no]')) { await api.post(`/assistant/actions/${aid}/confirm`, { accept: false }); box.outerHTML = actionHtml({ id: aid, summary: box.querySelector('span').textContent, kind: 'confirm' }, 'canceled'); }
+      emit('data-changed');
+      if (detail) detail.actionStatus = { ...(detail.actionStatus || {}), [aid]: e.target.closest('[data-undo]') ? 'undone' : e.target.closest('[data-yes]') ? 'done' : 'canceled' };
+    } catch (err) { toast('Erro', err.message, 'error'); }
+  });
+
+  // ---------- modo ligação: fala → IA responde em voz → escuta de novo ----------
+  const call = { on: false, rec: null };
+  const callBar = document.createElement('div');
+  callBar.className = 'tg-call';
+  callBar.hidden = true;
+  el.querySelector('#chatPane').append(callBar);
+  const callListen = () => {
+    if (!call.on) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast('Seu navegador não ouve', 'Use o Chrome ou o Edge para o modo ligação.', 'error'); return stopCall(); }
+    const english = peer()?.focus === 'ingles';
+    const rec = new SR();
+    call.rec = rec;
+    rec.lang = english ? 'en-US' : 'pt-BR';
+    rec.interimResults = true;
+    callBar.innerHTML = `<span class="pulse"></span><b>${esc(peer()?.name || name)}</b> está ouvindo… <small id="callHeard"></small><button type="button" class="btn sm danger" id="callEnd">${icon('x', 12)} Encerrar</button>`;
+    callBar.querySelector('#callEnd').onclick = stopCall;
+    let final = ''; let conf = null;
+    rec.onresult = (ev) => {
+      let interim = '';
+      for (const r of ev.results) { if (r.isFinal) { final = r[0].transcript; conf = r[0].confidence; } else interim += r[0].transcript; }
+      const h = callBar.querySelector('#callHeard'); if (h) h.textContent = final || interim;
+    };
+    rec.onend = () => {
+      if (!call.on) return;
+      if (final.trim()) {
+        callBar.innerHTML = `<span class="pulse busy"></span><b>${esc(peer()?.name || name)}</b> está pensando… <button type="button" class="btn sm danger" id="callEnd">${icon('x', 12)} Encerrar</button>`;
+        callBar.querySelector('#callEnd').onclick = stopCall;
+        send(final, { pron: english && conf ? Math.round(conf * 100) : null });
+      } else setTimeout(callListen, 300);
+    };
+    rec.onerror = (ev) => { if (ev.error === 'not-allowed') { toast('Microfone bloqueado', 'Permita o microfone para este site.', 'error'); stopCall(); } };
+    try { rec.start(); } catch { /* já ouvindo */ }
+  };
+  const stopCall = () => { call.on = false; try { call.rec?.abort(); } catch { /* ok */ } speechSynthesis?.cancel(); callBar.hidden = true; el.querySelector('#callBtn')?.classList.remove('on'); };
+  const startCall = () => { if (isGroup()) return toast('O modo ligação é para conversas com um personagem', '', 'info'); call.on = true; callBar.hidden = false; el.querySelector('#callBtn')?.classList.add('on'); callListen(); };
 
   // ---------- eventos ----------
   el.querySelector('#new').onclick = openNew;
@@ -353,7 +503,17 @@ export default async function render(el) {
   window.addEventListener('resize', onResize);
 
   paintList();
+  const pre = JSON.parse(localStorage.getItem('codeniac.pendingChat') || 'null');
+  if (pre) {
+    localStorage.removeItem('codeniac.pendingChat');
+    const c = await api.post('/assistant/conversations', { title: pre.title || 'Nova conversa' });
+    convs.unshift(c); current = c.id; localStorage.setItem('codeniac.conv', current);
+    pending = (pre.files || []).map((f) => ({ ...f, done: true }));
+    paintAttach(); paintList(); setOpen(true);
+    input.value = pre.text || '';
+    if (store.aiMode !== 'gemini') toast('Ligue o Gemini', 'Para ler o PDF do livro, ative o Gemini em Configurações → Assistente.', 'info');
+  }
   await loadMessages();
   if (current && !isMobile()) setOpen(true);
-  return () => { liveOff?.(); liveOff = null; window.removeEventListener('resize', onResize); document.body.classList.remove('chat-full'); };
+  return () => { stopCall(); liveOff?.(); liveOff = null; window.removeEventListener('resize', onResize); document.body.classList.remove('chat-full'); };
 }

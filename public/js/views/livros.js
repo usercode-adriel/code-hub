@@ -23,6 +23,12 @@ function cover(title, author, img, extra = '') {
   return `<div class="bk-cover gen" style="--bc:${colorOf(title)}" ${extra}><span class="t">${esc(title)}</span><span class="a">${esc(author || '')}</span></div>`;
 }
 
+// Abre o assistente com o PDF do livro anexado, para perguntar o que quiser sobre ele.
+function askBook(f) {
+  localStorage.setItem('codeniac.pendingChat', JSON.stringify({ title: `Sobre ${f.title}`.slice(0, 60), text: 'Me faz um resumo das ideias principais deste livro.', files: [{ file: `lib:${f.id}`, name: f.title, mime: 'application/pdf', size: f.size }] }));
+  location.hash = '#/assistente';
+}
+
 let libFilter = '';
 let libQuery = '';
 
@@ -85,7 +91,7 @@ async function draw(el) {
       <div class="upload-zone bk-drop" id="drop" tabindex="0" role="button">${icon('upload', 20)}<div>Arraste arquivos <b>.pdf</b> ou <b>.epub</b> aqui, ou clique para escolher</div><small>Até ${libRes.maxMb} MB cada · ficam num banco separado, só neste computador</small><input type="file" id="fileIn" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple hidden></div>
       <div id="upList"></div>
       <div class="bk-grid">${shown.map((f) => `<div class="bk-item" data-f="${f.id}"><a class="bk-dl" href="${dlHref(f)}" title="Baixar ${esc(f.title)}">${cover(f.title, f.author, f.cover)}<span class="fmt ${f.format}">${f.format.toUpperCase()}</span><span class="dl-ic">${icon('download', 18)}</span></a>
-          <div class="bk-item-info"><div class="grow"><b>${esc(f.title)}</b><small>${esc(f.author || f.category)} · ${fmtSize(f.size)}</small></div><button class="icon-btn sm ghost" data-edit="${f.id}" title="Editar nome e capa">${icon('edit', 13)}</button></div></div>`).join('')
+          <div class="bk-item-info"><div class="grow"><b>${esc(f.title)}</b><small>${esc(f.author || f.category)} · ${fmtSize(f.size)}</small></div>${f.format === 'pdf' ? `<button class="icon-btn sm ghost" data-ask="${f.id}" title="Perguntar à IA sobre este livro">${icon('bot', 13)}</button>` : ''}<button class="icon-btn sm ghost" data-edit="${f.id}" title="Editar nome e capa">${icon('edit', 13)}</button></div></div>`).join('')
         || `<div class="empty-mini" style="grid-column:1/-1">${files.length ? 'Nada com esse filtro.' : 'Sua biblioteca está vazia. Envie seu primeiro PDF ou EPUB.'}</div>`}</div></section>`;
 
   const reload = () => draw(el);
@@ -195,6 +201,7 @@ async function draw(el) {
   drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); uploadFiles(e.dataTransfer.files); };
 
+  el.querySelectorAll('[data-ask]').forEach((b) => { b.onclick = () => askBook(files.find((x) => x.id === b.dataset.ask)); });
   // editar nome, autor, categoria e capa de um arquivo
   el.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => {
     const f = files.find((x) => x.id === b.dataset.edit);
@@ -205,12 +212,13 @@ async function draw(el) {
           <div class="field"><label>Autor</label><input name="author" value="${esc(f.author || '')}" maxlength="120"></div>
           <div class="field"><label>Categoria</label><select name="category">${cats.map((c) => `<option ${c === f.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm outline" id="edUp">${icon('image', 12)} ${f.cover ? 'Trocar capa' : 'Enviar capa'}</button>${f.cover ? '<button type="button" class="btn sm outline" id="edRm">Usar capa automática</button>' : ''}
-            <a class="btn sm outline" href="${dlHref(f)}">${icon('download', 12)} Baixar</a></div>
+            <a class="btn sm outline" href="${dlHref(f)}">${icon('download', 12)} Baixar</a>${f.format === 'pdf' ? `<button type="button" class="btn sm primary" id="edAsk">${icon('bot', 12)} Perguntar à IA</button>` : ''}</div>
           <small class="muted">${f.format.toUpperCase()} · ${fmtSize(f.size)} · baixado ${f.downloads || 0} vez(es)<br>Arquivo original: ${esc(f.originalName || '')}</small></div></div>
         <div class="form-actions"><button type="button" class="btn danger" id="edDel" style="margin-right:auto">${icon('trash', 13)} Excluir</button><button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">Salvar</button></div></form>`,
       onMount: (m, close) => {
         m.querySelector('#edUp').onclick = () => pickImage(async (file) => { if (!validateImage(file)) return; await api.upload(`/library/${f.id}/cover`, file); toast('Capa atualizada', '', 'success'); close(); reload(); });
         m.querySelector('#edRm')?.addEventListener('click', async () => { await api.del(`/library/${f.id}/cover`); close(); reload(); });
+        m.querySelector('#edAsk')?.addEventListener('click', () => { close(); askBook(f); });
         m.querySelector('#edDel').onclick = async () => { if (!(await confirmDialog('Excluir livro digital', `"${f.title}" e o arquivo serão apagados.`))) return; await api.del(`/library/${f.id}`); close(); reload(); };
         m.querySelector('form').onsubmit = async (e) => { e.preventDefault(); const fm = e.target; await api.put(`/library/${f.id}`, { title: fm.title.value, author: fm.author.value, category: fm.category.value }); close(); toast('Livro atualizado', '', 'success'); reload(); };
       },
