@@ -718,13 +718,13 @@ async function typeOut(result, write) {
 }
 
 // ---------- Grupos: vários personagens conversando entre si (Gemini) ----------
-const NIAC = (user) => { const s = prefs(user); return { id: 'niac', name: s.assistantName || 'Niac', personality: s.assistantPersonality, traits: 'O assistente oficial do Codeniac: conhece todo o sistema do usuário.', avatar: null, isNiac: true }; };
+export const NIAC = (user) => { const s = prefs(user); return { id: 'niac', name: s.assistantName || 'Niac', personality: s.assistantPersonality, traits: 'O assistente oficial do Codeniac: conhece todo o sistema do usuário.', avatar: null, isNiac: true }; };
 export function groupMembers(user, conv) {
   return (conv.group?.members || []).map((mid) => (mid === 'niac' ? NIAC(user) : db().bots.find((b) => b.id === mid && b.userId === user.id))).filter(Boolean);
 }
 const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 
-async function groupTurn(user, conv, bot, members, write, nudge) {
+export async function groupTurn(user, conv, bot, members, write, nudge) {
   const s = prefs(user);
   const others = members.filter((m) => m.id !== bot.id).map((m) => m.name);
   const nameOf = (m) => (m.role === 'user' ? callName(user, s) : (members.find((x) => x.id === m.botId)?.name || 'Alguém'));
@@ -792,7 +792,7 @@ async function runGroup(user, conv, text, write, auto) {
 // ---------- Mensagens automáticas dos personagens ----------
 export const FOCUS = { geral: 'Rotina em geral', financas: 'Finanças pessoais', indrive: 'InDrive e carro', tarefas: 'Tarefas e prazos', estudos: 'Estudos e leitura', ingles: 'Inglês', habitos: 'Hábitos e bem-estar' };
 const brlx = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-function focusData(user, focus) {
+export function focusData(user, focus) {
   const b = briefing(user.id);
   const today = localDate();
   const month = today.slice(0, 7);
@@ -854,18 +854,61 @@ Escreva UMA mensagem espontânea que você mandaria agora no chat, como alguém 
   try { return await geminiCall(body); } catch (err) { console.error('[automático]', err.message); return localProactive(user, bot, focus); }
 }
 
-export async function sendProactive(user, bot) {
-  const text = (await proactiveText(user, bot)).trim();
-  if (!text) return null;
+// Entrega uma mensagem de um personagem (ou do Niac, bot = null) sem o usuário pedir.
+const deliverHooks = [];
+export const onDeliver = (fn) => deliverHooks.push(fn);
+export function deliverMessage(user, bot, text, { groupConvId = null, kind = 'auto' } = {}) {
   const st = store(user.id);
-  let conv = st.conversations.filter((c) => c.botId === bot.id && !c.group).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  if (!conv) conv = createConversation(user.id, `Chat com ${bot.name}`, bot);
-  conv.display.push({ role: 'assistant', text, at: now(), mode: hasGemini() ? 'gemini' : 'local', auto: true });
+  let conv;
+  if (groupConvId) conv = st.conversations.find((c) => c.id === groupConvId);
+  else if (bot) conv = st.conversations.filter((c) => c.botId === bot.id && !c.group).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  else conv = st.conversations.find((c) => c.inbox && !c.botId && !c.group);
+  if (!conv) {
+    conv = createConversation(user.id, bot ? `Chat com ${bot.name}` : `Avisos do ${prefs(user).assistantName || 'Niac'}`, bot);
+    if (!bot) conv.inbox = true;
+  }
+  conv.display.push({ role: 'assistant', text, at: now(), mode: hasGemini() ? 'gemini' : 'local', auto: true, kind, ...(groupConvId && bot ? { botId: bot.id } : {}) });
   conv.unread = (conv.unread || 0) + 1;
   conv.updatedAt = now();
   save();
-  emit(user.id, 'chat', { conversationId: conv.id, botId: bot.id, name: bot.name, avatar: bot.avatar, color: bot.color, text: text.slice(0, 200) });
-  return { conversationId: conv.id, text };
+  const name = bot?.name || prefs(user).assistantName || 'Niac';
+  const ev = { conversationId: conv.id, botId: bot?.id || null, name: groupConvId ? `${name} · ${conv.group?.name || 'grupo'}` : name, avatar: bot?.avatar || null, color: bot?.color, text: text.slice(0, 200) };
+  announceDelivery(user, ev, text);
+  return conv.id;
+}
+// Avisa a tela (balão flutuante) e os canais extras (Telegram, notificação no celular).
+export function announceDelivery(user, ev, text) {
+  emit(user.id, 'chat', ev);
+  for (const fn of deliverHooks) { try { fn(user, ev, text); } catch (e) { console.error('[entrega]', e.message); } }
+}
+
+// Pede uma resposta em JSON ao Gemini.
+export async function geminiJSON(prompt, maxTokens = 3000) {
+  const out = await geminiCall({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.5, maxOutputTokens: maxTokens, responseMimeType: 'application/json' } });
+  return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+}
+
+// Texto escrito pela IA no estilo do personagem, a partir de uma instrução e dos dados (null se não houver Gemini).
+export async function aiWrite(user, bot, instruction, data = '', maxTokens = 1500) {
+  if (!hasGemini()) return null;
+  try {
+    const out = await geminiCall({
+      systemInstruction: { parts: [{ text: systemPrompt(user, 'gemini', bot) }] },
+      contents: [{ role: 'user', parts: [{ text: `[Mensagem automática — o usuário NÃO escreveu nada.] Agora são ${new Date().toLocaleString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.
+${instruction}
+${data ? `\nDados atuais do usuário:\n${data}\n` : ''}
+Escreva só a mensagem, natural e no seu jeito, como no WhatsApp. Não diga que é automática.` }] }],
+      generationConfig: { temperature: 0.9, maxOutputTokens: maxTokens },
+    });
+    return out.trim();
+  } catch (err) { console.error('[aiWrite]', err.message); return null; }
+}
+
+export async function sendProactive(user, bot) {
+  const text = (await proactiveText(user, bot)).trim();
+  if (!text) return null;
+  const conversationId = deliverMessage(user, bot, text);
+  return { conversationId, text };
 }
 
 const validTimes = (t) => String(t || '').split(/[,;\s]+/).filter((x) => /^([01]\d|2[0-3]):[0-5]\d$/.test(x)).sort();

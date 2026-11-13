@@ -14,6 +14,7 @@ import life from './routes/life.js';
 import admin, { setRestart } from './routes/admin.js';
 import aiRoutes from './ai.js';
 import library, { loadLibrary, saveLibraryNow } from './library.js';
+import automations from './automations.js';
 import chatFiles from './routes/chatfiles.js';
 import { confirmAction, undoAction, actionStatuses } from './agent.js';
 import {
@@ -136,7 +137,7 @@ function cleanGroup(userId, g) {
   const members = [...new Set((Array.isArray(g.members) ? g.members : []).filter((m) => m === 'niac' || ids.has(m)))].slice(0, 8);
   if (members.length < 2) return { error: 'Escolha pelo menos 2 participantes' };
   const avatar = /^\/uploads\/[\w.-]+$/.test(g.avatar || '') ? g.avatar : null;
-  return { name, members, avatar, description: String(g.description || '').slice(0, 300) };
+  return { name, members, avatar, description: String(g.description || '').slice(0, 300), observe: Boolean(g.observe), observeTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(g.observeTime || '') ? g.observeTime : '21:00' };
 }
 
 // Encerramento local seguro (atalho "Parar Codeniac"): só da própria máquina e com o token da pasta de dados.
@@ -158,6 +159,7 @@ app.use('/api/library', requireAuth, library);
 app.use('/api', api);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
+app.use('/api', requireAuth, automations);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
 

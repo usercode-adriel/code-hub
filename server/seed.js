@@ -87,6 +87,7 @@ export const DEFAULT_SETTINGS = {
   briefingEnabled: true,
   dayCloseTime: '21:30',
   pomodoroMinutes: 25,
+  weeklyReview: true,          // revisão semanal no domingo à noite
   englishDailyGoal: 20,        // cartões por dia
   readingYearGoal: 12,         // livros por ano
   // Notificações
