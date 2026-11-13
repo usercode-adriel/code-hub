@@ -17,6 +17,7 @@ export const USER_COLLECTIONS = [
   'events', 'agenda', 'habits', 'inbox', 'decisions', 'journal', 'dayClose',
   'fuel', 'services', 'docs', 'shifts', 'cards', 'snippets', 'trail', 'books', 'studyLog', 'enJournal',
   'money', 'bills', 'subscriptions', 'bots',
+  'aiActions', 'memories', 'rules', 'capsules',
 ];
 
 const EMPTY = () => ({
@@ -27,6 +28,7 @@ const EMPTY = () => ({
   threads: {},        // userId -> { conversations: [...] }
   garage: {},         // userId -> dados do carro
   budgets: {},        // userId -> { categoria: limite }
+  userMeta: {},       // userId -> extras (plano do dia, Telegram, recorrentes ignorados...)
   ...Object.fromEntries(USER_COLLECTIONS.map((c) => [c, []])),
 });
 
@@ -37,6 +39,7 @@ export function load() {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   state = fs.existsSync(DB_FILE) ? { ...EMPTY(), ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) } : EMPTY();
   for (const c of USER_COLLECTIONS) state[c] ??= [];
+  state.userMeta ??= {};
   return state;
 }
 

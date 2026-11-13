@@ -12,6 +12,7 @@ import { addFinanceEntry } from './routes/pages.js';
 import { guessCategory } from './routes/life.js';
 import { logEvent, emit } from './notify.js';
 import { chatFile } from './routes/chatfiles.js';
+import { toolDeclarations, callTool, memoriesBlock, areasOf, AREAS } from './agent.js';
 import { briefing, procrastination, financeTotals, indrivePage } from './briefing.js';
 import { searchKB } from './kb.js';
 
@@ -176,6 +177,19 @@ const STYLE = `Jeito de escrever: como uma pessoa conversando por mensagem, nunc
 - Escreva valores sempre com R$ e números (ex.: R$ 180,50) e datas no formato 12/11 — nada de valores por extenso ou gírias para dinheiro.
 - Se a pessoa enviar foto ou PDF, leia com atenção e responda exatamente o que ela pediu; cite números e trechos do arquivo quando ajudar.`;
 
+function agentRules(bot) {
+  const areas = areasOf(bot);
+  return `Você pode AGIR no Codeniac com ferramentas. Consultar dados é sempre permitido; alterar só nestas áreas: ${areas.map((a) => AREAS[a]).join(', ') || 'nenhuma (apenas consulta)'}.
+- Quando a pessoa pedir uma ação (registrar, criar, concluir, mudar, pagar, marcar...), use as ferramentas, mesmo que seja um pedido com várias ações numa frase só. Depois confirme em uma frase curta o que foi feito.
+- NUNCA diga que fez, guardou, registrou ou anotou algo sem ter chamado a ferramenta correspondente nesta resposta. Se não conseguir, diga a verdade.
+- Nunca invente números: consulte antes (ferramentas consultar/estatisticas). Use as datas no formato AAAA-MM-DD; hoje é ${localDate()}.
+- Se receber foto de nota fiscal, recibo, fatura ou boleto e a pessoa pedir para lançar, leia os valores e registre (gasto, conta a pagar ou InDrive, conforme o caso).
+- Se pedirem algo fora das suas áreas, explique com leveza que outro personagem (ou o Niac) cuida disso.
+- Algumas ações pedem confirmação: nesse caso avise que é só tocar em "Confirmar" no cartão que apareceu.
+- Quando a pessoa contar algo duradouro sobre ela (meta, gosto, rotina, pessoa importante) ou pedir para lembrar, chame guardar_memoria (uma vez por fato).
+- Ao ensinar uma palavra útil em inglês, crie um cartão com criar_cartao_ingles (se tiver permissão).`;
+}
+
 function systemPrompt(user, mode = 'claude', bot = null) {
   const s = prefs(user);
   const p = PERSONALITY[bot?.personality || s.assistantPersonality] || PERSONALITY.amigavel;
@@ -188,7 +202,7 @@ Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual do hub; 
 Responda em português do Brasil, a menos que o personagem ou o usuário peçam outro idioma.
 ${EXPERTISE}
 ${STYLE}
-Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado", "ganhei 35 numa corrida de 12 km" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.`;
+${mode === 'gemini' ? agentRules(bot) : 'Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.'}${memoriesBlock(user)}`;
   }
   return `Você é ${s.assistantName}, o assistente integrado do Codeniac, um hub pessoal (projetos, rotina, InDrive, finanças, estudos).
 Cada mensagem chega com um bloco <contexto_codeniac> com o estado atual; use-o e não o mencione.
@@ -197,7 +211,7 @@ Chame o usuário de "${callName(user, s)}". ${LENGTH[s.assistantLength] || LENGT
 Responda em português do Brasil, exceto na prática de inglês.
 ${STYLE}
 ${EXPERTISE}
-${mode === 'claude' ? 'Use as ferramentas para criar/concluir tarefas e registrar entradas/saídas do InDrive; confirme em uma frase.' : 'Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado", "ganhei 35 numa corrida de 12 km" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.'}${s.assistantInstructions ? `\n\nInstruções pessoais do usuário:\n${s.assistantInstructions}` : ''}`;
+${mode === 'claude' ? 'Use as ferramentas para criar/concluir tarefas e registrar entradas/saídas do InDrive; confirme em uma frase.' : mode === 'gemini' ? agentRules(null) : 'Se a pessoa quiser registrar algo, sugira que ela escreva naturalmente, por exemplo "gastei 87,63 no mercado" ou "tarefa: estudar SQL" — o próprio sistema registra. Nunca diga que você registrou algo.'}${memoriesBlock(user)}${s.assistantInstructions ? `\n\nInstruções pessoais do usuário:\n${s.assistantInstructions}` : ''}`;
 }
 
 // ---------- Ferramentas (Claude) ----------
@@ -335,7 +349,7 @@ async function runOllama(user, conv, text, write) {
 }
 
 // ---------- Gemini (Google) ----------
-async function geminiStream(model, body, write) {
+async function geminiStream(model, body, write, full = false) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
@@ -351,6 +365,7 @@ async function geminiStream(model, body, write) {
   let answer = '';
   let buf = '';
   let blocked = null;
+  const rawParts = [];
   const decoder = new TextDecoder();
   for await (const chunk of res.body) {
     buf += decoder.decode(chunk, { stream: true });
@@ -365,13 +380,61 @@ async function geminiStream(model, body, write) {
       const cand = obj.candidates?.[0];
       if (obj.promptFeedback?.blockReason) blocked = obj.promptFeedback.blockReason;
       if (cand?.finishReason === 'SAFETY') blocked = 'SAFETY';
+      for (const p of cand?.content?.parts || []) rawParts.push(p);
       const piece = (cand?.content?.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
       if (piece) { answer += piece; write({ type: 'text', text: piece }); }
     }
   }
+  const calls = rawParts.filter((p) => p.functionCall);
+  if (full) return { text: answer, parts: rawParts, calls, blocked };
   if (!answer.trim() && blocked) return 'Prefiro não responder a esse pedido. Posso ajudar com outra coisa?';
   if (!answer.trim()) throw new Error('O Gemini não respondeu');
   return answer.trim();
+}
+
+// Envia um arquivo grande para a File API do Gemini (válido por ~48 h) e reaproveita o endereço.
+const fileUris = new Map();
+async function geminiUpload(full, mime, displayName) {
+  const st = fs.statSync(full);
+  const key = `${full}:${st.size}:${st.mtimeMs}`;
+  const cached = fileUris.get(key);
+  if (cached && Date.now() - cached.at < 40 * 3600 * 1000) return cached.uri;
+  const boundary = `cdn${Date.now()}`;
+  const meta = JSON.stringify({ file: { display_name: String(displayName || 'arquivo').slice(0, 100) } });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
+    fs.readFileSync(full), Buffer.from(`\r\n--${boundary}--\r\n`)]);
+  const res = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart', {
+    method: 'POST', headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': `multipart/related; boundary=${boundary}` }, body, signal: AbortSignal.timeout(300000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error?.message || `Envio do arquivo falhou (${res.status})`);
+  let file = data.file;
+  for (let i = 0; i < 30 && file.state === 'PROCESSING'; i++) {
+    await sleep(2000);
+    file = await (await fetch(`https://generativelanguage.googleapis.com/v1beta/${file.name}`, { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY } })).json();
+  }
+  if (file.state === 'FAILED') throw new Error('O Gemini não conseguiu processar o arquivo');
+  fileUris.set(key, { uri: file.uri, at: Date.now() });
+  return file.uri;
+}
+
+async function partsOfAsync(user, m, budget) {
+  const parts = [];
+  for (const f of m.files || []) {
+    const info = chatFile(user.id, f.file);
+    if (!info) { parts.push({ text: `[anexo indisponível: ${f.name || f.file}]` }); continue; }
+    if (info.mime === 'application/epub+zip') { parts.push({ text: `[o livro "${f.name}" está em EPUB, formato que a IA não consegue ler; peça o PDF]` }); continue; }
+    if (budget.left >= info.size) {
+      budget.left -= info.size;
+      parts.push({ inlineData: { mimeType: info.mime, data: fs.readFileSync(info.full).toString('base64') } });
+    } else if (info.size <= 1024 * 1024 * 1024) {
+      try { parts.push({ fileData: { mimeType: info.mime, fileUri: await geminiUpload(info.full, info.mime, f.name) } }); }
+      catch (err) { console.error('[arquivo]', err.message); parts.push({ text: `[não consegui enviar o arquivo ${f.name}: ${err.message}]` }); }
+    } else parts.push({ text: `[arquivo grande demais: ${f.name}]` });
+  }
+  if (m.text) parts.push({ text: m.text });
+  if (!parts.length) parts.push({ text: '(mensagem vazia)' });
+  return parts;
 }
 
 // Monta as partes de uma mensagem: texto + fotos/PDFs (enquanto couber no limite de envio).
@@ -389,12 +452,12 @@ function partsOf(user, m, budget) {
   return parts;
 }
 
-async function geminiCall(body, write = () => {}) {
+async function geminiCall(body, write = () => {}, full = false) {
   const wanted = aiConfig().geminiModel || GEMINI_FALLBACK[0];
   const models = [wanted, ...GEMINI_FALLBACK.filter((m) => m !== wanted)];
   let lastErr;
   for (const model of models) {
-    try { return await geminiStream(model, body, write); }
+    try { return await geminiStream(model, body, write, full); }
     catch (err) {
       lastErr = err;
       console.error(`[assistente] Gemini ${model}: ${err.status || ''} ${err.message}`);
@@ -405,24 +468,64 @@ async function geminiCall(body, write = () => {}) {
   throw lastErr;
 }
 
-async function runGemini(user, conv, text, write) {
+const MEMORY_HINT = /\b(meu objetivo|minha meta|eu quero|pretendo|sonho|eu (odeio|amo|adoro|gosto|prefiro|detesto)|nao gosto|lembra que|lembre que|guarda isso|guarde isso|nao esquece|anota que eu|minha (esposa|mulher|namorada|mae|filha|irma)|meu (marido|namorado|pai|filho|irmao|cachorro|gato)|eu trabalho|eu moro|eu estudo|sou alergico|meu aniversario)\b/;
+// Pede ao Gemini só a lista de fatos duradouros da mensagem e guarda (sem repetir os já salvos).
+async function extractMemories(ctx, text) {
+  const known = db().memories.filter((m) => m.userId === ctx.user.id).map((m) => m.text);
+  const out = await geminiCall({
+    contents: [{ role: 'user', parts: [{ text: `Mensagem do usuário: "${text}"\nMemórias já salvas: ${JSON.stringify(known.slice(-40))}\n\nListe SOMENTE fatos duradouros novos sobre o usuário (metas, gostos, rotina, pessoas, trabalho), cada um como frase curta em terceira pessoa. Responda apenas um JSON: {"fatos": ["..."]}. Se não houver, {"fatos": []}.` }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 400, responseMimeType: 'application/json' },
+  });
+  const fatos = (JSON.parse(out).fatos || []).slice(0, 5);
+  for (const fato of fatos) callTool({ ...ctx, write: null }, 'guardar_memoria', { fato });
+}
+
+async function runGemini(user, conv, text, write, actions = []) {
   const budget = { left: 14 * 1024 * 1024 }; // limite seguro de anexos por pedido
   const recent = conv.display.slice(-GEMINI_HISTORY).filter((m) => m.text || m.files?.length);
   // do mais novo para o mais antigo, para os anexos recentes terem prioridade
   const contents = [];
   for (let i = recent.length - 1; i >= 0; i--) {
     const m = recent[i];
-    contents.unshift({ role: m.role === 'user' ? 'user' : 'model', parts: partsOf(user, m, budget) });
+    contents.unshift({ role: m.role === 'user' ? 'user' : 'model', parts: await partsOfAsync(user, m, budget) });
   }
   while (contents.length && contents[0].role !== 'user') contents.shift();
+  const bot = botOf(user, conv);
   const kb = searchKB(text);
   const manual = kb && kb.score >= 1.5 ? `\n\n<manual_codeniac>\n${kb.answer}\n</manual_codeniac>\nSe a pergunta for sobre o sistema, baseie-se nesse trecho do manual.` : '';
   const body = {
-    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', botOf(user, conv))}\n\n${contextBlock(user)}${manual}` }] },
+    systemInstruction: { parts: [{ text: `${systemPrompt(user, 'gemini', bot)}\n\n${contextBlock(user)}${manual}` }] },
     contents,
-    generationConfig: { temperature: 0.85, maxOutputTokens: 4096 },
+    tools: [{ functionDeclarations: toolDeclarations(bot) }],
+    generationConfig: { temperature: 0.8, maxOutputTokens: 4096 },
   };
-  return { text: await geminiCall(body, write), tools: [] };
+  const ctx = { user, conv, bot, write, actions };
+  let answer = '';
+  for (let round = 0; round < 6; round++) {
+    const r = await geminiCall(body, write, true);
+    answer += r.text;
+    if (!r.calls.length) {
+      if (!answer.trim() && r.blocked) answer = 'Prefiro não responder a esse pedido. Posso ajudar com outra coisa?';
+      break;
+    }
+    // devolve a resposta do modelo (com as assinaturas) e o resultado de cada ferramenta
+    body.contents.push({ role: 'model', parts: r.parts });
+    const responses = r.calls.map(({ functionCall: fc }) => {
+      const out = callTool(ctx, fc.name, fc.args || {});
+      if (process.env.CODENIAC_DEBUG_TOOLS) console.log('[ferramenta]', fc.name, JSON.stringify(fc.args), '->', JSON.stringify(out).slice(0, 200));
+      return { functionResponse: { ...(fc.id ? { id: fc.id } : {}), name: fc.name, response: out.error ? { erro: out.error } : (out.result || { ok: true }) } };
+    });
+    body.contents.push({ role: 'user', parts: responses });
+    if (answer && !/\s$/.test(answer)) { answer += '\n\n'; write({ type: 'text', text: '\n\n' }); }
+  }
+  if (MEMORY_HINT.test(norm(text)) && !actions.some((a) => /^Memória/.test(a.summary)) && areasOf(bot).includes('memoria')) {
+    extractMemories(ctx, text).catch((e) => console.error('[memória]', e.message));
+  }
+  if (!answer.trim()) {
+    answer = actions.length ? 'Pronto!' : 'Hmm, não consegui responder agora.';
+    write({ type: 'text', text: answer });
+  }
+  return { text: answer.trim(), tools: [] };
 }
 
 // Confere se uma chave funciona (usado ao salvar a chave nas Configurações).
@@ -810,8 +913,10 @@ export async function chat(user, text, convId, write, opts = {}) {
   }
 
   let mode = assistantMode();
-  let result = files.length ? null : command(user, text) || naturalAction(user, text, mode !== 'local');
-  if (!result && !files.length) {
+  const actions = [];
+  // com o Gemini, a própria IA entende e executa (inclusive pedidos com várias ações); sem ele, regras locais
+  let result = files.length ? null : mode === 'gemini' ? (/^\//.test(text) ? command(user, text) : null) : command(user, text) || naturalAction(user, text, mode !== 'local');
+  if (!result && !files.length && mode !== 'gemini') {
     const kb = searchKB(text);
     if (kb && (mode === 'local' || kb.score >= 3)) result = { text: kb.answer, tools: [], link: kb.link };
   }
@@ -822,9 +927,10 @@ export async function chat(user, text, convId, write, opts = {}) {
     try { result = await runOllama(user, conv, text, write); result.streamed = true; }
     catch (err) { console.error('[assistente] IA local falhou:', err?.message); refreshOllama(); write({ type: 'notice', text: 'IA local indisponível. Respondendo no modo básico.' }); mode = 'local'; }
   } else if (!result && mode === 'gemini') {
-    try { result = await runGemini(user, conv, text, write); result.streamed = true; }
+    try { result = await runGemini(user, conv, text, write, actions); result.streamed = true; }
     catch (err) {
       console.error('[assistente] Gemini falhou:', err?.message);
+      if (!files.length) result = naturalAction(user, text, false);
       write({ type: 'notice', text: err.status === 429 ? 'A cota grátis do Gemini acabou por agora. Respondo no modo básico até ela voltar.' : 'O Gemini não respondeu agora. Respondo no modo básico.' });
       mode = 'local';
     }
@@ -843,7 +949,7 @@ export async function chat(user, text, convId, write, opts = {}) {
   if (!s.assistantEmoji) result.text = result.text.replace(/\p{Extended_Pictographic}️?/gu, '').replace(/ {2,}/g, ' ').trim();
   if (!result.streamed) await typeOut(result, write);
   if (result.link) write({ type: 'link', href: result.link });
-  conv.display.push({ role: 'assistant', text: result.text, at: now(), mode, tools: result.tools, link: result.link || null });
+  conv.display.push({ role: 'assistant', text: result.text, at: now(), mode, tools: result.tools, link: result.link || null, ...(actions.length ? { actions } : {}) });
   if (conv.display.length > 400) conv.display = conv.display.slice(-400);
   conv.updatedAt = now();
   save();

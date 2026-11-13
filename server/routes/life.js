@@ -73,6 +73,8 @@ const COLL = {
     fields: { name: F.str(40), avatar: F.img, personality: F.oneOf('amigavel', 'profissional', 'divertido', 'mentor', 'zen', 'nerd'),
       traits: F.str(2000), greeting: F.str(400), color: F.str(9),
       focus: F.oneOf('geral', 'financas', 'indrive', 'tarefas', 'estudos', 'ingles', 'habitos'), proactive: F.bool,
+      permissions: (v) => (v == null ? null : Array.isArray(v) ? [...new Set(v.map(String))].filter((x) => ['tarefas', 'financeiro', 'indrive', 'agenda', 'livros', 'habitos', 'notas', 'ingles', 'memoria'].includes(x)) : undefined),
+      voice: F.str(120), voiceRate: F.num, voicePitch: F.num, autoSpeak: F.bool,
       times: (v) => (v == null || v === '' ? '' : String(v).split(/[,;\s]+/).filter((x) => /^([01]\d|2[0-3]):[0-5]\d$/.test(x)).slice(0, 6).join(',')) } },
   money: { kind: 'money', label: 'Lançamento', title: 'desc', link: '#/financeiro', required: ['date', 'desc', 'amount'],
     fields: { date: F.date, desc: F.str(160), amount: F.num, category: F.str(40), account: F.str(40), notes: F.str(500) } },
@@ -101,7 +103,7 @@ const owned = (coll, itemId, uid) => db()[coll].find((x) => x.id === itemId && x
 // Categorias automáticas para lançamentos sem categoria (importação de extrato e comandos).
 const AUTO_CAT = [
   [/mercad|supermerc|atacad|assai|carrefour|hortifruti|padaria/i, 'Mercado'],
-  [/ifood|rappi|restaurante|lanchon|pizza|burger|cafe|almoço|almoco/i, 'Alimentação'],
+  [/ifood|rappi|restaurante|lanch|pizza|burger|cafe|almoço|almoco|jantar|padaria/i, 'Alimentação'],
   [/posto|combust|gasolina|etanol|shell|ipiranga|petrobras|br mania/i, 'Combustível'],
   [/uber|99app|99 pop|onibus|ônibus|metro|metrô|estacionamento|pedagio|pedágio/i, 'Transporte'],
   [/netflix|spotify|prime|disney|hbo|max\b|youtube|apple\.com|google\s*one|deezer|globoplay/i, 'Assinaturas'],

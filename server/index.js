@@ -15,6 +15,7 @@ import admin, { setRestart } from './routes/admin.js';
 import aiRoutes from './ai.js';
 import library, { loadLibrary, saveLibraryNow } from './library.js';
 import chatFiles from './routes/chatfiles.js';
+import { confirmAction, undoAction, actionStatuses } from './agent.js';
 import {
   chat, assistantMode, sendProactive, groupMembers, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
 } from './assistant.js';
@@ -61,7 +62,8 @@ app.get('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = getConversation(req.user.id, req.params.id);
   if (!c) return res.status(404).json({ error: 'Conversa não encontrada' });
   if (c.unread) { c.unread = 0; saveNow(); }
-  res.json({ id: c.id, title: c.title, botId: c.botId || null, group: c.group || null, members: c.group ? groupMembers(req.user, c).map(({ id: mid, name, avatar, color, personality }) => ({ id: mid, name, avatar, color, personality })) : null, messages: c.display });
+  const actionIds = c.display.flatMap((m) => (m.actions || []).map((a) => a.id));
+  res.json({ id: c.id, title: c.title, botId: c.botId || null, group: c.group || null, actionStatus: actionStatuses(req.user, actionIds), members: c.group ? groupMembers(req.user, c).map(({ id: mid, name, avatar, color, personality }) => ({ id: mid, name, avatar, color, personality })) : null, messages: c.display });
 });
 app.put('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = renameConversation(req.user.id, req.params.id, req.body?.title || getConversation(req.user.id, req.params.id)?.title);
@@ -102,6 +104,31 @@ app.post('/api/assistant/bots/:id/ping', requireAuth, async (req, res) => {
   if (!bot) return res.status(404).json({ error: 'Personagem não encontrado' });
   try { res.json(await sendProactive(req.user, bot)); } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Ações da IA: confirmar (ou cancelar) e desfazer.
+app.post('/api/assistant/actions/:id/confirm', requireAuth, (req, res) => {
+  try { const a = confirmAction(req.user, req.params.id, req.body?.accept !== false); res.json({ id: a.id, status: a.status, summary: a.summary }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/assistant/actions/:id/undo', requireAuth, (req, res) => {
+  try { const a = undoAction(req.user, req.params.id); res.json({ id: a.id, status: a.status, summary: a.summary }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.get('/api/assistant/actions', requireAuth, (req, res) => {
+  res.json(db().aiActions.filter((a) => a.userId === req.user.id).slice(-100).reverse()
+    .map(({ id: aid, tool, summary, status, at, botId }) => ({ id: aid, tool, summary, status, at, botId })));
+});
+// Memórias da IA sobre o usuário
+app.get('/api/assistant/memories', requireAuth, (req, res) => res.json(db().memories.filter((m) => m.userId === req.user.id).reverse()));
+app.post('/api/assistant/memories', requireAuth, (req, res) => {
+  const text = String(req.body?.text || '').trim().slice(0, 300);
+  if (!text) return res.status(400).json({ error: 'Escreva a memória' });
+  const m = { id: crypto.randomUUID(), userId: req.user.id, text, botId: null, source: 'usuario', createdAt: new Date().toISOString() };
+  db().memories.push(m); saveNow(); res.status(201).json(m);
+});
+app.delete('/api/assistant/memories/:id', requireAuth, (req, res) => {
+  db().memories = db().memories.filter((m) => !(m.id === req.params.id && m.userId === req.user.id)); saveNow(); res.json({ ok: true });
+});
+
 function cleanGroup(userId, g) {
   const name = String(g.name || '').trim().slice(0, 60);
   if (!name) return { error: 'Dê um nome ao grupo' };

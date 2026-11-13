@@ -4,6 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import { DATA_DIR, id } from '../db.js';
+import { libraryItem, LIBRARY_DIR } from '../library.js';
 
 export const CHAT_FILES = path.join(DATA_DIR, 'chat-files');
 export const CHAT_MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.pdf': 'application/pdf' };
@@ -12,6 +13,14 @@ export const MAX_CHAT_FILE_MB = 15;
 
 // Confere se o arquivo pertence ao usuário e devolve os dados dele.
 export function chatFile(userId, file) {
+  // livros da biblioteca também podem ser anexados ("lib:<id>")
+  if (String(file || '').startsWith('lib:')) {
+    const item = libraryItem(userId, String(file).slice(4));
+    if (!item) return null;
+    const full = path.join(LIBRARY_DIR, path.basename(item.file));
+    if (!fs.existsSync(full)) return null;
+    return { file: `lib:${item.id}`, full, mime: item.format === 'pdf' ? 'application/pdf' : 'application/epub+zip', size: fs.statSync(full).size, name: item.title };
+  }
   const name = path.basename(String(file || ''));
   if (!name.startsWith(`${userId}__`)) return null;
   const full = path.join(CHAT_FILES, name);
@@ -39,6 +48,7 @@ router.post('/', (req, res) => {
 });
 router.get('/:file', (req, res) => {
   const f = chatFile(req.user.id, req.params.file);
+  if (f && f.file.startsWith('lib:')) return res.type(f.mime).sendFile(f.full);
   if (!f) return res.status(404).json({ error: 'Arquivo não encontrado' });
   res.set('Cache-Control', 'private, max-age=86400');
   res.type(f.mime).sendFile(f.full);

@@ -41,6 +41,7 @@ export function saveLibraryNow() {
 // usado ao restaurar um backup
 export function replaceLibrary(next) { lib = { items: [], ...next }; saveLibraryNow(); }
 
+export const libraryItem = (userId, itemId) => store().items.find((x) => x.id === itemId && x.userId === userId) || null;
 const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 const owned = (itemId, uid) => store().items.find((x) => x.id === itemId && x.userId === uid);
 const fileOf = (item) => path.join(LIBRARY_DIR, path.basename(item.file));
