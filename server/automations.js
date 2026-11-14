@@ -7,7 +7,7 @@ import { db, id, now, save, localDate, UPLOAD_DIR } from './db.js';
 import { notify, logEvent } from './notify.js';
 import { briefing, financeTotals, streak, prefs } from './briefing.js';
 import {
-  deliverMessage, aiWrite, focusData, hasGemini, groupMembers, groupTurn, NIAC, PERSONALITY_LABELS, geminiJSON, announceDelivery,
+  deliverMessage, aiWrite, focusData, hasCloud, groupMembers, groupTurn, NIAC, PERSONALITY_LABELS, geminiJSON, announceDelivery,
 } from './assistant.js';
 
 const mine = (coll, uid) => db()[coll].filter((x) => x.userId === uid);
@@ -170,7 +170,7 @@ export async function makePlan(user) {
   const projects = Object.fromEntries(mine('projects', uid).map((p) => [p.id, p.name]));
   const open = mine('tasks', uid).filter((t) => t.status !== 'done').slice(0, 40)
     .map((t) => ({ id: t.id, titulo: t.title, projeto: projects[t.projectId], prioridade: t.priority, prazo: t.dueDate, status: t.status, adiada: t.postponed || 0 }));
-  if (!hasGemini() || !open.length) return { ...planHeuristic(uid), source: 'regras' };
+  if (!hasCloud() || !open.length) return { ...planHeuristic(uid), source: 'regras' };
   const lastClose = mine('dayClose', uid).sort((a, b) => b.date.localeCompare(a.date))[0];
   const s = prefs(uid);
   try {
@@ -255,7 +255,7 @@ export function shiftSuggestion(uid) {
 // ---------------- Grupos comentam o dia (à noite) ----------------
 async function observeGroups(user) {
   const st = db().threads[user.id];
-  if (!st || !hasGemini()) return;
+  if (!st || !hasCloud()) return;
   const today = localDate();
   for (const conv of st.conversations.filter((c) => c.group?.observe)) {
     const time = conv.group.observeTime || '21:00';
@@ -389,7 +389,7 @@ const DEFAULT_DEBATERS = [
 router.post('/decisions/:id/debate', async (req, res) => {
   const d = db().decisions.find((x) => x.id === req.params.id && x.userId === req.user.id);
   if (!d) return bad(res, 'Decisão não encontrada', 404);
-  if (!hasGemini()) return bad(res, 'O debate precisa do Gemini ligado (Configurações → Assistente).');
+  if (!hasCloud()) return bad(res, 'O debate precisa de uma IA na nuvem ligada (Configurações → Assistente).');
   if ((d.alternatives || []).filter((a) => a.name).length < 2) return bad(res, 'Cadastre pelo menos 2 alternativas antes do debate.');
   const chosen = (Array.isArray(req.body?.bots) ? req.body.bots : []).map((bid) => db().bots.find((b) => b.id === bid && b.userId === req.user.id)).filter(Boolean).slice(0, 4);
   const debaters = chosen.length >= 2 ? chosen : DEFAULT_DEBATERS;

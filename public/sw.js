@@ -1,5 +1,5 @@
 // Codeniac no celular: abre rápido (guarda a interface), recebe notificações e abre a tela certa ao tocar.
-const CACHE = 'codeniac-1.7.0';
+const CACHE = 'codeniac-1.8.0';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {

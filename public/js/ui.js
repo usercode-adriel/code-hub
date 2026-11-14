@@ -11,7 +11,10 @@ export function esc(v) {
 export function chatMd(text) {
   return String(text ?? '').split('```').map((part, i) => {
     if (i % 2) return `<pre class="chat-code"><code>${esc(part.replace(/^[\w+#.-]*\n/, '').replace(/\n$/, ''))}</code></pre>`;
-    return esc(part).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    return esc(part).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      // links: só http(s); abrem em outra aba, sem acesso ao sistema
+      .replace(/\[([^\]\n]{1,160})\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;!?])/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
   }).join('');
 }
 

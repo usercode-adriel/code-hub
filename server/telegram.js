@@ -172,7 +172,7 @@ async function handleCallback(q) {
   const m = /^c:([\w-]+):([01])$/.exec(q.data || '');
   if (!user || !m) return call('answerCallbackQuery', { callback_query_id: q.id });
   let msg;
-  try { const a = confirmAction(user, m[1], m[2] === '1'); msg = a.status === 'done' ? `✅ Feito: ${a.summary}` : '❌ Cancelado.'; }
+  try { const a = await confirmAction(user, m[1], m[2] === '1'); msg = a.status === 'done' ? `✅ Feito: ${a.summary}${a.link ? `\n${a.link}` : ''}` : '❌ Cancelado.'; }
   catch (err) { msg = err.message; }
   await call('answerCallbackQuery', { callback_query_id: q.id, text: msg.slice(0, 190) }).catch(() => {});
   await call('editMessageText', { chat_id: q.message.chat.id, message_id: q.message.message_id, text: msg }).catch(() => {});

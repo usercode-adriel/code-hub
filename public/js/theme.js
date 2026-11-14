@@ -18,10 +18,17 @@ export const THEMES = {
   oceano: { group: 'preset', name: 'Oceano', desc: 'Azul profundo e turquesa', vars: { surface: '#041821', bg: '#071a24', sidebar: '#08202c', card: '#0c2a38', card2: '#103343', input: '#133b4d', border: '#1d4e63', text: '#e6f7ff', text2: '#a6d4e6', muted: '#6c9fb3', accent: '#22d3ee' } },
   cafe: { group: 'preset', name: 'Café', desc: 'Tons quentes de torra', head: 'serif', vars: { surface: '#2a211c', bg: '#1c1612', sidebar: '#201914', card: '#2a211b', card2: '#31271f', input: '#382c23', border: '#4a3a2e', text: '#f6ece3', text2: '#d1bba8', muted: '#9a8371', accent: '#d4a373' } },
   harvard: { group: 'preset', name: 'Harvard', desc: 'Carmesim acadêmico e serifas', head: 'serif', vars: { surface: '#0e0607', bg: '#170b0d', sidebar: '#1d0d10', card: '#241114', card2: '#2c1519', input: '#33191e', border: '#4a2228', text: '#f6ece6', text2: '#d8bfb6', muted: '#a3867e', accent: '#c4122f' } },
+  // ---- Premium: trocam também o layout do início (cartões em vidro, degradês e avatares) ----
+  arena: { group: 'premium', name: 'Arena Neon', desc: 'Roxo elétrico, como nos painéis de streaming', vars: { surface: '#0a0516', bg: '#130a29', sidebar: '#0f0820', card: '#1b1137', card2: '#23164a', input: '#2a1a58', border: '#3d2a78', text: '#f5efff', text2: '#cbbcf3', muted: '#8d7cc0', accent: '#a855f7', accent2: '#e040fb' } },
+  ciano: { group: 'premium', name: 'Ciano Cyber', desc: 'Ciano e índigo futuristas', vars: { surface: '#030c14', bg: '#07141f', sidebar: '#050f19', card: '#0c1f30', card2: '#102740', input: '#142e4a', border: '#1f4668', text: '#eafaff', text2: '#a9d6e8', muted: '#6b9bb3', accent: '#22d3ee', accent2: '#6366f1' } },
+  inferno: { group: 'premium', name: 'Inferno', desc: 'Rubi e laranja em brasa', vars: { surface: '#0e0408', bg: '#1a0810', sidebar: '#14060c', card: '#260d17', card2: '#321220', input: '#3b1526', border: '#5a2038', text: '#fff0f3', text2: '#efbcc7', muted: '#b27a88', accent: '#f43f5e', accent2: '#f59e0b' } },
+  esmeralda: { group: 'premium', name: 'Esmeralda', desc: 'Verde neon com toque turquesa', vars: { surface: '#030f0a', bg: '#071a12', sidebar: '#05140d', card: '#0c2619', card2: '#10321f', input: '#143b26', border: '#1f5a3a', text: '#eafff3', text2: '#a8e0c1', muted: '#6aa686', accent: '#22c55e', accent2: '#06b6d4' } },
+  ouro: { group: 'premium', name: 'Ouro Real', desc: 'Dourado sobre violeta profundo', vars: { surface: '#0b0612', bg: '#150d1f', sidebar: '#100a19', card: '#201430', card2: '#2a1a3f', input: '#321f4b', border: '#4c3270', text: '#fff7e6', text2: '#e6d2a6', muted: '#a99370', accent: '#f5b324', accent2: '#ef4444' } },
+  safira: { group: 'premium', name: 'Safira', desc: 'Azul real com brilho violeta', vars: { surface: '#050a1c', bg: '#0a1230', sidebar: '#070e26', card: '#111c45', card2: '#16245a', input: '#1b2b6a', border: '#2a3f8f', text: '#edf1ff', text2: '#b6c3f0', muted: '#7b8ac0', accent: '#3b82f6', accent2: '#8b5cf6' } },
 };
 
 export const COLOR_LABELS = {
-  accent: 'Destaque', bg: 'Fundo do app', surface: 'Fundo externo', sidebar: 'Barra lateral', card: 'Cards',
+  accent: 'Destaque', accent2: 'Destaque 2 (degradê premium)', bg: 'Fundo do app', surface: 'Fundo externo', sidebar: 'Barra lateral', card: 'Cards',
   card2: 'Cards secundários', input: 'Campos', border: 'Bordas', text: 'Texto', text2: 'Texto secundário', muted: 'Texto apagado',
 };
 
@@ -57,6 +64,7 @@ export function applyTheme(settings) {
   set('--border', vars.border); set('--border-soft', `color-mix(in srgb, ${vars.border} 55%, ${vars.card})`);
   set('--text', vars.text); set('--text-2', vars.text2); set('--muted', vars.muted);
   set('--accent', vars.accent); set('--on-accent', contrastText(vars.accent));
+  set('--accent-2', vars.accent2 || `color-mix(in srgb, ${vars.accent} 55%, #ff4fd8)`);
   set('--tint', mode === 'light' ? '0, 0, 0' : '255, 255, 255');
   set('--media', mode === 'light' ? `color-mix(in srgb, ${vars.card2} 80%, ${vars.border})` : `color-mix(in srgb, ${vars.bg} 85%, #000)`);
   const radius = Number.isFinite(settings.radius) ? settings.radius : 20;
@@ -65,6 +73,7 @@ export function applyTheme(settings) {
   set('--font-head', FONTS[preset.head] || 'var(--font)');
   set('--zoom', String((settings.fontScale || 100) / 100));
   document.body.dataset.theme = settings.theme || 'padrao';
+  document.body.dataset.layout = settings.layout === 'premium' ? 'premium' : 'classic';
   document.body.dataset.scheme = mode;
   document.body.classList.toggle('compact', settings.density === 'compact');
   document.body.classList.toggle('no-fx', settings.effects === false);
@@ -75,5 +84,7 @@ export function applyTheme(settings) {
 // Valores de layout que um tema sugere ao ser escolhido.
 export function presetLayout(themeId) {
   const p = THEMES[themeId] || THEMES.padrao;
-  return { radius: p.radius ?? 20, fontFamily: p.font ?? 'poppins', effects: p.effects ?? true };
+  const out = { radius: p.radius ?? 20, fontFamily: p.font ?? 'poppins', effects: p.effects ?? true };
+  if (p.group === 'premium') { out.layout = 'premium'; out.radius = 24; }
+  return out;
 }

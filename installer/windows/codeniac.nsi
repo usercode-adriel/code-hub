@@ -1,7 +1,7 @@
 ; Instalador do Codeniac para Windows (por usuário, sem precisar de administrador).
 Unicode true
 !define APP "Codeniac"
-!define VERSION "1.7.0"
+!define VERSION "1.8.0"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Codeniac"
 !include MUI2.nsh
 !include FileFunc.nsh

@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -51,6 +51,13 @@ export const CHANGELOG = [
       + 'e guarda memórias suas. Novas automações (rotinas, plano do dia, revisão semanal, assinaturas detectadas, sugestão de turno), voz e modo ligação, '
       + 'debate de decisões, cápsula do tempo, personagens no Telegram e app no celular com notificações.',
   },
+  {
+    version: '1.8.0',
+    title: 'Codeniac 1.8: visual premium e IA turbinada ✨',
+    message: 'Nova logo code hub, temas premium com personagens que saem dos cartões, nova tela de login, Groq e OpenRouter como IAs extras (cada personagem pode ter a sua), '
+      + 'chat que pesquisa na web com fontes, gera imagens e arquivos (PDF, Word, planilha), responde em inglês quando você escreve em inglês e, no modo desenvolvedor, '
+      + 'lê o código no GitHub e propõe pequenas alterações com a sua aprovação.',
+  },
 ];
 
 export const DEFAULT_PROJECTS = [
@@ -70,16 +77,20 @@ export const THEMES = [
   // cores básicas (só mudam as cores)
   'azul', 'azulclaro', 'preto', 'vermelho', 'roxo', 'verde', 'neutro',
   // temas prontos
-  'padrao', 'gamers', 'magia', 'batcaverna', 'retro80', 'nerds', 'oceano', 'cafe', 'harvard'];
+  'padrao', 'gamers', 'magia', 'batcaverna', 'retro80', 'nerds', 'oceano', 'cafe', 'harvard',
+  // temas premium (trocam também o layout do início)
+  'arena', 'ciano', 'inferno', 'esmeralda', 'ouro', 'safira'];
+export const PREMIUM_THEMES = ['arena', 'ciano', 'inferno', 'esmeralda', 'ouro', 'safira'];
 // temas antigos (1.3) que saíram: viram o mais parecido
 export const THEME_REPLACED = { minimalista: 'neutro', console: 'vermelho', fazenda: 'verde', natal: 'vermelho', chuva: 'azul', pixel: 'padrao', blocos: 'verde' };
-export const THEME_VAR_KEYS = ['bg', 'surface', 'sidebar', 'card', 'card2', 'input', 'border', 'text', 'text2', 'muted', 'accent'];
+export const THEME_VAR_KEYS = ['bg', 'surface', 'sidebar', 'card', 'card2', 'input', 'border', 'text', 'text2', 'muted', 'accent', 'accent2'];
 export const PERSONALITIES = ['amigavel', 'profissional', 'divertido', 'mentor', 'zen', 'nerd'];
 
 export const DEFAULT_SETTINGS = {
   // Aparência
   theme: 'padrao',
   themeVars: {},
+  layout: 'classic',           // classic | premium (início com cartões em vidro e avatares)
   radius: 20,
   fontScale: 100,
   fontFamily: 'poppins',       // poppins | system | mono | serif
@@ -94,6 +105,9 @@ export const DEFAULT_SETTINGS = {
   briefingEnabled: true,
   dayCloseTime: '21:30',
   pomodoroMinutes: 25,
+  chatWeb: true,               // IA pode pesquisar na web
+  chatImages: true,            // IA pode gerar imagens
+  chatFiles: true,             // IA pode criar arquivos (PDF, Word, planilha...)
   weeklyReview: true,          // revisão semanal no domingo à noite
   englishDailyGoal: 20,        // cartões por dia
   readingYearGoal: 12,         // livros por ano
@@ -119,6 +133,9 @@ export const DEFAULT_SYSTEM = {
   allowRegistration: true,
   defaultTheme: 'padrao',
   loginMessage: '',
+  avatars: { enabled: true, items: [], slots: {} },   // avatares PNG que saem dos cartões (premium)
+  logoVersion: 0,
+  github: { repo: '', branch: 'main', mode: 'pr', devMode: false },   // o token fica no .env
   images: {},                  // loginBg, loginArt, logo, heroDefault, cardFocus, cardForYou, cardSoon, cardNews
   customCss: '',
   menu: { hidden: [], labels: {} },
@@ -131,12 +148,21 @@ export function systemConfig() {
   const d = db();
   const sys = (d.system ??= {});
   for (const [k, v] of Object.entries(DEFAULT_SYSTEM)) if (sys[k] === undefined) sys[k] = structuredClone(v);
-  for (const k of ['backup', 'menu']) {
+  for (const k of ['backup', 'menu', 'github']) {
     if (!sys[k] || typeof sys[k] !== 'object') sys[k] = {};
     for (const [kk, vv] of Object.entries(DEFAULT_SYSTEM[k])) if (sys[k][kk] === undefined) sys[k][kk] = structuredClone(vv);
   }
   sys.images ??= {};
+  if (!sys.avatars || typeof sys.avatars !== 'object') sys.avatars = { enabled: true, items: [], slots: {} };
+  sys.avatars.items ??= []; sys.avatars.slots ??= {}; if (typeof sys.avatars.enabled !== 'boolean') sys.avatars.enabled = true;
   return sys;
+}
+
+export const AVATAR_SLOTS = ['login', 'hero', 'projetos', 'foco', 'plano', 'banner', 'estatistica'];
+// Avatares PNG (públicos, usados também na tela de login).
+export function avatarsPublic() {
+  const a = systemConfig().avatars;
+  return { enabled: a.enabled, items: a.items.map((i) => ({ id: i.id, name: i.name, url: i.url })), slots: a.slots };
 }
 
 // ---------- Páginas (estilo Notion) ----------

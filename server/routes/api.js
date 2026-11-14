@@ -5,7 +5,7 @@ import {
   requireAuth, requireAdmin, signToken, verifyPassword, hashPassword, publicUser,
 } from '../auth.js';
 import {
-  createUser, DEFAULT_SETTINGS, APP_VERSION, CHANGELOG, THEMES, THEME_VAR_KEYS, PERSONALITIES, systemConfig, ensureRootPage,
+  createUser, avatarsPublic, DEFAULT_SETTINGS, APP_VERSION, CHANGELOG, THEMES, THEME_VAR_KEYS, PERSONALITIES, systemConfig, ensureRootPage,
 } from '../seed.js';
 import { notify, subscribe, emit, logEvent } from '../notify.js';
 
@@ -54,7 +54,7 @@ router.get('/system/info', (_req, res) => {
   const sys = systemConfig();
   res.json({
     appName: sys.appName, allowRegistration: sys.allowRegistration || db().users.length === 0,
-    loginMessage: sys.loginMessage, version: APP_VERSION, images: sys.images,
+    loginMessage: sys.loginMessage, version: APP_VERSION, images: sys.images, avatars: avatarsPublic(),
     demoAccount: demoActive(),
   });
 });
@@ -114,7 +114,7 @@ router.get('/auth/me', (req, res) => {
     user: publicUser(req.user),
     settings: { ...DEFAULT_SETTINGS, ...(db().settings[req.user.id] || {}) },
     version: APP_VERSION,
-    system: { appName: sys.appName, images: sys.images, menu: sys.menu },
+    system: { appName: sys.appName, images: sys.images, menu: sys.menu, avatars: avatarsPublic() },
   });
 });
 
@@ -176,6 +176,7 @@ const SETTINGS_SCHEMA = {
     if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
     return Object.fromEntries(Object.entries(v).filter(([k, c]) => THEME_VAR_KEYS.includes(k) && HEX.test(c)));
   },
+  layout: oneOf(['classic', 'premium']),
   radius: intIn(0, 28),
   fontScale: intIn(85, 120),
   fontFamily: oneOf(['poppins', 'system', 'mono', 'serif', 'retro']),

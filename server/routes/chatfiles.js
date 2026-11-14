@@ -7,7 +7,13 @@ import { DATA_DIR, id } from '../db.js';
 import { libraryItem, LIBRARY_DIR } from '../library.js';
 
 export const CHAT_FILES = path.join(DATA_DIR, 'chat-files');
-export const CHAT_MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.pdf': 'application/pdf' };
+export const CHAT_MIME = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.pdf': 'application/pdf',
+  // arquivos criados pela IA (só para baixar)
+  '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json', '.html': 'text/plain; charset=utf-8',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
+const INLINE_OK = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf']);
 const MIME_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif', 'application/pdf': '.pdf' };
 export const MAX_CHAT_FILE_MB = 15;
 
@@ -51,6 +57,12 @@ router.get('/:file', (req, res) => {
   if (f && f.file.startsWith('lib:')) return res.type(f.mime).sendFile(f.full);
   if (!f) return res.status(404).json({ error: 'Arquivo não encontrado' });
   res.set('Cache-Control', 'private, max-age=86400');
+  const ext = path.extname(f.file).toLowerCase();
+  // o que a IA gerou (html, texto...) nunca abre dentro do sistema: só baixa, sem executar nada
+  if (!INLINE_OK.has(ext) || req.query.download) {
+    const name = String(req.query.name || f.file).replace(/[\r\n"\\/]/g, '_').slice(0, 120);
+    res.set({ 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': 'sandbox', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}` });
+  }
   res.type(f.mime).sendFile(f.full);
 });
 export default router;

@@ -3,74 +3,116 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17181c">
-  <title>Entrar · Codeniac</title>
+  <meta name="theme-color" content="#130a29">
+  <title>Entrar · code hub</title>
   <link rel="icon" href="/assets/favicon.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/fonts/fonts.css">
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/themes.css">
+  <link rel="stylesheet" href="/css/premium.css">
   <style>
-    body { display: grid; place-items: center; min-height: 100vh; padding: 20px; background: radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%), var(--bg-outer); background-size: cover; background-position: center; }
-    body.has-bg { background: linear-gradient(rgba(5,6,8,.55), rgba(5,6,8,.7)), var(--login-bg) center / cover no-repeat; }
-    .login { width: min(920px, 100%); display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0,0,0,.7); }
-    .login-art { position: relative; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; min-height: 520px; overflow: hidden;
-      background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 35%, var(--bg-app)), var(--bg-app) 70%); }
-    .login-art.img { background: linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.75)), var(--login-art) center / cover no-repeat; }
-    .login-art .orb { position: absolute; right: -60px; top: 30%; width: 280px; height: 280px; border-radius: 50%; border: 1px dashed rgba(255,255,255,.18); }
-    .login-art .orb::after { content: ''; position: absolute; inset: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--accent) 80%, #fff), var(--accent) 45%, transparent 72%); opacity: .55; filter: blur(2px); }
-    .login-art img.logo { height: 58px; width: auto; position: relative; }
-    .login-art h2 { font-size: 26px; margin: 0 0 8px; line-height: 1.25; position: relative; color: #fff; font-family: var(--font-head, var(--font)); }
-    .login-art p { margin: 0; color: rgba(255,255,255,.75); font-size: 13px; line-height: 1.6; position: relative; max-width: 340px; }
-    .login-art ul { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 8px; position: relative; color: rgba(255,255,255,.85); font-size: 12.5px; }
-    .login-form { padding: 44px 40px; display: flex; flex-direction: column; justify-content: center; }
-    .login-form h1 { margin: 0 0 4px; font-size: 22px; }
+    body { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 26px 20px; overflow-x: hidden; overflow-y: auto;
+      background: radial-gradient(900px 520px at 12% -10%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%), radial-gradient(800px 520px at 100% 110%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 62%), var(--bg-outer); background-attachment: fixed; }
+    body.has-bg { background: linear-gradient(rgba(8,4,20,.62), rgba(8,4,20,.82)), var(--login-bg) center / cover no-repeat fixed; }
+    html { overflow-x: hidden; }
+    .login { position: relative; z-index: 1; width: min(1000px, 100%); margin-top: 74px; display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "art art" "feat form"; border-radius: 30px; isolation: isolate;
+      background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 12%, var(--bg-card)), var(--bg-card) 70%); border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+      box-shadow: 0 40px 100px -40px color-mix(in srgb, var(--accent) 70%, #000), 0 0 0 1px rgba(255,255,255,.03) inset; }
+    .login-art { grid-area: art; position: relative; padding: 34px 42px; display: flex; flex-direction: column; justify-content: center; gap: 14px; min-height: 236px; border-radius: 30px 30px 0 0;
+      background: radial-gradient(420px 220px at 88% 60%, color-mix(in srgb, var(--accent-2) 60%, transparent), transparent 70%), linear-gradient(120deg, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-2)) 55%, color-mix(in srgb, var(--accent-2) 75%, #000)); }
+    .login-art.img { background: linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.7)), var(--login-art) center / cover no-repeat; }
+    .art-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+    .art-clip .ring { position: absolute; right: 4%; top: 50%; width: 330px; height: 330px; transform: translateY(-50%); border-radius: 50%; border: 1px dashed rgba(255,255,255,.3); }
+    .art-clip .ring::after { content: ''; position: absolute; inset: 48px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.55), rgba(255,255,255,.07) 55%, transparent 72%); }
+    .login-art img.logo { position: relative; z-index: 2; height: 58px; width: auto; align-self: flex-start; filter: drop-shadow(0 6px 16px rgba(0,0,0,.35)); }
+    .art-copy { position: relative; z-index: 2; max-width: 54%; }
+    .art-copy .chip { background: rgba(57,231,95,.18); color: #7dffa0; font-weight: 600; padding: 5px 11px; }
+    .art-copy h2 { margin: 10px 0 8px; font-size: clamp(22px, 2.6vw, 32px); line-height: 1.08; color: #fff; font-family: var(--font-head, var(--font)); letter-spacing: -.01em; }
+    .art-copy h2 em { font-style: normal; background: rgba(0,0,0,.28); padding: 0 .28em; border-radius: 10px; white-space: nowrap; }
+    .art-copy p { margin: 0; color: rgba(255,255,255,.86); font-size: 12.5px; line-height: 1.6; }
+    .av-pop.av-login { right: 4%; bottom: 0; height: 126%; max-width: 40%; z-index: 3; }
+    .login-feat { grid-area: feat; padding: 34px 40px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+    .login-feat .f { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; font-size: 12.5px; color: var(--text-2);
+      background: color-mix(in srgb, var(--accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+    .login-feat .f i { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; flex: none; font-style: normal; font-size: 15px; background: linear-gradient(115deg, var(--accent), var(--accent-2)); }
+    .login-form { grid-area: form; padding: 34px 42px 38px; display: flex; flex-direction: column; justify-content: center; }
+    .login-form h1 { margin: 0 0 4px; font-size: 24px; font-family: var(--font-head, var(--font)); }
     .login-form .sub { margin: 0 0 22px; color: var(--muted); font-size: 12.5px; }
     .login-tabs { display: flex; gap: 4px; background: var(--bg-input); padding: 4px; border-radius: var(--pill); margin-bottom: 20px; }
-    .login-tabs button { flex: 1; border: 0; background: none; padding: 8px; border-radius: var(--pill); font-size: 12px; color: var(--muted); }
-    .login-tabs button.on { background: var(--accent); color: var(--on-accent); }
-    .login-form .btn.primary { height: 42px; width: 100%; margin-top: 6px; }
-    .msg-box { margin-top: 14px; font-size: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-card-2); color: var(--text-2); }
+    .login-tabs button { flex: 1; border: 0; background: none; padding: 9px; border-radius: var(--pill); font-size: 12px; color: var(--muted); }
+    .login-tabs button.on { background: linear-gradient(115deg, var(--accent), var(--accent-2)); color: #fff; }
+    .login-form .field input { height: 44px; border-radius: 14px; background: color-mix(in srgb, var(--bg-input) 80%, transparent); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
+    .login-form .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); outline: 0; }
+    .pass { position: relative; } .pass input { padding-right: 46px; }
+    .pass button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; background: none; color: var(--muted); border-radius: 10px; display: grid; place-items: center; }
+    .pass button:hover { color: var(--text); }
+    .login-form .btn.primary { height: 46px; width: 100%; margin-top: 8px; border-radius: 15px; font-weight: 600; background: linear-gradient(115deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 14px 30px -12px var(--accent); }
+    .login-form .btn.primary:disabled { opacity: .6; }
+    .msg-box { margin-top: 14px; font-size: 12px; padding: 10px 12px; border-radius: 12px; background: var(--bg-card-2); color: var(--text-2); }
     .msg-box.err { background: rgba(239,68,68,.12); color: #ff8a8a; }
     .demo { margin-top: 18px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--border-soft); padding-top: 14px; }
     .demo code { color: var(--text-2); }
-    @media (max-width: 760px) { .login { grid-template-columns: 1fr; } .login-art { min-height: 200px; padding: 26px; } .login-art ul, .login-art .orb { display: none; } .login-form { padding: 28px 24px; } }
+    .foot { margin-top: 16px; font-size: 10.5px; color: var(--muted); text-align: center; position: relative; z-index: 1; }
+    @media (max-width: 800px) {
+      body { padding: 18px 14px; align-content: start; }
+      .login { grid-template-columns: 1fr; grid-template-areas: "art" "form"; margin-top: 84px; }
+      .login-art { min-height: 200px; padding: 24px 22px; }
+      .login-feat { display: none; }
+      .art-copy { max-width: 50%; } .art-copy p, .art-copy .long { display: none; } .art-copy h2 { font-size: 20px; }
+      .login-art img.logo { height: 44px; }
+      .av-pop.av-login { height: 130%; max-width: 50%; right: 2%; }
+      .art-clip .ring { width: 230px; height: 230px; right: -30px; }
+      .login-form { padding: 26px 22px 30px; }
+    }
+    @media (min-width: 801px) { .art-copy .short { display: none; } }
+    @media (max-width: 380px) { .art-copy h2 { font-size: 17px; } }
   </style>
 </head>
-<body>
+<body data-layout="premium">
   <main class="login">
-    <section class="login-art" id="art"><div class="orb"></div><img class="logo brand-mark" id="logo" src="/assets/logo.png" alt="Codeniac">
-      <div><h2>Seu hub pessoal de projetos, rotina e estudos.</h2><p id="loginMsg">Tudo no seu computador: tarefas, InDrive, finanças, inglês, diário e decisões.</p>
-        <ul><li>☀️ Briefing automático toda manhã</li><li>🚗 Turnos e lucro real do InDrive</li><li>🇺🇸 Inglês com repetição espaçada</li><li>🤖 Assistente que entende todo o sistema</li></ul></div></section>
+    <section class="login-art" id="art"><div class="art-clip"><div class="ring"></div></div><img class="logo brand-mark" id="logo" src="/assets/logo.png" alt="code hub">
+      <div class="art-copy"><span class="chip">● Seu hub pessoal</span>
+        <h2><span class="long">Rotina, dinheiro e estudos em <em>um só lugar</em></span><span class="short">Tudo em <em>um só lugar</em></span></h2><p id="loginMsg">Tudo no seu computador, com um assistente que realmente faz as coisas por você.</p></div>
+    </section>
+    <section class="login-feat"><div class="f"><i>🤖</i>Assistente com IA que age no sistema</div><div class="f"><i>⚡</i>Plano do dia, rotinas e automações</div><div class="f"><i>💸</i>Finanças, InDrive, livros e inglês</div><div class="f"><i>📱</i>Telegram e app no celular</div></section>
     <section class="login-form">
       <h1 id="hTitle">Bem-vindo de volta</h1><p class="sub" id="hSub">Entre para continuar</p>
       <div class="login-tabs" id="tabs" hidden><button type="button" data-tab="login" class="on">Entrar</button><button type="button" data-tab="register">Criar conta</button></div>
       <form class="form" id="form">
         <div class="field" id="nameField" hidden><label for="name">Nome</label><input id="name" name="name" autocomplete="name"></div>
         <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required></div>
-        <div class="field"><label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" required minlength="6"></div>
+        <div class="field"><label for="password">Senha</label><div class="pass"><input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
+          <button type="button" id="eye" aria-label="Mostrar senha"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="btn primary" id="go">Entrar</button>
       </form>
       <div class="msg-box err" id="err" hidden></div>
       <div class="demo" id="demo" hidden>Primeiro acesso: <code>admin@codeniac.dev</code> / <code>codeniac123</code>. Depois, troque o e-mail e a senha em <b>Perfil</b>.</div>
     </section>
   </main>
+  <div class="foot" id="foot">code hub · seus dados ficam no seu computador</div>
   <script type="module">
-    import { applyTheme } from '/js/theme.js';
+    import { applyTheme, THEMES } from '/js/theme.js';
+    import { popHtml } from '/js/avatars.js';
     const $ = (s) => document.querySelector(s);
-    try { const l = JSON.parse(localStorage.getItem('codeniac.look') || 'null'); applyTheme(l || {}); } catch { applyTheme({}); }
+    // a tela de login sempre usa o visual premium; as cores seguem o tema escolhido (padrão: roxo neon)
+    let look = null; try { look = JSON.parse(localStorage.getItem('codeniac.look') || 'null'); } catch { /* sem preferências */ }
+    applyTheme({ ...(look && THEMES[look.theme] ? look : { theme: 'arena' }), layout: 'premium', effects: look?.effects });
+    document.body.dataset.layout = 'premium';
     if (localStorage.getItem('codeniac.token')) {
       fetch('/api/auth/me', { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } }).then((r) => { if (r.ok) location.replace('/'); });
     }
     let mode = 'login';
     const info = await fetch('/api/system/info').then((r) => r.json()).catch(() => ({}));
-    document.title = `Entrar · ${info.appName || 'Codeniac'}`;
+    document.title = `Entrar · ${info.appName || 'code hub'}`;
     if (info.images?.logo) { $('#logo').src = info.images.logo; $('#logo').classList.add('custom'); }
     if (info.images?.loginBg) { document.body.style.setProperty('--login-bg', `url('${info.images.loginBg}')`); document.body.classList.add('has-bg'); }
     if (info.images?.loginArt) { $('#art').style.setProperty('--login-art', `url('${info.images.loginArt}')`); $('#art').classList.add('img'); }
     if (info.loginMessage) $('#loginMsg').textContent = info.loginMessage;
+    const av = popHtml('login', info.avatars); if (av) $('#art').insertAdjacentHTML('beforeend', av);
     if (info.allowRegistration) $('#tabs').hidden = false;
     if (info.demoAccount) $('#demo').hidden = false;
+    $('#eye').addEventListener('click', () => { const i = $('#password'); i.type = i.type === 'password' ? 'text' : 'password'; });
     const setMode = (m) => {
       mode = m;
       document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === m));

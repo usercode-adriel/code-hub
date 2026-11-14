@@ -5,7 +5,7 @@ import { applyTheme } from './theme.js';
 const listeners = new Map();
 
 export const store = {
-  user: null, settings: {}, projects: [], unread: 0, version: '', aiMode: 'local', appName: 'Codeniac', images: {}, menu: { hidden: [], labels: {} },
+  user: null, settings: {}, projects: [], unread: 0, version: '', aiMode: 'local', appName: 'Codeniac', images: {}, avatars: { enabled: false, items: [], slots: {} }, menu: { hidden: [], labels: {} },
 };
 
 export function on(evt, fn) {
@@ -32,8 +32,8 @@ export function applySettings(settings) {
   applyTheme(settings);
   document.body.classList.toggle('no-assistant', settings.showAssistantPanel === false);
   try {
-    const { theme, themeVars, radius, fontFamily, fontScale, density, effects } = settings;
-    localStorage.setItem('codeniac.look', JSON.stringify({ theme, themeVars, radius, fontFamily, fontScale, density, effects }));
+    const { theme, themeVars, radius, fontFamily, fontScale, density, effects, layout } = settings;
+    localStorage.setItem('codeniac.look', JSON.stringify({ theme, themeVars, radius, fontFamily, fontScale, density, effects, layout }));
   } catch { /* armazenamento indisponível */ }
   emit('settings', settings);
 }

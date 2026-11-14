@@ -1,5 +1,6 @@
 // Migrações de dados entre versões. Roda no início do servidor e é idempotente.
 import { db, id, now, save } from './db.js';
+import { removeUpload } from './routes/uploads.js';
 import { ensureRootPage, ensureInDrive, DEFAULT_SETTINGS, systemConfig, seedStudy, THEMES, THEME_REPLACED } from './seed.js';
 
 const SCHEMA = 4;
@@ -80,6 +81,11 @@ function toV4(d) {
 export function migrate() {
   const d = db();
   d.system = systemConfig();
+  // 1.8: a logo "code hub" passa a valer em todo o sistema (troca logos enviadas antes só uma vez)
+  if ((d.system.logoVersion || 0) < 2) {
+    for (const k of ['logo', 'logoIcon']) { removeUpload(d.system.images?.[k]); delete d.system.images?.[k]; }
+    d.system.logoVersion = 2; save();
+  }
   const from = d.meta.schema || 1;
   if (from >= SCHEMA) return;
   if (from < 2) toV2(d);

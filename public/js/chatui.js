@@ -16,7 +16,7 @@ export const PERSONA = {
   nerd: { label: 'Nerd', desc: 'Referências geek e de tecnologia', emoji: '🤓' },
 };
 export const COMMANDS = ['/corrida 35 12km', '/gasto 50 gasolina', '/tarefa ', '/nota ', '/agenda 15/11 14:00 ', '/despesa ', '/briefing', '/ajuda'];
-export const MODE_LABEL = { gemini: 'Gemini', ollama: 'IA local', claude: 'Claude', local: 'sem IA' };
+export const MODE_LABEL = { gemini: 'Gemini', groq: 'Groq', openrouter: 'OpenRouter', ollama: 'IA local', claude: 'Claude', local: 'sem IA' };
 
 export function botAvatar(size = 26) {
   return `<div class="avatar bot-face" style="--s:${size}px">${esc(store.settings.assistantAvatar || '🤖')}</div>`;

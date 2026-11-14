@@ -5,11 +5,13 @@ import path from 'node:path';
 import express from 'express';
 import { DATA_DIR } from './db.js';
 import { logEvent } from './notify.js';
+import { setEnvVar } from './envfile.js';
 import { requireAuth, requireAdmin } from './auth.js';
 import {
   aiConfig, saveAiConfig, ollamaState, refreshOllama, assistantMode, effectiveModel, CATALOG, recommendModel, PROVIDERS,
-  hasGemini, testGeminiKey, GEMINI_MODELS,
+  hasGemini, testGeminiKey, GEMINI_MODELS, cloudOrder,
 } from './assistant.js';
+import { CLOUD_PROVIDERS, hasKey, keyHint, testKey, listModels } from './providers.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -20,6 +22,8 @@ function status(req) {
     mode: assistantMode(), config: aiConfig(), providers: PROVIDERS, model: effectiveModel(), ollama: ollamaState,
     ramGb: Math.round((os.totalmem() / 1024 ** 3) * 10) / 10, recommended: recommendModel(), catalog: CATALOG,
     claudeKey: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN), isAdmin: req.user.role === 'admin',
+    cloud: Object.fromEntries(['groq', 'openrouter'].map((n) => [n, { configured: hasKey(n), hint: req.user.role === 'admin' ? keyHint(n) : null, model: aiConfig()[`${n}Model`] || '' }])),
+    cloudOrder: cloudOrder(),
     gemini: { configured: hasGemini(), hint: hasGemini() && req.user.role === 'admin' ? `…${process.env.GEMINI_API_KEY.slice(-4)}` : null, models: GEMINI_MODELS },
   };
 }
@@ -36,15 +40,7 @@ router.put('/config', requireAdmin, async (req, res) => {
 });
 
 // ---------- Chave do Gemini (só administrador). Fica no .env da pasta de dados, fora do banco e dos backups. ----------
-const ENV_FILE = () => path.join(DATA_DIR, '.env');
-export function setEnvVar(name, value) {
-  let env = fs.existsSync(ENV_FILE()) ? fs.readFileSync(ENV_FILE(), 'utf8') : '';
-  env = env.replace(new RegExp(`^[ \\t]*${name}[ \\t]*=.*(\\r?\\n)?`, 'gm'), '');
-  if (value) env = `${env}${env && !/\n$/.test(env) ? '\r\n' : ''}${name}=${value}\r\n`;
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(ENV_FILE(), env, { mode: 0o600 });
-  if (value) process.env[name] = value; else delete process.env[name];
-}
+export { setEnvVar };
 
 router.put('/gemini-key', requireAdmin, async (req, res) => {
   const key = String(req.body?.key || '').trim();
@@ -62,6 +58,40 @@ router.delete('/gemini-key', requireAdmin, (req, res) => {
   if (aiConfig().provider === 'gemini') saveAiConfig({ provider: 'local' });
   logEvent(req.user.id, 'system', 'update', 'Chave do Gemini removida');
   res.json(status(req));
+});
+
+// ---------- Chaves do Groq e do OpenRouter (só administrador; ficam no .env, fora do banco e dos backups) ----------
+router.put('/key/:provider', requireAdmin, async (req, res) => {
+  const name = req.params.provider;
+  const def = CLOUD_PROVIDERS[name];
+  if (!def?.keyRe) return res.status(404).json({ error: 'Provedor desconhecido' });
+  const key = String(req.body?.key || '').trim();
+  if (!def.keyRe.test(key)) return res.status(400).json({ error: `Chave inválida. Copie a chave inteira do ${def.label} (${name === 'groq' ? 'começa com gsk_' : 'começa com sk-or-'}).` });
+  const test = await testKey(name, key);
+  if (!test.ok) return res.status(400).json({ error: `O ${def.label} recusou a chave: ${test.error}` });
+  setEnvVar(def.env, key);
+  if (aiConfig().provider === 'local') saveAiConfig({ provider: name });
+  logEvent(req.user.id, 'system', 'update', `Chave do ${def.label} configurada`);
+  res.json(status(req));
+});
+
+router.delete('/key/:provider', requireAdmin, (req, res) => {
+  const name = req.params.provider;
+  const def = CLOUD_PROVIDERS[name];
+  if (!def?.keyRe) return res.status(404).json({ error: 'Provedor desconhecido' });
+  setEnvVar(def.env, '');
+  if (aiConfig().provider === name) saveAiConfig({ provider: cloudOrder()[0] ? 'auto' : 'local' });
+  logEvent(req.user.id, 'system', 'update', `Chave do ${def.label} removida`);
+  res.json(status(req));
+});
+
+// Modelos disponíveis no provedor (OpenRouter: só os gratuitos que aceitam ferramentas).
+router.get('/models/:provider', requireAdmin, async (req, res) => {
+  const name = req.params.provider;
+  if (!CLOUD_PROVIDERS[name]?.keyRe) return res.status(404).json({ error: 'Provedor desconhecido' });
+  if (!hasKey(name)) return res.status(400).json({ error: 'Configure a chave primeiro' });
+  try { res.json({ models: (await listModels(name, { force: Boolean(req.query.refresh) })).slice(0, 80) }); }
+  catch (err) { res.status(502).json({ error: err.message }); }
 });
 
 router.post('/pull', requireAdmin, async (req, res) => {

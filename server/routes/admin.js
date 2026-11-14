@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { db, save, now, DATA_DIR, UPLOAD_DIR, DB_FILE, USER_COLLECTIONS } from '../db.js';
 import { requireAdmin, hashPassword, publicUser } from '../auth.js';
-import { createUser, systemConfig, THEMES, APP_VERSION } from '../seed.js';
+import { createUser, systemConfig, avatarsPublic, AVATAR_SLOTS, THEMES, APP_VERSION } from '../seed.js';
 import { single, removeUpload } from './uploads.js';
 import { assistantMode } from '../assistant.js';
 import { logEvent } from '../notify.js';
@@ -163,6 +163,44 @@ router.delete('/images/:slot', (req, res) => {
   delete sys.images[req.params.slot];
   save();
   res.json(sys.images);
+});
+
+// ---------- Avatares PNG que saem dos cartões (temas premium) ----------
+router.get('/avatars', (_req, res) => res.json({ ...avatarsPublic(), slotNames: AVATAR_SLOTS }));
+router.post('/avatars', single('image'), (req, res) => {
+  if (!req.file) return bad(res, 'Nenhuma imagem enviada');
+  const a = systemConfig().avatars;
+  if (!['image/png', 'image/webp'].includes(req.file.mimetype)) { removeUpload(`/uploads/${req.file.filename}`); return bad(res, 'Use PNG ou WEBP com fundo transparente'); }
+  if (a.items.length >= 24) { removeUpload(`/uploads/${req.file.filename}`); return bad(res, 'Limite de 24 avatares. Exclua algum para enviar outro.'); }
+  const name = str(req.body?.name, 40) || path.parse(req.file.originalname || 'avatar').name.slice(0, 40) || 'Avatar';
+  a.items.push({ id: crypto.randomBytes(5).toString('hex'), name, url: `/uploads/${req.file.filename}`, at: now() });
+  save();
+  logEvent(req.user.id, 'upload', 'create', `Avatar ${name} adicionado`, { link: '#/settings/aparencia' });
+  res.status(201).json(avatarsPublic());
+});
+router.put('/avatars', (req, res) => {
+  const a = systemConfig().avatars;
+  const b = req.body || {};
+  if ('enabled' in b) a.enabled = Boolean(b.enabled);
+  if (b.slots && typeof b.slots === 'object') {
+    for (const [slot, v] of Object.entries(b.slots)) {
+      if (!AVATAR_SLOTS.includes(slot)) continue;
+      if (v === 'auto' || v === 'none' || a.items.some((i) => i.id === v)) a.slots[slot] = v;
+    }
+  }
+  if (typeof b.rename === 'object' && b.rename?.id) { const it = a.items.find((i) => i.id === b.rename.id); if (it) it.name = str(b.rename.name, 40) || it.name; }
+  save();
+  res.json(avatarsPublic());
+});
+router.delete('/avatars/:id', (req, res) => {
+  const a = systemConfig().avatars;
+  const it = a.items.find((i) => i.id === req.params.id);
+  if (!it) return bad(res, 'Avatar não encontrado', 404);
+  removeUpload(it.url);
+  a.items = a.items.filter((i) => i.id !== it.id);
+  for (const k of Object.keys(a.slots)) if (a.slots[k] === it.id) a.slots[k] = 'auto';
+  save();
+  res.json(avatarsPublic());
 });
 
 // ---------- Backup ----------

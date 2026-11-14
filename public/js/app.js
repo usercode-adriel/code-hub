@@ -505,6 +505,7 @@ async function boot() {
   store.version = me.version;
   store.appName = me.system?.appName || 'Codeniac';
   store.images = me.system?.images || {};
+  store.avatars = me.system?.avatars || store.avatars;
   store.menu = me.system?.menu || { hidden: [], labels: {} };
   document.title = store.appName;
   setUser(me.user);
@@ -517,7 +518,7 @@ async function boot() {
   on('projects', renderSidebar);
   on('user', () => { renderSidebar(); renderTopbar(); });
   on('unread', (n) => { const d = $('#bellDot'); if (d) { d.hidden = !n; d.textContent = n; } renderSidebar(); });
-  on('system', (sys) => { store.images = sys.images || store.images; store.menu = sys.menu || store.menu; store.appName = sys.appName || store.appName; renderSidebar(); });
+  on('system', (sys) => { store.images = sys.images || store.images; store.avatars = sys.avatars || store.avatars; store.menu = sys.menu || store.menu; store.appName = sys.appName || store.appName; renderSidebar(); });
   window.addEventListener('hashchange', route);
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#q')?.focus(); }

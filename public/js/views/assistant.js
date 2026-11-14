@@ -14,6 +14,7 @@ const dayOf = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric
 const fileUrl = (f) => `/api/assistant/files/${encodeURIComponent(f.file)}?token=${encodeURIComponent(auth.token)}`;
 const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const AREAS = { tarefas: 'Tarefas', financeiro: 'Gastos, receitas e contas', indrive: 'InDrive', agenda: 'Agenda', livros: 'Livros', habitos: 'Hábitos', notas: 'Notas', ingles: 'Cartões de inglês', memoria: 'Memória' };
+const DEV_AREA = { dev: 'Código do sistema no GitHub (só administrador)' };
 const FOCUS_AREAS = { geral: Object.keys(AREAS), financas: ['financeiro', 'memoria'], indrive: ['indrive', 'memoria'], tarefas: ['tarefas', 'agenda', 'notas', 'memoria'], estudos: ['livros', 'ingles', 'tarefas', 'memoria'], ingles: ['ingles', 'memoria'], habitos: ['habitos', 'memoria'] };
 
 // ---------- voz (sintetizador do próprio navegador: grátis e funciona sem internet) ----------
@@ -39,14 +40,19 @@ export async function speakAs(bot, text, onEnd) {
   speechSynthesis.speak(u);
 }
 
+const diffHtml = (t) => esc(t).split('\n').map((l) => `<i class="${l.startsWith('+') && !l.startsWith('+++') ? 'ad' : l.startsWith('-') && !l.startsWith('---') ? 'rm' : l.startsWith('@@') || l.startsWith('---') || l.startsWith('+++') ? 'hd' : ''}">${l || ' '}</i>`).join('');
+const linkHtml = (a) => (a.link ? `<a class="tg-go" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">${icon('chevRight', 11)} Abrir no GitHub</a>` : '');
+const detailHtml = (a) => (a.detail ? `<details class="tg-diff"><summary>Ver o que muda</summary><pre>${diffHtml(a.detail)}</pre></details>` : '');
 function actionHtml(a, status) {
   const st = status || (a.kind === 'confirm' ? 'pending' : 'done');
   if (a.kind === 'confirm' || st === 'pending' || st === 'canceled') {
-    return `<div class="tg-confirm ${st}" data-aid="${esc(a.id)}"><b>${st === 'pending' ? 'Confirma?' : st === 'canceled' ? 'Cancelado' : 'Feito'}</b><span>${esc(a.summary)}</span>
-      ${st === 'pending' ? `<div class="tg-confirm-acts"><button type="button" class="btn sm primary" data-yes>${icon('check', 12)} Confirmar</button><button type="button" class="btn sm outline" data-no>Cancelar</button></div>` : st === 'done' ? `<button type="button" class="tg-undo" data-undo>Desfazer</button>` : ''}</div>`;
+    return `<div class="tg-confirm ${st}" data-aid="${esc(a.id)}"><b>${st === 'pending' ? 'Confirma?' : st === 'canceled' ? 'Cancelado' : 'Feito'}</b><span>${esc(a.summary)}</span>${detailHtml(a)}${linkHtml(a)}
+      ${st === 'pending' ? `<div class="tg-confirm-acts"><button type="button" class="btn sm primary" data-yes>${icon('check', 12)} Confirmar</button><button type="button" class="btn sm outline" data-no>Cancelar</button></div>` : st === 'done' && a.undoable !== false ? `<button type="button" class="tg-undo" data-undo>Desfazer</button>` : ''}</div>`;
   }
-  return `<div class="tg-action ${st}" data-aid="${esc(a.id)}">${icon(st === 'undone' ? 'refresh' : 'check', 11)} <span>${esc(a.summary)}</span>${st === 'done' ? '<button type="button" class="tg-undo" data-undo>Desfazer</button>' : st === 'undone' ? '<em>desfeito</em>' : ''}</div>`;
+  return `<div class="tg-action ${st}" data-aid="${esc(a.id)}">${icon(st === 'undone' ? 'refresh' : 'check', 11)} <span>${esc(a.summary)}</span>${st === 'done' && a.undoable !== false ? '<button type="button" class="tg-undo" data-undo>Desfazer</button>' : st === 'undone' ? '<em>desfeito</em>' : ''}${linkHtml(a)}</div>`;
 }
+const domainOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+const sourcesHtml = (list = []) => (list.length ? `<div class="tg-sources"><small>Fontes</small>${list.map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.title)}">${icon('link', 10)} ${esc(x.title && x.title.length < 40 ? x.title : domainOf(x.url))}</a>`).join('')}</div>` : '');
 
 const BOT_COLORS = ['#e5484d', '#7c3aed', '#0ea5e9', '#22c55e', '#f59e0b', '#ec4899', '#14b8a6'];
 
@@ -64,7 +70,7 @@ function groupFace(group, members, size = 44) {
 function filesHtml(files = []) {
   return files.map((f) => (f.mime?.startsWith('image/')
     ? `<a class="tg-img" href="${fileUrl(f)}" target="_blank" rel="noopener"><img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy"></a>`
-    : `<a class="tg-file" href="${fileUrl(f)}" target="_blank" rel="noopener"><span class="fi">${icon('file', 18)}</span><span><b>${esc(f.name)}</b><small>PDF · ${fmtSize(f.size || 0)}</small></span></a>`)).join('');
+    : `<a class="tg-file" href="${fileUrl(f)}&download=1&name=${encodeURIComponent(f.name)}" download="${esc(f.name)}"><span class="fi">${icon('file', 18)}</span><span><b>${esc(f.name)}</b><small>${esc((f.name.split('.').pop() || 'arquivo').toUpperCase())} · ${fmtSize(f.size || 0)}</small></span></a>`)).join('');
 }
 
 // Formulário de criar/editar personagem (com função e mensagens automáticas).
@@ -82,7 +88,8 @@ export function botForm(bot = null) {
         <div class="bot-auto"><div class="field"><label>Função deste chat</label><select name="focus">${Object.entries(FOCUS).map(([k, l]) => `<option value="${k}" ${(bot?.focus || 'geral') === k ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="hint">É sobre isso que ele vai puxar assunto sozinho.</span></div>
           <div class="field"><label>Mensagens automáticas</label><div class="setting-row" style="padding:6px 0;border:0"><div class="txt"><small>Ele te manda mensagem sem você pedir</small></div><label class="switch"><input type="checkbox" name="proactive" ${bot?.proactive ? 'checked' : ''}><span></span></label></div></div>
           <div class="field"><label>Horários</label><input name="times" value="${esc(bot?.times || '09:00')}" placeholder="09:00, 19:30"><span class="hint">Separe com vírgula. Funciona enquanto o Codeniac estiver ligado.</span></div></div>
-        <div class="field"><label>O que ele pode fazer no sistema (com o Gemini)</label><div class="perm-grid">${Object.entries(AREAS).map(([k, l]) => `<label class="perm"><input type="checkbox" name="perm" value="${k}" ${(Array.isArray(bot?.permissions) ? bot.permissions : FOCUS_AREAS[bot?.focus || 'geral']).includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+        <div class="field"><label>IA deste personagem</label><select name="ai"><option value="">Padrão do sistema</option>${[['gemini', 'Gemini'], ['groq', 'Groq'], ['openrouter', 'OpenRouter']].map(([v, l]) => `<option value="${v}" ${bot?.ai === v ? 'selected' : ''}>${l}</option>`).join('')}</select><span class="hint">Cada personagem pode usar uma IA diferente. Se ela falhar ou não estiver configurada, o sistema usa as outras.</span></div>
+        <div class="field"><label>O que ele pode fazer no sistema (com uma IA na nuvem)</label><div class="perm-grid">${Object.entries({ ...AREAS, ...(store.user.role === 'admin' ? DEV_AREA : {}) }).map(([k, l]) => `<label class="perm"><input type="checkbox" name="perm" value="${k}" ${(Array.isArray(bot?.permissions) ? bot.permissions : FOCUS_AREAS[bot?.focus || 'geral']).includes(k) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
           <span class="hint">Consultar seus dados é sempre permitido. Excluir, pagar contas e valores a partir de R$ 1.000 sempre pedem sua confirmação.</span></div>
         <div class="bot-auto"><div class="field"><label>Voz</label><select name="voice"><option value="">Automática</option></select></div>
           <div class="field"><label>Velocidade da fala</label><input type="range" name="voiceRate" min="0.6" max="1.6" step="0.1" value="${bot?.voiceRate || 1}"></div>
@@ -101,7 +108,7 @@ export function botForm(bot = null) {
         m.querySelectorAll('[data-pe]').forEach((b) => { b.onclick = () => { personality = b.dataset.pe; m.querySelectorAll('[data-pe]').forEach((x) => x.classList.toggle('on', x === b)); }; });
         const body = (f) => ({ name: f.name.value.trim(), greeting: f.greeting.value.trim(), traits: f.traits.value.trim(), personality, avatar: avatar || '',
           focus: f.focus.value, proactive: f.proactive.checked, times: f.times.value, color: bot?.color || BOT_COLORS[Math.floor(Math.random() * BOT_COLORS.length)],
-          permissions: [...f.querySelectorAll('[name=perm]:checked')].map((x) => x.value), voice: f.voice.value, voiceRate: f.voiceRate.value, voicePitch: f.voicePitch.value, autoSpeak: f.autoSpeak.checked });
+          permissions: [...f.querySelectorAll('[name=perm]:checked')].map((x) => x.value), voice: f.voice.value, voiceRate: f.voiceRate.value, voicePitch: f.voicePitch.value, autoSpeak: f.autoSpeak.checked, ai: f.ai.value });
         voicesReady().then((vs) => {
           const sel = m.querySelector('[name=voice]');
           const sorted = [...vs].sort((a, b) => (b.lang.startsWith('pt') - a.lang.startsWith('pt')) || a.lang.localeCompare(b.lang));
@@ -249,9 +256,9 @@ export default async function render(el) {
     const face = out ? '' : faceOf(isGroup() ? who : peer(), 30);
     const color = who?.color || 'var(--accent)';
     return `<div class="tg-msg ${out ? 'out' : 'in'}">${face}<div class="tg-bubble">${who ? `<div class="tg-sender" style="color:${esc(color)}">${esc(who.name)}</div>` : ''}${m.auto ? `<div class="tg-auto">${icon('bell', 10)} mensagem automática</div>` : ''}
-      ${filesHtml(m.files)}${m.text ? `<div class="tg-text">${out ? esc(m.text) : chatMd(m.text)}</div>` : ''}
+      ${filesHtml(m.files)}${filesHtml(m.media)}${m.text ? `<div class="tg-text">${out ? esc(m.text) : chatMd(m.text)}</div>` : ''}${sourcesHtml(m.sources)}
       ${(m.tools || []).map((t) => `<div class="tg-tool">${icon('check', 11)} ${esc(TOOL_LABEL[t] || t)}</div>`).join('')}${m.link ? `<a class="tg-go" href="${esc(m.link)}">${icon('chevRight', 11)} Abrir</a>` : ''}
-      ${(m.actions || []).map((a) => actionHtml(a, detail?.actionStatus?.[a.id])).join('')}${m.pron ? `<div class="tg-pron">🎙️ pronúncia ~ ${m.pron}%</div>` : ''}
+      ${(m.actions || []).map((a) => actionHtml({ ...a, ...(detail?.actionInfo?.[a.id] ? { link: detail.actionInfo[a.id].link, undoable: detail.actionInfo[a.id].undoable, summary: detail.actionInfo[a.id].summary || a.summary } : {}) }, detail?.actionStatus?.[a.id])).join('')}${m.pron ? `<div class="tg-pron">🎙️ pronúncia ~ ${m.pron}%</div>` : ''}
       <div class="tg-meta">${!out && m.text ? `<button type="button" class="tg-say" data-say title="Ouvir">${icon('volume', 11)}</button>` : ''}${hhmm(m.at)}${out ? ticks : ''}</div></div></div>`;
   };
   const welcome = () => {
@@ -334,8 +341,10 @@ export default async function render(el) {
         if (ev.type === 'speaker_end' && pend) { pend.classList.remove('pend'); pend = null; }
         if (ev.type === 'text' && txt) { acc += ev.text; txt.innerHTML = chatMd(acc); }
         if (ev.type === 'tool' && meta) { meta.insertAdjacentHTML('beforebegin', `<div class="tg-tool">${icon('check', 11)} ${esc(TOOL_LABEL[ev.name] || ev.name)}</div>`); emit('data-changed'); }
+        if (ev.type === 'media' && meta) meta.insertAdjacentHTML('beforebegin', filesHtml(ev.items));
+        if (ev.type === 'sources' && meta) { pend?.querySelector('.tg-sources')?.remove(); meta.insertAdjacentHTML('beforebegin', sourcesHtml(ev.items)); }
         if (ev.type === 'link' && meta) meta.insertAdjacentHTML('beforebegin', `<a class="tg-go" href="${esc(ev.href)}">${icon('chevRight', 11)} Abrir</a>`);
-        if ((ev.type === 'action' || ev.type === 'confirm') && meta) { meta.insertAdjacentHTML('beforebegin', actionHtml({ id: ev.id, summary: ev.summary, kind: ev.type === 'confirm' ? 'confirm' : 'action' })); emit('data-changed'); navigator.vibrate?.(20); }
+        if ((ev.type === 'action' || ev.type === 'confirm') && meta) { meta.insertAdjacentHTML('beforebegin', actionHtml({ id: ev.id, summary: ev.summary, kind: ev.type === 'confirm' ? 'confirm' : 'action', undoable: ev.undoable, detail: ev.detail })); emit('data-changed'); navigator.vibrate?.(20); }
         if (ev.type === 'notice') msgs.insertAdjacentHTML('beforeend', `<div class="tg-notice">${esc(ev.text)}</div>`);
         if (ev.type === 'error' && txt) txt.textContent = ev.text;
         msgs.scrollTop = msgs.scrollHeight;
@@ -429,7 +438,7 @@ export default async function render(el) {
     const aid = box.dataset.aid;
     try {
       if (e.target.closest('[data-undo]')) { await api.post(`/assistant/actions/${aid}/undo`); box.outerHTML = actionHtml({ id: aid, summary: box.querySelector('span').textContent, kind: 'action' }, 'undone'); toast('Desfeito', '', 'success'); }
-      if (e.target.closest('[data-yes]')) { const r = await api.post(`/assistant/actions/${aid}/confirm`, { accept: true }); box.outerHTML = actionHtml({ id: aid, summary: r.summary, kind: 'confirm' }, 'done'); toast('Feito ✅', r.summary, 'success'); }
+      if (e.target.closest('[data-yes]')) { const r = await api.post(`/assistant/actions/${aid}/confirm`, { accept: true }); box.outerHTML = actionHtml({ id: aid, summary: r.summary, kind: 'confirm', link: r.link, undoable: r.undoable }, 'done'); toast('Feito ✅', r.summary, 'success'); }
       if (e.target.closest('[data-no]')) { await api.post(`/assistant/actions/${aid}/confirm`, { accept: false }); box.outerHTML = actionHtml({ id: aid, summary: box.querySelector('span').textContent, kind: 'confirm' }, 'canceled'); }
       emit('data-changed');
       if (detail) detail.actionStatus = { ...(detail.actionStatus || {}), [aid]: e.target.closest('[data-undo]') ? 'undone' : e.target.closest('[data-yes]') ? 'done' : 'canceled' };

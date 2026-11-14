@@ -10,6 +10,23 @@ export function animateView(el) {
   el.classList.add('view-in');
   [...el.querySelectorAll(CASCADE)].slice(0, 24).forEach((c, i) => { c.style.setProperty('--i', i); c.classList.add('fx-in'); });
   countUp(el);
+  parallax(el);
+}
+
+// Os avatares seguem o mouse de leve (efeito 3D sutil). Só em telas com mouse e sem "reduzir movimento".
+function parallax(root) {
+  if (reduced() || !matchMedia('(hover: hover)').matches) return;
+  for (const av of root.querySelectorAll('.av-pop')) {
+    const host = av.parentElement;
+    if (!host || host._par) continue;
+    host._par = true;
+    host.addEventListener('pointermove', (e) => {
+      const r = host.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5; const y = (e.clientY - r.top) / r.height - 0.5;
+      av.style.setProperty('--px', `${(x * -10).toFixed(1)}px`); av.style.setProperty('--py', `${(y * -6).toFixed(1)}px`); av.style.setProperty('--rz', `${(x * 2.2).toFixed(2)}deg`);
+    });
+    host.addEventListener('pointerleave', () => { av.style.setProperty('--px', '0px'); av.style.setProperty('--py', '0px'); av.style.setProperty('--rz', '0deg'); });
+  }
 }
 
 const FMT = /^(-?)(R\$\s?)?(-?)(\d{1,3}(?:\.\d{3})*|\d+)(,\d+)?(%|h| km\/l| min)?$/;

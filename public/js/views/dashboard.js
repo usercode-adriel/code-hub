@@ -4,6 +4,7 @@ import { store } from '../store.js';
 import { icon } from '../icons.js';
 import { esc, dmy, isLate, brl, PRIORITY, toast } from '../ui.js';
 import { openTaskModal, openProjectModal } from '../components.js';
+import { popHtml, avatarUrl } from '../avatars.js';
 
 let heroTimer = null;
 const PALETTE = ['#e0464b', '#f5a524', '#7c3aed', '#22c55e', '#06b6d4', '#ec4899'];
@@ -29,39 +30,54 @@ export default async function render(el) {
     rows.push(`<a class="row-card" href="${href}"><span class="th" style="--cc:${c}">${icon(ic, 20)}</span><span class="tx">${t} <em>(${esc(sub)})</em></span><span class="chev">${icon('chevRight', 16)}</span></a>`);
   }
 
-  el.innerHTML = `
-    <section class="d-top">
-      ${slides.length ? `<div class="hero2" id="hero"><div class="hero2-cover" id="hCover"></div><div class="hero2-body" id="hBody"></div><div class="hero2-art" id="hArt"></div>
+  const premium = store.settings.layout === 'premium';
+  const heroHtml = slides.length ? `<div class="hero2" id="hero"><div class="hero2-cover" id="hCover"></div><div class="hero2-body" id="hBody"></div><div class="hero2-art" id="hArt"></div>${popHtml('hero')}
         <div class="hero2-dots">${slides.map((_, i) => `<button data-i="${i}" aria-label="Destaque ${i + 1}"></button>`).join('')}</div></div>`
-        : `<div class="hero2"><div class="hero2-body"><h1>Bem-vindo!</h1><p>Crie seu primeiro projeto para começar.</p><div class="hero2-foot"><button class="pill-btn" id="firstP">${icon('plus', 13)} Novo projeto</button></div></div></div>`}
-      <div class="d-list">${rows.join('')}</div>
-    </section>
-    <section class="d-mid">
-      <div>
-        <div class="section-head"><h3 style="font-size:17px">Seus projetos</h3><button class="see-more" id="newP">${icon('plus', 12)} Novo</button></div>
-        <div class="hscroll-wrap"><div class="hscroll" id="pRow">${projects.map((p) => `<a class="pcard" href="#/project/${esc(p.slug)}" style="--c:${esc(p.color)}">
+    : `<div class="hero2"><div class="hero2-body"><h1>Bem-vindo!</h1><p>Crie seu primeiro projeto para começar.</p><div class="hero2-foot"><button class="pill-btn" id="firstP">${icon('plus', 13)} Novo projeto</button></div></div>${popHtml('hero')}</div>`;
+  const projectsHtml = `<div class="section-head"><h3 style="font-size:17px">Seus projetos</h3><button class="see-more" id="newP">${icon('plus', 12)} Novo</button></div>
+        <div class="hscroll-wrap"><div class="hscroll" id="pRow">${projects.map((p, k) => `<a class="pcard ${premium && k === 0 && avatarUrl('projetos') ? 'hl' : ''}" href="#/project/${esc(p.slug)}" style="--c:${esc(p.color)}">
             ${p.cover ? `<span class="bg" style="background-image:url('${esc(p.cover)}')"></span>` : `<span class="gl">${icon(p.icon, 150)}</span>`}
-            <span class="ic">${icon(p.icon, 16)}</span>${p.favorite ? `<span class="fv">${icon('star', 15)}</span>` : ''}
+            <span class="ic">${icon(p.icon, 16)}</span>${p.favorite ? `<span class="fv">${icon('star', 15)}</span>` : ''}${premium && k === 0 ? popHtml('projetos') : ''}
             <b>${esc(p.name)}</b><small>${esc(p.description || p.tagline || '')}</small></a>`).join('')}
             <button class="pcard new" id="newP2">${icon('plus', 24)}<span>Novo projeto</span></button></div>
-          ${projects.length > 3 ? `<button class="hs-next" id="pNext" aria-label="Mais projetos">${icon('chevRight', 18)}</button>` : ''}</div>
-        <div class="section-head"><h3 style="font-size:17px">Foco agora</h3><a class="see-more" href="#/tasks">Ver tarefas ${icon('chevRight', 12)}</a></div>
+          ${projects.length > 3 ? `<button class="hs-next" id="pNext" aria-label="Mais projetos">${icon('chevRight', 18)}</button>` : ''}</div>`;
+  const focusHtml = `<div class="section-head"><h3 style="font-size:17px">Foco agora</h3><a class="see-more" href="#/tasks">Ver tarefas ${icon('chevRight', 12)}</a></div>
         ${focus ? `<div class="dl-row" style="--c:${esc(focus.project.color || 'var(--accent)')}"><span class="th">${icon(focus.project.icon || 'target', 26)}</span>
             <div class="tx"><b>${esc(focus.title)}</b><span class="chip">${esc(focus.project.name || '')} · ${PRIORITY[focus.priority]}</span></div>
             <div class="meta">${focus.dueDate ? dmy(focus.dueDate) : 'sem prazo'}<small>${isLate(focus) ? 'atrasada' : focus.status === 'doing' ? 'em andamento' : 'a fazer'}</small></div>
-            <div class="acts"><button class="round-btn go" id="fDone" title="Concluir">${icon('check', 14)}</button><button class="round-btn" id="fOpen" title="Abrir">${icon('edit', 13)}</button></div></div>`
-          : `<div class="dl-row"><span class="th">${icon('trophy', 26)}</span><div class="tx"><b>Tudo em dia!</b><span class="chip">nenhuma tarefa aberta</span></div><div class="acts"><button class="round-btn go" id="fNew" title="Nova tarefa">${icon('plus', 14)}</button></div></div>`}
-        <div class="section-head" style="margin-top:26px"><h3 style="font-size:17px">Plano do dia</h3><button class="see-more" id="planNew">${icon('sparkles', 12)} Montar com IA</button></div>
-        <div class="card plan-card" id="plan"></div>
-      </div>
-      <div class="stat-card"><div class="section-head"><h3 style="font-size:17px">Sua estatística</h3><a class="see-more" href="#/achievements">${icon('chevRight', 14)}</a></div>
+            <div class="acts"><button class="round-btn go" id="fDone" title="Concluir">${icon('check', 14)}</button><button class="round-btn" id="fOpen" title="Abrir">${icon('edit', 13)}</button></div>${premium ? popHtml('foco') : ''}</div>`
+          : `<div class="dl-row"><span class="th">${icon('trophy', 26)}</span><div class="tx"><b>Tudo em dia!</b><span class="chip">nenhuma tarefa aberta</span></div><div class="acts"><button class="round-btn go" id="fNew" title="Nova tarefa">${icon('plus', 14)}</button></div>${premium ? popHtml('foco') : ''}</div>`}`;
+  const planHtml = `<div class="section-head" style="margin-top:26px"><h3 style="font-size:17px">Plano do dia</h3><button class="see-more" id="planNew">${icon('sparkles', 12)} Montar com IA</button></div>
+        <div class="plan-wrap"><div class="card plan-card" id="plan"></div>${premium ? popHtml('plano') : ''}</div>`;
+  const statHtml = `<div class="stat-card"><div class="section-head"><h3 style="font-size:17px">Sua estatística</h3><a class="see-more" href="#/achievements">${icon('chevRight', 14)}</a></div>
         <div class="blob"><div class="blob-in"><small>Tarefas concluídas</small><b>${d.totals.done.toLocaleString('pt-BR')}</b><small>${d.totals.progress}% do total</small></div></div>
         <div class="stat-mini">
           <a href="#/tasks"><span style="--cc:${PALETTE[0]}">${icon('tasks', 19)}</span>${d.totals.open}<small>abertas</small></a>
           <a href="#/tasks?filter=late"><span style="--cc:${PALETTE[1]};color:#1a1200">${icon('clock', 19)}</span>${d.totals.overdue}<small>atrasadas</small></a>
           <a href="#/financeiro"><span style="--cc:${PALETTE[2]}">${icon('wallet', 19)}</span>${brl(d.financeMonth.in - d.financeMonth.out).replace(/,\d\d$/, '')}<small>InDrive no mês</small></a>
-        </div></div>
-    </section>`;
+        </div>${premium ? popHtml('estatistica') : ''}</div>`;
+
+  if (!premium) {
+    el.innerHTML = `
+    <section class="d-top">${heroHtml}<div class="d-list">${rows.join('')}</div></section>
+    <section class="d-mid"><div>${projectsHtml}${focusHtml}${planHtml}</div>${statHtml}</section>`;
+  } else {
+    // Início premium: destaque grande, cartões em vidro, banner do assistente e coluna lateral
+    el.innerHTML = `<div class="pm">
+      <div class="pm-main">${heroHtml}
+        ${projectsHtml}
+        <div class="section-head"><h3 style="font-size:17px">Próximas tarefas</h3><a class="see-more" href="#/tasks">Ver todas ${icon('chevRight', 12)}</a></div>
+        <div class="pm-trio">${rows.join('')}</div>
+        ${planHtml}
+        <section class="pm-banner"><div class="pm-banner-tx"><span class="chip live">${icon('bot', 11)} Online</span><h2>Fale com o seu <em>assistente</em></h2>
+          <p>Peça para lançar um gasto, criar uma tarefa, montar o plano do dia ou pesquisar na web.</p>
+          <div class="hero2-foot" style="padding-top:12px"><a class="pill-btn" href="#/assistente">${icon('chat', 13)} Abrir o chat</a><a class="pill-btn ghost" href="#/automacoes">${icon('zap', 13)} Automações</a></div></div>${popHtml('banner')}</section>
+      </div>
+      <aside class="pm-side">${statHtml}
+        <div class="pm-focus">${focusHtml}</div>
+        <div class="pm-links">${shortcuts.map(([href, ic, c, t, sub]) => `<a class="row-card" href="${href}"><span class="th" style="--cc:${c}">${icon(ic, 20)}</span><span class="tx">${t} <em>(${esc(sub)})</em></span><span class="chev">${icon('chevRight', 16)}</span></a>`).join('')}</div>
+      </aside></div>`;
+  }
 
   const newProject = () => openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; });
   el.querySelector('#newP').onclick = newProject;

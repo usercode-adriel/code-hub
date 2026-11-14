@@ -12,6 +12,7 @@ import api from './routes/api.js';
 import pages from './routes/pages.js';
 import life from './routes/life.js';
 import admin, { setRestart } from './routes/admin.js';
+import dev from './routes/dev.js';
 import aiRoutes from './ai.js';
 import library, { loadLibrary, saveLibraryNow } from './library.js';
 import automations from './automations.js';
@@ -19,7 +20,7 @@ import connect from './routes/connect.js';
 import { startTelegram } from './telegram.js';
 import './push.js';
 import chatFiles from './routes/chatfiles.js';
-import { confirmAction, undoAction, actionStatuses } from './agent.js';
+import { confirmAction, undoAction, actionStatuses, actionInfos, onRestartRequest } from './agent.js';
 import {
   chat, assistantMode, sendProactive, groupMembers, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
 } from './assistant.js';
@@ -69,7 +70,7 @@ app.get('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   if (!c) return res.status(404).json({ error: 'Conversa não encontrada' });
   if (c.unread) { c.unread = 0; saveNow(); }
   const actionIds = c.display.flatMap((m) => (m.actions || []).map((a) => a.id));
-  res.json({ id: c.id, title: c.title, botId: c.botId || null, group: c.group || null, actionStatus: actionStatuses(req.user, actionIds), members: c.group ? groupMembers(req.user, c).map(({ id: mid, name, avatar, color, personality }) => ({ id: mid, name, avatar, color, personality })) : null, messages: c.display });
+  res.json({ id: c.id, title: c.title, botId: c.botId || null, group: c.group || null, actionStatus: actionStatuses(req.user, actionIds), actionInfo: actionInfos(req.user, actionIds), members: c.group ? groupMembers(req.user, c).map(({ id: mid, name, avatar, color, personality }) => ({ id: mid, name, avatar, color, personality })) : null, messages: c.display });
 });
 app.put('/api/assistant/conversations/:id', requireAuth, (req, res) => {
   const c = renameConversation(req.user.id, req.params.id, req.body?.title || getConversation(req.user.id, req.params.id)?.title);
@@ -111,8 +112,8 @@ app.post('/api/assistant/bots/:id/ping', requireAuth, async (req, res) => {
   try { res.json(await sendProactive(req.user, bot)); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 // Ações da IA: confirmar (ou cancelar) e desfazer.
-app.post('/api/assistant/actions/:id/confirm', requireAuth, (req, res) => {
-  try { const a = confirmAction(req.user, req.params.id, req.body?.accept !== false); res.json({ id: a.id, status: a.status, summary: a.summary }); }
+app.post('/api/assistant/actions/:id/confirm', requireAuth, async (req, res) => {
+  try { const a = await confirmAction(req.user, req.params.id, req.body?.accept !== false); res.json({ id: a.id, status: a.status, summary: a.summary, link: a.link || null, undoable: Boolean(a.touched?.length) }); }
   catch (err) { res.status(400).json({ error: err.message }); }
 });
 app.post('/api/assistant/actions/:id/undo', requireAuth, (req, res) => {
@@ -166,6 +167,7 @@ app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
 app.use('/api', requireAuth, connect);
+app.use('/api', requireAuth, dev);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
 
@@ -207,7 +209,7 @@ function shutdown() {
 }
 
 // Reinício pelo painel de administração: inicia um novo processo com os mesmos argumentos e encerra este.
-setRestart(() => {
+const doRestart = () => {
   saveNow();
   saveLibraryNow();
   server.close();
@@ -216,6 +218,8 @@ setRestart(() => {
   const child = spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: 'ignore', windowsHide: true, env, cwd: APP_ROOT });
   child.unref();
   setTimeout(() => process.exit(0), 200);
-});
+};
+setRestart(doRestart);
+onRestartRequest(doRestart); // a IA (ou a tela do GitHub) também pode pedir reinício depois de atualizar o código
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, shutdown);
