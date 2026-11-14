@@ -48,17 +48,6 @@ Section "Codeniac (obrigatório)" SecMain
     ExecWait '"$SYSDIR\wscript.exe" "$INSTDIR\Parar Codeniac.vbs" /silent'
     Sleep 1000
 
-  ; guarda o logo atual (o seu logo personalizado continua após a atualização)
-  InitPluginsDir
-  CreateDirectory "$PLUGINSDIR\keep"
-  StrCpy $0 0
-  IfFileExists "$INSTDIR\public\assets\logo.png" 0 nokeep
-    CopyFiles /SILENT "$INSTDIR\public\assets\*.png" "$PLUGINSDIR\keep"
-    CopyFiles /SILENT "$INSTDIR\codeniac.ico" "$PLUGINSDIR\keep"
-    StrCpy $0 1
-  nokeep:
-  ClearErrors
-
   ; remove arquivos antigos do programa (os dados ficam em %APPDATA%\Codeniac e não são tocados)
   RMDir /r "$INSTDIR\public"
   RMDir /r "$INSTDIR\server"
@@ -67,11 +56,7 @@ Section "Codeniac (obrigatório)" SecMain
   SetOutPath "$INSTDIR"
   File /r "app\*.*"
 
-  StrCmp $0 1 0 norestore
-    CopyFiles /SILENT "$PLUGINSDIR\keep\*.png" "$INSTDIR\public\assets"
-    IfFileExists "$PLUGINSDIR\keep\codeniac.ico" 0 norestore
-      CopyFiles /SILENT "$PLUGINSDIR\keep\codeniac.ico" "$INSTDIR"
-  norestore:
+  ; (a logo e o ícone novos "code hub" substituem os antigos; logos personalizadas pelo painel ficam nos dados e não são afetadas)
   ClearErrors
 
   ; atalhos

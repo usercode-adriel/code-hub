@@ -185,7 +185,8 @@ Responda só JSON: {"itens":[{"taskId":"id da tarefa ou vazio","titulo":"...","i
     const ids = new Set(open.map((t) => t.id));
     const items = (r.itens || []).slice(0, 8).map((i) => ({ type: ids.has(i.taskId) ? 'task' : 'livre', taskId: ids.has(i.taskId) ? i.taskId : null, title: String(i.titulo || '').slice(0, 160),
       start: /^\d{2}:\d{2}$/.test(i.inicio || '') ? i.inicio : '', why: String(i.porque || '').slice(0, 160) })).filter((i) => i.title);
-    return { items: items.sort((a, b) => (a.start || '99').localeCompare(b.start || '99')), text: String(r.dica || '').slice(0, 300), source: 'gemini' };
+    if (!items.length) throw new Error('a IA não devolveu itens'); // volta para as regras locais
+    return { items: items.sort((a, b) => (a.start || '99').localeCompare(b.start || '99')), text: String(r.dica || '').slice(0, 300), source: 'ia' };
   } catch (err) {
     console.error('[plano]', err.message);
     return { ...planHeuristic(uid), source: 'regras' };
