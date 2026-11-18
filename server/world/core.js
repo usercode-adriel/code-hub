@@ -19,11 +19,14 @@ export const PACES = {
 };
 // Categorias usadas pelas notícias, pelo arquivo e pelos filtros.
 export const CATS = {
-  politica: 'Política', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes',
+  politica: 'Política', justica: 'Justiça', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes',
   seguranca: 'Segurança', ciencia: 'Ciência', celebridades: 'Celebridades', sociedade: 'Sociedade', local: 'Local', pessoal: 'Vida pessoal',
 };
 
 const hooks = { event: [], hourly: [], daily: [], genesis: [], tick: [] };
+// atualizações de esquema: rodam uma vez em mundos novos e antigos, na ordem em que foram registradas
+const upgrades = [];
+export const onUpgrade = (n, fn) => upgrades.push([n, fn]);
 const handlers = {};
 export const onEvent = (fn) => hooks.event.push(fn);
 export const onHourly = (fn) => hooks.hourly.push(fn);
@@ -31,6 +34,8 @@ export const onDaily = (fn) => hooks.daily.push(fn);
 export const onGenesis = (fn) => hooks.genesis.push(fn);
 export const onTick = (fn) => hooks.tick.push(fn);
 export const handle = (kind, fn) => { handlers[kind] = fn; };
+// serviços que um módulo oferece aos outros sem criar ciclos de importação (ex.: abrir inquérito, entregar item)
+export const services = {};
 
 // ---------------------------------------------------------------- estado
 export function world(userId) {
@@ -134,6 +139,15 @@ export async function worldTick(user, { live = true } = {}) {
     w.core.lastDay = dayKey();
     saveWorld();
     return;
+  }
+
+  // novos módulos entram em mundos que já existiam (uma vez só)
+  const schema = w.core.schema || 1;
+  const pending = upgrades.filter(([n]) => n > schema).sort((a, b) => a[0] - b[0]);
+  if (pending.length) {
+    const ctx = { ...base, at: new Date() };
+    for (const [n, fn] of pending) { try { fn(ctx); } catch (err) { console.error(`[mundo] atualização ${n}:`, err); } w.core.schema = Math.max(w.core.schema || 1, n); }
+    saveWorld();
   }
 
   // horas que passaram desde a última vez (recupera o tempo desligado)

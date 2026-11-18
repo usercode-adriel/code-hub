@@ -20,6 +20,7 @@ export const SECTORS = {
   saude: { label: 'Saúde', demand: 9000, cat: 'sociedade', roles: ['enfermeiro(a)', 'médico(a)', 'recepcionista'], products: ['consulta', 'check-up'] },
   publicidade: { label: 'Publicidade', demand: 5000, cat: 'economia', roles: ['publicitário(a)', 'designer', 'redator(a)'], products: [] },
   pesquisa: { label: 'Pesquisa e ciência', demand: 5000, cat: 'ciencia', roles: ['pesquisador(a)', 'cientista', 'técnico(a) de laboratório'], products: [] },
+  submundo: { label: 'Submundo', demand: 2500, cat: 'seguranca', roles: ['vendedor(a)', 'olheiro(a)'], products: [] },
   construcao: { label: 'Construção e imóveis', demand: 9000, cat: 'economia', roles: ['engenheiro(a)', 'corretor(a)', 'mestre de obras'], products: [] },
 };
 const SALARY = { gerente: 520, 'gerente de produto': 560, 'gerente de loja': 380, 'gerente de contas': 450, economista: 500, 'médico(a)': 700, 'desenvolvedor(a)': 480, 'analista de dados': 450, 'analista financeiro(a)': 430, 'pesquisador(a)': 420, 'cientista': 520, 'engenheiro(a)': 520, 'apresentador(a)': 480, 'editor(a)': 380, jornalista: 320, CEO: 900 };
@@ -376,7 +377,7 @@ registerAction({
 });
 registerAction({
   name: 'comprar',
-  weight: (ctx, p) => (p.agent.cash > 300 ? (100 - p.agent.needs.fun) / 60 : 0),
+  weight: () => 0, // substituída pelas compras nas lojas do mapa (commerce.js)
   run(ctx, p) {
     const shops = companies(ctx.w).filter((c) => live(c) && c.products.length);
     const c = pick(shops); if (!c) return;
