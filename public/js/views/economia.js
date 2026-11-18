@@ -25,7 +25,10 @@ async function bolsa(box) {
 
 async function empresas(box, reload) {
   const d = await api.get('/mundo/economia');
-  box.innerHTML = `<div class="w-ph"><h3 class="w-h3">Empresas de Nexus City</h3><button class="btn sm primary" id="found">${icon('rocket', 12)} Abrir minha empresa</button></div>
+  const soc = d.society;
+  const big = (v) => (v >= 1e9 ? `${(v / 1e9).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} bi` : v >= 1e6 ? `${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi` : Math.round(v).toLocaleString('pt-BR'));
+  box.innerHTML = `${soc ? `<section class="w-panel e-society"><div><small>Valor bruto da sociedade</small><b>${big(soc.grossValue)} NXC</b></div><div><small>Em circulação</small><b>${big(soc.circulating)} NXC</b></div><div><small>${icon('flag', 12)} Cofres públicos</small><b>${big(soc.treasury)} NXC</b></div></section>` : ''}
+    <div class="w-ph"><h3 class="w-h3">Empresas de Nexus City</h3><button class="btn sm primary" id="found">${icon('rocket', 12)} Abrir minha empresa</button></div>
     <div class="e-cos">${d.market.map((c) => `<button class="w-panel e-co ${c.status}" data-company="${esc(c.id)}" style="--c:${esc(c.color)}"><span class="w-co-logo">${esc(c.name[0])}</span><b>${esc(c.name)}</b><small>${esc(c.sectorLabel)}</small>
       <span class="w-chips"><span class="w-chip ${c.status === 'ativa' ? 'ok' : 'warn'}">${esc(c.status)}</span><span class="w-chip">${c.employees} func.</span>${c.openings ? `<span class="w-chip gold">${c.openings} vaga(s)</span>` : ''}${c.mine ? '<span class="w-chip gold">sua</span>' : ''}</span>
       <small class="muted">${c.ceo ? `CEO: ${esc(c.ceo.name)}` : ''}${c.origin === 'genese' ? ' · da gênese' : ''}</small></button>`).join('')}</div>`;

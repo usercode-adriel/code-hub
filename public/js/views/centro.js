@@ -32,7 +32,7 @@ export default async function render(el) {
     body.innerHTML = `<div class="dx">
       <aside class="dx-me w-panel">
         <div class="dx-id">${face({ name: me.name, avatar: store.user?.avatar || me.avatar, color: '#7c3aed' }, 64)}<div><b>${esc(me.name)}</b>
-          <small>${me.office ? (me.office === 'prefeito' ? 'Prefeito(a)' : 'Vereador(a)') : me.job ? esc(me.job.role) : 'Cidadã(o)'} · Nível ${me.level}</small>
+          <small>${me.office ? (me.office === 'prefeito' ? 'Governador(a)' : 'Ministro(a)') : me.job ? esc(me.job.role) : 'Cidadã(o)'} · Nível ${me.level}</small>
           <small class="dx-loc">${icon('pin', 11)} ${esc(me.location || d.city.name)}</small></div></div>
         <div class="dx-stats">
           ${stat('wallet', 'Saldo', nx(me.balance), me.wallet ? `<small>+ ${nx(me.wallet)} na carteira</small>` : '', '#/banco')}

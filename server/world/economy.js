@@ -51,6 +51,8 @@ const NAME_B = { tecnologia: ['Tech', 'Labs', 'Systems', 'AI'], varejo: ['Store'
 // ---------------------------------------------------------------- estado
 export function eco(w) {
   w.eco ??= { cpi: 1, inflation: 0.4, baseRate: 0.0015, taxRate: 0.12, index: 1000, indexHistory: [], demandMult: {}, crimeMult: 1, housingMult: 1, eduDiscount: 0, monthDay: 0, lastMonth: null, loansOut: 0 };
+  w.eco.grossValue ??= 200e9; // valor bruto da sociedade: 200 bilhões de NXC circulando
+  w.eco.treasury ??= 0; // cofres públicos (impostos e multas)
   w.companies ??= [];
   w.properties ??= [];
   return w.eco;

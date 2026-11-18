@@ -292,3 +292,8 @@ a.dx-stat:hover { background: var(--bg-hover); }
 .e-lesson-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; } .e-lesson p { margin: 0; font-size: 12.8px; line-height: 1.55; }
 .e-lecture { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; background: color-mix(in srgb, var(--wa) 12%, transparent); } .e-lecture small { color: var(--text-2); }
 .w-chip.sm { font-size: 9.5px; padding: 1px 6px; }
+
+/* ---------- faixa da sociedade (economia) ---------- */
+.e-society { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.e-society > div { display: grid; gap: 2px; } .e-society small { color: var(--muted); font-size: 11px; display: inline-flex; gap: 4px; align-items: center; } .e-society b { font-size: 18px; }
+@media (max-width: 600px) { .e-society { grid-template-columns: 1fr; gap: 6px; } .e-society b { font-size: 15px; } }

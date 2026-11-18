@@ -380,6 +380,12 @@ router.get('/mundo/economia', (req, res) => {
     market: companies(w).map((c) => publicCompany(w, c)).sort((a, b) => (a.status === 'falida') - (b.status === 'falida') || b.price - a.price),
     index: e.index, indexHistory: e.indexHistory.slice(-72).map((x) => x.v), inflation: e.inflation, cpi: e.cpi, taxRate: e.taxRate, baseRate: e.baseRate,
     sectors: Object.fromEntries(Object.entries(SECTORS).map(([k, v]) => [k, v.label])), foundCost: FOUND_COST,
+    society: (() => {
+      const personas = people(w).reduce((a, p) => a + (p.agent?.cash || 0), 0);
+      const corp = companies(w).reduce((a, c) => a + (c.cash || 0), 0);
+      const mine = u.bank.balance + (u.bank.wallet || 0);
+      return { grossValue: e.grossValue, treasury: round2(e.treasury || 0), circulating: round2(personas + corp + mine + (e.treasury || 0)) };
+    })(),
   });
 });
 router.post('/mundo/banco/transferir', (req, res) => {

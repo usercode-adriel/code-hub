@@ -2,7 +2,7 @@
 // Ciclo (tempo real): mandato (12 dias) → inscrições (2) → campanha (5, com pesquisas diárias e um debate na TV)
 // → apuração no fim do dia seguinte. Cada morador vota: ideologia, fama, gastos de campanha, situação da economia,
 // escândalos e a relação pessoal com cada candidato (inclusive com o usuário) pesam no voto.
-import { onDaily, onGenesis, handle, record, schedule } from './core.js';
+import { onDaily, onGenesis, onUpgrade, handle, record, schedule } from './core.js';
 import { residents, personById, bumpUser, userName, active } from './agents.js';
 import { account, debit, addXp } from './bank.js';
 import { worldPost, remember, genderize } from '../social.js';
@@ -11,7 +11,8 @@ import { notify } from '../notify.js';
 
 const PHASE = { mandato: 12, inscricoes: 2, campanha: 5 };
 export const PHASE_LABEL = { mandato: 'Mandato em curso', inscricoes: 'Inscrições abertas', campanha: 'Campanha eleitoral', apuracao: 'Votação e apuração' };
-export const OFFICES = [{ id: 'prefeito', title: 'Prefeito(a)', seats: 1 }, { id: 'vereador', title: 'Vereador(a)', seats: 5 }];
+// Governo autônomo: um governador(a) e ministros, todos personagens de IA. O id interno é mantido para compatibilidade.
+export const OFFICES = [{ id: 'prefeito', title: 'Governador(a)', seats: 1, one: ['governador', 'governadora'] }, { id: 'vereador', title: 'Ministro(a)', seats: 5, one: ['ministro', 'ministra'] }];
 export const LAWS = [
   { key: 'menos-impostos', title: 'Redução de impostos para empresas', ideology: 0.6, desc: 'Imposto sobre o lucro cai 2 pontos.', apply: (e) => { e.taxRate = clamp(e.taxRate - 0.02, 0.02, 0.4); } },
   { key: 'mais-impostos', title: 'Imposto maior para grandes empresas', ideology: -0.6, desc: 'Imposto sobre o lucro sobe 2 pontos.', apply: (e) => { e.taxRate = clamp(e.taxRate + 0.02, 0.02, 0.4); } },
@@ -25,6 +26,14 @@ export const LAWS = [
 ];
 
 export function pol(w) { return w.politics; }
+// renomeia Prefeito/Vereador para Governador/Ministros em mundos que já existiam
+onUpgrade(8, (ctx) => {
+  const w = ctx.w; const P = w.politics; if (!P) return;
+  for (const off of P.offices) {
+    const o = OFFICES.find((x) => x.id === off.id); if (o) off.title = o.title;
+    for (const h of off.holders) { const p = h.type === 'persona' ? personById(w, h.id) : null; if (p && o) p.job = `${o.one[p.gender === 'f' ? 1 : 0]} de Nexus City`; }
+  }
+});
 const who = (w, h) => (h?.type === 'user' ? { id: 'me', name: 'Você', me: true } : personById(w, h?.id) ? { id: h.id, name: personById(w, h.id).name, avatar: personById(w, h.id).avatar, color: personById(w, h.id).color } : { id: h?.id, name: (w.gone || {})[h?.id] || 'vago' });
 
 onGenesis((ctx) => {
@@ -47,7 +56,7 @@ onGenesis((ctx) => {
   const mayorParty = parties.slice().sort((a, b) => b.members.length - a.members.length)[0];
   const mayor = pool(mayorParty.id).sort((a, b) => b.agent.traits.ambition - a.agent.traits.ambition)[0] || pick(residents(w));
   offices[0].holders.push({ type: 'persona', id: mayor.id, partyId: mayor.agent.partyId, since: ctx.at.toISOString(), origin: 'genese' });
-  mayor.agent.office = 'prefeito'; mayor.agent.keep = true; mayor.job = `${mayor.gender === 'f' ? 'prefeita' : 'prefeito'} de Codeniac Society`;
+  mayor.agent.office = 'prefeito'; mayor.agent.keep = true; mayor.job = `${mayor.gender === 'f' ? 'governadora' : 'governador'} de Nexus City`;
   const council = shuffle(parties.flatMap((p) => pool(p.id)).filter((p) => p.id !== mayor.id)).slice(0, 5);
   for (const p of council) { offices[1].holders.push({ type: 'persona', id: p.id, partyId: p.agent.partyId, since: ctx.at.toISOString(), origin: 'genese' }); p.agent.office = 'vereador'; p.agent.keep = true; }
   w.politics = { parties, offices, election: { n: 1, phase: 'mandato', phaseEnds: new Date(ctx.at.getTime() + 5 * DAY).toISOString(), candidates: [], polls: [], debateAt: null }, history: [], laws: [] };
@@ -65,7 +74,7 @@ onDaily((ctx) => {
   }
   if (el.phase === 'mandato') {
     el.phase = 'inscricoes'; el.phaseEnds = new Date(ctx.at.getTime() + PHASE.inscricoes * DAY).toISOString(); el.candidates = []; el.polls = [];
-    record(ctx, { type: 'eleicao-inscricoes', cat: 'politica', title: `Abertas as inscrições para a ${el.n}ª eleição de Codeniac Society`, text: 'Prefeitura e 5 vagas na Câmara.', importance: 3 });
+    record(ctx, { type: 'eleicao-inscricoes', cat: 'politica', title: `Abertas as inscrições para a ${el.n}ª eleição de Nexus City`, text: 'Governo e 5 ministérios em disputa.', importance: 3 });
     // políticos se inscrevem
     for (const party of P.parties) {
       const members = party.members.map((id) => personById(w, id)).filter((p) => p?.agent && active(p)).sort((a, b) => b.agent.traits.ambition - a.agent.traits.ambition);
@@ -163,11 +172,11 @@ handle('apuracao', (ctx, { n }) => {
     for (const { c } of winners) {
       if (c.who.type === 'user') { account(w).office = off.id; addXp(w, 200); }
       const p = c.who.type === 'persona' ? personById(w, c.who.id) : null;
-      if (p) { p.agent.office = off.id; p.agent.keep = true; remember(p, `Fui eleita(o) ${off.title.toLowerCase()} de Codeniac Society!`); if (off.id === 'prefeito') p.job = p.gender === 'f' ? 'prefeita de Codeniac Society' : 'prefeito de Codeniac Society'; worldPost(ctx, p, genderize(p, off.id === 'prefeito' ? 'ELEITA(O)! Obrigada(o), Codeniac Society. Vamos trabalhar.' : 'Eleita(o) para a Câmara! A cidade pode contar comigo.')); }
+      if (p) { p.agent.office = off.id; p.agent.keep = true; remember(p, `Assumi como ${off.one[p.gender === 'f' ? 1 : 0]} de Nexus City!`); p.job = `${off.one[p.gender === 'f' ? 1 : 0]} de Nexus City`; worldPost(ctx, p, genderize(p, off.id === 'prefeito' ? 'ASSUMI O GOVERNO! Obrigada(o), Nexus City. Vamos trabalhar.' : 'Assumi o ministério! A cidade pode contar comigo.')); }
     }
     result[off.id] = ranked.map(({ c, v }) => ({ who: who(w, c.who), partyId: c.partyId, votes: v, pct: total ? Math.round((v / total) * 1000) / 10 : 0 }));
     const top = result[off.id][0];
-    record(ctx, { type: 'resultado-eleicao', cat: 'politica', title: off.id === 'prefeito' ? `${top.who.name} é eleito(a) prefeito(a) de Codeniac Society com ${top.pct}% dos votos` : `Câmara eleita: ${winners.map(({ c }) => who(w, c.who).name).join(', ')}`, actors: winners.map(({ c }) => (c.who.type === 'user' ? 'me' : c.who.id)), importance: off.id === 'prefeito' ? 5 : 4, data: { office: off.id } });
+    record(ctx, { type: 'resultado-eleicao', cat: 'politica', title: off.id === 'prefeito' ? `${top.who.name} assume o Governo de Nexus City com ${top.pct}% dos votos` : `Novos ministros: ${winners.map(({ c }) => who(w, c.who).name).join(', ')}`, actors: winners.map(({ c }) => (c.who.type === 'user' ? 'me' : c.who.id)), importance: off.id === 'prefeito' ? 5 : 4, data: { office: off.id } });
     if (winners.some(({ c }) => c.who.type === 'user')) notify(ctx.uid, { type: 'system', title: `🗳️ Você foi eleito(a) ${off.title.toLowerCase()}!`, message: 'Agora você pode propor leis em Governo.', link: '#/governo' });
   }
   for (const c of el.candidates) { const p = c.who.type === 'persona' ? personById(w, c.who.id) : null; if (p) p.agent.candidate = null; }
@@ -232,6 +241,7 @@ export function joinParty(ctx, partyId) {
 }
 export const CANDIDATE_RULES = { reputation: 40, fee: 3000 };
 export function runForOffice(ctx, office, ideology) {
+  throw new Error('O governo de Nexus City é autônomo: os cargos são ocupados por indicação, não por você.');
   const w = ctx.w; const u = account(w); const el = w.politics.election;
   if (el.phase !== 'inscricoes') throw new Error('As inscrições não estão abertas agora');
   if (!u.partyId) throw new Error('Filie-se a um partido primeiro');
@@ -244,6 +254,7 @@ export function runForOffice(ctx, office, ideology) {
   record(ctx, { type: 'candidatura-usuario', cat: 'politica', title: `${userName(ctx)} é candidato(a) a ${OFFICES.find((o) => o.id === office).title.toLowerCase()}`, actors: ['me'], importance: 3 });
 }
 export function campaign(ctx, amount) {
+  throw new Error('O governo é autônomo; não há campanha sua.');
   const w = ctx.w; const u = account(w); const el = w.politics.election;
   const c = el.candidates.find((x) => x.who.type === 'user');
   if (!c || !['inscricoes', 'campanha'].includes(el.phase)) throw new Error('Você não está em campanha');
@@ -254,11 +265,13 @@ export function campaign(ctx, amount) {
   return c;
 }
 export function userProposeLaw(ctx, key) {
+  throw new Error('As leis são decididas pelo governo, de forma autônoma.');
   const u = account(ctx.w);
   if (u.office !== 'vereador' && u.office !== 'prefeito') throw new Error('Só quem tem mandato pode propor leis');
   return proposeLaw(ctx, { author: { type: 'user', id: 'me' }, key });
 }
 export function voteLaw(ctx, id, vote) {
+  throw new Error('Os ministros votam as leis; você não interfere.');
   const u = account(ctx.w);
   if (u.office !== 'vereador') throw new Error('Só vereadores votam leis');
   const law = ctx.w.politics.laws.find((l) => l.id === id && l.status === 'em votação');
