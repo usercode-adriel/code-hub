@@ -58,7 +58,11 @@ function appearance(box) {
       ${row('Tamanho do texto', '', `<div class="range-row" style="width:240px"><input type="range" min="85" max="120" step="5" value="${s.fontScale}" data-range="fontScale"><output>${s.fontScale}%</output></div>`)}
       ${row('Fonte', '', seg('fontFamily', [['poppins', 'Poppins'], ['system', 'Sistema'], ['mono', 'Mono'], ['serif', 'Serifada']], s.fontFamily))}
       ${row('Densidade', '', seg('density', [['comfortable', 'Confortável'], ['compact', 'Compacta']], s.density))}
-      ${sw('effects', 'Efeitos do tema', 'Neve, chuva, neon, brilhos e animações')}${sw('heroAutoplay', 'Destaque do início muda sozinho')}</section>`;
+      ${sw('effects', 'Efeitos do tema', 'Neve, chuva, neon, brilhos e animações')}${sw('heroAutoplay', 'Destaque do início muda sozinho')}</section>
+    <section class="card" style="margin-top:var(--gap)"><h3 class="title">${icon('image', 15)} Capa do Início</h3>
+      <p class="sub">A imagem grande de Nexus City no painel. Envie um PNG ou JPG no mesmo formato (paisagem, por volta de 1280×640).</p>
+      <div class="cover-set"><div class="cover-prev" id="coverPrev"></div>
+        <div class="cover-acts"><button class="btn sm primary" id="coverUp">${icon('upload', 13)} Enviar imagem</button><button class="btn sm outline" id="coverReset">Voltar ao padrão</button></div></div></section>`;
   box.querySelectorAll('[data-theme]').forEach((b) => { b.onclick = () => { patch({ theme: b.dataset.theme, themeVars: {}, ...presetLayout(b.dataset.theme) }); appearance(box); }; });
   box.querySelectorAll('[data-color]').forEach((i) => {
     i.oninput = () => { i.nextElementSibling.querySelector('small').textContent = i.value; applySettings({ ...store.settings, themeVars: { ...store.settings.themeVars, [i.dataset.color]: i.value } }); };
@@ -70,7 +74,20 @@ function appearance(box) {
     r.onchange = () => patch({ [r.dataset.range]: Number(r.value) });
   });
   bindCommon(box, () => {});
+  coverSetup(box);
   if (store.user.role === 'admin') avatarAdmin(box.querySelector('#avAdmin'));
+}
+
+// Capa personalizada do Início (envio de PNG/JPG, mesmo tamanho da capa).
+function coverSetup(box) {
+  const prev = box.querySelector('#coverPrev'); if (!prev) return;
+  const paint = (url) => { prev.style.backgroundImage = url ? `url(${url})` : ''; prev.classList.toggle('empty', !url); if (!url) prev.innerHTML = `<span>${icon('image', 20)} Capa padrão (gerada)</span>`; else prev.innerHTML = ''; };
+  api.get('/mundo/resumo').then((d) => paint(d.heroImage)).catch(() => paint(null));
+  box.querySelector('#coverUp').onclick = () => pickImage(async (file) => {
+    const v = validateImage(file); if (v) { toast('Imagem inválida', v, 'error'); return; }
+    try { const r = await api.upload('/mundo/capa', file); paint(r.image); toast('Capa atualizada', 'Ela já aparece no Início.', 'success'); } catch (err) { toast('Não deu', err.message, 'error'); }
+  });
+  box.querySelector('#coverReset').onclick = async () => { try { const r = await api.del('/mundo/capa'); paint(r.image); toast('Capa restaurada', '', 'success'); } catch (err) { toast('Não deu', err.message, 'error'); } };
 }
 
 // Avatares PNG (só o administrador vê): liga/desliga, envia arquivos e escolhe qual vai em cada cartão.

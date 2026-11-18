@@ -9,7 +9,7 @@ document.addEventListener('click', (e) => { for (const d of document.querySelect
 
 // navegação principal (como na referência) e o menu "Mais"
 export const ENVS = [
-  ['centro', 'Início', 'dashboard'], ['mapa', 'Mapa', 'pin'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe'], ['mercado', 'Mercado', 'bag'],
+  ['centro', 'Início', 'dashboard'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe'], ['mercado', 'Mercado', 'bag'],
   ['empresas', 'Empresas', 'briefcase'], ['banco', 'Banco', 'wallet'], ['policia', 'Polícia', 'shield'], ['justica', 'Justiça', 'scale'], ['inventario', 'Inventário', 'layers'], ['midia', 'Notícias', 'news'],
 ];
 export const MORE = [['governo', 'Governo', 'flag'], ['arquivo', 'Arquivo', 'book'], ['controle', 'Controle da IA', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub pessoal', 'dashboard']];

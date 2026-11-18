@@ -31,7 +31,7 @@ export function cityMap(host, geo, { mini = false, onPick = null } = {}) {
   const clampVb = () => { vb[2] = Math.min(geo.w, Math.max(160, vb[2])); vb[3] = vb[2] * (geo.h / geo.w); vb[0] = Math.max(0, Math.min(geo.w - vb[2], vb[0])); vb[1] = Math.max(0, Math.min(geo.h - vb[3], vb[1])); };
   const zoomAt = (f, cx, cy) => { const nw = vb[2] / f; vb[0] = cx - (cx - vb[0]) / f; vb[1] = cy - (cy - vb[1]) / f; vb[2] = nw; clampVb(); set(); };
   const focus = (x, y, width = 520) => { vb = [x - width / 2, y - (width * geo.h / geo.w) / 2, width, width * geo.h / geo.w]; clampVb(); set(); };
-  function scaleMarkers() { const k = px(); for (const g of layer.querySelectorAll('[data-x]')) g.setAttribute('transform', `translate(${g.dataset.x},${g.dataset.y}) scale(${k * (mini ? 0.75 : 1)})`); }
+  function scaleMarkers() { const k = px(); for (const g of layer.querySelectorAll('[data-x]')) g.setAttribute('transform', `translate(${g.dataset.x},${g.dataset.y}) scale(${k * (mini ? 0.5 : 1)})`); }
   const blip = (p, cats) => {
     const c = cats[p.kind] || { color: '#64748b', icon: 'pin' };
     // pino estilo jogo: sombra no chão, corpo em gota com brilho, anel e ícone branco maior

@@ -16,6 +16,7 @@ import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
 import { str, round2, clamp, nowIso, HOUR } from './util.js';
+import { single, removeUpload } from '../routes/uploads.js';
 
 const router = express.Router();
 const ctxOf = (req) => ({ user: req.user, uid: req.user.id, w: world(req.user.id), live: true, at: new Date() });
@@ -267,6 +268,21 @@ router.get('/mundo/heroi', (req, res) => {
     requestImage(req.user.id, 'futuristic cyberpunk megacity at night, aerial view, neon skyscrapers, holographic billboards, flying cars, airship, river reflections, purple and cyan lights, highly detailed open-world video game key art, no text', 1280, 640,
       (url) => { const w2 = world(req.user.id); w2.city.heroImage = url; w2.city.heroPending = null; saveWorld(); });
   }
+  res.json({ image: account(w).heroImage || w.city?.heroImage || null });
+});
+// capa personalizada do início (upload de PNG/JPG, no mesmo tamanho da capa)
+router.post('/mundo/capa', single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+  const w = world(req.user.id); const u = account(w);
+  if (u.heroImage?.startsWith('/uploads/')) removeUpload(u.heroImage);
+  u.heroImage = `/uploads/${req.file.filename}`;
+  saveWorld();
+  res.status(201).json({ image: u.heroImage });
+});
+router.delete('/mundo/capa', (req, res) => {
+  const w = world(req.user.id); const u = account(w);
+  if (u.heroImage?.startsWith('/uploads/')) removeUpload(u.heroImage);
+  u.heroImage = null; saveWorld();
   res.json({ image: w.city?.heroImage || null });
 });
 
