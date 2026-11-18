@@ -522,3 +522,72 @@ body.world-mode .content { padding: 0 !important; height: calc(var(--vvh, 100dvh
 .wg .dx-ticker { background: rgba(18,12,42,.85); border: 1px solid rgba(168,120,255,.22); }
 .wg .w-ph h3 { color: #f5f0ff; background: none; -webkit-text-fill-color: #f5f0ff; }
 .wg .w-ph a { color: var(--acc-3); }
+
+/* ---------- mapa vivo: cidadãos andando, casas e prédios ---------- */
+.cm-walker { cursor: pointer; }
+.cm-trail { stroke: var(--c, #f59e0b); stroke-width: 5px; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.cm-wglow { fill: var(--c, #f59e0b); opacity: .22; }
+.cm-wdot { fill: var(--c, #f59e0b); stroke: #fff; stroke-width: 2; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.cm-walker.friend .cm-wdot { stroke: #22d3ee; stroke-width: 3; }
+.cm-walker.car .cm-wdot { stroke-dasharray: 0; rx: 4; }
+.cm-wini { fill: #fff; font: 800 9.5px Poppins, sans-serif; pointer-events: none; }
+.cm-wlabel { display: none; pointer-events: none; } .cm-wlabel rect { fill: rgba(14,10,33,.88); stroke: var(--c); stroke-width: 1.2; } .cm-wlabel text { fill: #fff; font: 700 10.5px Poppins, sans-serif; }
+.cm-near .cm-wlabel { display: block; }
+.cm-hs { cursor: pointer; } .cm-hs .r { fill: color-mix(in srgb, var(--c) 70%, #000); } .cm-hs .b { fill: var(--c); stroke: rgba(0,0,0,.45); stroke-width: .8; } .cm-hs:hover .b { stroke: #fff; }
+.cm-bld path { pointer-events: none; }
+
+/* ============================================================
+   MAPA VIVO — layout aprovado (docs/design/mapa-vivo.png)
+   ============================================================ */
+body[data-route="mapa"] .wg-main { padding: 0 !important; overflow: hidden; }
+body[data-route="mapa"] .w-body, body[data-route="mapa"] .wg-main { height: 100%; }
+.lv { position: relative; height: 100%; min-height: 460px; overflow: hidden; background: #0b0818; }
+.lv-stage { position: absolute; inset: 0; } .lv .cm { background: #0e1730; }
+.lv-hud { position: absolute; z-index: 6; background: linear-gradient(165deg, rgba(33,22,72,.86), rgba(14,10,33,.9)); border: 1px solid rgba(168,120,255,.32); border-radius: 16px; backdrop-filter: blur(10px); box-shadow: 0 18px 50px -20px #000, 0 0 30px -14px rgba(168,85,247,.6); color: var(--txt, #ece9ff); }
+.lv-hud h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #a99be0; font-weight: 600; }
+/* relógio e velocidade */
+.lv-clock { left: 18px; top: 16px; padding: 11px 15px; display: flex; gap: 14px; align-items: center; }
+.lv-t { display: grid; line-height: 1.1; } .lv-t b { font-size: 26px; letter-spacing: .04em; color: #f5f0ff; text-shadow: 0 0 16px rgba(168,85,247,.8); } .lv-t small { font-size: 11px; color: #a99be0; white-space: nowrap; }
+.lv-wx { font-size: 13px; color: #d8e8ff; white-space: nowrap; }
+.lv-spd { display: flex; gap: 4px; } .lv-spd i { font-style: normal; font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 9px; background: rgba(168,120,255,.12); color: #c9bdf0; border: 1px solid rgba(168,120,255,.18); }
+.lv-spd i.on { background: linear-gradient(100deg, #7c3aed, #a855f7); color: #fff; border-color: transparent; box-shadow: 0 6px 18px -8px #a855f7; } .lv-spd i.off { opacity: .45; cursor: not-allowed; }
+/* busca e filtros no topo, entre o relógio e o "Online agora" */
+.lv-top { position: absolute; z-index: 7; top: 16px; left: 372px; right: 332px; display: flex; gap: 10px; align-items: flex-start; pointer-events: none; }
+.lv-top > * { pointer-events: auto; } .lv-top .gm-search { flex: none; width: 250px; }
+.lv-top .gm-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .lv-top .gm-chips::-webkit-scrollbar { display: none; }
+/* online agora */
+.lv-online { right: 18px; top: 16px; width: 296px; padding: 14px; max-height: 46%; overflow: hidden; }
+.lv-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399; display: inline-block; margin-right: 6px; }
+.lv-row { display: flex; gap: 10px; align-items: center; width: 100%; padding: 6px 4px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; border-radius: 10px; border-bottom: 1px solid rgba(168,120,255,.08); }
+.lv-row:hover { background: rgba(168,120,255,.1); }
+.lv-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; border: 2px solid rgba(255,255,255,.7); flex: none; }
+.lv-nm { display: grid; line-height: 1.15; min-width: 0; } .lv-nm b { font-size: 12.5px; } .lv-nm small { font-size: 10.5px; color: #a99be0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* deslocamento */
+.lv-route { left: 18px; bottom: 18px; width: 372px; padding: 16px; max-height: calc(100% - 150px); overflow: auto; }
+.lv-x { position: absolute; right: 10px; top: 10px; width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 8px; background: rgba(168,120,255,.14); color: #d8ccff; cursor: pointer; }
+.lv-to { display: flex; gap: 12px; align-items: center; padding-right: 22px; } .lv-to b { font-size: 15px; display: block; } .lv-to small { color: #a99be0; font-size: 11.5px; }
+.lv-ic { width: 42px; height: 42px; flex: none; border-radius: 13px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--c, #7c3aed), #22d3ee); box-shadow: 0 0 22px -4px var(--c, #a855f7); }
+.lv-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 0 0; font-size: 11.5px; color: #c9bdf0; } .lv-st { color: #fbbf24; } .lv-here { color: #34d399; display: inline-flex; gap: 4px; align-items: center; }
+.lv-eta { margin-top: 10px; font-size: 11.5px; color: #c9bdf0; }
+.lv-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 10px; }
+.lv-modes button { padding: 8px 4px; border-radius: 11px; text-align: center; font: inherit; font-size: 11px; background: rgba(168,120,255,.1); border: 1px solid rgba(168,120,255,.22); color: #ece9ff; cursor: pointer; } .lv-modes button b { display: block; font-size: 12px; } .lv-modes button:hover { border-color: #22d3ee; background: rgba(34,211,238,.14); } .lv-modes button:disabled { opacity: .5; }
+.lv-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* feed ao vivo */
+.lv-feed { right: 18px; bottom: 18px; width: 336px; padding: 14px; }
+.lv-live { display: inline-flex; gap: 6px; align-items: center; float: right; font-size: 10px; color: #fb7185; letter-spacing: .1em; } .lv-live i { width: 7px; height: 7px; border-radius: 50%; background: #fb7185; box-shadow: 0 0 8px #fb7185; animation: lvBlink 1.4s ease-in-out infinite; }
+@keyframes lvBlink { 50% { opacity: .25; } }
+.lv-l { font-size: 12px; line-height: 1.35; padding: 4px 0; color: #d6cdf5; display: block; } .lv-l small { float: right; margin-left: 8px; color: #8b82b4; font-size: 10px; } .lv-pl { color: #fff; font-weight: 600; }
+/* legenda */
+.lv-legend { left: 50%; transform: translateX(-50%); bottom: 18px; padding: 8px 16px; display: flex; gap: 16px; font-size: 11px; color: #c9bdf0; white-space: nowrap; }
+.lv-legend span { display: inline-flex; gap: 6px; align-items: center; } .lv-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.lv .cm-tools { right: auto !important; left: 18px; bottom: auto !important; top: 100px; }
+@media (max-width: 1760px) { .lv-top { left: 18px; right: 330px; top: 84px; } .lv .cm-tools { top: 140px; } }
+@media (max-width: 1280px) { .lv-top { right: 18px; } .lv-online { top: 16px; width: 250px; } .lv-clock { padding: 9px 12px; gap: 10px; } .lv-legend { display: none; } }
+@media (max-width: 900px) {
+  .lv-online, .lv-legend { display: none; }
+  .lv-clock { left: 10px; top: 10px; right: auto; gap: 8px; padding: 8px 10px; } .lv-t b { font-size: 20px; } .lv-t small { display: none; } .lv-spd i { padding: 5px 7px; font-size: 11px; }
+  .lv-top { left: 10px; right: 10px; top: 62px; flex-direction: column; gap: 8px; } .lv-top .gm-search { width: 100%; } .lv-top .gm-chips { max-width: 100%; }
+  .lv-route { left: 8px; right: 8px; bottom: calc(86px + env(safe-area-inset-bottom)); width: auto; padding: 12px; max-height: 44%; border-radius: 16px; }
+  .lv-feed { left: 8px; right: 8px; bottom: auto; top: auto; width: auto; padding: 8px 12px; display: none; }
+  .lv .cm-tools { top: 150px; left: 10px; } .lv .cm-btn { width: 34px; height: 34px; }
+}
