@@ -45,16 +45,16 @@ test('compra sem saldo é atômica: nada muda', () => {
   T.w.user.location = { placeId: pl.id, node: pl.node, at: new Date().toISOString() };
   const b = B.bankOf(T.w);
   b.balance = 0; b.card = null;
-  const it = pl.catalog.find((x) => x.key === 'flores'); it.stock = Math.max(it.stock, 3);
+  const it = pl.catalog.find((x) => x.key === 'cafe'); it.stock = Math.max(it.stock, 3);
   const stock = it.stock; const invN = I.inv(T.w).length;
-  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'flores', { pin: '4826', opId: 'x1' }), (e) => e.code === 'FUNDS');
+  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '4826', opId: 'x1' }), (e) => e.code === 'FUNDS');
   assert.equal(it.stock, stock); assert.equal(b.balance, 0); assert.equal(I.inv(T.w).length, invN);
 });
 
 test('compra com senha errada não cobra', () => {
   const pl = shop(); money(500);
   const before = B.bankOf(T.w).balance;
-  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'flores', { pin: '0000', opId: 'x2' }));
+  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '0000', opId: 'x2' }));
   assert.equal(B.bankOf(T.w).balance, before);
   B.bankOf(T.w).pin.fails = 0;
 });
@@ -62,9 +62,9 @@ test('compra com senha errada não cobra', () => {
 test('compra repetida com o mesmo identificador cobra uma vez só', () => {
   const pl = shop();
   const b = B.bankOf(T.w); const before = b.balance;
-  const it = pl.catalog.find((x) => x.key === 'flores'); const stock = it.stock;
-  const r1 = C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'flores', { pin: '4826', opId: 'x3' });
-  const r2 = C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'flores', { pin: '4826', opId: 'x3' });
+  const it = pl.catalog.find((x) => x.key === 'cafe'); const stock = it.stock;
+  const r1 = C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '4826', opId: 'x3' });
+  const r2 = C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '4826', opId: 'x3' });
   assert.equal(r1.item.id, r2.item.id);
   assert.equal(it.stock, stock - 1);
   assert.equal(Math.round((before - b.balance) * 100) / 100, r1.price);
@@ -77,12 +77,12 @@ test('loja fechada não vende', () => {
 });
 
 test('revender um item tira o dinheiro de quem comprou (não cria dinheiro)', () => {
-  const it = I.inv(T.w).find((x) => x.key === 'flores');
-  const sold = { ...it, key: 'fone' }; // item revendível
-  I.inv(T.w).push({ ...sold, id: 'fone-teste', name: 'Fone', price: 180, history: [] });
+  const it = I.inv(T.w).find((x) => x.key === 'cafe');
+  const sold = { ...it, key: 'smartphone' }; // item revendível
+  I.inv(T.w).push({ ...sold, id: 'sp-teste', name: 'Smartphone', price: 1200, history: [] });
   const total = () => people(T.w).reduce((s, p) => s + (p.agent?.cash || 0), 0) + B.bankOf(T.w).balance;
   const before = total();
-  I.itemAction(T.ctx(), 'fone-teste', 'vender');
+  I.itemAction(T.ctx(), 'sp-teste', 'vender');
   assert.ok(Math.abs(total() - before) < 0.02, 'o dinheiro só mudou de mãos');
 });
 
