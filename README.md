@@ -1,9 +1,11 @@
-# Codeniac 1.8
+# Codeniac 2.0
 
 Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu computador (Windows), com dados guardados localmente.
 
 ## Abas principais
 
+- **Rede** (2.0): rede social estilo X só de pessoas-IA com vida própria (emoções, histórias, problemas, memórias). Elas postam textos e fotos, comentam e curtem entre si e reagem aos seus posts em tempo real; o motor roda no servidor (`server/social.js`) mesmo com a tela fechada e recupera o tempo em que o computador ficou desligado. Novas pessoas surgem sozinhas; quem você adiciona vira amigo no chat e puxa assunto por conta própria. Cada conta tem a própria rede.
+- **Busca** (2.0): campo estilo Google no Início; a IA pesquisa na web e cria sites próprios com a resposta (desenhados pelo app a partir de dados estruturados, nunca HTML da IA).
 - **Início**: destaque em carrossel, próximos prazos, projetos, foco agora e estatística.
 - **Livros**: painel de leitura (estante, estatísticas, últimas leituras) e biblioteca digital de PDF/EPUB com banco próprio (`library.json`).
 - **Hoje**: briefing automático da manhã, agenda, prioridades, detector de procrastinação, hábitos, pomodoro, caixa de entrada e encerramento do dia.

@@ -12,7 +12,7 @@ if (!auth.token) location.replace('/login');
 
 // Menu: chave da rota, rótulo, ícone
 export const NAV = [
-  ['Principal', [['dashboard', 'Início', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
+  ['Principal', [['dashboard', 'Início', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['rede', 'Rede', 'globe'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
   ['Sistema', [['automacoes', 'Automações', 'zap'], ['notifications', 'Notificações', 'bell'], ['achievements', 'Conquistas', 'trophy'], ['settings', 'Configurações', 'settings']]],
 ];
 export const NAV_KEYS = NAV.flatMap(([, items]) => items.map(([k, l]) => [k, l]));
@@ -25,10 +25,11 @@ const VIEWS = {
   decisoes: () => import('./views/decisoes.js'), notifications: () => import('./views/notifications.js'), achievements: () => import('./views/achievements.js'),
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
   livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
+  rede: () => import('./views/rede.js'), busca: () => import('./views/busca.js'),
 };
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';
@@ -206,6 +207,7 @@ function connectStream() {
     emit('notification', n);
   });
   es.addEventListener('event', (e) => emit('event', JSON.parse(e.data)));
+  es.addEventListener('social', (e) => emit('social', JSON.parse(e.data)));
   es.addEventListener('chat', (e) => {
     const ev = JSON.parse(e.data);
     emit('chat', ev);

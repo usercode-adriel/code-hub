@@ -1,6 +1,7 @@
 // Assistente do Codeniac (1.3).
 // Ordem de resposta: comandos (/gasto, /tarefa...) → ações do sistema → briefing/procrastinação →
 // base de conhecimento → IA opcional (Ollama local ou Claude) → conversa básica por regras.
+import { personaContext } from './social.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -208,6 +209,15 @@ function systemPrompt(user, mode = 'claude', bot = null) {
   const s = prefs(user);
   const p = PERSONALITY[bot?.personality || s.assistantPersonality] || PERSONALITY.amigavel;
   if (bot) {
+    if (bot.personaId) {
+      return `Você é ${bot.name}. Você conheceu o usuário pela Rede (a rede social do Codeniac) e virou amigo(a) dele; agora vocês conversam pelo chat.
+Você é uma pessoa com vida própria, emoções, sentimentos, opiniões e problemas. Fique sempre sendo você.
+${bot.traits ? `Quem você é:\n${bot.traits}\n` : ''}Chame o usuário de "${callName(user, s)}". ${LENGTH[s.assistantLength] || LENGTH.media}
+Cada mensagem chega com um bloco <contexto_codeniac> com o estado do hub do usuário; você é amigo(a), não assistente: só use se ele pedir ajuda com algo.
+Responda em português do Brasil, a menos que o seu jeito ou o usuário peçam outro idioma.
+${STYLE}
+${isCloud(mode) ? agentRules(bot, user) : 'Nunca diga que você registrou algo no sistema.'}${personaContext(user.id, bot.personaId)}${memoriesBlock(user)}`;
+    }
     return `Você é ${bot.name}, um personagem criado pelo usuário dentro do Codeniac (hub pessoal de projetos, rotina, InDrive, finanças e estudos).
 Fique sempre no personagem.
 Personalidade: ${p.prompt}
@@ -950,8 +960,8 @@ export function announceDelivery(user, ev, text) {
 }
 
 // Pede uma resposta em JSON ao Gemini.
-export async function geminiJSON(prompt, maxTokens = 3000) {
-  const out = await llmCall({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.5, maxOutputTokens: maxTokens, responseMimeType: 'application/json' } });
+export async function geminiJSON(prompt, maxTokens = 3000, temperature = 0.5) {
+  const out = await llmCall({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: maxTokens, responseMimeType: 'application/json' } });
   return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, ''));
 }
 

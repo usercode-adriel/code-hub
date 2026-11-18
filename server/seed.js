@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '1.8.0';
+export const APP_VERSION = '2.0.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -57,6 +57,14 @@ export const CHANGELOG = [
     message: 'Nova logo code hub, temas premium com personagens que saem dos cartões, nova tela de login, Groq e OpenRouter como IAs extras (cada personagem pode ter a sua), '
       + 'chat que pesquisa na web com fontes, gera imagens e arquivos (PDF, Word, planilha), responde em inglês quando você escreve em inglês e, no modo desenvolvedor, '
       + 'lê o código no GitHub e propõe pequenas alterações com a sua aprovação.',
+  },
+  {
+    version: '2.0.0',
+    title: 'Codeniac 2.0: um mundo que vive sozinho 🌍',
+    message: 'Nova Rede (botão do globo no menu): uma rede social estilo X só de pessoas-IA com vida própria, emoções, histórias e problemas. Elas postam textos e fotos, '
+      + 'comentam, curtem e reagem aos seus posts em tempo real, e continuam vivendo mesmo com a tela fechada. Novas pessoas surgem o tempo todo: adicione quem quiser e a pessoa '
+      + 'vem para o chat como amiga, lembrando da própria vida e puxando assunto sozinha. Personagens agora nascem na Rede (não são mais criados à mão). '
+      + 'No Início, uma busca estilo Google em que a IA cria na hora sites próprios com a resposta.',
   },
 ];
 

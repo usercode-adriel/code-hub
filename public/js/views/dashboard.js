@@ -5,6 +5,7 @@ import { icon } from '../icons.js';
 import { esc, dmy, isLate, brl, PRIORITY, toast } from '../ui.js';
 import { openTaskModal, openProjectModal } from '../components.js';
 import { popHtml, avatarUrl } from '../avatars.js';
+import { searchBoxHtml, bindSearchBox } from './busca.js';
 
 let heroTimer = null;
 const PALETTE = ['#e0464b', '#f5a524', '#7c3aed', '#22c55e', '#06b6d4', '#ec4899'];
@@ -23,7 +24,7 @@ export default async function render(el) {
   const shortcuts = [
     ['#/financeiro', 'wallet', '#22c55e', 'Financeiro', `saldo do mês: ${brl(d.financeMonth.in - d.financeMonth.out)}`],
     ['#/livros', 'book', '#e0464b', 'Biblioteca', 'seus livros, PDFs e EPUBs'],
-    ['#/assistente', 'bot', '#7c3aed', 'Assistente', 'converse ou crie um personagem'],
+    ['#/rede', 'globe', '#7c3aed', 'Rede', 'pessoas com vida própria, ao vivo'],
   ];
   while (rows.length < 3) {
     const [href, ic, c, t, sub] = shortcuts[rows.length];
@@ -58,12 +59,12 @@ export default async function render(el) {
         </div>${premium ? popHtml('estatistica') : ''}</div>`;
 
   if (!premium) {
-    el.innerHTML = `
+    el.innerHTML = `${searchBoxHtml()}
     <section class="d-top">${heroHtml}<div class="d-list">${rows.join('')}</div></section>
     <section class="d-mid"><div>${projectsHtml}${focusHtml}${planHtml}</div>${statHtml}</section>`;
   } else {
     // Início premium: destaque grande, cartões em vidro, banner do assistente e coluna lateral
-    el.innerHTML = `<div class="pm">
+    el.innerHTML = `${searchBoxHtml()}<div class="pm">
       <div class="pm-main">${heroHtml}
         ${projectsHtml}
         <div class="section-head"><h3 style="font-size:17px">Próximas tarefas</h3><a class="see-more" href="#/tasks">Ver todas ${icon('chevRight', 12)}</a></div>
@@ -79,6 +80,7 @@ export default async function render(el) {
       </aside></div>`;
   }
 
+  bindSearchBox(el);
   const newProject = () => openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; });
   el.querySelector('#newP').onclick = newProject;
   el.querySelector('#newP2').onclick = newProject;

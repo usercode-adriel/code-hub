@@ -135,6 +135,7 @@ router.post('/c/:coll', (req, res) => {
   const { coll } = req.params;
   const spec = COLL[coll];
   if (!spec) return bad(res, 'Coleção desconhecida', 404);
+  if (coll === 'bots') return bad(res, 'Na versão 2.0 os personagens nascem na Rede: abra a Rede e adicione quem você quiser.', 410);
   try {
     const item = { id: id(), userId: req.user.id, ...(spec.init?.() || {}), ...clean(coll, req.body || {}), createdAt: now(), updatedAt: now() };
     if (coll === 'money' && !item.category) item.category = guessCategory(item.desc, item.amount);

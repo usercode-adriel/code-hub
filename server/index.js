@@ -18,6 +18,7 @@ import library, { loadLibrary, saveLibraryNow } from './library.js';
 import automations from './automations.js';
 import connect from './routes/connect.js';
 import { startTelegram } from './telegram.js';
+import social, { startSocial } from './social.js';
 import './push.js';
 import chatFiles from './routes/chatfiles.js';
 import { confirmAction, undoAction, actionStatuses, actionInfos, onRestartRequest } from './agent.js';
@@ -167,6 +168,7 @@ app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
 app.use('/api', requireAuth, connect);
+app.use('/api', requireAuth, social);
 app.use('/api', requireAuth, dev);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
@@ -199,6 +201,7 @@ function listen(attempt = 0) {
 listen();
 startScheduler();
 startTelegram();
+startSocial();
 
 function shutdown() {
   saveNow();

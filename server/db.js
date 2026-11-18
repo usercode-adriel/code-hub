@@ -29,6 +29,7 @@ const EMPTY = () => ({
   garage: {},         // userId -> dados do carro
   budgets: {},        // userId -> { categoria: limite }
   userMeta: {},       // userId -> extras (plano do dia, Telegram, recorrentes ignorados...)
+  social: {},         // userId -> rede social (pessoas-IA, posts, pesquisas)
   ...Object.fromEntries(USER_COLLECTIONS.map((c) => [c, []])),
 });
 
@@ -40,6 +41,7 @@ export function load() {
   state = fs.existsSync(DB_FILE) ? { ...EMPTY(), ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) } : EMPTY();
   for (const c of USER_COLLECTIONS) state[c] ??= [];
   state.userMeta ??= {};
+  state.social ??= {};
   return state;
 }
 

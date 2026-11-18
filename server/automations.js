@@ -437,6 +437,8 @@ router.get('/bots/:id/export', (req, res) => {
 });
 router.post('/bots/import', (req, res) => {
   const data = req.body || {};
+  return bad(res, 'Na versão 2.0 os personagens nascem na Rede: abra a Rede e adicione quem você quiser.', 410);
+  // eslint-disable-next-line no-unreachable
   if (data.codeniac !== 'personagem' || !data.bot?.name) return bad(res, 'Arquivo inválido: não é um personagem do Codeniac');
   const s = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
   let avatar = null;

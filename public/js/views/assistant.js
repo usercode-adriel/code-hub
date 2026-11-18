@@ -153,7 +153,7 @@ function groupForm(bots, niacName, group = null) {
         <div class="grow"><div class="field"><label>Nome do grupo</label><input name="name" maxlength="60" value="${esc(group?.name || '')}" placeholder="Ex.: Conselho, Família, Estudos" required></div>
         <div class="field" style="margin-top:10px"><label>Sobre o grupo (opcional)</label><input name="description" maxlength="300" value="${esc(group?.description || '')}" placeholder="Ex.: decisões de dinheiro e carreira"></div></div></div>
         <div class="field"><label>Participantes (escolha 2 ou mais)</label><div class="bot-grid pick">${people.map((p) => `<button type="button" class="bot-card ${chosen.has(p.id) ? 'on' : ''}" data-m="${p.id}">${faceOf(p, 46)}<b>${esc(p.name)}</b><small>${p.id === 'niac' ? 'Assistente do Codeniac' : esc((PERSONA[p.personality] || PERSONA.amigavel).label)}</small><span class="tick">${icon('check', 12)}</span></button>`).join('')}</div>
-          ${bots.length ? '' : '<span class="hint">Você ainda não tem personagens. Crie alguns em “Criar chat → Criar personagem” para montar um grupo animado.</span>'}</div>
+          ${bots.length ? '' : '<span class="hint">Você ainda não tem amigos. Adicione pessoas na Rede (menu lateral) para montar um grupo animado.</span>'}</div>
         <div class="setting-row" style="padding:6px 0"><div class="txt"><b>Comentar meu dia à noite</b><small>Os participantes conversam sobre o seu dia (tarefas, InDrive, gastos, hábitos) no horário escolhido</small></div><input type="time" name="observeTime" class="input" value="${esc(group?.observeTime || '21:00')}" style="width:110px"><label class="switch"><input type="checkbox" name="observe" ${group?.observe ? 'checked' : ''}><span></span></label></div>
         <p class="hint" style="margin:0">No grupo, cada personagem responde do seu jeito e eles conversam entre si (precisa do Gemini).</p>
         <div class="form-actions"><button type="button" class="btn outline" data-close>Cancelar</button><button class="btn primary">${group ? 'Salvar' : 'Criar grupo'}</button></div></form>`,
@@ -377,12 +377,11 @@ export default async function render(el) {
     body: `<p class="muted" style="margin:0 0 12px;font-size:12px">Converse com o assistente, com um personagem ou monte um grupo.</p><div class="bot-grid">
       <button class="bot-card" data-pick="">${botAvatar(54)}<b>${esc(name)}</b><small>Assistente do Codeniac</small></button>
       ${bots.map((b) => `<div class="bot-card" data-pick="${b.id}" role="button" tabindex="0">${faceOf(b, 54)}<b>${esc(b.name)}</b><small>${esc(FOCUS[b.focus] || FOCUS.geral)}${b.proactive ? ' · automático' : ''}</small><button class="icon-btn sm ghost bot-edit" data-edit="${b.id}" title="Editar">${icon('edit', 13)}</button></div>`).join('')}
-      <button class="bot-card new" data-create>${icon('plus', 26)}<b>Criar personagem</b><small>Nome, foto, personalidade, função e mensagens automáticas</small></button>
+      <a class="bot-card new" href="#/rede/pessoas" data-close>${icon('globe', 26)}<b>Encontrar pessoas na Rede</b><small>Personagens nascem na Rede: adicione quem quiser e a pessoa vem para o chat</small></a>
       <button class="bot-card new" data-group>${icon('users', 26)}<b>Criar grupo</b><small>Vários personagens conversando entre si</small></button>
-      <button class="bot-card new" data-import>${icon('upload', 24)}<b>Importar personagem</b><small>De um arquivo .codeniac-personagem.json</small></button>
       <button class="bot-card new" data-capsule>${icon('clock', 24)}<b>Cápsula do tempo</b><small>Uma carta para o seu eu do futuro</small></button>
       <a class="bot-card new" href="#/decisoes" data-close>${icon('scale', 24)}<b>Debater uma decisão</b><small>Os personagens debatem e votam</small></a></div>
-      <input type="file" id="impFile" accept=".json,application/json" hidden>`,
+`,
     onMount: (m, close) => {
       m.querySelectorAll('[data-pick]').forEach((c) => {
         const go = (e) => { if (e.target.closest('[data-edit]')) return; close(); startChat(c.dataset.pick ? { botId: c.dataset.pick } : { title: 'Nova conversa' }); };
@@ -390,18 +389,8 @@ export default async function render(el) {
         c.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(e); });
       });
       m.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = async () => { close(); await editBot(bots.find((x) => x.id === b.dataset.edit)); openNew(); }; });
-      m.querySelector('[data-create]').onclick = async () => { close(); const b = await botForm(); if (b?.id) { bots = await coll('bots').list(); startChat({ botId: b.id }); } };
       m.querySelector('[data-group]').onclick = async () => { close(); const g = await groupForm(bots, name); if (g) startChat({ group: g }); };
       m.querySelector('[data-capsule]').onclick = () => { close(); capsuleModal(); };
-      const imp = m.querySelector('#impFile');
-      m.querySelector('[data-import]').onclick = () => imp.click();
-      imp.onchange = async () => {
-        try {
-          const data = JSON.parse(await imp.files[0].text());
-          const b = await api.post('/bots/import', data);
-          close(); bots = await coll('bots').list(); toast('Personagem importado', b.name, 'success'); startChat({ botId: b.id });
-        } catch (err) { toast('Não deu para importar', err.message, 'error'); }
-      };
     },
   });
 
