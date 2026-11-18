@@ -219,6 +219,8 @@ export default async function render(el) {
     }
     acts.querySelector('#talk')?.addEventListener('click', () => send('', { auto: true }));
     acts.querySelector('#callBtn')?.addEventListener('click', () => (call.on ? stopCall() : startCall()));
+    // atendeu uma ligação de um amigo da Rede: entra direto no modo ligação
+    if (c && localStorage.getItem('codeniac.autocall') === c.id) { localStorage.removeItem('codeniac.autocall'); setTimeout(() => { if (!call.on) startCall(); }, 600); }
     acts.querySelector('#gEdit')?.addEventListener('click', async () => {
       const g = await groupForm(bots, name, convOf(current).group);
       if (!g) return;

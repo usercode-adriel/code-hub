@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import { db, id, now, save, UPLOAD_DIR } from './db.js';
+import { db, id, now, save as saveDb, UPLOAD_DIR } from './db.js';
+import { worldOf, saveWorld } from './world/store.js';
 import { emit } from './notify.js';
 import { single, removeUpload } from './routes/uploads.js';
 import { assistantMode, isCloud, geminiJSON, aiWrite, deliverMessage, createConversation, listConversations } from './assistant.js';
@@ -25,17 +26,19 @@ const ago = (iso) => Date.now() - new Date(iso || 0).getTime();
 const str = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const longStr = (v, max) => String(v ?? '').trim().slice(0, max);
 
-export const LIMITS = { personas: 160, minPersonas: 24, posts: 700, comments: 40, lifeLog: 40, searches: 30 };
+// a rede muda de lugar na 2.0: fica no world.json (mundo vivo), não mais no db.json
+const save = () => { saveWorld(); saveDb(); };
+
+export const LIMITS = { personas: 240, minPersonas: 70, posts: 700, comments: 40, lifeLog: 40, searches: 30 };
 export const PACE = {
-  calma: { post: [150, 420], spawnMin: 90, reactions: 1, aiEvery: 8 },
-  normal: { post: [60, 240], spawnMin: 35, reactions: 2, aiEvery: 4 },
-  agitada: { post: [25, 110], spawnMin: 15, reactions: 4, aiEvery: 2 },
+  calma: { post: [150, 420], spawnMin: 240, reactions: 1, aiEvery: 8 },
+  normal: { post: [60, 240], spawnMin: 120, reactions: 2, aiEvery: 4 },
+  agitada: { post: [25, 110], spawnMin: 60, reactions: 4, aiEvery: 2 },
 };
 
 export function net(userId) {
-  const d = db();
-  d.social ??= {};
-  const s = (d.social[userId] ??= {});
+  const w = worldOf(userId);
+  const s = (w.social ??= {});
   s.personas ??= []; s.posts ??= []; s.searches ??= [];
   s.cfg ??= {};
   s.cfg = { enabled: true, pace: 'normal', photos: true, dms: true, ...s.cfg };
@@ -221,12 +224,26 @@ function remember(p, text, at = now()) {
   }
 }
 
+// ganchos do mundo vivo (System 2.0): quem tem papel na cidade não sai; quem sai é registrado
+export const removalGuards = [];
+export const personaRemovedHooks = [];
+export const userInteractionHooks = [];
+export const personaAddedHooks = [];
+const userById = (uid) => db().users.find((u) => u.id === uid);
+export function fireUserInteraction(user, p, kind) {
+  for (const fn of userInteractionHooks) { try { fn(user, worldOf(user.id), p, kind); } catch (e) { console.error('[rede] interação:', e.message); } }
+}
+
 function addPersona(userId, s, p) {
   s.personas.push(p);
-  // a rede tem limite: quem está há mais tempo sem postar (e não é amigo) "sai da rede"
+  for (const fn of personaAddedHooks) { try { fn(userById(userId), worldOf(userId), p); } catch (e) { console.error('[rede] nova pessoa:', e.message); } }
+  // a rede tem limite: quem está há mais tempo sem postar (e não tem laços nem papel no mundo) "sai da rede"
   if (s.personas.length > LIMITS.personas) {
-    const removable = s.personas.filter((x) => !x.friend && !x.botId).sort((a, b) => (a.lastPostAt || a.createdAt).localeCompare(b.lastPostAt || b.createdAt));
-    for (const x of removable.slice(0, s.personas.length - LIMITS.personas)) removePersona(s, x);
+    const removable = s.personas.filter((x) => !x.friend && !x.botId && removalGuards.every((fn) => fn(x))).sort((a, b) => (a.lastPostAt || a.createdAt).localeCompare(b.lastPostAt || b.createdAt));
+    for (const x of removable.slice(0, s.personas.length - LIMITS.personas)) {
+      removePersona(s, x);
+      for (const fn of personaRemovedHooks) { try { fn(userById(userId), worldOf(userId), x); } catch (e) { console.error('[rede] saída:', e.message); } }
+    }
   }
   if (s.cfg.photos) queueAvatar(userId, p);
   emit(userId, 'social', { type: 'persona', persona: publicPersona(s, p) });
@@ -383,10 +400,11 @@ async function fetchImage(prompt, w, h) {
 }
 
 function queueImage(job) {
-  if (process.env.CODENIAC_NO_IMAGES === '1') return;
-  if (imageQueue.length > 40) return;
+  if (process.env.CODENIAC_NO_IMAGES === '1') return false;
+  if (imageQueue.length > 40) return false;
   imageQueue.push(job);
   pumpImages();
+  return true;
 }
 async function pumpImages() {
   if (imageBusy) return;
@@ -416,7 +434,8 @@ function queueAvatar(userId, p) {
       save();
       emit(userId, 'social', { type: 'persona', persona: publicPersona(s, cur) });
     },
-  });
+    fail: () => { p.avatarTried = false; p.avatarFailAt = now(); },
+  }) || (p.avatarTried = false);
 }
 
 function queuePostImage(userId, post, prompt) {
@@ -455,6 +474,8 @@ async function tickUser(user, { forceAi = false } = {}) {
   const first = !s.lastTick;
   if (s.lastTick && ago(s.lastTick) > 20 * MIN) catchUp(user, s, ago(s.lastTick));
   s.lastTick = now();
+
+  if (imagesOn(s) && imageQueue.length < 4) for (const p of s.personas.filter((x) => !x.avatar && !x.avatarTried && (!x.avatarFailAt || ago(x.avatarFailAt) > 6 * HOUR)).slice(0, 3)) queueAvatar(user.id, p);
 
   // população: a rede nunca fica vazia e sempre aparece gente nova
   if (s.personas.length < LIMITS.minPersonas) {
@@ -632,7 +653,7 @@ Interesses: ${p.interests.join(', ')}. Sonho: ${p.goal}.${p.lang === 'en' ? '\nV
 
 // Para o chat: o personagem conhece a própria vida na rede.
 export function personaContext(userId, personaId) {
-  const s = db().social?.[userId];
+  const s = worldOf(userId).social;
   const p = s?.personas?.find((x) => x.id === personaId);
   if (!p) return '';
   const myPosts = s.posts.filter((x) => x.personaId === p.id).slice(-4).map((x) => `- ${str(x.text, 160)}`).join('\n');
@@ -642,7 +663,13 @@ export function personaContext(userId, personaId) {
 - Como você está se sentindo agora: ${p.mood.emotion}${p.mood.reason ? ` (${p.mood.reason})` : ''}. Deixe isso aparecer no seu jeito de falar.
 - O que você está enfrentando: ${p.problem || 'nada grave no momento'}. Sonho: ${p.goal}.
 - Coisas recentes da sua vida (suas memórias):\n${p.lifeLog.slice().sort((a, b) => a.at.localeCompare(b.at)).slice(-8).map((l) => `  · ${l.text}`).join('\n')}
-${myPosts ? `- Seus últimos posts na rede:\n${myPosts}\n` : ''}${userPosts ? `- Últimos posts do seu amigo (o usuário) na rede:\n${userPosts}\n` : ''}Você tem opiniões, humor que muda, dias bons e ruins, e às vezes também quer desabafar ou pedir conselho. Responda como amigo(a), não como atendente.`;
+${myPosts ? `- Seus últimos posts na rede:\n${myPosts}\n` : ''}${userPosts ? `- Últimos posts do seu amigo (o usuário) na rede:\n${userPosts}\n` : ''}${worldFacts(userId, p)}Você tem opiniões, humor que muda, dias bons e ruins, e às vezes também quer desabafar ou pedir conselho. Responda como amigo(a), não como atendente.`;
+}
+
+// O que a pessoa sabe da própria vida na cidade e da relação com o usuário (System 2.0).
+export const worldFactHooks = [];
+function worldFacts(userId, p) {
+  return worldFactHooks.map((fn) => { try { return fn(userId, p) || ''; } catch { return ''; } }).join('');
 }
 
 // ---------------------------------------------------------------- formato público (para a tela)
@@ -666,6 +693,7 @@ function publicPost(s, post, userId) {
     id: post.id, text: post.text, image: post.image, imagePending: Boolean(post.imagePending), kind: post.kind, at: post.at, me: post.personaId === 'me',
     mood: post.mood ? { emotion: post.mood.emotion, emoji: EMOTIONS[post.mood.emotion]?.emoji || '' } : null,
     author: p ? { id: p.id, name: p.name, handle: p.handle, avatar: p.avatar, color: p.color, verified: p.verified, friend: Boolean(p.friend && p.botId) } : null,
+    rumorId: post.rumorId || null, refs: post.refs || null,
     likes: likeCount(post), liked: post.likes.includes(`u:${userId}`), comments: post.comments.slice(-40).map((c) => publicComment(s, c)), commentCount: post.comments.length,
   };
 }
@@ -679,10 +707,10 @@ function trends(s) {
   const add = (k, w, label) => { counts.set(k, (counts.get(k) || 0) + w); if (label?.startsWith('#') || !labels.has(k)) labels.set(k, label); };
   for (const post of s.posts.filter((x) => ago(x.at) < 48 * HOUR)) {
     const text = fold(post.text);
-    for (const t of post.text.match(/#[\p{L}\d_]{3,30}/gu) || []) add(tagOf(t), 3, t.toLowerCase());
-    for (const sub of SUBJECTS) if (text.includes(fold(sub))) add(tagOf(sub), 1 + Math.min(2, post.comments.length / 3), sub);
+    for (const t of new Set((post.text.match(/#[\p{L}\d_]{3,30}/gu) || []).map((x) => x.toLowerCase()))) add(tagOf(t), 1, t);
+    for (const sub of SUBJECTS) if (text.includes(fold(sub)) && !(post.text.toLowerCase().includes(`#${tagOf(sub)}`))) add(tagOf(sub), 1, sub);
   }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => ({ tag: labels.get(k), posts: Math.round(n * 37) + (k.length * 13) % 40 }));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => ({ tag: labels.get(k), posts: Math.round(n) }));
 }
 
 // ---------------------------------------------------------------- busca com "sites" gerados pela IA
@@ -763,7 +791,7 @@ router.get('/rede/feed', (req, res) => {
   const away = s.awayNote; s.awayNote = null;
   res.json({
     posts: page.map((x) => publicPost(s, x, req.user.id)), more: posts.length > page.length, trends: trends(s), away,
-    online: s.personas.filter((p) => awake(p)).length * 1234 + rnd(900), people: s.personas.length, cfg: s.cfg, ai: hasCloud(),
+    online: s.personas.filter((p) => awake(p) && (!p.agent || p.agent.status === 'ativo')).length, people: s.personas.length, cfg: s.cfg, ai: hasCloud(),
     suggestions: s.personas.filter((p) => !p.friend).sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)).slice(0, 5).map((p) => publicPersona(s, p)),
   });
 });
@@ -789,7 +817,9 @@ router.post('/rede/pessoas/:id/amizade', (req, res) => {
   const s = net(req.user.id);
   const p = P(s, req.params.id);
   if (!p) return res.status(404).json({ error: 'Essa pessoa saiu da rede' });
+  const wasFriend = Boolean(p.friend && p.botId);
   const bot = befriend(req.user, s, p);
+  if (!wasFriend) fireUserInteraction(req.user, p, 'friend');
   emit(req.user.id, 'social', { type: 'persona', persona: publicPersona(s, p) });
   let conv = listConversations(req.user.id).find((c) => c.botId === bot.id && !c.group);
   if (!conv) conv = createConversation(req.user.id, `Chat com ${bot.name}`, bot);
@@ -802,6 +832,7 @@ router.delete('/rede/pessoas/:id/amizade', (req, res) => {
   if (!p) return res.status(404).json({ error: 'Essa pessoa saiu da rede' });
   if (p.botId) db().bots = db().bots.filter((b) => !(b.id === p.botId && b.userId === req.user.id));
   p.friend = false; p.botId = null;
+  fireUserInteraction(req.user, p, 'unfriend');
   remember(p, `${req.user.name.split(' ')[0]} desfez a amizade comigo.`);
   p.mood = { emotion: 'triste', intensity: 0.6, reason: 'perdeu uma amizade' };
   save();
@@ -846,7 +877,7 @@ router.post('/rede/posts/:id/curtir', (req, res) => {
   else {
     post.likes.push(me);
     const p = P(s, post.personaId);
-    if (p) { p.relations.me = clamp((p.relations.me || 0) + 1, -10, 50); if (p.friend) remember(p, `${req.user.name.split(' ')[0]} curtiu meu post.`); }
+    if (p) { p.relations.me = clamp((p.relations.me || 0) + 1, -10, 50); if (p.friend) remember(p, `${req.user.name.split(' ')[0]} curtiu meu post.`); fireUserInteraction(req.user, p, 'like'); }
   }
   save();
   res.json({ likes: likeCount(post), liked: post.likes.includes(me) });
@@ -860,7 +891,7 @@ router.post('/rede/posts/:id/comentarios', (req, res) => {
   if (!text) return res.status(400).json({ error: 'Escreva o comentário' });
   const c = addComment(req.user.id, s, post, null, text);
   // o autor (e às vezes outra pessoa) responde
-  if (post.personaId !== 'me') replyLater(req.user, s, post, text);
+  if (post.personaId !== 'me') { replyLater(req.user, s, post, text); fireUserInteraction(req.user, P(s, post.personaId), 'comment'); }
   else { post.wantReplies = (post.wantReplies || 0) + 1; post.replyAt = new Date(Date.now() + 15 * 1000).toISOString(); }
   save();
   res.status(201).json(publicComment(s, c));
@@ -947,10 +978,27 @@ router.get('/busca/:id/sites/:site', async (req, res) => {
 
 export default router;
 
-let started = false;
-export function startSocial() {
-  if (started) return;
-  started = true;
-  setTimeout(() => socialTick().catch(() => {}), 8000);
-  setInterval(() => socialTick().catch((e) => console.error('[rede]', e.message)), Number(process.env.SOCIAL_TICK_MS) || 30 * 1000).unref();
+// Um passo da rede para um usuário (chamado pelo motor do mundo a cada 30 s).
+export async function socialStep(user) {
+  if (busy.has(user.id)) return;
+  busy.add(user.id);
+  try { await tickUser(user); } catch (err) { console.error('[rede]', err.message); } finally { busy.delete(user.id); }
 }
+
+// ---------------------------------------------------------------- usado pelo mundo vivo
+// Post de uma pessoa causado por um acontecimento do mundo (com o horário do acontecimento).
+export function worldPost(ctx, p, text, { kind = 'texto', photo = null, rumorId = null, refs = null } = {}) {
+  const s = net(ctx.uid);
+  if (!p || !s.personas.includes(p) || !String(text || '').trim()) return null;
+  const post = makePost(s, p, text, { at: ctx.at.toISOString(), kind });
+  if (rumorId) post.rumorId = rumorId;
+  if (refs) post.refs = refs;
+  if (photo && ctx.live && imagesOn(s) && chance(0.6)) queuePostImage(ctx.uid, post, photo);
+  if (ctx.live) emit(ctx.uid, 'social', { type: 'post', post: publicPost(s, post, ctx.uid) });
+  return post;
+}
+export function worldComment(ctx, post, p, text) {
+  const s = net(ctx.uid);
+  return addComment(ctx.uid, s, post, p, text, { at: ctx.at.toISOString() });
+}
+export { remember, publicPost, publicPersona, g as genderize, localPersona, EMOTIONS as SOCIAL_EMOTIONS };

@@ -18,7 +18,10 @@ import library, { loadLibrary, saveLibraryNow } from './library.js';
 import automations from './automations.js';
 import connect from './routes/connect.js';
 import { startTelegram } from './telegram.js';
-import social, { startSocial } from './social.js';
+import social from './social.js';
+// a ordem importa: o mundo registra os módulos (agentes → cidade → economia → política → mídia) antes das rotas
+import { startWorld, onUserChat, flushWorld } from './world/index.js';
+import worldRoutes from './world/routes.js';
 import './push.js';
 import chatFiles from './routes/chatfiles.js';
 import { confirmAction, undoAction, actionStatuses, actionInfos, onRestartRequest } from './agent.js';
@@ -97,6 +100,12 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
   const write = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
   try {
     await chat(req.user, text, typeof req.body.conversationId === 'string' ? req.body.conversationId : null, write, { files, auto });
+    // conversar com um amigo da Rede conta como contato no mundo vivo
+    if (!auto && typeof req.body.conversationId === 'string') {
+      const conv = getConversation(req.user.id, req.body.conversationId);
+      const bot = conv?.botId ? db().bots.find((b) => b.id === conv.botId) : null;
+      if (bot) onUserChat(req.user, bot);
+    }
     write({ type: 'done' });
   } catch (err) {
     console.error('[assistente]', err);
@@ -169,6 +178,7 @@ app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
 app.use('/api', requireAuth, connect);
 app.use('/api', requireAuth, social);
+app.use('/api', requireAuth, worldRoutes);
 app.use('/api', requireAuth, dev);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
@@ -201,10 +211,11 @@ function listen(attempt = 0) {
 listen();
 startScheduler();
 startTelegram();
-startSocial();
+startWorld();
 
 function shutdown() {
   saveNow();
+  try { flushWorld(); } catch (err) { console.error(err); }
   saveLibraryNow();
   fs.rmSync(TOKEN_FILE, { force: true });
   server.close();
@@ -215,6 +226,7 @@ function shutdown() {
 const doRestart = () => {
   saveNow();
   saveLibraryNow();
+  try { flushWorld(); } catch (err) { console.error(err); }
   server.close();
   const env = { ...process.env, CODENIAC_RESTARTED: '1' };
   delete env.HOST; // o novo processo relê o .env (acesso pela rede pode ter mudado)

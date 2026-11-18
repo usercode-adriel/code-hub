@@ -6,6 +6,7 @@ import path from 'node:path';
 import { saveLibraryNow, replaceLibrary, LIBRARY_DB, LIBRARY_DIR } from './library.js';
 import { db, saveNow, replaceState, DB_FILE, UPLOAD_DIR, DATA_DIR, localDate, now, save } from './db.js';
 import { systemConfig } from './seed.js';
+import { flushWorld, replaceWorld, WORLD_FILE } from './world/store.js';
 
 export function defaultBackupDir() {
   const oneDrive = process.env.OneDrive || process.env.OneDriveConsumer;
@@ -36,6 +37,9 @@ export function runBackup(reason = 'automático') {
     fs.copyFileSync(DB_FILE, path.join(target, 'db.json'));
     saveLibraryNow();
     if (fs.existsSync(LIBRARY_DB)) fs.copyFileSync(LIBRARY_DB, path.join(target, 'library.json'));
+    // o mundo vivo (System 2.0) tem arquivo próprio
+    flushWorld();
+    if (fs.existsSync(WORLD_FILE)) fs.copyFileSync(WORLD_FILE, path.join(target, 'world.json'));
     // livros digitais: pasta compartilhada entre os backups, copia só os arquivos novos
     const libDir = path.join(dir, 'library');
     fs.mkdirSync(libDir, { recursive: true });
@@ -89,6 +93,8 @@ export function restoreBackup(name) {
   const next = JSON.parse(fs.readFileSync(file, 'utf8'));
   const keepSecret = db().meta?.jwtSecret;
   replaceState({ ...next, meta: { ...(next.meta || {}), jwtSecret: next.meta?.jwtSecret || keepSecret } });
+  const worldFile = path.join(dir, name, 'world.json');
+  if (fs.existsSync(worldFile)) replaceWorld(JSON.parse(fs.readFileSync(worldFile, 'utf8')));
   const libFile = path.join(dir, name, 'library.json');
   if (fs.existsSync(libFile)) replaceLibrary(JSON.parse(fs.readFileSync(libFile, 'utf8')));
   const libDir = path.join(dir, 'library');

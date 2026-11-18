@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { on, store } from '../store.js';
 import { icon } from '../icons.js';
 import { esc, timeAgo, toast, modal, confirmDialog, initials } from '../ui.js';
+import { shell } from '../world/wui.js';
 
 const TABS = [['para-voce', 'Para você', 'sparkles'], ['amigos', 'Amigos', 'heart'], ['fotos', 'Fotos', 'image'], ['meus', 'Meus posts', 'user'], ['pessoas', 'Pessoas', 'users']];
 const PACE_LABEL = { calma: 'Calma', normal: 'Normal', agitada: 'Agitada' };
@@ -28,7 +29,8 @@ export default async function render(el, parts = [], query = new URLSearchParams
   let peopleFilter = 'todos';
   let search = query.get('q') || '';
 
-  el.innerHTML = `<div class="rd">
+  const host = shell(el, 'social');
+  host.innerHTML = `<div class="rd">
     <aside class="rd-left">
       <div class="rd-brand">${icon('globe', 22)}<b>Rede</b></div>
       <nav class="rd-tabs" id="rdTabs">${TABS.map(([k, l, ic]) => `<button data-tab="${k}">${icon(ic, 17)}<span>${l}</span></button>`).join('')}</nav>
@@ -100,7 +102,9 @@ export default async function render(el, parts = [], query = new URLSearchParams
         ${p.image ? `<img class="rd-img" src="${esc(p.image)}" alt="" loading="lazy" data-zoom>` : p.imagePending ? `<div class="rd-img pending">${icon('camera', 22)}<small>revelando a foto...</small></div>` : ''}
         <div class="rd-acts"><button data-cm>${icon('chat', 15)}<span>${p.commentCount ? n(p.commentCount) : ''}</span></button>
           <button data-like class="${p.liked ? 'on' : ''}">${icon('heart', 15)}<span>${n(p.likes)}</span></button>
-          ${!p.me && a && !a.friend ? `<button data-add="${esc(a.id)}" title="Adicionar amizade">${icon('plus', 15)}<span>Adicionar</span></button>` : !p.me ? `<button data-chat="${esc(a.id)}" title="Conversar">${icon('send', 14)}<span>Conversar</span></button>` : ''}</div>
+          ${!p.me && a && !a.friend ? `<button data-add="${esc(a.id)}" title="Adicionar amizade">${icon('plus', 15)}<span>Adicionar</span></button>` : !p.me ? `<button data-chat="${esc(a.id)}" title="Conversar">${icon('send', 14)}<span>Conversar</span></button>` : ''}
+          ${p.rumorId ? `<button data-investigate="${esc(p.rumorId)}" title="Descobrir quem espalhou e se é verdade">${icon('search', 14)}<span>Investigar</span></button>` : ''}
+          ${(p.refs || []).filter((r) => r.t === 'article').map((r) => `<a href="#/internet/artigo/${esc(r.id)}" title="Abrir a matéria">${icon('news', 14)}<span>Matéria</span></a>`).join('')}</div>
         <div class="rd-comments" hidden></div></div></article>`;
   };
   const commentHtml = (c) => `<div class="rd-cm" data-cid="${esc(c.id)}">${c.me ? meFace(user, 28) : `<button class="rd-av" data-person="${esc(c.author?.id)}">${face(c.author, 28)}</button>`}
@@ -139,6 +143,10 @@ export default async function render(el, parts = [], query = new URLSearchParams
       await api.del(`/rede/posts/${p.id}`); art.remove(); posts = posts.filter((x) => x.id !== p.id);
     });
     art.querySelector('[data-add]')?.addEventListener('click', (e) => befriend(e.currentTarget.dataset.add));
+    art.querySelector('[data-investigate]')?.addEventListener('click', async (e) => {
+      try { await api.post(`/mundo/rumores/${e.currentTarget.dataset.investigate}/investigar`); toast('Investigação iniciada 🔎', 'A cada 5 minutos você descobre mais uma pessoa da cadeia.', 'success'); }
+      catch (err) { toast('Investigação', err.message, 'info'); }
+    });
     art.querySelector('[data-chat]')?.addEventListener('click', (e) => openChat(e.currentTarget.dataset.chat));
     art.querySelector('[data-zoom]')?.addEventListener('click', () => modal({ title: 'Foto', wide: true, body: `<img src="${esc(p.image)}" alt="" style="width:100%;border-radius:12px">` }));
   };
@@ -194,7 +202,7 @@ export default async function render(el, parts = [], query = new URLSearchParams
   };
   const paintSide = () => {
     if (!feed) return;
-    el.querySelector('#rdOnline').innerHTML = `<i class="rd-live"></i> ${n(feed.online)} pessoas online no mundo · ${feed.people} perfis na sua rede${feed.ai ? '' : ' · modo sem IA'}`;
+    el.querySelector('#rdOnline').innerHTML = `<i class="rd-live"></i> ${n(feed.online)} pessoas acordadas agora · ${feed.people} perfis na sua rede${feed.ai ? '' : ' · modo sem IA'}`;
     el.querySelector('#rdTrends').innerHTML = feed.trends.map((t, i) => `<button class="rd-trend" data-tag="${esc(t.tag)}"><small class="muted">${i + 1} · Em alta</small><b>${esc(t.tag)}</b><small class="muted">${n(t.posts)} posts</small></button>`).join('') || '<div class="muted rd-pad">Ainda sem assuntos em alta.</div>';
     el.querySelector('#rdSugg').innerHTML = feed.suggestions.map((p) => `<div class="rd-sugg" data-person="${esc(p.id)}" role="button" tabindex="0">${face(p, 38)}<div class="grow"><b>${esc(p.name)}${badge(p)}</b><small class="muted">${p.isNew ? 'acabou de chegar · ' : ''}${esc(p.city || '')}</small></div><button class="btn sm primary" data-add="${esc(p.id)}">Adicionar</button></div>`).join('');
     bindPeople(el.querySelector('#rdSugg'));

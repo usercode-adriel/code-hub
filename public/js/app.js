@@ -12,7 +12,7 @@ if (!auth.token) location.replace('/login');
 
 // Menu: chave da rota, rótulo, ícone
 export const NAV = [
-  ['Principal', [['dashboard', 'Início', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['rede', 'Rede', 'globe'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
+  ['Principal', [['centro', 'System 2.0', 'globe'], ['dashboard', 'Meu hub', 'dashboard'], ['assistente', 'Assistente', 'bot'], ['rede', 'Rede', 'users'], ['tasks', 'Minhas tarefas', 'tasks'], ['financeiro', 'Financeiro', 'wallet'], ['estudos', 'Estudos', 'school'], ['livros', 'Livros', 'book']]],
   ['Sistema', [['automacoes', 'Automações', 'zap'], ['notifications', 'Notificações', 'bell'], ['achievements', 'Conquistas', 'trophy'], ['settings', 'Configurações', 'settings']]],
 ];
 export const NAV_KEYS = NAV.flatMap(([, items]) => items.map(([k, l]) => [k, l]));
@@ -26,10 +26,13 @@ const VIEWS = {
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
   livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
   rede: () => import('./views/rede.js'), busca: () => import('./views/busca.js'),
+  centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
+  midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
+  controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
 };
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { mapa: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';
@@ -72,9 +75,9 @@ function renderRightRail() {
 function renderBottomNav() {
   const cur = NAV_OF[currentRoute()] || currentRoute();
   const b = (k, l, ic) => `<a class="bn-btn ${cur === k ? 'on' : ''}" href="#/${k}">${icon(ic, 20)}<span>${esc(navLabel(k, l))}</span></a>`;
-  $('#bottomNav').innerHTML = `<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>${b('dashboard', 'Início', 'dashboard')}
+  $('#bottomNav').innerHTML = `<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>${b('dashboard', 'Hub', 'dashboard')}
     <button class="bn-main" id="bnAdd" aria-label="Captura rápida">${icon('plus', 24)}</button>
-    ${b('financeiro', 'Finanças', 'wallet')}<a class="bn-btn ${cur === 'assistente' ? 'on' : ''}" href="#/assistente" style="position:relative">${icon('chat', 20)}<span>Chat</span>${store.chatUnread ? '<i class="rail-dot" style="top:4px;right:14px"></i>' : ''}</a>`;
+    ${b('centro', 'Cidade', 'globe')}<a class="bn-btn ${cur === 'assistente' ? 'on' : ''}" href="#/assistente" style="position:relative">${icon('chat', 20)}<span>Chat</span>${store.chatUnread ? '<i class="rail-dot" style="top:4px;right:14px"></i>' : ''}</a>`;
   $('#bnAdd').onclick = () => openCapture();
   $('#bnMenu').onclick = () => openSheet();
 }
@@ -197,6 +200,28 @@ function beep() {
   } catch { /* sem áudio */ }
 }
 
+// Ligação de um amigo da Rede: toca, e quem atende cai direto no modo ligação do chat.
+function incomingCall(call) {
+  document.querySelector('.w-call')?.remove();
+  const p = call.persona;
+  const box = document.createElement('div');
+  box.className = 'w-call';
+  box.innerHTML = `<div class="w-call-av">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : `<span style="background:${esc(p.color || '#7c3aed')}">${esc((p.name || '?')[0])}</span>`}</div>
+    <div><b>${esc(p.name)}</b><small>está ligando para você…</small></div>
+    <button class="w-call-btn no" aria-label="Recusar">${icon('x', 18)}</button><button class="w-call-btn yes" aria-label="Atender">${icon('mic', 18)}</button>`;
+  document.body.append(box);
+  try { if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]); } catch { /* sem vibração */ }
+  const ring = setInterval(() => { if (store.settings.notifySound !== false) beep(); }, 1800);
+  const done = async (accept) => {
+    clearInterval(ring); box.remove();
+    try { await api.post(`/mundo/ligacoes/${call.id}`, { atender: accept }); } catch { /* ligação expirou */ }
+    if (accept && call.conversationId) { localStorage.setItem('codeniac.conv', call.conversationId); localStorage.setItem('codeniac.autocall', call.conversationId); location.hash = '#/assistente'; }
+  };
+  box.querySelector('.yes').onclick = () => done(true);
+  box.querySelector('.no').onclick = () => done(false);
+  setTimeout(() => { if (document.body.contains(box)) { clearInterval(ring); box.remove(); } }, 65000);
+}
+
 function connectStream() {
   const es = new EventSource(`/api/notifications/stream?token=${encodeURIComponent(auth.token)}`);
   es.addEventListener('notification', (e) => {
@@ -208,6 +233,7 @@ function connectStream() {
   });
   es.addEventListener('event', (e) => emit('event', JSON.parse(e.data)));
   es.addEventListener('social', (e) => emit('social', JSON.parse(e.data)));
+  es.addEventListener('world', (e) => { const ev = JSON.parse(e.data); emit('world', ev); if (ev.type === 'call') incomingCall(ev.call); });
   es.addEventListener('chat', (e) => {
     const ev = JSON.parse(e.data);
     emit('chat', ev);
@@ -425,7 +451,8 @@ async function route() {
   const raw = location.hash.slice(2);
   const [path, query = ''] = raw.split('?');
   const parts = path.split('/').filter(Boolean);
-  let name = parts[0] || store.settings.homePage || 'dashboard';
+  // a 2.0 abre na cidade (Command Center); quem escolheu "Hoje" continua abrindo nele
+  let name = parts[0] || (store.settings.homePage === 'hoje' ? 'hoje' : 'centro');
   if (!VIEWS[name]) name = 'dashboard';
   if (name === 'estudos' && parts[1] === 'livros') { location.replace('#/livros'); return; }
   if (parts[0] === 'capturar') { location.replace('#/dashboard'); setTimeout(() => openCapture(), 300); return; }

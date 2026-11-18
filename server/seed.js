@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -65,6 +65,13 @@ export const CHANGELOG = [
       + 'comentam, curtem e reagem aos seus posts em tempo real, e continuam vivendo mesmo com a tela fechada. Novas pessoas surgem o tempo todo: adicione quem quiser e a pessoa '
       + 'vem para o chat como amiga, lembrando da própria vida e puxando assunto sozinha. Personagens agora nascem na Rede (não são mais criados à mão). '
       + 'No Início, uma busca estilo Google em que a IA cria na hora sites próprios com a resposta.',
+  },
+  {
+    version: '2.1.0',
+    title: 'System 2.0: Codeniac Society, o mundo vivo 🌆',
+    message: 'O hub virou uma cidade que vive sozinha, mesmo com a tela fechada. As pessoas têm rotina, emprego, dinheiro, amizades, namoros, rivalidades e fofocas; '
+      + 'empresas lucram, contratam, lançam produtos e quebram; há bolsa, banco com empréstimos, imóveis, eleições, leis com efeito real, notícias escritas por jornalistas da cidade, '
+      + 'TV, rádio, cinema, comunidades, uma internet própria, mapa, arquivo histórico e relatório do que aconteceu enquanto você estava fora. Abra pelo globo no menu.',
   },
 ];
 

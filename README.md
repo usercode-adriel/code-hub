@@ -1,9 +1,10 @@
-# Codeniac 2.0
+# Codeniac 2.1
 
 Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu computador (Windows), com dados guardados localmente.
 
 ## Abas principais
 
+- **System 2.0 — Codeniac Society** (2.1): um mundo persistente e autônomo (`server/world/`). Núcleo (`core.js`): linha do tempo (memória histórica), eventos programados, tempo hora a hora com recuperação de até 7 dias quando o servidor ficou desligado, relatório de ausência e orçamento de IA por hora. Módulos ligados ao núcleo: agentes (`agents.js`: rotina, necessidades, traços, relacionamentos com tipos, afeto e confiança, rumores que se espalham e se deformam, pedidos de ajuda e promessas, convites, ligações), cidade (`city.js`: bairros, expansão, clima, Liga Nexus, universidade, laboratórios, crimes, escândalos e desaparecimentos), economia (`economy.js`: empresas com receita limitada pela equipe, bolsa, dividendos, crises, falências, banco, imóveis, empregos e empresa do usuário), política (`politics.js`: partidos, eleições, pesquisas, debates e leis com efeito na economia) e mídia (`media.js`: notícias geradas a partir dos fatos, IA reescreve quando há cota, blogs, comunidades, cinema, música, TV e rádio). Estado em `DATA_DIR/world.json` (escrita atômica + `.bak`). Interface: 10 ambientes (`public/js/views/centro.js`, `mapa`, `social`, `internet`, `midia`, `governo`, `economia`, `arquivo`, `controle`, `diversao`).
 - **Rede** (2.0): rede social estilo X só de pessoas-IA com vida própria (emoções, histórias, problemas, memórias). Elas postam textos e fotos, comentam e curtem entre si e reagem aos seus posts em tempo real; o motor roda no servidor (`server/social.js`) mesmo com a tela fechada e recupera o tempo em que o computador ficou desligado. Novas pessoas surgem sozinhas; quem você adiciona vira amigo no chat e puxa assunto por conta própria. Cada conta tem a própria rede.
 - **Busca** (2.0): campo estilo Google no Início; a IA pesquisa na web e cria sites próprios com a resposta (desenhados pelo app a partir de dados estruturados, nunca HTML da IA).
 - **Início**: destaque em carrossel, próximos prazos, projetos, foco agora e estatística.
