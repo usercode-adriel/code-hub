@@ -53,15 +53,12 @@ export const PRODUCTS = {
   'mapa-inteligente': { name: 'Mapa Inteligente', cat: 'tecnologia', base: 950, type: 'software', desc: 'Mostra no mapa onde cada pessoa está agora, imóveis e filtros avançados.', actions: ['instalar', 'vender', 'descartar'], stock: [3, 8] },
   memoria: { name: 'Expansão de memória (+40 lembranças)', cat: 'tecnologia', base: 600, type: 'upgrade', desc: 'Seus amigos de IA guardam mais 40 lembranças cada (até 160) e recuperam memórias antigas. Custo real: o arquivo do mundo cresce.', actions: ['instalar', 'descartar'], stock: [3, 10] },
   smartphone: { name: 'Smartphone Neon X', cat: 'tecnologia', base: 1200, type: 'gadget', desc: 'Permite ligar para os seus amigos (modo ligação por voz).', actions: ['ativar', 'transferir', 'vender', 'descartar'], stock: [2, 8] },
-  fone: { name: 'Fone Pulse sem fio', cat: 'tecnologia', base: 180, type: 'bem', desc: 'Áudio cristalino. Dá de presente ou revende.', actions: ['transferir', 'vender', 'descartar'], stock: [5, 20] },
   'clube-vip': { name: 'Assinatura Clube Aurora VIP (30 dias)', cat: 'social', base: 900, type: 'assinatura', desc: 'Festas e eventos exclusivos, networking com gente influente e comunidade privada.', actions: ['ativar'], stock: [5, 30] },
   campanha: { name: 'Campanha publicitária (3 dias)', cat: 'social', base: 700, type: 'servico', desc: 'Divulga sua empresa (mais clientes e reputação) ou seu perfil (mais fama), com anúncios nos sites e na Rede.', actions: ['usar'], stock: [5, 20], target: 'campanha' },
   estudio: { name: 'Sessão no Estúdio Prisma', cat: 'social', base: 400, type: 'servico', desc: 'Grave um podcast ou uma música: ela toca na Neon FM e aumenta sua fama.', actions: ['usar'], stock: [3, 12] },
   camera: { name: 'Câmera profissional Lumen', cat: 'social', base: 1500, type: 'gadget', desc: 'Seus posts na Rede ganham fotos geradas e rendem mais fama.', actions: ['ativar', 'transferir', 'vender', 'descartar'], stock: [1, 5] },
   'kit-empreendedor': { name: 'Kit do Empreendedor', cat: 'social', base: 1200, type: 'upgrade', desc: 'Abrir empresa fica 40% mais barato e libera contratação direta e promoção relâmpago.', actions: ['ativar'], stock: [2, 8] },
   cafe: { name: 'Café especial', cat: 'geral', base: 12, type: 'consumivel', desc: 'Um bom café. Pode oferecer a alguém.', actions: ['usar', 'transferir'], stock: [20, 60] },
-  flores: { name: 'Buquê de flores', cat: 'geral', base: 60, type: 'presente', desc: 'Presente que faz o dia de qualquer um.', actions: ['transferir'], stock: [5, 20] },
-  ferramentas: { name: 'Kit de ferramentas', cat: 'geral', base: 250, type: 'bem', desc: 'Ferramentas de qualidade.', actions: ['transferir', 'vender', 'descartar'], stock: [3, 10] },
 };
 const SELLER_STYLES = {
   insistente: { flex: 0.12, patience: 4, label: 'Insistente' }, simpatico: { flex: 0.08, patience: 4, label: 'Simpático' }, desconfiado: { flex: 0.03, patience: 2, label: 'Desconfiado' },
@@ -82,15 +79,15 @@ const shops = (w) => places(w).filter((p) => p.catalog);
 
 // ---------------------------------------------------------------- criação das lojas (mundos novos e antigos)
 const STORES = [
-  { name: 'TechVision Store', kind: 'loja-tec', company: 'TechVision', district: 'tech', items: ['central-comando', 'mapa-inteligente', 'memoria', 'smartphone', 'fone'] },
-  { name: 'NovaTech Shop', kind: 'loja-tec', company: 'NovaTech', district: 'centro', items: ['smartphone', 'mapa-inteligente', 'memoria', 'fone'] },
+  { name: 'TechVision Store', kind: 'loja-tec', company: 'TechVision', district: 'tech', items: ['central-comando', 'mapa-inteligente', 'memoria', 'smartphone'] },
+  { name: 'NovaTech Shop', kind: 'loja-tec', company: 'NovaTech', district: 'centro', items: ['smartphone', 'mapa-inteligente', 'memoria'] },
   { name: 'Clube Aurora VIP', kind: 'clube', company: 'Clube Aurora', sector: 'entretenimento', district: 'jardins', items: ['clube-vip'] },
   { name: 'Agência Pulso', kind: 'publicidade', company: 'Agência Pulso', district: 'centro', items: ['campanha'] },
   { name: 'Estúdio Prisma', kind: 'loja-social', company: 'Estúdio Prisma', sector: 'entretenimento', district: 'porto', items: ['estudio', 'camera'] },
   { name: 'Empreenda+', kind: 'loja-social', company: 'Empreenda+', sector: 'publicidade', district: 'mercado', items: ['kit-empreendedor'] },
-  { name: 'Vitrine Digital Shopping', kind: 'shopping', company: 'Vitrine Digital', district: 'centro', items: ['fone', 'flores', 'cafe', 'smartphone'] },
-  { name: 'Mercado Central', kind: 'mercado', company: 'Sabor da Vila', district: 'mercado', items: ['cafe', 'flores'] },
-  { name: 'Oficina Turbo', kind: 'oficina', company: 'Oficina Turbo', sector: 'construcao', district: 'vila', items: ['ferramentas'] },
+  { name: 'Vitrine Digital Shopping', kind: 'shopping', company: 'Vitrine Digital', district: 'centro', items: ['cafe', 'smartphone', 'clube-vip', 'camera'] },
+  { name: 'Mercado Central', kind: 'mercado', company: 'Sabor da Vila', district: 'mercado', items: ['cafe'] },
+  { name: 'Oficina Turbo', kind: 'oficina', company: 'Oficina Turbo', sector: 'construcao', district: 'vila' },
   { name: 'Banco Nexus — Agência Central', kind: 'banco', company: 'Banco Nexus', district: 'centro' },
   { name: 'Imobiliária Horizonte', kind: 'imobiliaria', company: 'Construtora Horizonte', district: 'jardins' },
   { name: 'Empregos BR — Agência', kind: 'empregos', company: 'Empregos BR', district: 'mercado' },
@@ -123,6 +120,12 @@ function assignSeller(w, pl, c) {
   pl.sellerId = s.id;
   return s;
 }
+// remove itens decorativos antigos (fone/flores/ferramentas) dos catálogos de mundos já existentes
+onUpgrade(10, (ctx) => {
+  const w = ctx.w;
+  for (const pl of (w.city?.places || [])) if (pl.catalog) pl.catalog = pl.catalog.filter((it) => PRODUCTS[it.key]);
+  for (const u of [account(w)]) if (u.inventory) u.inventory = u.inventory.filter((it) => PRODUCTS[it.key]);
+});
 onUpgrade(4, (ctx) => {
   const w = ctx.w;
   if (!w.city) return;
@@ -213,7 +216,7 @@ onEvent((ctx, e) => {
   const c = companyById(ctx.w, e.refs.find((r) => r.t === 'company')?.id);
   if (!c || places(ctx.w).some((p) => p.companyId === c.id)) return;
   const node = freeNode(ctx.w, c.districtId || 'centro'); const [x, y] = pos(ctx.w, node);
-  const items = { tecnologia: ['fone', 'smartphone'], varejo: ['fone', 'flores'], alimentacao: ['cafe'], entretenimento: ['estudio'], construcao: ['ferramentas'] }[c.sector];
+  const items = { tecnologia: ['smartphone'], varejo: ['cafe'], alimentacao: ['cafe'], entretenimento: ['estudio'] }[c.sector];
   const pl = { id: uid(), name: items ? c.name : `${c.name} — escritório`, kind: items ? ({ tecnologia: 'loja-tec', varejo: 'shopping', alimentacao: 'restaurante', entretenimento: 'loja-social', construcao: 'oficina' }[c.sector]) : 'empresa', districtId: districtOfNode(ctx.w, node), node, x, y, address: address(ctx.w, node), hours: [9, 20], companyId: c.id, status: 'aberto', security: 0.35, reputation: 3.5, ratings: [], banned: [], ledger: [], createdAt: ctx.at.toISOString(), origin: 'vivo' };
   if (items) pl.catalog = makeCatalog(items, c.sector, 0.95);
   ctx.w.city.places.push(pl);

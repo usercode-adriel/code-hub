@@ -3,7 +3,7 @@
 import { api, auth, coll, streamChat } from '../api.js';
 import { store, emit, on } from '../store.js';
 import { icon } from '../icons.js';
-import { esc, chatMd, toast, confirmDialog, timeAgo, modal, validateImage, pickImage } from '../ui.js';
+import { esc, chatMd, toast, confirmDialog, timeAgo, modal, formModal, validateImage, pickImage } from '../ui.js';
 import { TOOL_LABEL, PERSONA, botAvatar, bindDictation, MODE_LABEL } from '../chatui.js';
 
 const STARTERS = [['☀️', 'Como está meu dia hoje?'], ['💸', 'Gastei 50 de gasolina'], ['📚', 'Me ajuda a montar um plano de estudo de inglês'], ['📎', 'Envie uma foto ou PDF e me pergunte sobre ele']];
@@ -203,6 +203,33 @@ export default async function render(el) {
   const input = el.querySelector('#input');
   const setOpen = (open) => { tg.classList.toggle('show-chat', open); document.body.classList.toggle('chat-full', open && isMobile()); };
 
+  // dinheiro pelo chat: enviar NXC (com senha) ou pedir emprestado — igual a mandar um Pix na conversa
+  const injectBubble = (text, out = false) => { const box = el.querySelector('#msgs'); if (box) { box.insertAdjacentHTML('beforeend', `<div class="tg-msg ${out ? 'out' : 'in'}">${out ? '' : faceOf(peer(), 30)}<div class="tg-bubble"><div class="tg-text">${esc(text)}</div></div></div>`); box.scrollTop = box.scrollHeight; } };
+  async function moneyAction(b, mode) {
+    const pid = b.personaId; const nm = (b.name || '').split(' ')[0];
+    if (mode === 'pay') {
+      return formModal({ title: `Enviar NXC para ${nm}`, submit: 'Enviar', fields: [{ name: 'valor', label: 'Valor (NXC)', type: 'number', value: 100 }, { name: 'motivo', label: 'Mensagem (opcional)', full: true }],
+        onSubmit: async (d) => {
+          const { askPin } = await import('../world/wui.js');
+          const pin = await askPin('Confirme com a senha'); if (!pin) return;
+          try { const r = await api.post('/mundo/banco/transferir', { personaId: pid, valor: Number(d.valor), motivo: d.motivo, pin }); injectBubble(`💸 Você enviou ${Number(d.valor).toLocaleString('pt-BR')} NXC${d.motivo ? ` — ${d.motivo}` : ''}`, true); toast('Transferência feita', `Saldo: ${r.balance.toLocaleString('pt-BR')} NXC`, 'success'); }
+          catch (err) { toast('Não deu', err.message, 'error'); }
+        } });
+    }
+    return formModal({ title: `Pedir emprestado a ${nm}`, submit: 'Pedir', fields: [{ name: 'valor', label: 'Quanto (NXC)', type: 'number', value: 200 }, { name: 'dias', label: 'Devolvo em (dias)', type: 'number', value: 7 }],
+      onSubmit: async (d) => {
+        try {
+          const r = await api.post('/mundo/amigos/emprestimo', { personaId: pid, valor: Number(d.valor), dias: Number(d.dias) });
+          injectBubble(`Oi ${nm}, consegue me emprestar ${Number(d.valor).toLocaleString('pt-BR')} NXC? Devolvo em ${d.dias} dias.`, true);
+          injectBubble(r.text || '…');
+          if (['aceito', 'parcial', 'condicoes'].includes(r.decision)) {
+            if (await confirmDialog(nm, `Aceitar ${r.offer.toLocaleString('pt-BR')} NXC (devolver em ${r.dueDays} dias${r.interest ? `, com ${Math.round(r.interest * 100)}% a mais` : ''})?`, 'Aceitar')) {
+              await api.post(`/mundo/amigos/emprestimo/${r.id}/aceitar`); injectBubble(`✅ ${nm} te emprestou ${r.offer.toLocaleString('pt-BR')} NXC.`); toast('Dinheiro recebido', '', 'success');
+            }
+          }
+        } catch (err) { toast('Não deu', err.message, 'error'); }
+      } });
+  }
   const paintHead = () => {
     const c = convOf(current);
     const peerEl = el.querySelector('#peer');
@@ -215,7 +242,10 @@ export default async function render(el) {
       const b = peer();
       const p = PERSONA[b?.personality || store.settings.assistantPersonality] || PERSONA.amigavel;
       peerEl.innerHTML = `${faceOf(b, 40)}<div><b>${esc(b?.name || name)} <span class="chip tg-persona">${p.emoji} ${p.label}</span></b><small id="status">${b ? (b.proactive ? 'manda mensagens sozinho' : 'personagem') : 'online'} · ${MODE_LABEL[store.aiMode] || 'sem IA'}</small></div>`;
-      acts.innerHTML = `<button class="icon-btn sm ghost" id="callBtn" title="Modo ligação: converse por voz">${icon('mic', 15)}</button>${c ? `<button class="icon-btn sm ghost tg-hide-sm" id="ren" title="Renomear">${icon('edit', 15)}</button>` : ''}<button class="icon-btn sm ghost" id="pEdit" title="${b ? 'Editar personagem' : 'Personalidade'}">${icon('settings', 15)}</button>${c ? `<button class="icon-btn sm ghost" id="del" title="Apagar">${icon('trash', 15)}</button>` : ''}`;
+      const money = b?.personaId ? `<button class="icon-btn sm ghost" id="payBtn" title="Enviar NXC">${icon('wallet', 15)}</button><button class="icon-btn sm ghost" id="loanBtn" title="Pedir emprestado">${icon('trending', 15)}</button>` : '';
+      acts.innerHTML = `${money}<button class="icon-btn sm ghost" id="callBtn" title="Modo ligação: converse por voz">${icon('mic', 15)}</button>${c ? `<button class="icon-btn sm ghost tg-hide-sm" id="ren" title="Renomear">${icon('edit', 15)}</button>` : ''}<button class="icon-btn sm ghost" id="pEdit" title="${b ? 'Editar personagem' : 'Personalidade'}">${icon('settings', 15)}</button>${c ? `<button class="icon-btn sm ghost" id="del" title="Apagar">${icon('trash', 15)}</button>` : ''}`;
+      acts.querySelector('#payBtn')?.addEventListener('click', () => moneyAction(b, 'pay'));
+      acts.querySelector('#loanBtn')?.addEventListener('click', () => moneyAction(b, 'loan'));
     }
     acts.querySelector('#talk')?.addEventListener('click', () => send('', { auto: true }));
     acts.querySelector('#callBtn')?.addEventListener('click', () => (call.on ? stopCall() : startCall()));
