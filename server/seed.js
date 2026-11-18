@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '2.2.0';
+export const APP_VERSION = '2.3.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -72,6 +72,14 @@ export const CHANGELOG = [
     message: 'O hub virou uma cidade que vive sozinha, mesmo com a tela fechada. As pessoas têm rotina, emprego, dinheiro, amizades, namoros, rivalidades e fofocas; '
       + 'empresas lucram, contratam, lançam produtos e quebram; há bolsa, banco com empréstimos, imóveis, eleições, leis com efeito real, notícias escritas por jornalistas da cidade, '
       + 'TV, rádio, cinema, comunidades, uma internet própria, mapa, arquivo histórico e relatório do que aconteceu enquanto você estava fora. Abra pelo globo no menu.',
+  },
+  {
+    version: '2.3.0',
+    title: 'Você é um cidadão de Nexus City 🌆',
+    message: 'Agora você entra como cidadão comum e anônimo: ninguém na cidade te conhece de início. A polícia e a justiça viram sigilosas — você acompanha só o que é noticiado e os seus próprios casos. '
+      + 'A Universidade tem cursos de 3 dias com mini apostilas e palestras: Direito habilita polícia ou ministério, Administração abre empresa, Economia libera a Bolsa, Administração + Economia liberam um banco próprio, '
+      + 'e Segurança da Informação forma a perícia cibernética. O governo passa a ser Governador e Ministros, autônomos, sem a sua interferência. '
+      + 'O Início ganhou visual neon futurista, com capa trocável nas Configurações, e cada aba do menu mostra um marcador. O Mapa saiu do menu e ficou com ícones maiores, estilo jogo.',
   },
   {
     version: '2.2.0',

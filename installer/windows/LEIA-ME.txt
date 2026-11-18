@@ -1,4 +1,4 @@
-CODENIAC 2.2 — seu hub pessoal
+CODENIAC 2.3 — seu hub pessoal
 ==============================
 
 COMO ABRIR
@@ -11,7 +11,18 @@ PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
 
-O QUE HÁ DE NOVO NA 2.2 — CODENIAC DIGITAL SOCIETY (NEXUS CITY)
+O QUE HÁ DE NOVO NA 2.3 — VOCÊ É UM CIDADÃO DE NEXUS CITY
+- Você entra como cidadão comum e anônimo: ninguém na cidade te conhece de início.
+- Polícia e Justiça ficam sigilosas. Você só vê o que é noticiado e os seus próprios casos.
+- Universidade com cursos de 3 dias (mini apostila por dia e, às vezes, palestras):
+  Direito -> polícia ou ministério; Administração -> abrir empresa; Economia -> investir;
+  Administração + Economia -> banco próprio; Segurança da Informação -> perícia cibernética.
+- Abrir empresa e investir na Bolsa agora exigem a profissão correspondente.
+- Governo autônomo: Governador e Ministros governam sozinhos, sem a sua interferência.
+- Início com visual neon futurista e capa trocável (Configurações > Aparência; envie PNG ou JPG).
+- Cada aba do menu mostra um marcador; o Mapa saiu do menu e ganhou ícones maiores, estilo jogo.
+
+O QUE HÁ NA 2.2 — CODENIAC DIGITAL SOCIETY (NEXUS CITY)
 - Novo início no estilo de jogo: perfil com saldo, reputação, popularidade, influência,
   patrimônio e nível; Nexus City ao centro com clima e relógio; eventos, redes sociais,
   economia, notícias e aplicativos.
