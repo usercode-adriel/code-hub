@@ -503,3 +503,22 @@ body.world-mode .content { padding: 0 !important; height: calc(var(--vvh, 100dvh
 .mk-wc-acts { display: flex; gap: 8px; justify-content: center; } .mk-wc-acts .btn { min-width: 120px; }
 .mk-wc-hint { display: block; }
 @media (max-width: 1000px) { .mk-wheel { width: min(84vw, 360px); height: min(84vw, 360px); } .mk-token { width: 52px; height: 52px; } }
+
+/* ============================================================
+   INÍCIO no estilo dashboard roxo de referência (2.4)
+   ============================================================ */
+.wg .dx { gap: 16px; }
+.wg .dx-hero { min-height: 430px; border-radius: 22px; border: 1px solid rgba(168,120,255,.35); background: #0c0820; box-shadow: 0 30px 80px -30px rgba(124,58,237,.7), inset 0 0 0 1px rgba(255,255,255,.03); }
+.wg .dx-hero-ov { background: linear-gradient(180deg, rgba(10,6,28,.55) 0%, transparent 32%, transparent 48%, rgba(10,6,28,.88) 100%); }
+.wg .dx-title h1 { font-size: clamp(34px, 5vw, 60px); background: linear-gradient(90deg, #ffffff 0%, #d8b4fe 45%, #22d3ee 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px rgba(168,85,247,.55)); }
+.wg .dx-title small { color: var(--acc-3); }
+.wg .dx-wx, .wg .dx-clock { background: rgba(16,10,38,.7); border: 1px solid rgba(168,120,255,.35); box-shadow: 0 0 22px -8px rgba(168,85,247,.7); }
+.wg .dx-clock b { color: #f5f0ff; text-shadow: 0 0 14px rgba(168,85,247,.8); }
+.wg .dx-me { background: linear-gradient(170deg, rgba(40,22,86,.9), rgba(18,12,42,.9)) !important; border-color: rgba(168,120,255,.4) !important; }
+.wg .dx-stat { background: rgba(18,12,42,.75); border: 1px solid rgba(168,120,255,.16); }
+.wg .dx-stat b { color: #fff; }
+.wg .dx-quick a { background: rgba(18,12,42,.7); border-color: rgba(168,120,255,.16); }
+.wg .dx-app-grid a span { box-shadow: 0 0 20px -4px var(--c); }
+.wg .dx-ticker { background: rgba(18,12,42,.85); border: 1px solid rgba(168,120,255,.22); }
+.wg .w-ph h3 { color: #f5f0ff; background: none; -webkit-text-fill-color: #f5f0ff; }
+.wg .w-ph a { color: var(--acc-3); }
