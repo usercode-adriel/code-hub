@@ -11,7 +11,7 @@ import {
   rnd, pick, chance, clamp, uid, nowIso, MIN, HOUR, DAY, ago, str, weighted, gauss, shuffle, cap, dayKey,
 } from './util.js';
 import {
-  net, worldPost, remember, genderize, userInteractionHooks, removalGuards, personaRemovedHooks, publicPersona,
+  net, worldPost, remember, genderize, userInteractionHooks, removalGuards, personaRemovedHooks, publicPersona, befriend,
 } from '../social.js';
 import { notify, emit } from '../notify.js';
 import { db } from '../db.js';
@@ -510,6 +510,51 @@ onDaily((ctx) => {
     }
   }
 });
+
+// ---------------------------------------------------------------- contato espontâneo (as pessoas procuram VOCÊ sozinhas)
+// Cria o chat do lado da pessoa e manda a primeira mensagem, com um motivo pessoal. Não depende de nada do usuário.
+function coldReachOut(ctx, p, reason) {
+  const w = ctx.w;
+  if (p.botId || !p.botId && (net(ctx.uid).personas || []).filter((x) => x.botId && x.agent?.coldReached).length >= 14) return false;
+  const bot = befriend(ctx.user, net(ctx.uid), p);
+  if (!bot) return false;
+  const a = agentOf(w, p);
+  a.coldReached = true; a.user.metAt ??= nowIso(); a.user.aff = clamp(a.user.aff + 8, -100, 100); a.user.lastContact = nowIso();
+  dm(ctx, p, genderize(p, reason), 'apresentacao');
+  record(ctx, { type: 'novo-contato', cat: 'pessoal', title: `${p.name} começou a te seguir e mandou mensagem`, actors: [p.id, 'me'], importance: 1 });
+  return true;
+}
+const firstName = (p) => p.name.split(' ')[0];
+function outreachReason(ctx, p) {
+  const a = agentOf(ctx.w, p); const you = userName(ctx);
+  const opts = [];
+  if (a.companyId) opts.push(`Oi! Sou ${firstName(p)}, trabalho na cidade com ${p.job}. Vi seu perfil e quis te conhecer. Tudo bem?`);
+  opts.push(`Oi, ${you}! Sou ${firstName(p)} 👋 novata(o) aqui em Nexus City. Ainda tô conhecendo as pessoas. Bora trocar ideia?`);
+  opts.push(`Ei! Reparei que a gente curte ${pick(p.interests || ['as mesmas coisas'])}. Sou ${firstName(p)}. Me conta, você é daqui mesmo?`);
+  opts.push(`Oii! Vi você comentando por aí e achei sua vibe boa. Sou ${firstName(p)}, prazer. Como tá seu dia?`);
+  if (p.mood?.emotion === 'animada') opts.push(`Oi! Tô num dia muito bom e resolvi fazer amizades novas 😄 sou ${firstName(p)}. Você tá de boa?`);
+  if (a.traits.sociability > 0.6) opts.push(`Opa! Eu adoro conhecer gente nova. Sou ${firstName(p)}. Qual é a sua história?`);
+  return pick(opts);
+}
+function tryOutreach(ctx, minGapMs) {
+  const w = ctx.w;
+  w.outreach ??= { lastAt: null };
+  const h = ctx.at.getHours();
+  if (h < 8 || h >= 23) return false;
+  if (w.outreach.lastAt && ago(w.outreach.lastAt) < minGapMs) return false;
+  const reached = people(w).filter((p) => p.agent?.coldReached).length;
+  const chanceOut = reached < 3 ? 1 : reached < 8 ? 0.5 : 0.2;
+  if (!chance(chanceOut)) return false;
+  const cand = shuffle(people(w).filter((p) => !p.botId && p.agent && active(p) && isAwake(p, ctx.at) && p.agent.status === 'ativo' && !p.agent.office && !p.agent.police));
+  const p = cand[0];
+  if (!p) return false;
+  if (coldReachOut(ctx, p, outreachReason(ctx, p))) { w.outreach.lastAt = nowIso(); return true; }
+  return false;
+}
+// ao vivo: as primeiras pessoas te procuram em poucos minutos
+onTick((ctx) => { if (ctx.live) tryOutreach(ctx, 90 * 1000); });
+// enquanto você esteve fora, algumas pessoas também te procuraram
+onHourly((ctx) => { tryOutreach(ctx, 2 * HOUR); });
 
 // ---------------------------------------------------------------- ligações (a cada tick, raras)
 onTick((ctx) => {
