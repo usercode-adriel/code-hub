@@ -1,4 +1,4 @@
-CODENIAC 2.1 — seu hub pessoal
+CODENIAC 2.2 — seu hub pessoal
 ==============================
 
 COMO ABRIR
@@ -11,7 +11,21 @@ PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
 
-O QUE HÁ DE NOVO NA 2.1 — SYSTEM 2.0 (CODENIAC SOCIETY)
+O QUE HÁ DE NOVO NA 2.2 — CODENIAC DIGITAL SOCIETY (NEXUS CITY)
+- Novo início no estilo de jogo: perfil com saldo, reputação, popularidade, influência,
+  patrimônio e nível; Nexus City ao centro com clima e relógio; eventos, redes sociais,
+  economia, notícias e aplicativos.
+- Mapa da cidade com ruas, avenidas, rodovias, rio e parques. Toque num lugar para ver dono,
+  equipe, horário e produtos; trace a rota e vá a pé, de ônibus ou de táxi.
+- Banco Nexus: senha de 4 dígitos (5 erros bloqueiam por 15 min), score de 0 a 1000,
+  empréstimos com contrato e parcelas, cartão virtual, cofrinhos, Pix, saque e depósito.
+  Contas novas começam em zero; quem já tinha saldo na 2.1 mantém o saldo.
+- Mercado: lojas com estoque, horário e vendedores que negociam e lembram de você. Para
+  comprar, vá até a loja. Os itens vão para o Inventário e têm efeito real.
+- Amigos podem te emprestar dinheiro (conforme a confiança), vaquinhas são fiscalizadas,
+  e a Polícia e a Justiça só punem com provas.
+
+NA 2.1 — SYSTEM 2.0 (CODENIAC SOCIETY)
 - O hub virou uma cidade que vive sozinha (botão do globo no menu). Enquanto o Codeniac estiver
   ligado, mesmo com o navegador fechado, as pessoas trabalham, gastam, fazem amizades, namoram,
   brigam, espalham boatos, fundam empresas, votam e viram notícia. Se o computador ficou desligado,
