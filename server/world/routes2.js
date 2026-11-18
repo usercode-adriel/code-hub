@@ -2,7 +2,7 @@
 import express from 'express';
 import { world, publicEvent, CATS } from './core.js';
 import { saveWorld } from './store.js';
-import { people, personById, agentOf, isAwake, isWorking, relType, REL_LABEL, userName, publicAgent } from './agents.js';
+import { people, residents, personById, agentOf, isAwake, isWorking, relType, REL_LABEL, userName, publicAgent } from './agents.js';
 import {
   account, bankOf, hasPin, setPin, verifyPin, propose, contract, payContract, renegotiate, requestCard, payCardBill, savingsOp, walletOp, creditLimit, dailyIncome, outstanding, band, bandsOf, once, debit, isLate, BankError, PERIOD_DAYS,
 } from './bank.js';
@@ -13,6 +13,7 @@ import { inv, publicItem, itemAction } from './inventory.js';
 import { justice, publicCase, testify, settleCase, payFine, report, DEFAULT_PENALTIES, penalty } from './justice.js';
 import { hasAuthority, society, professionsFor } from './society.js';
 import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } from './orgs.js';
+import { peopleView, housesPublic, housePublic, live } from './living.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
@@ -34,21 +35,6 @@ router.get('/mundo/mapa/geo', (req, res) => {
   const g = geoPublic(w);
   res.set('Cache-Control', 'private, max-age=600').json(g);
 });
-// onde cada pessoa está agora (derivado da rotina: casa, trabalho ou lazer)
-function personaWhere(w, p, at = new Date()) {
-  const a = agentOf(w, p);
-  if (!a.resident) return null;
-  if (a.status === 'preso') { const d = places(w).find((x) => x.kind === 'delegacia'); return d ? { node: d.node, place: d.name, doing: 'detida(o)' } : null; }
-  if (a.status !== 'ativo') return null;
-  a.homeNode ??= freeNode(w, a.districtId || 'centro', { used: new Set() });
-  if (!isAwake(p, at)) return { node: a.homeNode, place: 'em casa', doing: 'dormindo' };
-  if (isWorking(p, at)) { const pl = places(w).find((x) => x.companyId === a.companyId); if (pl) return { node: pl.node, place: pl.name, doing: 'trabalhando' }; }
-  const leisure = places(w).filter((x) => ['bar', 'parque', 'restaurante', 'shopping', 'turismo', 'clube'].includes(x.kind) && isOpen(x, at) && !x.hidden);
-  const h = at.getHours();
-  const idx = [...p.id].reduce((s, ch) => s + ch.charCodeAt(0), h) % (leisure.length + 2);
-  if (idx >= leisure.length) return { node: a.homeNode, place: 'em casa', doing: 'em casa' };
-  return { node: leisure[idx].node, place: leisure[idx].name, doing: 'passeando' };
-}
 router.get('/mundo/mapa/camadas', (req, res) => {
   const w = world(req.user.id); const u = account(w);
   if (!w.city?.mapSeed) return res.status(409).json({ error: 'O mapa ainda está sendo desenhado' });
@@ -67,12 +53,34 @@ router.get('/mundo/mapa/camadas', (req, res) => {
     me: u.location ? { ...u.location, xy: pos(w, u.location.node), place: placeById(w, u.location.placeId)?.name || null } : null,
     smart: Boolean(u.installed?.mapa),
   };
+  out.houses = housesPublic(w);
   if (out.smart) {
-    out.people = people(w).filter((p) => p.agent?.resident).map((p) => { const where = personaWhere(w, p, at); if (!where) return null; const [x, y] = pos(w, where.node); return { id: p.id, name: p.name, avatar: p.avatar, color: p.color, x, y, place: where.place, doing: where.doing, friend: Boolean(p.friend) }; }).filter(Boolean);
     out.properties = (w.properties || []).filter((p) => p.node != null).map((p) => ({ id: p.id, name: p.name, kind: p.kind, x: p.x, y: p.y, owner: p.ownerType, forSale: p.ownerType === 'cidade', address: p.address }));
   }
   res.json(out);
 });
+// cidadãos andando: posição agora e os próximos segundos, para o navegador animar entre uma consulta e outra
+router.get('/mundo/mapa/pessoas', (req, res) => {
+  const w = world(req.user.id);
+  if (!w.city?.mapSeed) return res.status(409).json({ error: 'O mapa ainda está sendo desenhado' });
+  const q = req.query; const num = (v) => (v === undefined || v === '' ? null : Number(v));
+  const box = [num(q.x0), num(q.y0), num(q.x1), num(q.y1)];
+  const bbox = box.every((v) => Number.isFinite(v)) ? box : null;
+  const now = Date.now(); let t = now;
+  if (Number.isFinite(Number(q.t))) t = Math.max(now - 24 * HOUR, Math.min(now + 24 * HOUR, Number(q.t))); // pré-visualização de outro horário do dia
+  const horizon = 6000;
+  const online = residents(w).filter((p) => p.agent.status === 'ativo' && isAwake(p, new Date(t))).length;
+  res.json({ t, horizon, online, people: peopleView(w, { bbox, t, horizon }) });
+});
+// feed "ao vivo": entradas e saídas, compras e o que virou notícia
+router.get('/mundo/mapa/ao-vivo', (req, res) => {
+  const w = world(req.user.id); const n = Math.min(40, Number(req.query.n) || 14);
+  const since = new Date(Date.now() - 3 * HOUR).toISOString();
+  const items = (live(w).items || []).filter((x) => x.at > since).map((x) => ({ id: x.id, at: x.at, kind: x.kind, personaId: x.personaId || null, name: x.name || null, placeId: x.placeId || null, placeName: x.placeName || null, text: x.text }));
+  const news = (w.events || []).filter((e) => e.at > since && e.type !== 'genese' && (e.cat === 'seguranca' || e.importance >= 3)).map((e) => ({ id: e.id, at: e.at, kind: e.cat === 'seguranca' ? 'alerta' : 'noticia', text: e.title }));
+  res.json([...items, ...news].sort((a, b) => b.at.localeCompare(a.at)).slice(0, n));
+});
+router.get('/mundo/mapa/casa/:id', (req, res) => { const h = housePublic(world(req.user.id), req.params.id); if (!h) return res.status(404).json({ error: 'Casa não encontrada' }); res.json(h); });
 router.get('/mundo/mapa/local/:id', (req, res) => {
   const w = world(req.user.id);
   const pl = placeById(w, req.params.id);

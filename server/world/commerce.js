@@ -38,6 +38,15 @@ export const PLACE_CATS = {
   hospital: { label: 'Hospital', icon: 'heart', color: '#f87171', hours: [0, 24] },
   turismo: { label: 'Ponto turístico', icon: 'camera', color: '#2dd4bf', hours: [0, 24] },
   clandestino: { label: 'Submundo', icon: 'eye', color: '#991b1b', hours: [21, 4] },
+  cafe: { label: 'Café', icon: 'coffee', color: '#b45309', hours: [7, 21] },
+  padaria: { label: 'Padaria', icon: 'coffee', color: '#d97706', hours: [5, 20] },
+  farmacia: { label: 'Farmácia', icon: 'pill', color: '#10b981', hours: [8, 22] },
+  academia: { label: 'Academia', icon: 'dumbbell', color: '#f43f5e', hours: [6, 23] },
+  hotel: { label: 'Hotel', icon: 'bed', color: '#0ea5e9', hours: [0, 24] },
+  cinema: { label: 'Cinema', icon: 'film', color: '#8b5cf6', hours: [12, 24] },
+  escola: { label: 'Escola', icon: 'school', color: '#facc15', hours: [7, 18] },
+  clinica: { label: 'Clínica', icon: 'heart', color: '#fb7185', hours: [8, 19] },
+  posto: { label: 'Posto de combustível', icon: 'fuel', color: '#fb923c', hours: [0, 24] },
 };
 export const isOpen = (pl, at = new Date()) => {
   if (['fechado', 'interditado', 'falido'].includes(pl.status)) return false;
@@ -94,6 +103,27 @@ const STORES = [
   { name: 'Fórum de Justiça de Nexus City', kind: 'tribunal', district: 'centro' },
   { name: 'Mirante da Serra', kind: 'turismo', district: 'serra' }, { name: 'Praia do Porto', kind: 'turismo', district: 'porto' },
 ];
+// mais comércio, serviços e escritórios: redes com várias unidades espalhadas pelos bairros
+const EXTRA = [
+  { company: 'Rede Café Aurora', sector: 'alimentacao', kind: 'cafe', items: ['cafe'], units: [['Café Aurora Centro', 'centro'], ['Café Aurora Campus', 'campus'], ['Café Aurora Jardins', 'jardins']] },
+  { company: 'Padaria Pão Quente', sector: 'alimentacao', kind: 'padaria', items: ['cafe'], units: [['Padaria Pão Quente', 'vila'], ['Padaria da Serra', 'serra'], ['Padaria Porto Neon', 'porto']] },
+  { company: 'Sabores de Nexus', sector: 'alimentacao', kind: 'restaurante', units: [['Cantina Nova', 'centro'], ['Sushi Prisma', 'tech'], ['Churrasco Horizonte', 'mercado'], ['Bistrô Jardins', 'jardins'], ['Burger Neon', 'porto']] },
+  { company: 'Noite Neon', sector: 'entretenimento', kind: 'bar', units: [['Bar do Zé', 'porto'], ['Boteco do Mercado', 'mercado'], ['Pub Distrito', 'tech']] },
+  { company: 'Farmácias Nexus', sector: 'saude', kind: 'farmacia', units: [['Farmácia Nexus Centro', 'centro'], ['Drogaria da Vila', 'vila'], ['Farmácia Jardins', 'jardins'], ['Farmácia Campus', 'campus']] },
+  { company: 'Pulse Academias', sector: 'saude', kind: 'academia', units: [['Academia Pulse Centro', 'centro'], ['Pulse Serra', 'serra'], ['Fit Porto', 'porto']] },
+  { company: 'Hotéis Horizonte', sector: 'entretenimento', kind: 'hotel', units: [['Hotel Skyline Inn', 'centro'], ['Pousada do Porto', 'porto'], ['Palace Jardins', 'jardins']] },
+  { company: 'Cine Nexus', sector: 'entretenimento', kind: 'cinema', units: [['Cine Nexus Porto', 'porto'], ['Cine Campus', 'campus']] },
+  { company: 'Rede Aprender', sector: 'pesquisa', kind: 'escola', units: [['Escola Estadual Nexus', 'serra'], ['Colégio Aurora', 'jardins'], ['Escola Vila Esperança', 'vila']] },
+  { company: 'Clínicas Vida', sector: 'saude', kind: 'clinica', units: [['Clínica Vida Centro', 'centro'], ['Clínica da Serra', 'serra'], ['Pronto Atendimento Vila', 'vila']] },
+  { company: 'Rotas Combustíveis', sector: 'varejo', kind: 'posto', units: [['Posto Rodovia Norte', 'tech'], ['Posto Porto', 'porto']] },
+  { company: 'Mercadinhos Nexus', sector: 'varejo', kind: 'mercado', items: ['cafe'], units: [['Mini Mercado da Vila', 'vila'], ['Hortifruti da Serra', 'serra'], ['Empório Jardins', 'jardins']] },
+  { company: 'Orion Consultoria', sector: 'tecnologia', kind: 'empresa', units: [['Orion Consultoria', 'centro']] },
+  { company: 'Vértice Advogados', sector: 'financas', kind: 'empresa', units: [['Vértice Advogados', 'centro']] },
+  { company: 'Atlas Engenharia', sector: 'construcao', kind: 'empresa', units: [['Atlas Engenharia', 'mercado']] },
+  { company: 'Helix Biotech', sector: 'saude', kind: 'empresa', units: [['Helix Biotech', 'campus']] },
+  { company: 'Cobalt Logística', sector: 'varejo', kind: 'empresa', units: [['Cobalt Logística', 'porto']] },
+  { company: 'Studio Pixel', sector: 'midia', kind: 'empresa', units: [['Studio Pixel', 'tech']] },
+];
 function ensureCompany(ctx, name, sector, owner) {
   const w = ctx.w;
   let c = companies(w).find((x) => x.name === name);
@@ -125,6 +155,33 @@ onUpgrade(10, (ctx) => {
   const w = ctx.w;
   for (const pl of (w.city?.places || [])) if (pl.catalog) pl.catalog = pl.catalog.filter((it) => PRODUCTS[it.key]);
   for (const u of [account(w)]) if (u.inventory) u.inventory = u.inventory.filter((it) => PRODUCTS[it.key]);
+});
+onUpgrade(11, (ctx) => {
+  const w = ctx.w;
+  if (!w.city) return;
+  const used = new Set(places(w).map((p) => p.node));
+  for (const g of EXTRA) {
+    if (companies(w).some((x) => x.name === g.company)) continue;
+    const free = shuffle(residents(w).filter((p) => !p.agent.companyId && p.agent.status === 'ativo' && !p.agent.office && !p.agent.police && p.id !== 'me'));
+    const owner = free.shift();
+    const c = ensureCompany(ctx, g.company, g.sector, owner);
+    // equipe: uma pessoa por unidade (no máximo, enquanto houver gente sem emprego)
+    for (const p of free.splice(0, Math.min(g.units.length, 3))) {
+      const role = { cafe: 'atendente', padaria: 'padeiro(a)', restaurante: 'cozinheiro(a)', bar: 'barman', farmacia: 'farmacêutico(a)', academia: 'instrutor(a)', hotel: 'recepcionista', cinema: 'bilheteiro(a)', escola: 'professor(a)', clinica: 'enfermeiro(a)', posto: 'frentista', mercado: 'caixa', empresa: 'analista' }[g.kind] || 'funcionário(a)';
+      c.employees.push({ personaId: p.id, role, salary: 110 + rnd(120), since: ctx.at.toISOString() });
+      Object.assign(p.agent, { companyId: c.id, role, salary: c.employees.at(-1).salary }); p.job = `${role} da ${g.company}`;
+    }
+    for (const [name, district] of g.units) {
+      if (places(w).some((p) => p.name === name)) continue;
+      const node = freeNode(w, district, { used }); used.add(node);
+      const [x, y] = pos(w, node);
+      const pl = { id: uid(), name, kind: g.kind, sub: null, districtId: districtOfNode(w, node) || district, node, x, y, address: address(w, node), hours: PLACE_CATS[g.kind].hours,
+        companyId: c.id, status: 'aberto', hidden: false, security: 0.3 + Math.random() * 0.4, reputation: 3.5 + Math.random(), ratings: [], banned: [], ledger: [], createdAt: ctx.at.toISOString(), origin: 'vivo' };
+      if (g.items) { pl.catalog = makeCatalog(g.items, g.sector); assignSeller(w, pl, c); }
+      c.districtId ??= pl.districtId; c.storeIds = [...new Set([...(c.storeIds || []), pl.id])];
+      w.city.places.push(pl);
+    }
+  }
 });
 onUpgrade(4, (ctx) => {
   const w = ctx.w;
@@ -189,6 +246,7 @@ onDaily((ctx) => {
       const it = pick(pl.catalog);
       pl.promo = { key: it.key, pct: 10 + rnd(21), until: new Date(ctx.at.getTime() + 2 * DAY).toISOString() };
       record(ctx, { type: 'promocao', cat: 'local', title: `${pl.name}: ${PRODUCTS[it.key].name} com ${pl.promo.pct}% de desconto`, text: pl.address, refs: [{ t: 'place', id: pl.id }, { t: 'district', id: pl.districtId }], importance: 1 });
+      services.live?.(w, { kind: 'promo', placeId: pl.id, placeName: pl.name, text: `#Promoção ${PRODUCTS[it.key].name} −${pl.promo.pct}% em` });
       const owner = personById(w, c.ceoId); if (owner) worldPost(ctx, owner, genderize(owner, `Promoção na ${pl.name}! ${PRODUCTS[it.key].name} com ${pl.promo.pct}% off até amanhã. ${pl.address}`));
     }
     if (pl.promo && pl.promo.until < ctx.at.toISOString()) pl.promo = null;
@@ -238,6 +296,7 @@ registerAction({
     p.agent.cash = round2(p.agent.cash - price); it.stock -= 1; it.soldToday = (it.soldToday || 0) + 1;
     const c = companyById(w, pl.companyId); if (c) c.salesToday += price;
     p.agent.needs.fun = clamp(p.agent.needs.fun + 15, 0, 100);
+    services.live?.(w, { kind: 'compra', personaId: p.id, name: p.name, placeId: pl.id, placeName: pl.name, text: `comprou ${PRODUCTS[it.key].name} em` });
     if (chance(0.3)) { pl.ratings.push({ by: p.id, stars: clamp(Math.round(3 + (pl.reputation - 3) + (Math.random() - 0.4) * 2), 1, 5), at: ctx.at.toISOString() }); cap(pl.ratings, 60); pl.reputation = round2(pl.ratings.reduce((s, r) => s + r.stars, 0) / pl.ratings.length); }
   },
 });

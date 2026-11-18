@@ -8,7 +8,7 @@ import { onUpgrade } from './core.js';
 export const W = 2000;
 export const H = 1200;
 export const SCALE = 2; // bairros são definidos em 1000×600 e desenhados em 2000×1200
-export const METERS_PER_UNIT = 5;
+export const METERS_PER_UNIT = 2; // cidade de porte médio: trajetos de alguns minutos, o suficiente para ver gente andando
 
 const STYLE = {
   centro: { s: 34, a: 0 }, tecnologia: { s: 40, a: 12 }, residencial: { s: 48, a: -8 }, nobre: { s: 56, a: 21 }, educacao: { s: 50, a: 4 },
@@ -61,7 +61,7 @@ function build(w, seed) {
     edges.push(e); adj[a].push({ to: b, e }); adj[b].push({ to: a, e });
   };
   const districts = (w.city?.districts || []).map((d) => ({ ...d, P: scaled(d.poly) }));
-  const byDistrict = {};
+  const byDistrict = {}; const cells = [];
 
   // malha de ruas por bairro
   for (const d of districts.filter((x) => !x.locked)) {
@@ -81,6 +81,12 @@ function build(w, seed) {
         grid.set(`${i},${j}`, id);
         byDistrict[d.id].push(id);
       }
+    }
+    // quarteirões: cada célula com 4 esquinas vira um lote para o desenho (prédios, casas, praças)
+    for (const [k, id] of grid) {
+      const [i, j] = k.split(',').map(Number);
+      const r = grid.get(`${i + 1},${j}`); const dn = grid.get(`${i},${j + 1}`); const dg = grid.get(`${i + 1},${j + 1}`);
+      if (r != null && dn != null && dg != null) cells.push([d.id, id, r, dg, dn]);
     }
     for (const [k, id] of grid) {
       const [i, j] = k.split(',').map(Number);
@@ -172,7 +178,7 @@ function build(w, seed) {
   for (let k = 0; k < 6; k++) piers.push([720 + k * 95, 1150, 18, 50 + Math.round(rnd() * 40)]);
   const labels = districts.map((d) => ({ id: d.id, name: d.name, at: centroid(d.P).map(Math.round), locked: Boolean(d.locked) }));
   return {
-    w: W, h: H, nodes, nodeInfo, edges, adj, byDistrict, hwPaths, landPath, parks, piers,
+    w: W, h: H, nodes, nodeInfo, edges, adj, byDistrict, cells, hwPaths, landPath, parks, piers,
     river: 'M0,950 C360,880 520,1000 840,940 S1400,840 2000,940', lake: { cx: 860, cy: 150, rx: 70, ry: 38 },
     districts: districts.map((d) => ({ id: d.id, name: d.name, kind: d.kind, color: d.color, poly: d.P.map((p) => p.map(Math.round)), locked: Boolean(d.locked) })), labels,
   };
@@ -238,12 +244,57 @@ export function route(w, from, to) {
   return { path, meters, streets: streets.filter(Boolean).slice(0, 8), minutes: { pe: Math.max(1, Math.round(meters / 80)), onibus: Math.max(3, Math.round(meters / 330) + 6), taxi: Math.max(2, Math.round(meters / 500) + 2) } };
 }
 
+// ---------------------------------------------------------------- caminhos em massa (cidadãos andando)
+// Uma busca por destino (hub) serve a todos os moradores que vão até lá: o caminho de qualquer ponto até o hub
+// sai seguindo os "prev". Dezenas de buscas atendem centenas de pessoas.
+function sptOf(g, hub) {
+  g.spt ??= new Map();
+  if (g.spt.has(hub)) return g.spt.get(hub);
+  const n = g.nodes.length; const d = new Float64Array(n).fill(Infinity); const prev = new Int32Array(n).fill(-1); const done = new Uint8Array(n);
+  d[hub] = 0; const heap = [[0, hub]];
+  const push = (x) => { heap.push(x); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0]; const last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1; const r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  while (heap.length) {
+    const [dc, v] = pop(); if (done[v]) continue; done[v] = 1;
+    for (const { to: u, e } of g.adj[v]) { const nd = dc + e.len * (KIND_COST[e.kind] || 1); if (nd < d[u]) { d[u] = nd; prev[u] = v; push([nd, u]); } }
+  }
+  const out = { prev }; g.spt.set(hub, out); return out;
+}
+// caminho a pé/de carro de um nó a outro: pontos, distâncias acumuladas e comprimento (em unidades do mapa)
+export function walkPath(w, from, to) {
+  const g = geo(w);
+  if (from == null || to == null || from >= g.nodes.length || to >= g.nodes.length) return null;
+  g.walks ??= new Map();
+  const key = `${from}|${to}`;
+  if (g.walks.has(key)) return g.walks.get(key);
+  const { prev } = sptOf(g, to);
+  const ids = [];
+  for (let v = from, guard = 0; v !== -1 && guard < 5000; v = prev[v], guard++) { ids.push(v); if (v === to) break; }
+  if (ids.at(-1) !== to) { g.walks.set(key, null); return null; }
+  const pts = ids.map((i) => g.nodes[i]); const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist(pts[i - 1], pts[i]));
+  const out = { pts, cum, len: cum.at(-1) };
+  if (g.walks.size > 8000) g.walks.clear();
+  g.walks.set(key, out);
+  return out;
+}
+// ponto a uma certa distância (0..len) ao longo de um caminho, com o rumo
+export function pointAlong(path, d, reverse = false) {
+  const { pts, cum, len } = path; const L = reverse ? len - d : d; const x = Math.max(0, Math.min(len, L));
+  let i = 1; while (i < cum.length - 1 && cum[i] < x) i++;
+  const a = pts[i - 1]; const b = pts[i]; const seg = cum[i] - cum[i - 1] || 1; const t = (x - cum[i - 1]) / seg;
+  const dir = reverse ? [a[0] - b[0], a[1] - b[1]] : [b[0] - a[0], b[1] - a[1]];
+  return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, dir };
+}
+
 // dados enviados ao navegador (estáticos enquanto a cidade não cresce)
 export function geoPublic(w) {
   const g = geo(w);
   const byKind = { rua: [], avenida: [], rodovia: [], acesso: [] };
   for (const e of g.edges) (byKind[e.kind] || byKind.rua).push([e.a, e.b]);
-  return { w: g.w, h: g.h, nodes: g.nodes, edges: byKind, hw: g.hwPaths, land: g.landPath, river: g.river, lake: g.lake, parks: g.parks, piers: g.piers, districts: g.districts, labels: g.labels, version: `${w.city?.mapSeed}-${g.districts.filter((d) => !d.locked).length}` };
+  const dIdx = Object.fromEntries(g.districts.map((d, i) => [d.id, i]));
+  const blocks = g.cells.map(([d, a, b, c, e]) => [dIdx[d] ?? 0, ...g.nodes[a], ...g.nodes[b], ...g.nodes[c], ...g.nodes[e]]);
+  return { w: g.w, h: g.h, nodes: g.nodes, blocks, edges: byKind, hw: g.hwPaths, land: g.landPath, river: g.river, lake: g.lake, parks: g.parks, piers: g.piers, districts: g.districts, labels: g.labels, version: `${w.city?.mapSeed}-${g.districts.filter((d) => !d.locked).length}` };
 }
 
 // ---------------------------------------------------------------- atualização: mundos existentes ganham o mapa novo

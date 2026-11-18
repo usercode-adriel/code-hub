@@ -15,6 +15,7 @@ import './inventory.js';
 import './justice.js';
 import './society.js';
 import './orgs.js';
+import './living.js';
 import { personById, userChatted, relType, REL_LABEL, requests } from './agents.js';
 import { companyById } from './economy.js';
 import { socialStep, worldFactHooks } from '../social.js';

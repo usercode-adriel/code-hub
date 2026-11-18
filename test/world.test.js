@@ -22,7 +22,7 @@ test('mapa: todos os lugares têm endereço e há rota entre quaisquer dois', ()
   for (const p of pls.slice(1)) {
     const r = M.route(T.w, pls[0].node, p.node);
     assert.ok(r && r.path.length >= 1, `sem rota até ${p.name}`);
-    assert.ok(r.meters >= 0 && r.minutes.pe >= r.minutes.taxi);
+    assert.ok(r.meters >= 0 && (r.meters < 400 || r.minutes.pe >= r.minutes.taxi), 'em trajetos longos o táxi é mais rápido que andar');
   }
 });
 
