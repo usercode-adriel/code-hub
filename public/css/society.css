@@ -92,9 +92,16 @@ a.dx-stat:hover { background: var(--bg-hover); }
 .cm-svg { width: 100%; height: 100%; display: block; cursor: grab; } .cm-svg:active { cursor: grabbing; }
 .cm-dist { fill: transparent; stroke: rgba(255,255,255,.05); stroke-width: 2; } .cm-dist.locked { fill: rgba(0,0,0,.35); stroke-dasharray: 10 8; }
 .cm-label { fill: rgba(220,230,240,.38); font: 700 22px var(--font, sans-serif); letter-spacing: .25em; pointer-events: none; paint-order: stroke; stroke: #111418; stroke-width: 5px; }
-.cm-mk { cursor: pointer; } .cm-mk rect { fill: var(--c); stroke: #0b0d10; stroke-width: 2.5; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); } .cm-mk .cm-ico { color: #fff; }
-.cm-mk.closed rect { fill: color-mix(in srgb, var(--c) 45%, #333); } .cm-mk.closed .cm-ico { opacity: .7; }
-.cm-mk.sel rect { stroke: #fff; stroke-width: 3.5; } .cm-mk:hover rect { stroke: #fff; }
+.cm-mk { cursor: pointer; transition: transform .1s; }
+.cm-mk .cm-shadow { fill: rgba(0,0,0,.45); }
+.cm-mk .cm-pin { fill: color-mix(in srgb, var(--c) 82%, #000); stroke: #0b0d10; stroke-width: 2; }
+.cm-mk .cm-pin-face { fill: var(--c); stroke: rgba(255,255,255,.45); stroke-width: 1.5; }
+.cm-mk .cm-ico { color: #fff; }
+.cm-mk .cm-dotflag { fill: #22c55e; stroke: #0b0d10; stroke-width: 1.5; }
+.cm-mk .cm-dotflag.closed { fill: #ef4444; }
+.cm-mk.closed .cm-pin-face { fill: color-mix(in srgb, var(--c) 45%, #333); } .cm-mk.closed .cm-ico { opacity: .75; }
+.cm-mk.sel .cm-pin { stroke: #fff; stroke-width: 3; } .cm-mk.sel .cm-pin-face { stroke: #fff; stroke-width: 2.5; }
+.cm-mk:hover { transform-box: fill-box; } .cm-mk:hover .cm-pin { stroke: #fff; }
 .cm-ev circle { fill: #facc15; stroke: #111; stroke-width: 2; } .cm-ev text { font-size: 10px; fill: #111; font-weight: 700; pointer-events: none; }
 .cm-al .ring { fill: none; stroke: #ef4444; stroke-width: 2.5; animation: cmPulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; } .cm-al circle:not(.ring) { fill: #ef4444; } .cm-al text { font-size: 11px; fill: #fff; font-weight: 800; }
 .cm-pp circle { fill: var(--c); stroke: #fff; stroke-width: 2; cursor: pointer; } .cm-pp.friend circle { stroke: #22d3ee; stroke-width: 3; }
@@ -256,3 +263,18 @@ a.dx-stat:hover { background: var(--bg-hover); }
 @media (max-width: 760px) { .gm { height: calc(var(--vvh, 100vh) - 200px); } }
 .gm .cm-tools { right: auto; left: 12px; bottom: 60px; }
 @media (max-width: 1600px) and (min-width: 1101px) { .wx-nav { gap: 2px; } .wx-nav a, .wx-more summary { padding: 7px 8px; gap: 5px; font-size: 11.5px; } .wx-top { gap: 10px; } }
+
+/* ---------- badges do menu (sempre visíveis) ---------- */
+.wx-nav a { position: relative; }
+.wx-badge { font-size: 9.5px; font-weight: 800; line-height: 1; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; }
+.wx-badge.on { background: #ef4444; color: #fff; box-shadow: 0 0 0 2px var(--wpanel); }
+.wx-badge.dot { width: 5px; min-width: 5px; height: 5px; padding: 0; border-radius: 50%; background: color-mix(in srgb, var(--wa) 55%, transparent); }
+.wx-nav a.on .wx-badge.dot { background: rgba(255,255,255,.6); }
+
+/* ---------- acesso restrito (cidadão) ---------- */
+.pj-locked { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; background: linear-gradient(135deg, color-mix(in srgb, #3b82f6 14%, var(--wpanel)), var(--wpanel)); }
+.pj-locked h1 { margin: 0 0 4px; font-size: 20px; } .pj-locked p { margin: 6px 0; font-size: 13px; }
+.pj-lock-ic { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #3b82f6, #1e3a8a); box-shadow: 0 8px 22px -8px #3b82f6; }
+.pj-elig { color: #22c55e; } .pj-rep-sm { align-self: start; white-space: nowrap; }
+.pj-note p { font-size: 12px; } .w-morelink { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--wa); }
+@media (max-width: 760px) { .pj-locked { grid-template-columns: 1fr; text-align: left; } .pj-rep-sm { justify-self: start; } }

@@ -34,8 +34,13 @@ export function cityMap(host, geo, { mini = false, onPick = null } = {}) {
   function scaleMarkers() { const k = px(); for (const g of layer.querySelectorAll('[data-x]')) g.setAttribute('transform', `translate(${g.dataset.x},${g.dataset.y}) scale(${k * (mini ? 0.75 : 1)})`); }
   const blip = (p, cats) => {
     const c = cats[p.kind] || { color: '#64748b', icon: 'pin' };
+    // pino estilo jogo: sombra no chão, corpo em gota com brilho, anel e ícone branco maior
     return `<g class="cm-mk ${p.open ? '' : 'closed'} ${p.hidden ? 'hidden' : ''} ${selected === p.id ? 'sel' : ''}" data-place="${esc(p.id)}" data-x="${p.x}" data-y="${p.y}" style="--c:${esc(c.color)}"><title>${esc(p.name)}${p.open ? '' : ' (fechado)'}</title>
-      <rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8,-8)" class="cm-ico">${icon(c.icon, 16)}</g></g>`;
+      <ellipse class="cm-shadow" cx="0" cy="2" rx="12" ry="5"/>
+      <path class="cm-pin" d="M0,6 C-11,-6 -16,-12 -16,-19 A16,16 0 1 1 16,-19 C16,-12 11,-6 0,6 Z"/>
+      <circle class="cm-pin-face" cx="0" cy="-19" r="12.5"/>
+      <g transform="translate(-10,-29)" class="cm-ico">${icon(c.icon, 20)}</g>
+      ${p.shop ? '<circle class="cm-dotflag" cx="11" cy="-28" r="3.4"/>' : ''}${p.open ? '' : '<circle class="cm-dotflag closed" cx="11" cy="-28" r="3.4"/>'}</g>`;
   };
   function paint() {
     const cats = data.cats || {};

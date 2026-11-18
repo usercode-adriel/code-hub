@@ -11,6 +11,7 @@ import { geoPublic, route, freeNode, pos, districtOfNode, W, H } from './map.js'
 import { PLACE_CATS, PRODUCTS, places, placeById, isOpen, storeView, negotiate, sellerChat, buy, rate, travel, TRANSPORT } from './commerce.js';
 import { inv, publicItem, itemAction } from './inventory.js';
 import { justice, publicCase, testify, settleCase, payFine, report, DEFAULT_PENALTIES, penalty } from './justice.js';
+import { hasAuthority, society, professionsFor } from './society.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
@@ -205,13 +206,23 @@ router.get('/mundo/policia', (req, res) => {
   const w = world(req.user.id); const J = justice(w);
   const st = places(w).find((p) => p.kind === 'delegacia');
   const since = new Date(Date.now() - 30 * 24 * HOUR).toISOString();
-  res.json({
+  const authorized = hasAuthority(w, 'policia');
+  // público (qualquer cidadão): só o que já foi noticiado + os seus próprios casos + registrar ocorrência
+  const base = {
+    authorized,
     station: st ? { id: st.id, name: st.name, address: st.address } : null,
+    alerts: (w.events || []).filter((e) => e.cat === 'seguranca').slice(-10).reverse().map((e) => publicEvent(e, w)),
+    mine: J.cases.filter((c) => mine(c) && c.kind === 'criminal').slice().reverse().map((c) => publicCase(w, c)),
+    profession: professionsFor(w).find((x) => x.key === 'policia'),
+  };
+  if (!authorized) { res.json({ ...base, restricted: true }); return; }
+  // acesso interno (autoridade policial): painel completo e sigiloso
+  res.json({
+    ...base,
     officers: J.officers.map((o) => { const p = personById(w, o.personaId); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color, rank: o.rank, role: p.agent?.role } : null; }).filter(Boolean),
     stats: { open: J.cases.filter((c) => ['aberto', 'investigacao', 'intimado', 'decisao'].includes(c.status)).length, solved: J.cases.filter((c) => c.at > since && ['multa', 'condenado', 'preso'].includes(c.status)).length, archived: J.cases.filter((c) => c.at > since && c.status === 'arquivado').length, arrests: J.cases.filter((c) => c.at > since && c.status === 'preso').length },
     cases: J.cases.filter((c) => c.kind === 'criminal').slice(-40).reverse().map((c) => publicCase(w, c)),
-    mine: J.cases.filter((c) => mine(c) && c.kind === 'criminal').slice().reverse().map((c) => publicCase(w, c)),
-    alerts: (w.events || []).filter((e) => e.cat === 'seguranca').slice(-10).reverse().map((e) => publicEvent(e, w)),
+    cyber: hasAuthority(w, 'ciber') ? J.cases.filter((c) => c.type === 'cibernetico').slice(-20).reverse().map((c) => publicCase(w, c)) : null,
     debtors: people(w).filter((p) => (p.agent?.debtToUser || 0) > 0).map((p) => ({ id: p.id, name: p.name, amount: p.agent.debtToUser })),
   });
 });
@@ -220,12 +231,19 @@ router.get('/mundo/justica', (req, res) => {
   const w = world(req.user.id); const J = justice(w); const b = bankOf(w);
   const court = places(w).find((p) => p.kind === 'tribunal');
   const judge = personById(w, J.judgeId);
+  const authorized = hasAuthority(w, 'ministro') || hasAuthority(w, 'policia');
   res.json({
+    authorized, restricted: !authorized,
     court: court ? { id: court.id, name: court.name, address: court.address } : null, judge: judge ? { id: judge.id, name: judge.name, avatar: judge.avatar, color: judge.color } : null,
+    // os seus próprios processos, multas e antecedentes você sempre vê
     mine: J.cases.filter(mine).slice().reverse().map((c) => publicCase(w, c)), record: J.record.slice().reverse(),
     debts: b.debts.filter((d) => ['multa', 'judicial'].includes(d.kind)).slice().reverse(),
-    sentences: J.cases.filter((c) => ['condenado', 'absolvido', 'acordo', 'preso'].includes(c.status)).slice(-15).reverse().map((c) => publicCase(w, c)),
-    penalties: Object.fromEntries(Object.keys(DEFAULT_PENALTIES).map((k) => [k, penalty(w, k)])),
+    // decisões de terceiros e a tabela de penas só com autoridade; senão, só o que virou notícia
+    sentences: authorized
+      ? J.cases.filter((c) => ['condenado', 'absolvido', 'acordo', 'preso'].includes(c.status)).slice(-15).reverse().map((c) => publicCase(w, c))
+      : (w.events || []).filter((e) => e.cat === 'justica').slice(-10).reverse().map((e) => publicEvent(e, w)),
+    penalties: authorized ? Object.fromEntries(Object.keys(DEFAULT_PENALTIES).map((k) => [k, penalty(w, k)])) : null,
+    profession: professionsFor(w).find((x) => x.key === 'ministro'),
   });
 });
 router.post('/mundo/justica/casos/:id/depor', (req, res) => { const ctx = ctxOf(req); run(res, () => publicCase(ctx.w, testify(ctx, req.params.id, req.body?.versao))); });
@@ -233,6 +251,7 @@ router.post('/mundo/justica/casos/:id/acordo', (req, res) => { const ctx = ctxOf
 router.put('/mundo/justica/penalidades', (req, res) => {
   const w = world(req.user.id);
   run(res, () => {
+    if (!hasAuthority(w, 'ministro')) throw new BankError('Apenas um ministro pode alterar as penas.');
     const J = justice(w);
     for (const [k, v] of Object.entries(req.body || {})) if (DEFAULT_PENALTIES[k] && DEFAULT_PENALTIES[k].kind === 'criminal') J.cfg.penalties[k] = { fine: clamp(Math.round(Number(v?.fine) || DEFAULT_PENALTIES[k].fine), 0, 100000) };
     return Object.fromEntries(Object.keys(DEFAULT_PENALTIES).map((k) => [k, penalty(w, k)]));

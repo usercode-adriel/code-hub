@@ -8,7 +8,11 @@ import {
 import {
   eco, companies, companyById, publicCompany, SECTORS, trade, netWorth, applyUser, workDay, WORK_TASKS, foundUserCompany, manageCompany, FOUND_COST, priceNow, fireUser,
 } from './economy.js';
-import { account, credit, debit, addXp, verifyPin } from './bank.js';
+import { account, credit, debit, addXp, verifyPin, bankOf, isLate, outstanding } from './bank.js';
+import { justice } from './justice.js';
+import { gigs, loans } from './finance.js';
+import { society, hasAuthority } from './society.js';
+import { inv } from './inventory.js';
 import { districtById, weatherNow, enroll, startInvestigation, quiz } from './city.js';
 import { publicPolitics, joinParty, runForOffice, campaign, userProposeLaw, voteLaw } from './politics.js';
 import { articles, communities, createCommunity, media, CHANNELS, program, searchWorld, siteOf } from './media.js';
@@ -57,6 +61,42 @@ router.get('/mundo/resumo', (req, res) => {
   });
 });
 router.get('/mundo/relatorio', (req, res) => { const w = world(req.user.id); const r = activityReport(w); saveWorld(); res.json(r); });
+// contadores do menu (sempre há algo em cada aba): pendências, novidades e alertas por ambiente
+router.get('/mundo/badges', (req, res) => {
+  const w = world(req.user.id);
+  if (!born(w)) return res.json({ born: false, badges: {} });
+  const u = account(w); const b = bankOf(w); const J = justice(w);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const recent = w.events.filter((e) => e.at > since && e.type !== 'genese');
+  const pendInv = invites(w).filter((i) => i.user === 'pendente' && i.status === 'agendado').length;
+  const reqs = requests(w).filter((r) => ['aberto', 'prometido'].includes(r.status)).length;
+  const lateInst = (b.contracts || []).reduce((n, c) => n + c.schedule.filter((i) => i.status === 'atrasada').length, 0);
+  const debts = (b.debts || []).filter((d) => d.status !== 'paga').length;
+  const bills = (b.card?.bills || []).filter((x) => x.status !== 'paga').length;
+  const myCases = J.cases.filter((c) => (c.suspect?.type === 'user' || c.plaintiff === 'me') && !['arquivado', 'absolvido', 'multa', 'condenado', 'acordo', 'preso'].includes(c.status)).length;
+  const myFines = (b.debts || []).filter((d) => ['multa', 'judicial'].includes(d.kind) && d.status !== 'paga').length;
+  const myCos = companies(w).filter((c) => c.founderId === 'me' && c.status !== 'falida');
+  const openGigs = gigs(w).filter((g) => g.status === 'aberto' && g.until > new Date().toISOString()).length;
+  const promos = (w.city?.places || []).filter((p) => p.promo && p.promo.until > new Date().toISOString()).length;
+  const items = (u.inventory || []).length;
+  const news = articles(w).filter((a) => a.at > since).length;
+  const alerts = recent.filter((e) => e.cat === 'seguranca').length;
+  const badges = {
+    centro: recent.filter((e) => e.importance >= 3).length,
+    mapa: (w.invites || []).filter((i) => ['agendado', 'acontecendo'].includes(i.status) && i.placeId).length + alerts,
+    social: pendInv + reqs,
+    internet: news,
+    mercado: promos || openGigs,
+    empresas: myCos.reduce((n, c) => n + (c.openings || 0), 0) + openGigs,
+    banco: lateInst + debts + bills + (isLate(w) ? 1 : 0),
+    policia: hasAuthority(w, 'policia') ? J.cases.filter((c) => ['aberto', 'investigacao'].includes(c.status)).length : alerts,
+    justica: myCases + myFines,
+    inventario: items,
+    midia: news,
+  };
+  res.json({ born: true, badges });
+});
+
 
 // ---------------------------------------------------------------- 09 · World Archive
 router.get('/mundo/eventos', (req, res) => {

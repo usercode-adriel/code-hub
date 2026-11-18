@@ -29,7 +29,7 @@ export function shell(el, env, { title = '', sub = '' } = {}) {
   el.innerHTML = `<div class="w-env" data-env="${env}">
     <header class="wx-top">
       <a class="wx-brand" href="#/centro" aria-label="Codeniac Digital Society"><span class="wx-logo">${icon('globe', 20)}</span><span class="wx-name"><b>Codeniac</b><small>Digital Society</small></span></a>
-      <nav class="w-nav wx-nav" aria-label="Ambientes do System 2.0">${ENVS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 14)}<span>${l}</span></a>`).join('')}
+      <nav class="w-nav wx-nav" aria-label="Ambientes do System 2.0">${ENVS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 14)}<span>${l}</span><i class="wx-badge" data-badge="${k}"></i></a>`).join('')}
         <details class="wx-more ${MORE.some(([k]) => k === cur) ? 'on' : ''}"><summary>${icon('more', 14)}<span>Mais</span></summary><div class="wx-more-menu">${MORE.map(([k, l, ic]) => `<a href="#/${k}">${icon(ic, 14)} ${l}</a>`).join('')}</div></details></nav>
       <div class="wx-right"><a class="wx-ic" href="#/notifications" aria-label="Notificações">${icon('bell', 17)}</a><span class="wx-online"><i></i>Online</span>
         <a class="wx-me" href="#/profile" aria-label="Meu perfil">${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : `<span>${esc(initials(user.name || 'Eu'))}</span>`}</a></div>
@@ -37,8 +37,23 @@ export function shell(el, env, { title = '', sub = '' } = {}) {
     ${title ? `<header class="w-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
     <div class="w-body" id="wBody"></div></div>`;
   el.querySelector('.wx-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  paintBadges(el);
   return el.querySelector('#wBody');
 }
+// badges do menu: sempre há um marcador em cada aba (número quando há pendências, ponto quando não).
+let badgeCache = null; let badgeAt = 0;
+async function paintBadges(root) {
+  try {
+    if (!badgeCache || Date.now() - badgeAt > 20000) { badgeCache = (await api.get('/mundo/badges')).badges || {}; badgeAt = Date.now(); }
+    for (const el of root.querySelectorAll('.wx-badge')) {
+      const n = badgeCache[el.dataset.badge] || 0;
+      el.textContent = n > 0 ? (n > 99 ? '99+' : String(n)) : '';
+      el.classList.toggle('on', n > 0);
+      el.classList.toggle('dot', n === 0);
+    }
+  } catch { /* sem badges */ }
+}
+export const refreshBadges = () => { badgeCache = null; };
 // identificador único de operação: o servidor nunca processa a mesma operação duas vezes
 export const opId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 // senha bancária de 4 dígitos com teclado numérico (a senha só vai ao servidor, nunca fica salva no navegador)
