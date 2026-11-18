@@ -15,7 +15,7 @@ export default async function render(el) {
       <div class="pj-cols"><div class="pj-main">
           <h3>Seus casos</h3>${d.mine.map((c) => caseCard(c)).join('') || '<p class="muted">Nenhum caso envolvendo você.</p>'}
           <h3>Ocorrências recentes na cidade</h3>${d.cases.filter((c) => c.suspect?.id !== 'me').slice(0, 12).map((c) => caseCard(c, { actions: false })).join('') || '<p class="muted">Nada registrado.</p>'}</div>
-        <aside class="pj-side"><section class="w-panel"><h5>Equipe</h5>${d.officers.map((o) => `<button class="gm-person" data-person="${esc(o.id)}">${face(o, 30)}<span>${esc(o.name)}<small>${esc(o.rank)}</small></span></button>`).join('') || '<p class="muted">Sem policiais.</p>'}</section>
+        <aside class="pj-side"><section class="w-panel"><h5>Equipe</h5>${d.officers.map((o) => `<button class="gm-person" data-person="${esc(o.id)}">${face(o, 30)}<span>${esc(o.name)}<small>${esc({ delegado: 'Delegado(a)', investigador: 'Investigador(a)', patrulha: 'Policial de patrulha' }[o.rank] || o.rank)}</small></span></button>`).join('') || '<p class="muted">Sem policiais.</p>'}</section>
           <section class="w-panel"><h5>Alertas</h5>${d.alerts.map((e) => evRow(e, { compact: true })).join('') || '<p class="muted">Cidade tranquila.</p>'}</section></aside></div></div>`;
     body.querySelector('#pjRep').onclick = () => reportForm(d);
     bindCaseActions(body, load);

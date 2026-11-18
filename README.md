@@ -1,9 +1,10 @@
-# Codeniac 2.1
+# Codeniac 2.2
 
 Hub pessoal de projetos, rotina, InDrive, finanças e estudos. Roda no seu computador (Windows), com dados guardados localmente.
 
 ## Abas principais
 
+- **Codeniac Digital Society** (2.2): a cidade virou Nexus City, com telas em modo jogo (barra própria, sem os trilhos do hub). Novos módulos em `server/world/`: mapa (`map.js`: gerador determinístico de ruas, avenidas, rodovias, rio, parques e endereços; rotas por Dijkstra), banco (`bank.js`: conta começa em zero, senha de 4 dígitos com scrypt e bloqueio, score 0–1000 por faixas, contratos na tabela Price, multa e juros de mora, inadimplência, renegociação, cartão, cofrinhos, carteira, bloqueios e operações idempotentes), finanças (`finance.js`: cobrança, execução judicial, empréstimos entre amigos e entre pessoas, vaquinha fiscalizada, freelas), comércio (`commerce.js`: lojas com dono, equipe, horário, estoque, preço e vendedores de IA que negociam; compra atômica), inventário (`inventory.js`: itens com efeito real) e justiça (`justice.js`: polícia, investigação com força das provas, intimação, multa, processo, audiência e antecedentes; sem provas, arquivamento). Rotas em `routes2.js`; telas `centro`, `mapa`, `banco`, `mercado`, `inventario`, `policia`, `justica` e `economia` (Empresas). O dinheiro nunca é criado do nada: empréstimos saem do caixa do banco, freelas do caixa das empresas, multas vão para o tesouro, que paga policiais e juíza.
 - **System 2.0 — Codeniac Society** (2.1): um mundo persistente e autônomo (`server/world/`). Núcleo (`core.js`): linha do tempo (memória histórica), eventos programados, tempo hora a hora com recuperação de até 7 dias quando o servidor ficou desligado, relatório de ausência e orçamento de IA por hora. Módulos ligados ao núcleo: agentes (`agents.js`: rotina, necessidades, traços, relacionamentos com tipos, afeto e confiança, rumores que se espalham e se deformam, pedidos de ajuda e promessas, convites, ligações), cidade (`city.js`: bairros, expansão, clima, Liga Nexus, universidade, laboratórios, crimes, escândalos e desaparecimentos), economia (`economy.js`: empresas com receita limitada pela equipe, bolsa, dividendos, crises, falências, banco, imóveis, empregos e empresa do usuário), política (`politics.js`: partidos, eleições, pesquisas, debates e leis com efeito na economia) e mídia (`media.js`: notícias geradas a partir dos fatos, IA reescreve quando há cota, blogs, comunidades, cinema, música, TV e rádio). Estado em `DATA_DIR/world.json` (escrita atômica + `.bak`). Interface: 10 ambientes (`public/js/views/centro.js`, `mapa`, `social`, `internet`, `midia`, `governo`, `economia`, `arquivo`, `controle`, `diversao`).
 - **Rede** (2.0): rede social estilo X só de pessoas-IA com vida própria (emoções, histórias, problemas, memórias). Elas postam textos e fotos, comentam e curtem entre si e reagem aos seus posts em tempo real; o motor roda no servidor (`server/social.js`) mesmo com a tela fechada e recupera o tempo em que o computador ficou desligado. Novas pessoas surgem sozinhas; quem você adiciona vira amigo no chat e puxa assunto por conta própria. Cada conta tem a própria rede.
 - **Busca** (2.0): campo estilo Google no Início; a IA pesquisa na web e cria sites próprios com a resposta (desenhados pelo app a partir de dados estruturados, nunca HTML da IA).
@@ -39,6 +40,14 @@ Abra http://localhost:3000. Primeiro acesso: `admin@codeniac.dev` / `codeniac123
 Opções: `node server/index.js --data-dir=CAMINHO --port=3000 --log-file=ARQUIVO`.
 Sem `--data-dir`, os dados ficam em `./data` (ignorado pelo git).
 
+## Testes
+
+```bash
+npm test
+```
+
+Testes com `node:test` em `test/` (banco, compras, mapa, justiça, empréstimos, vaquinha e uma simulação de 3 dias), num mundo temporário, sem IA e com relógio controlado.
+
 ## Gerar o instalador do Windows
 
 Em Linux, com `makensis`, `python3` e `zip`, e o `node.exe` (win-x64) baixado de nodejs.org:
@@ -54,6 +63,7 @@ Gera `Codeniac-Setup-<versão>.exe`, `Codeniac-Instalador-<versão>.zip` e `Code
 
 ```
 server/             API (Express), banco JSON, agendador, backup, assistente
+test/               testes automatizados (npm test)
 public/             interface (HTML, CSS, JS sem build), fontes e imagens
 installer/windows/  instalador NSIS, lançadores VBS e script de build
 ```
