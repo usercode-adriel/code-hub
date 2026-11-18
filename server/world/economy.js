@@ -6,7 +6,7 @@
 //   inflação reage ao crédito e aos impostos; leis e descobertas científicas mudam a demanda dos setores.
 import { onHourly, onDaily, onGenesis, onEvent, handle, record, schedule } from './core.js';
 import { registerAction, people, residents, personById, agentOf, active, isWorking, bump, bumpUser, userName, rel } from './agents.js';
-import { account, credit, debit, addXp } from './bank.js';
+import { account, credit, debit, addXp, outstanding } from './bank.js';
 import { worldPost, remember, genderize } from '../social.js';
 import { rnd, pick, chance, clamp, uid, nowIso, DAY, HOUR, gauss, cap, round2, shuffle, slug } from './util.js';
 
@@ -172,7 +172,7 @@ onDaily((ctx) => {
   const w = ctx.w; const e = eco(w);
   const active = companies(w).filter(live);
   // participação de mercado por setor
-  const weight = (c) => (c.reputation / 100) * (1 + c.marketing / 2000) * Math.sqrt(c.productivity + 0.5 + c.employees.length * 0.3) * (1 + c.sentiment * 0.2);
+  const weight = (c) => (c.reputation / 100) * (1 + (c.marketing + (c.adBoostUntil > ctx.at.toISOString() ? 1500 : 0)) / 2000) * Math.sqrt(c.productivity + 0.5 + c.employees.length * 0.3) * (1 + c.sentiment * 0.2);
   const bySector = {};
   for (const c of active) (bySector[c.sector] ??= []).push(c);
   for (const [sector, list] of Object.entries(bySector)) {
@@ -197,6 +197,7 @@ onDaily((ctx) => {
       const payroll = c.employees.reduce((s, x) => s + x.salary, 0);
       const rent = Math.round(150 * (cityDistrict(w, c.districtId)?.value || 1) * e.cpi);
       const tax = Math.max(0, revenue - payroll - rent - c.marketing) * e.taxRate;
+      e.treasury = round2((e.treasury || 0) + tax); // impostos pagam serviços públicos (polícia, justiça)
       const profit = round2(revenue - payroll - rent - c.marketing - tax);
       c.cash = round2(c.cash + profit); c.revenueDay = round2(revenue); c.profitDay = profit; c.salesToday = 0; c.productivity = 0; c.openDays = open + 1;
       c.profitHistory.push(profit); cap(c.profitHistory, 30);
@@ -246,7 +247,7 @@ function dividends(ctx, c, payroll) {
   const mine = u?.portfolio?.[c.id]?.shares || 0;
   if (mine > 0) {
     const v = round2(perShare * mine);
-    if (v >= 0.01) { credit(ctx.w, v, `Dividendos da ${c.name} (${mine} ações)`, ctx.at); record(ctx, { type: 'dividendos', cat: 'economia', title: `Você recebeu ${v.toLocaleString('pt-BR')} NXC em dividendos da ${c.name}`, actors: ['me'], refs: [{ t: 'company', id: c.id }], importance: 1 }); }
+    if (v >= 0.01) { credit(ctx.w, v, `Dividendos da ${c.name} (${mine} ações)`, ctx.at, 'dividendo'); record(ctx, { type: 'dividendos', cat: 'economia', title: `Você recebeu ${v.toLocaleString('pt-BR')} NXC em dividendos da ${c.name}`, actors: ['me'], refs: [{ t: 'company', id: c.id }], importance: 1 }); }
   }
   const founder = personById(ctx.w, c.founderId);
   if (founder?.agent) founder.agent.cash += round2(pool * 0.4);
@@ -439,8 +440,9 @@ export function foundUserCompany(ctx, name, sector) {
   if (!SECTORS[sector] || ['midia', 'financas'].includes(sector)) throw new Error('Escolha um setor válido');
   if (companies(w).some((c) => c.name.toLowerCase() === name.toLowerCase())) throw new Error('Já existe uma empresa com esse nome');
   if (companies(w).some((c) => c.founderId === 'me' && live(c))) throw new Error('Você já tem uma empresa ativa');
-  debit(w, FOUND_COST, `Abertura da empresa ${name}`, ctx.at);
-  const c = makeCompany(ctx, { name, sector, founderId: 'me', districtId: pick(w.city.districts.filter((d) => !d.locked)).id, cash: FOUND_COST, slogan: 'Do zero ao topo' });
+  const cost = Math.round(FOUND_COST * (account(w).installed?.kit ? 0.6 : 1));
+  debit(w, cost, `Abertura da empresa ${name}`, ctx.at, 'empresa');
+  const c = makeCompany(ctx, { name, sector, founderId: 'me', districtId: pick(w.city.districts.filter((d) => !d.locked)).id, cash: cost, slogan: 'Do zero ao topo' });
   c.ceoId = 'me';
   c.employees.push({ personaId: 'me', role: 'CEO', salary: 0, since: ctx.at.toISOString() });
   c.marketing = 200;
@@ -458,13 +460,15 @@ export function manageCompany(ctx, c, body) {
   if (body.retirada > 0) {
     const v = Number(body.retirada);
     if (v > c.cash) throw new Error(`A empresa tem só ${Math.floor(c.cash).toLocaleString('pt-BR')} NXC em caixa`);
-    c.cash = round2(c.cash - v); credit(w, v, `Retirada de lucros da ${c.name}`, ctx.at);
+    c.cash = round2(c.cash - v); credit(w, v, `Retirada de lucros da ${c.name}`, ctx.at, 'dividendo');
   }
   if (body.vaga) { if (c.openings.length >= 4) throw new Error('Máximo de 4 vagas abertas'); c.openings.push({ id: uid(), role: String(body.vaga.role || pick(SECTORS[c.sector].roles)).slice(0, 40), salary: clamp(Math.round(Number(body.vaga.salary) || 250), 80, 2000), at: ctx.at.toISOString() }); }
   if (body.contratar) {
     const p = personById(w, body.contratar);
-    if (!p || !(c.applicants || []).includes(p.id)) throw new Error('Candidato não encontrado');
-    const op = c.openings.shift();
+    const kit = Boolean(account(w).installed?.kit);
+    if (!p || !((c.applicants || []).includes(p.id) || (kit && p.agent && !p.agent.companyId))) throw new Error('Candidato não encontrado');
+    // com o Kit do Empreendedor, dá para contratar direto, sem vaga aberta
+    const op = c.openings.shift() || (kit ? { role: pick(SECTORS[c.sector].roles), salary: 250 } : null);
     if (!op) throw new Error('Abra uma vaga antes');
     c.applicants = c.applicants.filter((x) => x !== p.id);
     hire(ctx, c, p, op.role, op.salary);
@@ -482,21 +486,9 @@ export function manageCompany(ctx, c, body) {
 // ---------------------------------------------------------------- o usuário na economia
 export function userDaily(ctx) {
   const w = ctx.w; const u = account(w); const e = eco(w);
-  // rendimento da conta e juros dos empréstimos
-  if (u.bank.balance > 0) { const y = round2(u.bank.balance * e.baseRate * 0.5); if (y >= 0.01) credit(w, y, 'Rendimento da conta', ctx.at); }
-  for (const l of u.bank.loans.filter((x) => x.status === 'aberto')) {
-    l.owed = round2(l.owed * (1 + l.rate));
-    if (l.dueAt <= ctx.at.toISOString()) {
-      if (u.bank.balance >= l.owed) { debit(w, l.owed, 'Empréstimo quitado automaticamente no vencimento', ctx.at); e.loansOut -= l.principal; l.status = 'pago'; l.owed = 0; }
-      else if (!l.late) {
-        l.late = true; u.reputation = clamp(u.reputation - 15, 0, 100);
-        record(ctx, { type: 'inadimplencia', cat: 'economia', title: 'Você atrasou um empréstimo no Banco Nexus', text: `Dívida de ${l.owed.toLocaleString('pt-BR')} NXC. Sua reputação caiu.`, actors: ['me'], importance: 2 });
-      }
-    }
-  }
   // aluguéis dos imóveis do usuário
   for (const pr of (w.properties || []).filter((x) => x.ownerType === 'user' && ['apartamento', 'escritorio'].includes(x.kind))) {
-    credit(w, round2(priceNow(w, pr.base) * 0.0012), `Aluguel: ${pr.name}`, ctx.at);
+    credit(w, round2(priceNow(w, pr.base) * 0.0012), `Aluguel: ${pr.name}`, ctx.at, 'aluguel');
   }
   // emprego: quem faltou perde desempenho
   const job = u.job;
@@ -551,7 +543,7 @@ export function workDay(ctx, choice) {
   u.job.performance = clamp(u.job.performance + (good ? 9 : -4), 0, 100);
   u.job.days = (u.job.days || 0) + 1;
   c.productivity += good ? 1.4 : 0.6;
-  credit(w, u.job.salary, `Salário do dia — ${c.name}`, ctx.at);
+  credit(w, u.job.salary, `Salário do dia — ${c.name}`, ctx.at, 'salario');
   addXp(w, good ? 12 : 5);
   // colegas lembram de como você trabalha
   const mate = personById(w, pick(c.employees.filter((x) => x.personaId !== 'me'))?.personaId);
@@ -599,33 +591,6 @@ handle('resultado-candidatura', (ctx, { id }) => {
   }
 });
 
-export function takeLoan(ctx, amount) {
-  const w = ctx.w; const u = account(w); const e = eco(w);
-  const open = u.bank.loans.filter((l) => l.status === 'aberto');
-  const limit = loanLimit(w);
-  const owed = open.reduce((s, l) => s + l.owed, 0);
-  if (!(amount >= 100)) throw new Error('O mínimo é 100 NXC');
-  if (owed + amount > limit) throw new Error(`Seu limite disponível é ${Math.max(0, Math.floor(limit - owed)).toLocaleString('pt-BR')} NXC`);
-  if (open.some((l) => l.late)) throw new Error('Você tem empréstimo atrasado. Quite antes de pedir outro.');
-  const loan = { id: uid(), principal: amount, owed: amount, rate: Math.round((e.baseRate * 2 + (100 - u.reputation) / 100 * 0.002) * 100000) / 100000, takenAt: ctx.at.toISOString(), dueAt: new Date(ctx.at.getTime() + 15 * DAY).toISOString(), status: 'aberto' };
-  u.bank.loans.push(loan);
-  e.loansOut = (e.loansOut || 0) + amount;
-  credit(w, amount, 'Empréstimo do Banco Nexus', ctx.at);
-  record(ctx, { type: 'emprestimo', cat: 'economia', title: `Você pegou ${amount.toLocaleString('pt-BR')} NXC emprestados`, text: `Juros de ${(loan.rate * 100).toFixed(2)}% ao dia, vencimento em 15 dias.`, actors: ['me'], importance: 1 });
-  return loan;
-}
-export function loanLimit(w) { const u = account(w); return Math.round(2000 + u.reputation * 80 + (u.job ? u.job.salary * 10 : 0)); }
-export function payLoan(ctx, id, amount) {
-  const w = ctx.w; const u = account(w); const e = eco(w);
-  const l = u.bank.loans.find((x) => x.id === id && x.status === 'aberto');
-  if (!l) throw new Error('Empréstimo não encontrado');
-  const v = round2(Math.min(amount || l.owed, l.owed));
-  debit(w, v, 'Pagamento de empréstimo', ctx.at);
-  l.owed = round2(l.owed - v);
-  if (l.owed <= 0.009) { l.status = 'pago'; l.owed = 0; e.loansOut = Math.max(0, (e.loansOut || 0) - l.principal); if (l.late) u.reputation = clamp(u.reputation + 5, 0, 100); else u.reputation = clamp(u.reputation + 2, 0, 100); }
-  return l;
-}
-
 export function trade(ctx, companyId, qty, side) {
   const w = ctx.w; const u = account(w);
   const c = companyById(w, companyId);
@@ -641,7 +606,7 @@ export function trade(ctx, companyId, qty, side) {
     c.sentiment = clamp(c.sentiment + qty / c.shares * 2, -1, 1);
   } else {
     if (pos.shares < qty) throw new Error(`Você tem só ${pos.shares} ações`);
-    credit(w, gross - fee, `Venda de ${qty} ações ${c.ticker}`, ctx.at);
+    credit(w, gross - fee, `Venda de ${qty} ações ${c.ticker}`, ctx.at, 'investimento');
     pos.shares -= qty;
     c.sentiment = clamp(c.sentiment - qty / c.shares * 2, -1, 1);
   }
@@ -654,7 +619,7 @@ export function netWorth(w) {
   const stocks = Object.entries(u.portfolio).reduce((s, [id, pos]) => s + (companyById(w, id)?.price || 0) * pos.shares, 0);
   const props = (w.properties || []).filter((p) => p.ownerType === 'user').reduce((s, p) => s + priceNow(w, p.base), 0);
   const items = u.inventory.reduce((s, i) => s + i.price * 0.4, 0);
-  const debts = u.bank.loans.filter((l) => l.status === 'aberto').reduce((s, l) => s + l.owed, 0);
+  const debts = outstanding(w);
   const own = companies(w).filter((c) => c.founderId === 'me' && live(c)).reduce((s, c) => s + Math.max(0, c.cash), 0);
   return round2(u.bank.balance + stocks + props + items + own - debts);
 }

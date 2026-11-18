@@ -22,6 +22,7 @@ import social from './social.js';
 // a ordem importa: o mundo registra os módulos (agentes → cidade → economia → política → mídia) antes das rotas
 import { startWorld, onUserChat, flushWorld } from './world/index.js';
 import worldRoutes from './world/routes.js';
+import worldRoutes2 from './world/routes2.js';
 import './push.js';
 import chatFiles from './routes/chatfiles.js';
 import { confirmAction, undoAction, actionStatuses, actionInfos, onRestartRequest } from './agent.js';
@@ -179,6 +180,7 @@ app.use('/api', requireAuth, automations);
 app.use('/api', requireAuth, connect);
 app.use('/api', requireAuth, social);
 app.use('/api', requireAuth, worldRoutes);
+app.use('/api', requireAuth, worldRoutes2);
 app.use('/api', requireAuth, dev);
 app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));

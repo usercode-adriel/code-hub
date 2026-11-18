@@ -29,6 +29,11 @@ onDaily((ctx) => {
       record(ctx, { type: 'inadimplencia', cat: 'economia', title: 'Você ficou inadimplente no Banco Nexus', text: 'Crédito suspenso e cobrança iniciada.', actors: ['me'], importance: 2 });
       account(w).reputation = clamp(account(w).reputation - 8, 0, 100);
     }
+    if (ev.type === 'cobranca' && ev.daysLate >= 20 && !ev.contract.sued) {
+      ev.contract.sued = true;
+      const owed = ev.contract.schedule.filter((i) => i.status !== 'paga').reduce((s, i) => s + i.amount - i.paid, 0);
+      services.openCase(ctx, { type: 'execucao', suspect: { type: 'user', id: 'me' }, plaintiff: 'banco', amount: Math.round(owed), desc: `O Banco Nexus executa judicialmente um contrato inadimplente (${Math.round(owed).toLocaleString('pt-BR')} NXC).` });
+    }
     if (ev.type === 'cobranca' && agent) collector(ctx, agent, `Olá, aqui é ${agent.name.split(' ')[0]}, do setor de cobrança do Banco Nexus. Seu contrato está com ${ev.daysLate} dias de atraso. Podemos renegociar: é só abrir o app do banco.`);
     if (ev.type === 'debito-atrasado') say('⚠️ Débito vencido', `${ev.debt.desc}: ${ev.debt.amount.toLocaleString('pt-BR')} NXC. Juros de 1% ao dia.`, '#/banco');
     if (ev.type === 'penhora') { say('⚖️ Penhora judicial', `${ev.amount.toLocaleString('pt-BR')} NXC foram retirados da sua conta: ${ev.debt.desc}.`, '#/justica'); record(ctx, { type: 'penhora', cat: 'justica', title: `Justiça penhora ${ev.amount.toLocaleString('pt-BR')} NXC da sua conta`, text: ev.debt.desc, actors: ['me'], importance: 2 }); }
@@ -137,6 +142,7 @@ onDaily((ctx) => {
         bumpUser(ctx, lender, -30, { trust: -40, note: `${userName(ctx)} me deu calote de ${l.amount} NXC.` });
         record(ctx, { type: 'calote', cat: 'pessoal', title: `${lender.name} rompe com você por causa de uma dívida`, text: `${l.amount} NXC nunca devolvidos.`, actors: [lender.id, 'me'], importance: 2 });
         worldPost(ctx, lender, genderize(lender, 'Lição do dia: nunca empreste dinheiro achando que é amizade.'), { kind: 'indireta' });
+        if (lender.agent.traits.honesty > 0.45 && l.amount >= 150) services.openCase(ctx, { type: 'calote', suspect: { type: 'user', id: 'me' }, plaintiff: lender.id, amount: l.amount, desc: `${lender.name} cobra na Justiça ${l.amount} NXC emprestados e não devolvidos.` });
         account(w).reputation = clamp(account(w).reputation - 4, 0, 100);
       }
     } else if (lender && borrower && l.status !== 'pago') {

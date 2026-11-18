@@ -6,9 +6,9 @@ import {
   people, residents, personById, agentOf, publicAgent, relType, REL_LABEL, requests, answerRequest, invites, publicInvite, rumors, answerCall, bumpUser, userName,
 } from './agents.js';
 import {
-  eco, companies, companyById, publicCompany, SECTORS, trade, takeLoan, payLoan, loanLimit, netWorth, applyUser, workDay, WORK_TASKS, foundUserCompany, manageCompany, FOUND_COST, priceNow, fireUser,
+  eco, companies, companyById, publicCompany, SECTORS, trade, netWorth, applyUser, workDay, WORK_TASKS, foundUserCompany, manageCompany, FOUND_COST, priceNow, fireUser,
 } from './economy.js';
-import { account, credit, debit, addXp } from './bank.js';
+import { account, credit, debit, addXp, verifyPin } from './bank.js';
 import { districtById, weatherNow, enroll, startInvestigation, quiz } from './city.js';
 import { publicPolitics, joinParty, runForOffice, campaign, userProposeLaw, voteLaw } from './politics.js';
 import { articles, communities, createCommunity, media, CHANNELS, program, searchWorld, siteOf } from './media.js';
@@ -39,8 +39,12 @@ router.get('/mundo/resumo', (req, res) => {
   const nextInv = invites(w).filter((i) => i.status === 'agendado' && (i.user === 'aceito' || i.user === 'pendente')).sort((a, b) => a.at.localeCompare(b.at))[0];
   const el = w.politics?.election;
   res.json({
-    born: true, now: new Date().toISOString(), weather: weatherNow(w), city: { name: w.city.name, residents: residents(w).length, people: people(w).length, districts: w.city.districts.filter((d) => !d.locked).length },
-    me: { name: req.user.name, avatar: req.user.avatar || null, balance: u.bank.balance, reputation: u.reputation, fame: u.fame, level: u.level || 1, xp: u.xp, netWorth: netWorth(w), job: u.job ? { role: u.job.role, company: companyById(w, u.job.companyId)?.name, performance: u.job.performance, workedToday: u.job.lastWork === new Date().toISOString().slice(0, 10) } : null, office: u.office || null, partyId: u.partyId || null, studying: u.studying || null },
+    born: true, now: new Date().toISOString(), weather: weatherNow(w), gameMinutes: Math.round((Date.now() - new Date(w.core.genesisAt).getTime()) / 60000), heroImage: w.city.heroImage || null, city: { name: w.city.name || 'Nexus City', residents: residents(w).length, people: people(w).length, districts: w.city.districts.filter((d) => !d.locked).length },
+    me: { name: req.user.name, avatar: req.user.avatar || null, balance: u.bank.balance, wallet: u.bank.wallet || 0, score: u.bank.score || 0,
+      popularity: (() => { const met = people(w).filter((p) => p.agent?.user?.metAt); return met.length ? Math.round((met.filter((p) => p.agent.user.aff > 15).length / met.length) * 100) : 0; })(),
+      influence: Math.min(100, Math.round(Math.log10((u.fame || 0) + 1) * 28)), friends: people(w).filter((p) => p.friend).length,
+      contracts: (u.bank.contracts || []).filter((c) => ['ativo', 'inadimplente'].includes(c.status)).length, items: (u.inventory || []).length, installed: u.installed || {}, vipUntil: u.vipUntil || null,
+      location: u.location?.placeId ? (w.city.places.find((p) => p.id === u.location.placeId)?.name || null) : null, reputation: u.reputation, fame: u.fame, level: u.level || 1, xp: u.xp, netWorth: netWorth(w), job: u.job ? { role: u.job.role, company: companyById(w, u.job.companyId)?.name, performance: u.job.performance, workedToday: u.job.lastWork === new Date().toISOString().slice(0, 10) } : null, office: u.office || null, partyId: u.partyId || null, studying: u.studying || null },
     ticker, events: evs.slice(-10).reverse().map((x) => publicEvent(x, w)),
     news: articles(w).filter((a) => !a.blog).slice(-6).reverse().map((a) => ({ id: a.id, title: a.title, cat: a.cat, catLabel: CATS[a.cat], at: a.at, site: siteOf(w, companyById(w, a.siteId) || {}) })),
     social: s.posts.slice().sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5).map((p) => publicPost(s, p, req.user.id)),
@@ -311,7 +315,7 @@ router.post('/mundo/diversao/quiz', (req, res) => {
     const score = results.filter((r) => r.ok).length;
     u.quiz = null;
     let prize = 0;
-    if ((u.quizCount || 0) < 3) { prize = score * 40; u.quizCount = (u.quizCount || 0) + 1; if (prize) credit(ctx.w, prize, `Prêmio do Quiz da Cidade (${score} acertos)`); }
+    if ((u.quizCount || 0) < 3) { prize = score * 40; u.quizCount = (u.quizCount || 0) + 1; if (prize) credit(ctx.w, prize, `Prêmio do Quiz da Cidade (${score} acertos)`, new Date(), 'premio'); }
     u.quizBest = Math.max(u.quizBest || 0, score);
     addXp(ctx.w, score * 4);
     return { score, total: results.length, prize, results };
@@ -331,22 +335,21 @@ router.get('/mundo/economia', (req, res) => {
   const w = world(req.user.id); const u = account(w); const e = eco(w);
   const portfolio = Object.entries(u.portfolio).filter(([, p]) => p.shares > 0).map(([id, p]) => { const c = companyById(w, id); return { company: c ? publicCompany(w, c) : { id, name: '?' }, shares: p.shares, avg: p.avg, value: round2((c?.price || 0) * p.shares), pl: round2(((c?.price || 0) - p.avg) * p.shares) }; });
   res.json({
-    bank: { balance: u.bank.balance, history: u.bank.history.slice(-40).reverse(), loans: u.bank.loans.slice().reverse(), limit: loanLimit(w), rate: Math.round((e.baseRate * 2 + (100 - u.reputation) / 100 * 0.002) * 10000) / 100 },
+    bank: { balance: u.bank.balance, wallet: u.bank.wallet, score: u.bank.score },
     netWorth: netWorth(w), reputation: u.reputation, portfolio,
     market: companies(w).map((c) => publicCompany(w, c)).sort((a, b) => (a.status === 'falida') - (b.status === 'falida') || b.price - a.price),
     index: e.index, indexHistory: e.indexHistory.slice(-72).map((x) => x.v), inflation: e.inflation, cpi: e.cpi, taxRate: e.taxRate, baseRate: e.baseRate,
     sectors: Object.fromEntries(Object.entries(SECTORS).map(([k, v]) => [k, v.label])), foundCost: FOUND_COST,
   });
 });
-router.post('/mundo/banco/emprestimo', (req, res) => { const ctx = ctxOf(req); ok(res, () => takeLoan(ctx, Math.round(Number(req.body?.valor)))); });
-router.post('/mundo/banco/pagar', (req, res) => { const ctx = ctxOf(req); ok(res, () => payLoan(ctx, req.body?.id, Number(req.body?.valor) || null)); });
 router.post('/mundo/banco/transferir', (req, res) => {
   const ctx = ctxOf(req);
   ok(res, () => {
     const p = personById(ctx.w, req.body?.personaId);
     if (!p) throw new Error('Pessoa não encontrada');
     const v = round2(Number(req.body?.valor));
-    debit(ctx.w, v, `Transferência para ${p.name}${req.body?.motivo ? ` (${str(req.body.motivo, 60)})` : ''}`);
+    verifyPin(ctx.w, req.body?.pin);
+    debit(ctx.w, v, `Pix para ${p.name} (@${p.handle})${req.body?.motivo ? ` — ${str(req.body.motivo, 60)}` : ''}`, ctx.at, 'pix');
     agentOf(ctx.w, p).cash += v;
     bumpUser(ctx, p, clamp(Math.round(v / 100), 1, 10), { contact: true, note: `${userName(ctx)} me mandou ${v} NXC${req.body?.motivo ? ` (${str(req.body.motivo, 60)})` : ''}.` });
     record(ctx, { type: 'transferencia', cat: 'pessoal', title: `Você enviou ${v.toLocaleString('pt-BR')} NXC para ${p.name}`, actors: ['me', p.id], importance: 1 });
@@ -404,22 +407,18 @@ router.post('/mundo/imoveis/:id/:acao', (req, res) => {
     const price = priceNow(ctx.w, pr.base);
     if (req.params.acao === 'comprar') {
       if (pr.ownerType !== 'cidade') throw new Error('Esse imóvel não está à venda');
-      debit(ctx.w, price, `Compra: ${pr.name}`); pr.ownerType = 'user'; pr.ownerId = 'me';
+      verifyPin(ctx.w, req.body?.pin);
+      debit(ctx.w, price, `Compra: ${pr.name}`, ctx.at, 'imovel'); pr.ownerType = 'user'; pr.ownerId = 'me';
       record(ctx, { type: 'imovel-usuario', cat: 'local', title: `Você comprou ${pr.name}`, text: `${price.toLocaleString('pt-BR')} NXC.`, actors: ['me'], refs: [{ t: 'district', id: pr.districtId }], importance: 2 });
       addXp(ctx.w, 60);
     } else if (req.params.acao === 'vender') {
       if (pr.ownerType !== 'user') throw new Error('Esse imóvel não é seu');
       const v = round2(price * 0.95);
-      credit(ctx.w, v, `Venda: ${pr.name}`); pr.ownerType = 'cidade'; pr.ownerId = null;
+      credit(ctx.w, v, `Venda: ${pr.name}`, ctx.at, 'venda'); pr.ownerType = 'cidade'; pr.ownerId = null;
       record(ctx, { type: 'imovel-venda', cat: 'local', title: `Você vendeu ${pr.name}`, text: `${v.toLocaleString('pt-BR')} NXC.`, actors: ['me'], importance: 1 });
     } else throw new Error('Ação inválida');
     return { ok: true };
   });
-});
-router.post('/mundo/loja/:companyId/:productId', (req, res) => {
-  const ctx = ctxOf(req); const c = companyById(ctx.w, req.params.companyId); const p = c?.products.find((x) => x.id === req.params.productId);
-  if (!p || c.status === 'falida') return res.status(404).json({ error: 'Produto indisponível' });
-  ok(res, () => { const price = priceNow(ctx.w, p.price); debit(ctx.w, price, `Compra: ${p.name} (${c.name})`); c.salesToday += price; const u = account(ctx.w); u.inventory.push({ id: uid(), productId: p.id, companyId: c.id, name: p.name, price, at: new Date().toISOString() }); cap(u.inventory, 200); addXp(ctx.w, 2); return { balance: u.bank.balance }; });
 });
 
 // ---------------------------------------------------------------- 07 · Mapa

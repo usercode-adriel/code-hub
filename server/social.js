@@ -218,9 +218,12 @@ function cleanAiPersona(s, a) {
 
 function remember(p, text, at = now()) {
   p.lifeLog.push({ at, text: str(text, 300) });
-  if (p.lifeLog.length > LIMITS.lifeLog) {
+  const capN = p.memCap || LIMITS.lifeLog;
+  if (p.lifeLog.length > capN) {
     p.lifeLog.sort((x, y) => x.at.localeCompare(y.at)); // o tempo recuperado entra fora de ordem
-    p.lifeLog.splice(0, p.lifeLog.length - LIMITS.lifeLog);
+    const old = p.lifeLog.splice(0, p.lifeLog.length - capN);
+    // com memória expandida, o que sai da memória recente vai para o arquivo pessoal (recuperável)
+    if (p.memCap > LIMITS.lifeLog) { p.lifeArchive ??= []; p.lifeArchive.push(...old); if (p.lifeArchive.length > p.memCap * 2) p.lifeArchive.splice(0, p.lifeArchive.length - p.memCap * 2); }
   }
 }
 
@@ -418,19 +421,21 @@ async function pumpImages() {
 }
 
 function queueAvatar(userId, p) {
-  if (p.avatar || p.avatarTried) return;
+  if ((p.avatar && !p.restyle) || p.avatarTried) return;
   p.avatarTried = true;
   const look = p.looks || `${p.age} year old ${p.gender === 'f' ? 'woman' : 'man'} from ${p.country === 'Brasil' ? 'Brazil' : p.country}`;
   queueImage({
-    prompt: `realistic casual smartphone selfie profile picture of a ${look}, ${p.job}, ${pick(['smiling', 'serious face', 'laughing', 'shy smile', 'neutral expression'])}, ${pick(['at home', 'outdoors', 'in a cafe', 'on the street'])}, natural light, high detail`,
+    prompt: `stylized 3D video game character portrait of a ${look}, ${p.job}, ${pick(['confident smile', 'serious look', 'laughing', 'shy smile', 'cool expression'])}, open-world game art, cinematic lighting, neon city background, high detail, head and shoulders`,
     w: 384, h: 384,
     run: (url) => {
       const s = net(userId);
       const cur = s.personas.find((x) => x.id === p.id);
       if (!cur) { removeUpload(url); return; }
-      cur.avatar = url;
+      const old = cur.avatar;
+      cur.avatar = url; cur.restyle = false; cur.avatarStyle = '3d';
       const bot = cur.botId && db().bots.find((b) => b.id === cur.botId);
-      if (bot && !bot.avatar) bot.avatar = url;
+      if (bot && (!bot.avatar || bot.avatar === old)) bot.avatar = url;
+      if (old && old !== url && !db().bots.some((b) => b.avatar === old)) removeUpload(old);
       save();
       emit(userId, 'social', { type: 'persona', persona: publicPersona(s, cur) });
     },
@@ -441,7 +446,7 @@ function queueAvatar(userId, p) {
 function queuePostImage(userId, post, prompt) {
   post.imagePending = true;
   queueImage({
-    prompt: `${prompt}, realistic amateur photo posted on social media, no text`, w: 768, h: 640,
+    prompt: `${prompt}, stylized 3D open-world video game screenshot, vibrant cinematic lighting, no text`, w: 768, h: 640,
     run: (url) => {
       const s = net(userId);
       const cur = s.posts.find((x) => x.id === post.id);
@@ -475,7 +480,7 @@ async function tickUser(user, { forceAi = false } = {}) {
   if (s.lastTick && ago(s.lastTick) > 20 * MIN) catchUp(user, s, ago(s.lastTick));
   s.lastTick = now();
 
-  if (imagesOn(s) && imageQueue.length < 4) for (const p of s.personas.filter((x) => !x.avatar && !x.avatarTried && (!x.avatarFailAt || ago(x.avatarFailAt) > 6 * HOUR)).slice(0, 3)) queueAvatar(user.id, p);
+  if (imagesOn(s) && imageQueue.length < 4) for (const p of s.personas.filter((x) => (!x.avatar || x.restyle) && !x.avatarTried && (!x.avatarFailAt || ago(x.avatarFailAt) > 6 * HOUR)).slice(0, 3)) queueAvatar(user.id, p);
 
   // população: a rede nunca fica vazia e sempre aparece gente nova
   if (s.personas.length < LIMITS.minPersonas) {
@@ -844,7 +849,12 @@ router.post('/rede/posts', (req, res) => {
   const text = longStr(req.body?.text, 600);
   const image = /^\/uploads\/[\w.-]+$/.test(req.body?.image || '') ? req.body.image : null;
   if (!text && !image) return res.status(400).json({ error: 'Escreva algo ou escolha uma foto' });
-  const post = makePost(s, null, text, { image, kind: image ? 'foto' : 'texto' });
+  const u = worldOf(req.user.id).user;
+  const cam = Boolean(u?.installed?.camera);
+  const photo = cam && !image ? longStr(req.body?.photo, 200) : '';
+  const post = makePost(s, null, text, { image, kind: image || photo ? 'foto' : 'texto' });
+  if (photo && imagesOn(s)) queuePostImage(req.user.id, post, photo);
+  if (u) { const boost = u.fameBoostUntil > now() ? 3 : 1; u.fame = (u.fame || 0) + (cam ? 2 : 0.5) * boost; }
   // o mundo reage: comentários chegam nos próximos minutos
   post.wantReplies = 2 + rnd(3);
   post.replyAt = new Date(Date.now() + 20 * 1000).toISOString();
@@ -1000,5 +1010,28 @@ export function worldPost(ctx, p, text, { kind = 'texto', photo = null, rumorId 
 export function worldComment(ctx, post, p, text) {
   const s = net(ctx.uid);
   return addComment(ctx.uid, s, post, p, text, { at: ctx.at.toISOString() });
+}
+export function userPost(uid, text, { image = null, imagePrompt = null, sponsored = false } = {}) {
+  const s = net(uid);
+  const post = makePost(s, null, longStr(text, 600), { image, kind: image || imagePrompt ? 'foto' : 'texto' });
+  if (sponsored) post.sponsored = true;
+  post.wantReplies = 1 + rnd(3); post.replyAt = new Date(Date.now() + 20 * 1000).toISOString();
+  if (imagePrompt && imagesOn(s)) queuePostImage(uid, post, imagePrompt);
+  save();
+  emit(uid, 'social', { type: 'post', post: publicPost(s, post, uid) });
+  return post;
+}
+// imagem avulsa para outros módulos (ex.: o horizonte da cidade no Command Center)
+export function requestImage(uid, prompt, w, h, run) {
+  if (!imagesOn(net(uid))) return false;
+  return queueImage({ prompt, w, h, run, fail: () => {} });
+}
+// troca os rostos atuais pelo estilo 3D de jogo (aos poucos, respeitando a fila do gerador)
+export function restyleFaces(uid) {
+  const s = net(uid);
+  let n = 0;
+  for (const p of s.personas) if (p.avatarStyle !== '3d') { p.restyle = true; p.avatarTried = false; n++; }
+  save();
+  return n;
 }
 export { remember, publicPost, publicPersona, g as genderize, localPersona, EMOTIONS as SOCIAL_EMOTIONS };

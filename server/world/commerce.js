@@ -172,7 +172,9 @@ onDaily((ctx) => {
     // reposição: compra estoque com o caixa da empresa (custo = 60% do preço)
     for (const it of pl.catalog) {
       const tpl = PRODUCTS[it.key];
-      if (it.soldToday >= 2) it.price = Math.round(it.price * 1.04); else if (!it.soldToday && it.stock > 3) it.price = Math.max(Math.round(tpl.base * 0.7), Math.round(it.price * 0.98));
+      // preço sobe só quando esgota (procura maior que a oferta) e cai devagar quando encalha
+      if (it.stock === 0) it.price = Math.round(it.price * 1.05); else if (!it.soldToday && it.stock > 3) it.price = Math.round(it.price * 0.98);
+      it.price = clamp(it.price, Math.round(tpl.base * 0.7), Math.round(tpl.base * 1.5));
       it.soldToday = 0;
       if (tpl.rare && !chance(0.35)) continue; // itens raros nem sempre aparecem
       const want = Math.max(0, stockFor(it.key) - it.stock);

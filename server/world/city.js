@@ -1,6 +1,6 @@
 // WORLD MAP + cidade: Codeniac Society. Bairros, locais, moradores, clima, Liga Nexus (esportes),
 // Universidade e laboratórios (ciência), polícia (crimes, escândalos e desaparecimentos) e expansão da cidade.
-import { onDaily, onGenesis, handle, record, schedule } from './core.js';
+import { onDaily, onGenesis, handle, record, schedule, services } from './core.js';
 import { registerAction, people, residents, personById, agentOf, active, rumors, createRumor } from './agents.js';
 import { account, debit, addXp } from './bank.js';
 import { worldPost, remember, genderize, personaAddedHooks } from '../social.js';
@@ -268,8 +268,9 @@ registerAction({
     const gain = kind === 'vandalismo' ? 0 : 200 + rnd(1500);
     p.agent.cash += gain;
     const caught = chance(0.45 / (w.eco?.crimeMult || 1));
-    const ev = record(ctx, { type: 'crime', cat: 'seguranca', title: `${kind === 'golpe digital' ? 'Golpe digital' : kind[0].toUpperCase() + kind.slice(1)} registrado em ${d.name}`, text: caught ? `${p.name} foi detido(a) pela polícia.`.replace('detido(a)', genderize(p, 'detida(o)')) : 'Polícia investiga. Ninguém foi preso até agora.', actors: caught ? [p.id] : [], refs: [{ t: 'district', id: d.id }], importance: caught ? 3 : 2, data: { kind, districtId: d.id } });
-    if (caught) { p.agent.status = 'preso'; p.agent.statusUntil = new Date(ctx.at.getTime() + (2 + rnd(4)) * DAY).toISOString(); remember(p, `Fui presa(o) por ${kind}.`, ev.at); }
+    const ev = record(ctx, { type: 'crime', cat: 'seguranca', title: `${kind === 'golpe digital' ? 'Golpe digital' : kind[0].toUpperCase() + kind.slice(1)} registrado em ${d.name}`, text: caught ? `${p.name} foi detido(a) pela polícia.`.replace('detido(a)', genderize(p, 'detida(o)')) : 'Polícia investiga. Ninguém foi preso até agora.', actors: [p.id], refs: [{ t: 'district', id: d.id }], importance: caught ? 3 : 2, data: { kind, districtId: d.id } });
+    services.openCase?.(ctx, { type: kind === 'golpe digital' ? 'golpe' : kind, suspect: { type: 'persona', id: p.id }, plaintiff: 'policia', desc: `${kind[0].toUpperCase() + kind.slice(1)} em ${d.name}.`, evidence: caught ? [{ kind: 'flagrante', desc: 'Detido(a) no ato', strength: 0.8 }] : [{ kind: 'boato', desc: 'Moradores comentam sobre o caso', strength: 0.2 }] });
+    if (caught) remember(p, `Fui pega(o) pela polícia (${kind}).`, ev.at);
     else createRumor(ctx, { about: p.id, originId: pick(residents(w).filter((x) => x.agent.districtId === d.id && x.id !== p.id))?.id || p.id, text: `${p.name} está envolvido(a) no ${kind} de ${d.name}`.replace('envolvido(a)', genderize(p, 'envolvida(o)')), truth: 'verdadeiro' });
   },
 });
