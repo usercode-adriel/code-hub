@@ -31,12 +31,13 @@ const VIEWS = {
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
   empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), mercado: () => import('./views/mercado.js'),
   inventario: () => import('./views/inventario.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'),
+  organizacoes: () => import('./views/organizacoes.js'), acontecimentos: () => import('./views/acontecimentos.js'), cidade: () => import('./views/cidade.js'),
 };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
-const WORLD = new Set(['centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica']);
+const WORLD = new Set(['centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';

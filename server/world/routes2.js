@@ -12,6 +12,7 @@ import { PLACE_CATS, PRODUCTS, places, placeById, isOpen, storeView, negotiate, 
 import { inv, publicItem, itemAction } from './inventory.js';
 import { justice, publicCase, testify, settleCase, payFine, report, DEFAULT_PENALTIES, penalty } from './justice.js';
 import { hasAuthority, society, professionsFor } from './society.js';
+import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } from './orgs.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
@@ -258,6 +259,13 @@ router.put('/mundo/justica/penalidades', (req, res) => {
     return Object.fromEntries(Object.keys(DEFAULT_PENALTIES).map((k) => [k, penalty(w, k)]));
   });
 });
+
+// ---------------------------------------------------------------- organizações autônomas
+router.get('/mundo/organizacoes', (req, res) => { const w = world(req.user.id); res.json(orgsCenter(w)); });
+router.get('/mundo/organizacoes/:id', (req, res) => { const w = world(req.user.id); const o = orgById(w, req.params.id); if (!o) return res.status(404).json({ error: 'Organização não encontrada' }); res.json(publicOrg(w, o, true)); });
+router.post('/mundo/organizacoes/:id/entrar', (req, res) => { const ctx = ctxOf(req); run(res, () => requestJoin(ctx, req.params.id)); });
+router.post('/mundo/organizacoes/:id/aceitar', (req, res) => { const ctx = ctxOf(req); run(res, () => acceptInvite(ctx, req.params.id)); });
+router.post('/mundo/organizacoes/:id/sair', (req, res) => { const ctx = ctxOf(req); run(res, () => leaveOrg(ctx, req.params.id)); });
 
 // ---------------------------------------------------------------- rostos 3D e imagem da cidade
 router.post('/mundo/controle/rostos', (req, res) => { run(res, () => ({ queued: restyleFaces(req.user.id) })); });

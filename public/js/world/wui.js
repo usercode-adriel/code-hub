@@ -12,7 +12,7 @@ export const ENVS = [
   ['centro', 'Início', 'dashboard'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe'], ['mercado', 'Mercado', 'bag'],
   ['empresas', 'Empresas', 'briefcase'], ['banco', 'Banco', 'wallet'], ['policia', 'Polícia', 'shield'], ['justica', 'Justiça', 'scale'], ['inventario', 'Inventário', 'layers'], ['midia', 'Notícias', 'news'],
 ];
-export const MORE = [['governo', 'Governo', 'flag'], ['arquivo', 'Arquivo', 'book'], ['controle', 'Controle da IA', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub pessoal', 'dashboard']];
+export const MORE = [['organizacoes', 'Organizações', 'briefcase'], ['acontecimentos', 'Acontecimentos', 'zap'], ['cidade', 'Desenvolvimento', 'pin'], ['governo', 'Governo', 'flag'], ['arquivo', 'Arquivo', 'book'], ['controle', 'Controle da IA', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub pessoal', 'dashboard']];
 const ENV_OF = { economia: 'empresas', rede: 'social', busca: 'internet' };
 export const CAT_ICON = { politica: 'scale', economia: 'trending', tecnologia: 'cpu', entretenimento: 'play', esportes: 'trophy', seguranca: 'shield', ciencia: 'sparkles', celebridades: 'star', sociedade: 'users', local: 'pin', pessoal: 'heart' };
 export const CAT_LABEL = { politica: 'Política', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes', seguranca: 'Segurança', ciencia: 'Ciência', celebridades: 'Celebridades', sociedade: 'Sociedade', local: 'Local', pessoal: 'Vida pessoal' };
