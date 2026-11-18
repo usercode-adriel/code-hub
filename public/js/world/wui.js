@@ -22,24 +22,64 @@ export const nx = (v, d = 2) => `${(Number(v) || 0).toLocaleString('pt-BR', { mi
 export const num = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1).replace('.0', '')} mi` : v >= 1e3 ? `${(v / 1e3).toFixed(1).replace('.0', '')} mil` : String(Math.round(v || 0)));
 export const pct = (v) => `${v > 0 ? '+' : ''}${(Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 
-// moldura de cada ambiente: barra de navegação + área do conteúdo
+// grupos da barra lateral (layout de dashboard de jogo)
+export const SIDE_GROUPS = [
+  ['Cidade', [['centro', 'Início', 'dashboard'], ['mapa', 'Mapa', 'pin'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe']]],
+  ['Economia', [['mercado', 'Mercado', 'bag'], ['empresas', 'Empresas', 'briefcase'], ['banco', 'Banco', 'wallet'], ['inventario', 'Inventário', 'layers']]],
+  ['Cidade viva', [['organizacoes', 'Organizações', 'briefcase'], ['acontecimentos', 'Acontecimentos', 'zap'], ['cidade', 'Desenvolvimento', 'pin']]],
+  ['Autoridades', [['policia', 'Polícia', 'shield'], ['justica', 'Justiça', 'scale'], ['governo', 'Governo', 'flag'], ['midia', 'Notícias', 'news']]],
+  ['Sistema', [['arquivo', 'Arquivo', 'book'], ['controle', 'Controle', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub', 'dashboard']]],
+];
+
+// moldura de cada ambiente: barra lateral + topo + conteúdo (estilo dashboard de jogo roxo)
 export function shell(el, env, { title = '', sub = '' } = {}) {
   const cur = ENV_OF[env] || env;
   const user = store.user || {};
-  el.innerHTML = `<div class="w-env" data-env="${env}">
-    <header class="wx-top">
-      <a class="wx-brand" href="#/centro" aria-label="Codeniac Digital Society"><span class="wx-logo">${icon('globe', 20)}</span><span class="wx-name"><b>Codeniac</b><small>Digital Society</small></span></a>
-      <nav class="w-nav wx-nav" aria-label="Ambientes do System 2.0">${ENVS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 14)}<span>${l}</span><i class="wx-badge" data-badge="${k}"></i></a>`).join('')}
-        <details class="wx-more ${MORE.some(([k]) => k === cur) ? 'on' : ''}"><summary>${icon('more', 14)}<span>Mais</span></summary><div class="wx-more-menu">${MORE.map(([k, l, ic]) => `<a href="#/${k}">${icon(ic, 14)} ${l}</a>`).join('')}</div></details></nav>
-      <div class="wx-right"><a class="wx-ic" href="#/notifications" aria-label="Notificações">${icon('bell', 17)}</a><span class="wx-online"><i></i>Online</span>
-        <a class="wx-me" href="#/profile" aria-label="Meu perfil">${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : `<span>${esc(initials(user.name || 'Eu'))}</span>`}</a></div>
-    </header>
-    ${title ? `<header class="w-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
-    <div class="w-body" id="wBody"></div></div>`;
-  el.querySelector('.wx-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  const item = ([k, l, ic]) => `<a href="#/${k}" class="wg-item ${k === cur ? 'on' : ''}">${icon(ic, 17)}<span>${l}</span><i class="wx-badge" data-badge="${k}"></i></a>`;
+  el.innerHTML = `<div class="wg w-env" data-env="${env}">
+    <aside class="wg-side" id="wgSide">
+      <a class="wg-logo" href="#/centro" aria-label="Codeniac Digital Society"><span class="wg-logo-ic">${icon('globe', 20)}</span><span class="wg-logo-tx"><b>CODENIAC</b><small>Digital Society</small></span></a>
+      <nav class="wg-nav" aria-label="Navegação">${SIDE_GROUPS.map(([g, items]) => `<div class="wg-grp"><span class="wg-grp-t">${esc(g)}</span>${items.map(item).join('')}</div>`).join('')}</nav>
+    </aside>
+    <div class="wg-scrim" id="wgScrim"></div>
+    <div class="wg-col">
+      <header class="wg-top">
+        <button class="wg-burger" id="wgBurger" aria-label="Menu">${icon('menu', 20)}</button>
+        <form class="wg-search" id="wgSearch"><span>${icon('search', 16)}</span><input placeholder="Buscar em Nexus City…" aria-label="Buscar"></form>
+        <div class="wg-top-r">
+          <a class="wg-coins" href="#/banco" title="Seu saldo"><span class="wg-coin">${icon('wallet', 14)}</span><b id="wgBal">—</b></a>
+          <a class="wg-ic" href="#/notifications" aria-label="Notificações"><i class="wg-ic-dot" data-badge="centro"></i>${icon('bell', 18)}</a>
+          <span class="wg-online"><i></i>Online</span>
+          <a class="wg-me" href="#/profile" aria-label="Meu perfil">${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : `<span>${esc(initials(user.name || 'Eu'))}</span>`}</a>
+        </div>
+      </header>
+      <main class="wg-main">
+        ${title ? `<header class="w-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
+        <div class="w-body" id="wBody"></div>
+      </main>
+    </div></div>`;
+  // menu móvel
+  const side = el.querySelector('#wgSide'); const scrim = el.querySelector('#wgScrim');
+  const closeSide = () => { side.classList.remove('open'); scrim.classList.remove('on'); };
+  el.querySelector('#wgBurger').onclick = () => { side.classList.toggle('open'); scrim.classList.toggle('on'); };
+  scrim.onclick = closeSide;
+  el.querySelectorAll('.wg-item').forEach((a) => a.addEventListener('click', closeSide));
+  // busca -> internet
+  el.querySelector('#wgSearch').onsubmit = (e) => { e.preventDefault(); const q = e.target.querySelector('input').value.trim(); if (q) location.hash = `#/internet?q=${encodeURIComponent(q)}`; };
+  el.querySelector('.wg-item.on')?.scrollIntoView({ block: 'nearest' });
   paintBadges(el);
+  paintBalance(el);
   return el.querySelector('#wBody');
 }
+// saldo no topo (cache curto)
+let balCache = null; let balAt = 0;
+async function paintBalance(root) {
+  try {
+    if (balCache == null || Date.now() - balAt > 15000) { balCache = (await api.get('/mundo/resumo'))?.me?.balance ?? 0; balAt = Date.now(); }
+    const b = root.querySelector('#wgBal'); if (b) b.textContent = num(balCache);
+  } catch { /* sem saldo */ }
+}
+export const refreshBalance = () => { balCache = null; };
 // badges do menu: sempre há um marcador em cada aba (número quando há pendências, ponto quando não).
 let badgeCache = null; let badgeAt = 0;
 async function paintBadges(root) {

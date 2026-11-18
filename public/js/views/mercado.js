@@ -5,6 +5,31 @@ import { formModal } from '../ui.js';
 
 const stars = (r) => { const n = Math.round(r || 0); return `<span class="mk-stars" aria-label="${(r || 0).toFixed(1)} de 5">${'★'.repeat(n)}${'☆'.repeat(5 - n)}</span>`; };
 const hrs = (h) => (h ? `${String(h[0]).padStart(2, '0')}h–${String(h[1] % 24).padStart(2, '0')}h` : '24 h');
+const CATIC = { tecnologia: 'cpu', social: 'star', geral: 'bag' };
+const CATCOL = { tecnologia: '#22d3ee', social: '#ec4899', geral: '#f59e0b' };
+
+// menu circular (roleta) de itens: tokens ao redor, item selecionado no centro com os botões de compra
+function wheelHtml(s, sel) {
+  const cat = s.catalog || [];
+  const it = cat[sel] || null;
+  const n = cat.length;
+  const tokens = cat.map((p, i) => {
+    const ang = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
+    const x = 50 + 40 * Math.cos(ang); const y = 50 + 40 * Math.sin(ang);
+    const col = CATCOL[p.cat] || '#a855f7';
+    return `<button class="mk-token ${i === sel ? 'on' : ''} ${p.stock ? '' : 'out'}" data-sel="${i}" style="left:${x}%;top:${y}%;--c:${col}" title="${esc(p.name)}">${icon(CATIC[p.cat] || 'bag', 20)}${p.promo ? '<i class="mk-token-promo">%</i>' : ''}</button>`;
+  }).join('');
+  const buyable = it && s.here && s.open && it.stock && !s.banned;
+  return `<div class="mk-wheel-head"><h3>${icon('bag', 16)} Vitrine</h3><small class="muted">Gire e escolha o item</small></div>
+    <div class="mk-wheel"><div class="mk-wheel-ring">${tokens}
+      <div class="mk-wheel-center">${it ? `<span class="mk-wc-ic" style="--c:${CATCOL[it.cat] || '#a855f7'}">${icon(CATIC[it.cat] || 'bag', 30)}</span>
+        <b class="mk-wc-nm">${esc(it.name)}</b>
+        <div class="mk-wc-price">${it.promo ? `<s>${nx(it.listPrice, 0)}</s>` : ''}<em>${nx(it.price, 0)}</em></div>
+        <small class="mk-wc-stock ${it.stock ? '' : 'down'}">${it.stock ? `${it.stock} em estoque` : 'Esgotado'}</small>` : '<b>Sem itens</b>'}</div></div></div>
+    ${it ? `<div class="mk-wc-desc"><p class="muted">${esc(it.desc || '')}</p>
+      <div class="mk-wc-acts"><button class="btn primary" data-buy="${esc(it.key)}" ${buyable ? '' : 'disabled'}>${icon('bag', 14)} Comprar</button><button class="btn outline" data-neg="${esc(it.key)}" ${s.open && it.stock ? '' : 'disabled'}>Negociar</button></div>
+      ${!s.here ? '<small class="muted mk-wc-hint">Vá até a loja pelo mapa para comprar.</small>' : !s.open ? '<small class="muted mk-wc-hint">A loja está fechada agora.</small>' : ''}</div>` : ''}`;
+}
 
 export default async function render(el, parts) {
   const body = shell(el, 'mercado');
@@ -37,7 +62,8 @@ export default async function render(el, parts) {
 async function storePage(body, id) {
   body.innerHTML = '<div class="skeleton" style="height:360px"></div>';
   let s;
-  const load = async () => { s = await api.get(`/mundo/lojas/${encodeURIComponent(id)}`); paint(); };
+  let sel = 0;
+  const load = async () => { s = await api.get(`/mundo/lojas/${encodeURIComponent(id)}`); if (sel >= s.catalog.length) sel = 0; paint(); };
   const chatLog = [];
   function paint() {
     const promoOn = s.promo && s.promo.until > new Date().toISOString();
@@ -50,10 +76,7 @@ async function storePage(body, id) {
           ${s.banned ? '<span class="w-chip warn">O vendedor se recusa a te atender</span>' : ''}</div></header>
       ${promoOn ? `<div class="mk-banner">${icon('zap', 14)} Promoção: ${s.promo.pct}% de desconto em ${esc(s.catalog.find((c) => c.key === s.promo.key)?.name || 'um produto')} até ${new Date(s.promo.until).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
       <div class="mk-cols">
-        <section class="mk-cat">${s.catalog.map((it) => `<article class="mk-item w-panel"><div class="mk-it-h"><span class="mk-ic sm">${icon({ tecnologia: 'cpu', social: 'star', geral: 'bag' }[it.cat] || 'bag', 16)}</span><b>${esc(it.name)}</b></div>
-            <p class="muted">${esc(it.desc || '')}</p>
-            <div class="mk-price">${it.promo ? `<s>${nx(it.listPrice, 0)}</s>` : ''}<b>${nx(it.price, 0)}</b><small class="${it.stock ? '' : 'down'}">${it.stock ? `${it.stock} em estoque` : 'Esgotado'}</small></div>
-            <div class="mk-it-acts"><button class="btn sm primary" data-buy="${esc(it.key)}" ${!s.here || !s.open || !it.stock || s.banned ? 'disabled' : ''}>Comprar</button><button class="btn sm outline" data-neg="${esc(it.key)}" ${!s.open || !it.stock ? 'disabled' : ''}>Negociar</button></div></article>`).join('')}</section>
+        <section class="mk-showcase w-panel">${wheelHtml(s, sel)}</section>
         <aside class="mk-side">
           ${s.seller ? `<section class="w-panel mk-seller"><div class="mk-sl-h"><span data-person="${esc(s.seller.id)}">${face(s.seller, 48)}</span><div><b>${esc(s.seller.name)}</b><small>Vendedor(a) · estilo ${esc(s.seller.styleLabel)}</small>${s.seller.customer?.purchases ? `<small>Você já comprou ${s.seller.customer.purchases}× aqui</small>` : ''}</div></div>
             ${s.greeting ? `<p class="mk-bubble">“${esc(s.greeting)}”</p>` : ''}
@@ -92,6 +115,7 @@ async function storePage(body, id) {
     });
   });
   function bindActions() {
+    body.querySelectorAll('[data-sel]').forEach((b) => { b.onclick = () => { sel = Number(b.dataset.sel); paint(); }; });
     body.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => doBuy(b.dataset.buy); });
     body.querySelector('[data-pitch]')?.addEventListener('click', () => doBuy(s.pitch.offer.key, s.pitch.offer.id));
     body.querySelectorAll('[data-neg]').forEach((b) => { b.onclick = () => {
