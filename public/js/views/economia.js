@@ -69,8 +69,10 @@ async function carreira(box, reload) {
     : `<div class="w-panel e-job"><h2>Você está sem emprego</h2><p class="muted">Candidate-se às vagas abaixo. A empresa avalia sua reputação (${d.reputation}), seus diplomas e o que o CEO acha de você.</p></div>`}
     ${d.applications.length ? `<h3 class="w-h3">Suas candidaturas</h3>${d.applications.slice(0, 6).map((a) => `<div class="w-row"><span>${esc(a.role)} · ${esc(a.company || '')} <small class="muted">${esc(timeAgo(a.at))}</small></span><span class="w-chip ${a.status === 'aprovado' ? 'ok' : a.status === 'recusado' ? 'warn' : ''}">${esc(a.status)}</span></div>`).join('')}` : ''}
     <h3 class="w-h3">Vagas abertas (${d.openings.length})</h3>${d.openings.map((o) => `<div class="w-row"><span><b>${esc(o.role)}</b> · <a class="w-link" data-company="${esc(o.companyId)}">${esc(o.company)}</a> <small class="muted">${esc(o.sector)} · ${nx(o.salary, 0)}/dia</small></span><button class="btn sm outline" data-apply="${esc(o.companyId)}|${esc(o.id)}" ${j ? 'disabled title="Você já trabalha"' : ''}>Candidatar</button></div>`).join('') || '<p class="muted">Nenhuma vaga agora. Empresas abrem vagas quando a demanda passa da capacidade da equipe.</p>'}
-    <h3 class="w-h3">Universidade de Nexus City</h3>${d.studying ? `<p>📚 Cursando <b>${esc(d.studying.name)}</b> até ${new Date(d.studying.until).toLocaleString('pt-BR')}.</p>` : ''}
-    <div class="e-courses">${d.courses.map((c) => `<div class="w-panel e-course"><b>${esc(c.name)}</b><small>${c.days} dias · ${nx(c.cost, 0)}</small>${c.done ? '<span class="w-chip ok">diplomado</span>' : `<button class="btn sm outline" data-course="${esc(c.id)}" ${d.studying ? 'disabled' : ''}>Matricular</button>`}</div>`).join('')}</div>
+    ${professionsPanel(d)}
+    <h3 class="w-h3">${icon('school', 16)} Universidade de Nexus City</h3>
+    ${d.studying ? apostila(d.studying) : '<p class="muted">Todos os cursos duram 3 dias. A cada dia há uma mini apostila para ler e, às vezes, uma palestra. O diploma habilita a sua profissão.</p>'}
+    <div class="e-courses">${d.courses.map((c) => `<div class="w-panel e-course"><b>${esc(c.name)}</b><small>${c.days} dias · ${nx(c.cost, 0)}</small>${c.path ? `<small class="e-path">${icon('chevRight', 10)} ${esc(c.path)}</small>` : ''}${c.done ? '<span class="w-chip ok">diplomado</span>' : `<button class="btn sm outline" data-course="${esc(c.id)}" ${d.studying ? 'disabled' : ''}>Matricular</button>`}</div>`).join('')}</div>
     ${d.discoveries.length ? `<h3 class="w-h3">Descobertas científicas recentes</h3>${d.discoveries.map((x) => `<div class="w-row"><span><b>${esc(x.title)}</b> <small class="muted">${esc(x.lab)} · ${esc(x.effect)}</small></span></div>`).join('')}` : ''}
     <h3 class="w-h3">Laboratórios</h3>${d.labs.map((l) => `<div class="w-kv"><span>${esc(l.name)}: ${esc(l.project)}</span><i class="w-bar"><i style="width:${Math.min(100, l.progress)}%;background:#6366f1"></i></i><b>${Math.round(l.progress)}%</b></div>`).join('')}`;
   freelas(box);
@@ -78,6 +80,26 @@ async function carreira(box, reload) {
   box.querySelectorAll('[data-apply]').forEach((b) => { b.onclick = async () => { const [cid, oid] = b.dataset.apply.split('|'); try { await api.post(`/mundo/vagas/${cid}/${oid}`); toast('Candidatura enviada', 'Resposta em alguns minutos.', 'success'); reload(); } catch (err) { toast('Não deu', err.message, 'error'); } }; });
   box.querySelectorAll('[data-course]').forEach((b) => { b.onclick = async () => { try { await api.post(`/mundo/educacao/${b.dataset.course}`); toast('Matrícula feita 🎓', '', 'success'); reload(); } catch (err) { toast('Não deu', err.message, 'error'); } }; });
   box.querySelector('#quit')?.addEventListener('click', async () => { const { confirmDialog } = await import('../ui.js'); if (!(await confirmDialog('Pedir demissão', 'Seus colegas vão lembrar disso.', 'Pedir demissão'))) return; await api.post('/mundo/trabalho/sair'); reload(); });
+  box.querySelectorAll('[data-lesson]').forEach((b) => { b.onclick = async () => { try { await api.post(`/mundo/educacao/aula/${b.dataset.lesson}`); reload(); } catch (err) { toast('Não deu', err.message, 'error'); } }; });
+  box.querySelectorAll('[data-prof]').forEach((b) => { b.onclick = async () => { try { await api.post(`/mundo/profissao/${b.dataset.prof}`); toast('Profissão assumida ✅', 'Novos acessos liberados.', 'success'); reload(); } catch (err) { toast('Ainda não', err.message, 'error'); } }; });
+}
+// painel de profissões: o que cada diploma habilita e o que você já pode assumir
+function professionsPanel(d) {
+  const label = { policia: 'Polícia', ciber: 'Perícia cibernética', ministro: 'Ministério', investidor: 'Investidor', empresario: 'Empresa própria', banqueiro: 'Banco próprio' };
+  return `<h3 class="w-h3">${icon('shield', 16)} Profissões e autoridades</h3>
+    <p class="muted">Como cidadão comum, seu acesso é só o hub. Cada diploma abre uma carreira. ${d.authorities?.length ? `Você é: <b>${d.authorities.map((a) => label[a] || a).join(', ')}</b>.` : 'Você ainda não exerce nenhuma profissão.'}</p>
+    <div class="e-profs">${(d.professions || []).map((p) => `<div class="w-panel e-prof ${p.active ? 'on' : p.eligible ? 'elig' : ''}"><div class="e-prof-h">${icon(p.active ? 'check' : p.eligible ? 'star' : 'lock', 15)}<b>${esc(p.label)}</b></div>
+      <small class="muted">${esc(p.via)} · requer ${esc(p.needs.join(' + '))}</small>
+      ${p.active ? '<span class="w-chip ok">Ativa</span>' : p.eligible ? `<button class="btn sm primary" data-prof="${esc(p.key)}">Assumir</button>` : `<small class="e-miss">Falta: ${esc(p.missing.join(', '))}</small>`}</div>`).join('')}</div>`;
+}
+// leitor de apostila do curso em andamento
+function apostila(st) {
+  const done = (st.lessons || []).filter((l) => l.read).length;
+  return `<div class="w-panel e-study"><div class="w-ph"><div><small class="muted">Cursando</small><h2>${esc(st.name)}</h2></div><span class="w-chip">${done}/${(st.lessons || []).length} aulas lidas</span></div>
+    <p class="muted">Conclui em ${new Date(st.until).toLocaleString('pt-BR')}.</p>
+    <div class="e-lessons">${(st.lessons || []).map((l) => `<div class="e-lesson ${l.read ? 'read' : ''}"><div class="e-lesson-h"><b>Aula ${l.day}: ${esc(l.title)}</b>${l.read ? `<span class="w-chip ok sm">lida</span>` : ''}</div>
+      ${l.lecture ? `<div class="e-lecture"><span data-person="${esc(l.lecture.id)}">${face(l.lecture, 24)}</span><small>Palestra de <b>${esc(l.lecture.name)}</b> · ${esc(l.lecture.role)}</small></div>` : ''}
+      <p>${esc(l.text)}</p>${l.read ? '' : `<button class="btn sm outline" data-lesson="${l.day}">${icon('check', 12)} Marcar como lida</button>`}</div>`).join('')}</div></div>`;
 }
 
 async function imoveis(box, reload) {

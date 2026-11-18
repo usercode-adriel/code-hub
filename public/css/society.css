@@ -278,3 +278,17 @@ a.dx-stat:hover { background: var(--bg-hover); }
 .pj-elig { color: #22c55e; } .pj-rep-sm { align-self: start; white-space: nowrap; }
 .pj-note p { font-size: 12px; } .w-morelink { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--wa); }
 @media (max-width: 760px) { .pj-locked { grid-template-columns: 1fr; text-align: left; } .pj-rep-sm { justify-self: start; } }
+
+/* ---------- carreira: profissões e apostila ---------- */
+.e-profs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 8px 0 4px; }
+.e-prof { display: grid; gap: 6px; border-left: 3px solid var(--border); }
+.e-prof.elig { border-left-color: #eab308; } .e-prof.on { border-left-color: #22c55e; }
+.e-prof-h { display: flex; gap: 7px; align-items: center; } .e-prof-h svg { color: var(--wa); } .e-prof.on .e-prof-h svg { color: #22c55e; }
+.e-miss { color: #ef4444; } .e-path { color: var(--wa); display: inline-flex; align-items: center; gap: 3px; }
+.e-study { display: grid; gap: 8px; } .e-study h2 { margin: 0; font-size: 18px; }
+.e-lessons { display: grid; gap: 8px; }
+.e-lesson { padding: 10px 12px; border-radius: 12px; background: var(--bg-card-2); display: grid; gap: 6px; border-left: 3px solid var(--wa); }
+.e-lesson.read { opacity: .72; border-left-color: #22c55e; }
+.e-lesson-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; } .e-lesson p { margin: 0; font-size: 12.8px; line-height: 1.55; }
+.e-lecture { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; background: color-mix(in srgb, var(--wa) 12%, transparent); } .e-lecture small { color: var(--text-2); }
+.w-chip.sm { font-size: 9.5px; padding: 1px 6px; }

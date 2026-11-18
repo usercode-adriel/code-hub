@@ -6,6 +6,7 @@ import { account, debit, addXp } from './bank.js';
 import { worldPost, remember, genderize, personaAddedHooks } from '../social.js';
 import { rnd, pick, chance, clamp, uid, DAY, HOUR, gauss, poisson, cap, shuffle } from './util.js';
 import { notify } from '../notify.js';
+import { courseLessons, maybeLecture } from './society.js';
 
 // ---------------------------------------------------------------- geografia (mapa 1000 × 600)
 const DISTRICTS = [
@@ -87,10 +88,14 @@ onGenesis((ctx) => {
   newSeason(ctx);
   // educação e ciência
   w.edu = {
-    university: 'Universidade de Codeniac',
+    university: 'Universidade de Nexus City',
     courses: [
-      { id: 'prog', name: 'Programação', days: 5, cost: 1500 }, { id: 'adm', name: 'Administração', days: 6, cost: 2000 }, { id: 'jorn', name: 'Jornalismo', days: 4, cost: 1200 },
-      { id: 'dados', name: 'Ciência de dados', days: 6, cost: 2500 }, { id: 'med', name: 'Medicina', days: 12, cost: 6000 }, { id: 'direito', name: 'Direito', days: 8, cost: 3000 },
+      { id: 'direito', name: 'Direito', days: 3, cost: 3000, path: 'Polícia ou Ministério' },
+      { id: 'adm', name: 'Administração', days: 3, cost: 2200, path: 'Abrir empresa' },
+      { id: 'economia', name: 'Economia', days: 3, cost: 2400, path: 'Investir na Bolsa' },
+      { id: 'infosec', name: 'Segurança da Informação', days: 3, cost: 2600, path: 'Perícia cibernética' },
+      { id: 'prog', name: 'Programação', days: 3, cost: 1500 }, { id: 'dados', name: 'Ciência de dados', days: 3, cost: 2500 },
+      { id: 'jorn', name: 'Jornalismo', days: 3, cost: 1200 }, { id: 'med', name: 'Medicina', days: 3, cost: 3200 },
     ],
     labs: [
       { id: uid(), name: 'Laboratório de IA da Universidade', field: 'inteligência artificial', sector: 'tecnologia', progress: rnd(40), project: 'Assistentes que entendem emoções' },
@@ -207,7 +212,8 @@ export function enroll(ctx, courseId) {
   if (u.diplomas.includes(c.name)) throw new Error('Você já tem esse diploma');
   const cost = Math.round(c.cost * (w.eco?.cpi || 1) * (1 - (w.eco?.eduDiscount || 0)));
   debit(w, cost, `Matrícula: ${c.name} (Universidade de Codeniac)`, ctx.at);
-  u.studying = { courseId: c.id, name: c.name, until: new Date(ctx.at.getTime() + c.days * DAY).toISOString(), startedAt: ctx.at.toISOString() };
+  const lessons = maybeLecture(ctx, courseLessons(c.name), c.name);
+  u.studying = { courseId: c.id, name: c.name, days: c.days, until: new Date(ctx.at.getTime() + c.days * DAY).toISOString(), startedAt: ctx.at.toISOString(), lessons };
   schedule(ctx, new Date(u.studying.until), 'formatura-usuario', { courseId: c.id });
   record(ctx, { type: 'matricula', cat: 'local', title: `Você se matriculou em ${c.name}`, actors: ['me'], importance: 1 });
   return u.studying;
@@ -219,7 +225,7 @@ handle('formatura-usuario', (ctx, { courseId }) => {
   addXp(ctx.w, 80);
   const name = ctx.w.edu.courses.find((c) => c.id === courseId)?.name;
   record(ctx, { type: 'formatura', cat: 'local', title: `Você se formou em ${name}`, actors: ['me'], importance: 3 });
-  notify(ctx.uid, { type: 'system', title: `🎓 Diploma de ${name}`, message: 'Novas vagas aceitam você agora.', link: '#/economia/carreira' });
+  notify(ctx.uid, { type: 'system', title: `🎓 Diploma de ${name}`, message: 'Novas vagas aceitam você agora.', link: '#/empresas/carreira' });
 });
 registerAction({
   name: 'estudar',

@@ -11,7 +11,7 @@ import {
 import { account, credit, debit, addXp, verifyPin, bankOf, isLate, outstanding } from './bank.js';
 import { justice } from './justice.js';
 import { gigs, loans } from './finance.js';
-import { society, hasAuthority } from './society.js';
+import { society, hasAuthority, professionsFor, claimProfession, readLesson } from './society.js';
 import { inv } from './inventory.js';
 import { districtById, weatherNow, enroll, startInvestigation, quiz } from './city.js';
 import { publicPolitics, joinParty, runForOffice, campaign, userProposeLaw, voteLaw } from './politics.js';
@@ -396,13 +396,13 @@ router.post('/mundo/banco/transferir', (req, res) => {
     return { balance: account(ctx.w).bank.balance };
   });
 });
-router.post('/mundo/bolsa', (req, res) => { const ctx = ctxOf(req); ok(res, () => trade(ctx, req.body?.companyId, Number(req.body?.qtd), req.body?.lado === 'venda' ? 'venda' : 'compra')); });
+router.post('/mundo/bolsa', (req, res) => { const ctx = ctxOf(req); ok(res, () => { if (!hasAuthority(ctx.w, 'investidor')) throw new Error('Para investir na Bolsa, forme-se em Economia e credencie-se (Carreira).'); return trade(ctx, req.body?.companyId, Number(req.body?.qtd), req.body?.lado === 'venda' ? 'venda' : 'compra'); }); });
 router.get('/mundo/empresas/:id', (req, res) => {
   const w = world(req.user.id); const c = companyById(w, req.params.id);
   if (!c) return res.status(404).json({ error: 'Empresa não encontrada' });
   res.json({ ...publicCompany(w, c, true), events: w.events.filter((e) => e.refs.some((r) => r.id === c.id)).slice(-25).reverse().map((e) => publicEvent(e, w)), mine: c.founderId === 'me', position: account(w).portfolio[c.id] || null });
 });
-router.post('/mundo/empresas', (req, res) => { const ctx = ctxOf(req); if (!born(ctx.w)) return res.status(409).json({ error: 'O mundo ainda está nascendo' }); ok(res, () => publicCompany(ctx.w, foundUserCompany(ctx, req.body?.nome, req.body?.setor), true)); });
+router.post('/mundo/empresas', (req, res) => { const ctx = ctxOf(req); if (!born(ctx.w)) return res.status(409).json({ error: 'O mundo ainda está nascendo' }); ok(res, () => { if (!hasAuthority(ctx.w, 'empresario')) throw new Error('Para abrir empresa, forme-se em Administração e registre-se na Junta Comercial (Carreira).'); return publicCompany(ctx.w, foundUserCompany(ctx, req.body?.nome, req.body?.setor), true); }); });
 router.post('/mundo/empresas/:id/gestao', (req, res) => {
   const ctx = ctxOf(req); const c = companyById(ctx.w, req.params.id);
   if (!c) return res.status(404).json({ error: 'Empresa não encontrada' });
@@ -421,6 +421,7 @@ router.get('/mundo/carreira', (req, res) => {
     openings: companies(w).filter((x) => x.status !== 'falida' && x.founderId !== 'me').flatMap((x) => x.openings.map((o) => ({ ...o, companyId: x.id, company: x.name, sector: SECTORS[x.sector]?.label, reputation: x.reputation }))),
     courses: (w.edu?.courses || []).map((x) => ({ ...x, cost: Math.round(x.cost * (w.eco?.cpi || 1) * (1 - (w.eco?.eduDiscount || 0))), done: u.diplomas.includes(x.name) })),
     studying: u.studying || null, diplomas: u.diplomas, history: u.jobHistory || [], reputation: u.reputation,
+    professions: professionsFor(w), authorities: u.authorities || [],
     discoveries: (w.edu?.discoveries || []).slice(-5).reverse(), labs: w.edu?.labs || [],
   });
 });
@@ -435,6 +436,8 @@ router.post('/mundo/trabalho/sair', (req, res) => {
   ok(res, () => { const u = account(ctx.w); if (!u.job) throw new Error('Você não está empregado(a)'); const c = companyById(ctx.w, u.job.companyId); if (c) c.employees = c.employees.filter((e) => e.personaId !== 'me'); u.jobHistory ??= []; u.jobHistory.push({ ...u.job, until: new Date().toISOString(), reason: 'pediu demissão' }); u.job = null; record(ctx, { type: 'pediu-demissao-usuario', cat: 'economia', title: `Você pediu demissão da ${c?.name || 'empresa'}`, actors: ['me'], importance: 2 }); return { ok: true }; });
 });
 router.post('/mundo/educacao/:id', (req, res) => { const ctx = ctxOf(req); ok(res, () => enroll(ctx, req.params.id)); });
+router.post('/mundo/educacao/aula/:dia', (req, res) => { const ctx = ctxOf(req); ok(res, () => readLesson(ctx, req.params.dia)); });
+router.post('/mundo/profissao/:key', (req, res) => { const ctx = ctxOf(req); ok(res, () => ({ professions: claimProfession(ctx, req.params.key) })); });
 
 router.get('/mundo/imoveis', (req, res) => {
   const w = world(req.user.id);
