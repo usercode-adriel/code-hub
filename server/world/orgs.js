@@ -61,9 +61,11 @@ function foundOrg(ctx, founder, { kind = null, seed: seedMode = false } = {}) {
   // na semeadura (gênese) a cidade ainda tem poucas relações: aceita conhecidos do mesmo bairro
   if (seedMode && friends.length < 2) friends = shuffle(residents(w).filter((p) => p.id !== founder.id && active(p) && !p.agent.orgId && !p.agent.orgLead && p.agent.districtId === a.districtId));
   const cofounders = shuffle(friends).slice(0, 1 + rnd(2));
-  if (!cofounders.length && k.cat !== 'submundo') return null; // ninguém topou: fundação fracassa
+  if (!cofounders.length && k.cat !== 'submundo' && !seedMode) return null; // ninguém topou: fundação fracassa (na gênese aceita fundador solo)
   a.cash = round2(a.cash - seed);
-  const name = orgName(kind);
+  let name = orgName(kind); let tries = 0;
+  while (orgs(w).some((x) => x.name === name) && tries++ < 8) name = orgName(kind);
+  if (orgs(w).some((x) => x.name === name)) name = `${name} ${(w.city?.districts || []).find((d) => d.id === (a.districtId || 'centro'))?.name || ''}`.trim();
   const node = freeNode(w, a.districtId || 'centro', { used: new Set((w.city?.places || []).map((p) => p.node)) });
   const o = {
     id: uid(), name, sigla: sigla(name), kind, cat: k.cat, color: k.color, secret: Boolean(k.secret),
@@ -103,7 +105,7 @@ registerAction({
   weight: (ctx, p) => {
     const a = p.agent;
     if (!a.resident || a.orgLead || a.office || a.candidate || a.police) return 0;
-    if (a.cash < 3000 || a.age < 22) return 0;
+    if (a.cash < 3000 || p.age < 22) return 0;
     return (a.traits.ambition - 0.45) * 0.1 + (a.diplomas?.length ? 0.03 : 0);
   },
   run(ctx, p) { foundOrg(ctx, p); },
@@ -219,7 +221,7 @@ function maybeInviteUser(ctx) {
 // ---------------------------------------------------------------- semear organizações na gênese/atualização
 function seedOne(ctx) {
   const w = ctx.w;
-  const cand = shuffle(residents(w).filter((p) => active(p) && !p.agent.orgLead && p.agent.cash > 3000 && p.agent.age >= 22));
+  const cand = shuffle(residents(w).filter((p) => active(p) && !p.agent.orgLead && p.agent.cash > 3000 && p.age >= 22));
   for (const p of cand.slice(0, 8)) { const o = foundOrg(ctx, p, { seed: true }); if (o) { o.origin = 'genese'; return o; } }
   return null;
 }
