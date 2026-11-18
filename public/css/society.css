@@ -249,3 +249,9 @@ a.dx-stat:hover { background: var(--bg-hover); }
 .e-gigs { margin-bottom: 14px; display: grid; gap: 8px; } .e-gigs h3 { display: flex; gap: 6px; align-items: center; }
 .e-gig { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: var(--bg-card-2); } .e-gig p { margin: 4px 0 0; font-size: 12.5px; } .e-gig-opts { display: flex; gap: 6px; flex-wrap: wrap; }
 .rd-cam { width: 100%; margin-top: 6px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--accent); background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
+.gm-chips button, .mk-chips button { flex: none; white-space: nowrap; }
+.dx-wx { white-space: nowrap; }
+@media (max-width: 760px) { .gm-chips { max-width: 100%; padding-bottom: 2px; } }
+.gm { height: calc(var(--vvh, 100vh) - 175px); }
+@media (max-width: 760px) { .gm { height: calc(var(--vvh, 100vh) - 200px); } }
+.gm .cm-tools { right: auto; left: 12px; bottom: 60px; }

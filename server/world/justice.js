@@ -31,15 +31,22 @@ export const penalty = (w, type) => ({ ...DEFAULT_PENALTIES[type], ...(justice(w
 const who = (w, s) => (s?.type === 'user' || s === 'me' ? { id: 'me', name: 'Você' } : s?.type === 'banco' || s === 'banco' ? { id: 'banco', name: 'Banco Nexus' } : s === 'policia' ? { id: 'policia', name: 'Polícia de Nexus City' } : (() => { const p = personById(w, s?.id || s); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : { id: s?.id || s, name: (w.gone || {})[s?.id || s] || '—' }; })());
 
 // ---------------------------------------------------------------- estrutura: delegacia, policiais e juíza
-onUpgrade(5, (ctx) => {
+// monta (e recompõe) a equipe: juíza(iz) e policiais que faltarem — quem saiu da cidade ou foi presa(o) é substituída(o)
+function staffJustice(ctx) {
   const w = ctx.w; const J = justice(w);
-  if (J.officers.length) return;
+  const ok = (id) => { const p = personById(w, id); return p?.agent && p.agent.resident !== false && p.agent.status === 'ativo'; };
+  J.officers = J.officers.filter((o) => ok(o.personaId));
+  if (J.judgeId && !ok(J.judgeId)) J.judgeId = null;
+  const taken = new Set([J.judgeId, ...J.officers.map((o) => o.personaId)]);
   const pool = shuffle(residents(w).filter((p) => p.agent.traits.honesty > 0.45 && p.age >= 24 && !p.agent.office && !p.agent.partyLeader && !/CEO|dono/i.test(p.agent.role || '')));
   // a juíza é escolhida primeiro (a pessoa mais íntegra e experiente)
-  const judge = pool.filter((p) => p.age >= 35).sort((a, b) => b.agent.traits.honesty - a.agent.traits.honesty)[0] || pool[0];
+  for (let i = pool.length - 1; i >= 0; i--) if (taken.has(pool[i].id)) pool.splice(i, 1);
+  const judge = J.judgeId ? null : (pool.filter((p) => p.age >= 35).sort((a, b) => b.agent.traits.honesty - a.agent.traits.honesty)[0] || pool[0]);
   if (judge) pool.splice(pool.indexOf(judge), 1);
   const ranks = [['delegado', 'delegada(o)'], ['investigador', 'investigador(a)'], ['investigador', 'investigador(a)'], ['patrulha', 'policial'], ['patrulha', 'policial'], ['patrulha', 'policial']];
-  for (const [rank, title] of ranks) {
+  const have = J.officers.map((o) => o.rank);
+  const missing = ranks.filter(([r]) => { const i = have.indexOf(r); if (i >= 0) { have.splice(i, 1); return false; } return true; });
+  for (const [rank, title] of missing) {
     const p = pool.shift(); if (!p) break;
     const a = agentOf(w, p);
     const c = companies(w).find((x) => x.id === a.companyId);
@@ -49,12 +56,14 @@ onUpgrade(5, (ctx) => {
     J.officers.push({ personaId: p.id, rank });
   }
   if (judge) { const a = agentOf(w, judge); a.keep = true; a.judge = true; a.role = genderize(judge, 'juiz(a)'); judge.job = `${genderize(judge, 'juiz(a)')} do Fórum de Nexus City`; const c = companies(w).find((x) => x.id === a.companyId); if (c) c.employees = c.employees.filter((e) => e.personaId !== judge.id); a.companyId = null; J.judgeId = judge.id; }
-});
+}
+onUpgrade(5, staffJustice);
 onDaily((ctx) => {
+  staffJustice(ctx);
   const w = ctx.w; const e = eco(w);
   // salários públicos saem do tesouro (impostos e multas)
-  for (const o of justice(w).officers) { const p = personById(w, o.personaId); if (p?.agent) { p.agent.cash += 350; e.treasury = round2((e.treasury || 0) - 350); } }
-  const j = personById(w, justice(w).judgeId); if (j?.agent) { j.agent.cash += 600; e.treasury = round2((e.treasury || 0) - 600); }
+  for (const o of justice(w).officers) { const p = personById(w, o.personaId); if (p?.agent && (e.treasury || 0) >= 350) { p.agent.cash += 350; e.treasury = round2(e.treasury - 350); } }
+  const j = personById(w, justice(w).judgeId); if (j?.agent && (e.treasury || 0) >= 600) { j.agent.cash += 600; e.treasury = round2(e.treasury - 600); }
   settle(ctx);
 });
 const officer = (w, rank) => personById(w, pick(justice(w).officers.filter((o) => o.rank === rank))?.personaId) || personById(w, pick(justice(w).officers)?.personaId);

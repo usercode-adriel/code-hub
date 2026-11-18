@@ -258,16 +258,20 @@ const GIGS = [
   ['saude', 'Recepção num mutirão de saúde', 'Fila longa e pessoas nervosas.', ['Organizar senhas por prioridade', 'Chamar por ordem de chegada', 'Fechar a porta'], 0, [70, 130]],
 ];
 export const gigs = (w) => (w.gigs ??= []);
-onDaily((ctx) => {
+function makeGigs(ctx, odds = 0.35) {
   const w = ctx.w;
   gigs(w).splice(0, gigs(w).length, ...gigs(w).filter((g) => g.status !== 'aberto' || g.until > ctx.at.toISOString()));
   for (const c of companies(w).filter((x) => x.status === 'ativa' && x.cash > 3000 && x.founderId !== 'me')) {
-    if (!chance(0.35)) continue;
+    if (!chance(odds)) continue;
     const tpl = GIGS.find((g) => g[0] === c.sector) || pick(GIGS);
-    gigs(w).push({ id: uid(), companyId: c.id, title: tpl[1], text: tpl[2], options: tpl[3], best: tpl[4], pay: Math.round((tpl[5][0] + rnd(tpl[5][1] - tpl[5][0])) * (w.eco?.cpi || 1)), at: ctx.at.toISOString(), until: new Date(ctx.at.getTime() + 2 * DAY).toISOString(), status: 'aberto' });
+    // as opções aparecem embaralhadas: a certa não é sempre a primeira
+    const order = tpl[3].map((_, i) => i).sort(() => Math.random() - 0.5);
+    gigs(w).push({ id: uid(), companyId: c.id, title: tpl[1], text: tpl[2], options: order.map((i) => tpl[3][i]), best: order.indexOf(tpl[4]), pay: Math.round((tpl[5][0] + rnd(tpl[5][1] - tpl[5][0])) * (w.eco?.cpi || 1)), at: ctx.at.toISOString(), until: new Date(ctx.at.getTime() + 2 * DAY).toISOString(), status: 'aberto' });
   }
   cap(gigs(w), 30);
-});
+}
+onDaily((ctx) => makeGigs(ctx));
+onUpgrade(6, (ctx) => makeGigs(ctx, 0.6)); // primeiros freelas logo na chegada
 export function doGig(ctx, gigId, choice) {
   const w = ctx.w;
   const g = gigs(w).find((x) => x.id === gigId);

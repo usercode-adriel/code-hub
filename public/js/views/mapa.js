@@ -57,7 +57,7 @@ export default async function render(el, parts) {
       <div class="gm-ph" style="--c:${esc(p.color || '#64748b')}"><span class="gm-pic">${icon(p.icon || 'pin', 22)}</span><div><small>${esc(p.kindLabel)}${p.sub ? ` · ${esc(p.sub)}` : ''}</small><h3>${esc(p.name)}</h3><div class="gm-stars">${stars}</div></div></div>
       <div class="gm-kv"><span>${icon('pin', 13)} ${esc(p.address || '—')}</span>
         <span>${icon('clock', 13)} ${p.hours ? `${String(p.hours[0]).padStart(2, '0')}h às ${String(p.hours[1] % 24).padStart(2, '0')}h` : 'Sempre aberto'} · <b class="${p.open ? 'up' : 'down'}">${p.open ? 'Aberto agora' : 'Fechado'}</b></span>
-        ${p.status && p.status !== 'ativo' ? `<span class="w-chip warn">${esc(p.status)}</span>` : ''}${p.here ? `<span class="w-chip ok">${icon('target', 11)} Você está aqui</span>` : ''}</div>
+        ${p.status && !['ativo', 'aberto', 'ativa'].includes(p.status) ? `<span class="w-chip warn">${esc(p.status)}</span>` : ''}${p.here ? `<span class="w-chip ok">${icon('target', 11)} Você está aqui</span>` : ''}</div>
       ${p.owner ? `<h5>Dono(a)</h5><button class="gm-person" data-person="${esc(p.owner.id)}">${face(p.owner, 30)}<span>${esc(p.owner.name)}${p.company ? `<small>${esc(p.company.name)}</small>` : ''}</span></button>` : ''}
       ${p.staff.length ? `<h5>Equipe</h5><div class="gm-staff">${p.staff.map((s) => `<button data-person="${esc(s.id)}" title="${esc(s.name)}${s.role ? ` — ${esc(s.role)}` : ''}">${face(s, 30)}</button>`).join('')}</div>` : ''}
       ${p.products.length ? `<h5>Produtos</h5><ul class="gm-prod">${p.products.map((x) => `<li>${esc(x.name)} <small class="${x.stock ? '' : 'down'}">${x.stock ? `${x.stock} em estoque` : 'esgotado'}</small></li>`).join('')}</ul>` : ''}
@@ -65,11 +65,11 @@ export default async function render(el, parts) {
       <div class="gm-route" id="gmRoute"></div>
       <div class="gm-acts">${p.here
         ? (p.shop ? `<a class="btn primary" href="#/mercado/${esc(p.id)}">${icon('bag', 14)} Entrar na loja</a>` : p.app ? `<a class="btn primary" href="${esc(p.app)}">${icon('chevRight', 14)} Entrar</a>` : `<span class="muted">Você está aqui.</span>`)
-        : `<button class="btn primary" data-route>${icon('pin', 14)} Traçar rota</button>`}
+        : `<button class="btn primary" data-goroute>${icon('pin', 14)} Traçar rota</button>`}
         ${!p.here && p.shop ? `<a class="btn outline" href="#/mercado/${esc(p.id)}">${icon('bag', 14)} Ver vitrine</a>` : ''}</div>`;
     panel.querySelector('.gm-x').onclick = () => { panel.hidden = true; map.drawRoute(null); map.select(null); };
     panel.querySelectorAll('[data-person]').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); personCard(b.dataset.person); }; });
-    panel.querySelector('[data-route]')?.addEventListener('click', () => showRoute(p));
+    panel.querySelector('[data-goroute]')?.addEventListener('click', () => showRoute(p));
   }
   async function showRoute(p) {
     const box = panel.querySelector('#gmRoute');
@@ -77,6 +77,7 @@ export default async function render(el, parts) {
     let r;
     try { r = await api.get(`/mundo/rota?de=eu&para=${encodeURIComponent(p.id)}`); } catch (err) { box.innerHTML = `<p class="down">${esc(err.message)}</p>`; return; }
     map.drawRoute(r.path);
+    { const xs = r.path.map((q) => q[0]); const ys = r.path.map((q) => q[1]); map.focus((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, Math.max(500, (Math.max(...xs) - Math.min(...xs)) * 1.6, (Math.max(...ys) - Math.min(...ys)) * 1.6 * (geo.w / geo.h))); }
     const km = r.meters >= 1000 ? `${(r.meters / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km` : `${Math.round(r.meters)} m`;
     box.innerHTML = `<h5>Rota · ${km}</h5><small class="muted">${esc(r.streets.slice(0, 4).join(' → '))}${r.streets.length > 4 ? ' …' : ''}</small>
       <div class="gm-modes">${Object.entries(r.fares).map(([k, f]) => `<button data-mode="${k}"><b>${esc(f.label)}</b><small>${f.minutes} min · ${f.fee ? nx(f.fee, 0) : 'grátis'}</small></button>`).join('')}</div>`;

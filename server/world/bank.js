@@ -35,6 +35,9 @@ export function account(w) {
       b.contracts.push({ id: l.id, principal: l.principal, rate: 0.05, periods: 1, installment: l.owed, total: l.owed, createdAt: l.takenAt, status: 'ativo', autopay: true, migrated: true,
         schedule: [{ n: 1, due: l.dueAt, amount: round2(l.owed), paid: 0, status: 'aberta', lateFee: false, lastInterestDay: null }], text: 'Contrato convertido da versão anterior.' });
     }
+    // empréstimos já pagos na versão anterior contam como bom histórico
+    const paid = b.loans.filter((x) => x.status === 'pago').length;
+    if (paid) { b.score = Math.min(1000, b.score + 40 * Math.min(paid, 5)); b.scoreLog.push({ at: nowIso(), delta: 40 * Math.min(paid, 5), reason: 'Empréstimos quitados na versão anterior', score: b.score }); }
     delete b.loans;
   }
   u.portfolio ??= {}; u.properties ??= []; u.inventory ??= []; u.diplomas ??= [];
@@ -321,6 +324,7 @@ export function dailyBank(w, at, eco, hooks = {}) {
         }
         i.status = 'atrasada'; c.everLate = true;
         if (!i.lateFee) { i.lateFee = true; i.amount = round2(i.amount * 1.02); }
+        i.lastInterestDay = day; // juros de mora começam no dia seguinte
         scoreChange(w, c.renegotiation ? -80 : -25, c.renegotiation ? 'Atraso em dívida renegociada' : 'Parcela em atraso', at);
         events.push({ type: 'parcela-atrasada', contract: c, inst: i });
       } else if (i.status === 'atrasada' && i.lastInterestDay !== day) {
@@ -335,7 +339,7 @@ export function dailyBank(w, at, eco, hooks = {}) {
     if (c.schedule.every((i) => i.status === 'paga')) { c.status = 'quitado'; c.paidAt = nowS; scoreChange(w, 30, 'Empréstimo quitado', at); }
   }
   for (const d of b.debts.filter((x) => x.status !== 'paga' && x.due <= nowS)) {
-    if (d.status === 'aberta') { d.status = 'atrasada'; scoreChange(w, d.kind === 'judicial' ? -50 : -20, `Débito em atraso: ${d.kind}`, at); events.push({ type: 'debito-atrasado', debt: d }); }
+    if (d.status === 'aberta') { d.status = 'atrasada'; d.lastInterestDay = day; scoreChange(w, d.kind === 'judicial' ? -50 : -20, `Débito em atraso: ${d.kind}`, at); events.push({ type: 'debito-atrasado', debt: d }); }
     else if (d.lastInterestDay !== day) {
       d.lastInterestDay = day; d.amount = round2(d.amount + (d.amount - d.paid) * 0.01); scoreChange(w, -2, 'Dia de atraso em débito', at);
       // penhora: decisões judiciais vencidas há 3 dias são cobradas direto do saldo
@@ -356,7 +360,7 @@ export function dailyBank(w, at, eco, hooks = {}) {
       events.push({ type: 'fatura', card });
     }
     for (const bill of card.bills.filter((x) => x.status !== 'paga' && x.due <= nowS)) {
-      if (bill.status === 'aberta') { bill.status = 'atrasada'; bill.amount = round2(bill.amount * 1.02); card.status = 'bloqueado'; scoreChange(w, -25, 'Fatura em atraso', at); events.push({ type: 'fatura-atrasada', card }); }
+      if (bill.status === 'aberta') { bill.status = 'atrasada'; bill.lastInterestDay = day; bill.amount = round2(bill.amount * 1.02); card.status = 'bloqueado'; scoreChange(w, -25, 'Fatura em atraso', at); events.push({ type: 'fatura-atrasada', card }); }
       else if (bill.lastInterestDay !== day) { bill.lastInterestDay = day; bill.amount = round2(bill.amount + (bill.amount - bill.paid) * 0.012); scoreChange(w, -3, 'Dia de atraso na fatura', at); }
     }
   }
