@@ -104,11 +104,16 @@ export function itemAction(ctx, itemId, action, body = {}) {
   if (action === 'vender') {
     const base = it.price || tplOf(it.key).base || 50;
     const value = round2(base * (it.state === 'novo' ? 0.5 : 0.35));
+    // o dinheiro sai do bolso de alguém da cidade que quis o item (nunca é criado do nada)
+    const buyers = people(w).filter((p) => p.agent?.resident && p.agent.status === 'ativo' && p.agent.cash - value > 300);
+    const buyer = buyers.length ? pick(buyers) : null;
+    if (!buyer) throw new BankError('Ninguém na cidade quis comprar agora. Tente mais tarde.');
+    buyer.agent.cash = round2(buyer.agent.cash - value);
     drop();
     if (it.key === 'smartphone' && !inv(w).some((x) => x.key === 'smartphone')) u.installed.phone = false;
     if (it.key === 'camera' && !inv(w).some((x) => x.key === 'camera')) u.installed.camera = false;
-    credit(w, value, `Venda de ${it.name}`, ctx.at, 'venda');
-    return { ok: true, text: `Vendido por ${value.toLocaleString('pt-BR')} NXC.` };
+    credit(w, value, `Venda de ${it.name} para ${buyer.name}`, ctx.at, 'venda');
+    return { ok: true, text: `${buyer.name} comprou por ${value.toLocaleString('pt-BR')} NXC.` };
   }
   if (action === 'descartar') { drop(); return { ok: true, text: 'Item descartado.' }; }
   throw new BankError('Ação inválida');

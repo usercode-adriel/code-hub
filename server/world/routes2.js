@@ -20,7 +20,7 @@ const router = express.Router();
 const ctxOf = (req) => ({ user: req.user, uid: req.user.id, w: world(req.user.id), live: true, at: new Date() });
 const run = (res, fn) => {
   Promise.resolve().then(fn).then((out) => { saveWorld(); res.json(out ?? { ok: true }); })
-    .catch((err) => res.status(err.code === 'PIN_LOCKED' ? 423 : 400).json({ error: err.message, code: err.code || null }));
+    .catch((err) => { saveWorld(); res.status(err.code === 'PIN_LOCKED' ? 423 : 400).json({ error: err.message, code: err.code || null }); });
 };
 const visible = (w, pl) => !pl.hidden || (account(w).discovered || []).includes(pl.id);
 
@@ -169,7 +169,7 @@ router.get('/mundo/lojas', (req, res) => {
   const w = world(req.user.id); const u = account(w);
   res.json({
     cats: PLACE_CATS, here: u.location?.placeId || null,
-    stores: places(w).filter((pl) => pl.catalog && visible(w, pl)).map((pl) => ({ id: pl.id, name: pl.name, kind: pl.kind, kindLabel: PLACE_CATS[pl.kind]?.label, sub: pl.sub, address: pl.address, districtId: pl.districtId, open: isOpen(pl), status: pl.status, hours: pl.hours, rating: round2(pl.reputation || 0), reviews: (pl.ratings || []).length, promo: pl.promo, items: pl.catalog.length, inStock: pl.catalog.filter((x) => x.stock > 0).length, hidden: Boolean(pl.hidden) })),
+    stores: places(w).filter((pl) => pl.catalog && visible(w, pl)).map((pl) => ({ id: pl.id, name: pl.name, kind: pl.kind, kindLabel: PLACE_CATS[pl.kind]?.label, sub: pl.sub, address: pl.address, districtId: pl.districtId, open: isOpen(pl), status: pl.status, hours: pl.hours, rating: round2(pl.reputation || 0), reviews: (pl.ratings || []).length, promo: pl.promo, items: pl.catalog.length, inStock: pl.catalog.filter((x) => x.stock > 0).length, products: pl.catalog.map((x) => PRODUCTS[x.key]?.name).filter(Boolean), hidden: Boolean(pl.hidden) })),
   });
 });
 const storeOf = (req) => { const w = world(req.user.id); const pl = placeById(w, req.params.id); if (!pl || !pl.catalog || !visible(w, pl)) throw new BankError('Loja não encontrada'); return pl; };

@@ -44,7 +44,7 @@ async function home(page, q) {
     ${r.people.length ? `<h4>Pessoas</h4><div class="w-rels">${r.people.map((p) => `<button class="w-rel" data-person="${esc(p.id)}">${face(p, 28)}<span>${esc(p.name)}</span><small>${esc(p.job || '')}</small></button>`).join('')}</div>` : ''}
     ${r.companies.length ? `<h4>Empresas</h4><div class="w-chips">${r.companies.map((c) => `<button class="w-chip" data-company="${esc(c.id)}">${esc(c.name)} · ${esc(c.status)}</button>`).join('')}</div>` : ''}
     ${r.communities.length ? `<h4>Comunidades</h4>${r.communities.map((c) => `<a class="i-r" href="#/social/comunidades/${esc(c.id)}"><small>forumcentral.nx › ${esc(c.name)}</small><b>${esc(c.name)}</b><p>${c.members} membros</p></a>`).join('')}` : ''}
-    ${r.products.length ? `<h4>Produtos</h4>${r.products.map((p) => `<a class="i-r" href="#/internet/site/vitrine.nx"><small>vitrine.nx › ${esc(p.company)}</small><b>${esc(p.name)}</b><p>${nx(p.price)}</p></a>`).join('')}` : ''}
+    ${r.products.length ? `<h4>Produtos</h4>${r.products.map((p) => `<a class="i-r" href="#/mercado"><small>mercado › ${esc(p.company)}</small><b>${esc(p.name)}</b><p>${nx(p.price)}</p></a>`).join('')}` : ''}
     ${!total ? `<div class="i-404"><b>Nada encontrado na internet da cidade.</b><p><a href="#/busca?q=${encodeURIComponent(q)}">Pesquisar na web real com a IA</a></p></div>` : ''}`;
 }
 
@@ -67,7 +67,7 @@ async function site(page, domain) {
       : '<p class="muted i-pad">Nenhuma publicação ainda. As matérias aparecem quando algo importante acontece na cidade.</p>';
   }
   if (s.kind === 'cripto') main = `<div class="i-market">${d.market.map((m) => `<button class="i-mk" data-company="${esc(m.id)}"><b>${esc(m.ticker)}</b><span>${esc(m.name)}</span><span>${nx(m.price)}</span><em class="${m.change >= 0 ? 'up' : 'down'}">${pct(m.change)}</em></button>`).join('')}</div>${main}`;
-  if (s.kind === 'loja') main = `<div class="i-shop">${d.products.map((p) => `<div class="i-prod"><div class="i-prod-img" style="--h:${(p.name.length * 47) % 360}">${icon('bag', 26)}</div><b>${esc(p.name)}</b><small>${esc(p.company)}</small><span>${nx(p.price)}</span><button class="btn sm primary" data-buy="${esc(p.companyId)}|${esc(p.id)}">Comprar</button></div>`).join('') || '<p class="muted">Sem produtos.</p>'}</div>`;
+  if (s.kind === 'loja') main = `<div class="i-shop">${d.products.map((p) => `<div class="i-prod"><div class="i-prod-img" style="--h:${(p.name.length * 47) % 360}">${icon('bag', 26)}</div><b>${esc(p.name)}</b><small>${esc(p.company)}</small><span>${nx(p.price)}</span><a class="btn sm primary" href="#/mercado">Comprar nas lojas</a></div>`).join('') || '<p class="muted">Sem produtos.</p>'}</div>`;
   if (s.kind === 'empregos') main = `<h2 class="i-pad">Vagas abertas em Codeniac Society</h2>${d.openings.map((o) => `<div class="w-row i-job"><span><b>${esc(o.role)}</b> · <button class="w-link" data-company="${esc(o.companyId)}">${esc(o.company)}</button> <small class="muted">${nx(o.salary, 0)}/dia · ${esc(timeAgo(o.at))}</small></span><a class="btn sm outline" href="#/economia/carreira">Candidatar</a></div>`).join('') || '<p class="muted i-pad">Nenhuma vaga aberta agora.</p>'}`;
   if (s.kind === 'forum') main = `<h2 class="i-pad">Comunidades</h2>${d.communities.map((x) => `<a class="i-r" href="#/social/comunidades/${esc(x.id)}"><b>${esc(x.name)}</b><small>${x.members} membros</small>${x.threads.map((t) => `<p>• ${esc(t)}</p>`).join('')}</a>`).join('')}`;
   if (s.kind === 'tv') main = `<div class="i-pad"><h2>Grupo Nexus de Comunicação</h2><p>TV, rádio e entretenimento da cidade.</p><a class="btn primary" href="#/midia/tv">${icon('play', 13)} Assistir e ouvir agora</a></div>`;
@@ -79,7 +79,6 @@ async function site(page, domain) {
       <h3>Investidores</h3><p>Ação ${esc(c.ticker)}: <b>${nx(c.price)}</b> ${spark((c.priceHistory || []).map((x) => x.v), { w: 200, h: 36 })}</p></div>`;
   }
   page.innerHTML = `<div class="i-site i-${esc(s.kind)}">${head}<div class="i-site-body"><main>${main}</main>${ads}</div><footer class="i-foot">© ${esc(s.name)} · ${esc(s.domain)} · site da internet de Codeniac Society</footer></div>`;
-  page.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = async () => { const [cid, pid] = b.dataset.buy.split('|'); try { const r = await api.post(`/mundo/loja/${cid}/${pid}`); toast('Comprado 🛍️', `Saldo: ${nx(r.balance)}`, 'success'); } catch (err) { toast('Não deu', err.message, 'error'); } }; });
 }
 
 async function article(page, id) {

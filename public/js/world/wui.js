@@ -66,6 +66,7 @@ export async function withPin(fn, title) {
     const pin = await askPin(title);
     if (!pin) return null;
     try { return await fn(pin); } catch (err) {
+      if (/bloqueada/i.test(err.message)) throw err;
       if (/senha incorreta/i.test(err.message)) { toast('Senha incorreta', err.message, 'error'); continue; }
       if (/crie sua senha/i.test(err.message)) { await createPin(); continue; }
       throw err;

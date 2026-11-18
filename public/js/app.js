@@ -29,10 +29,14 @@ const VIEWS = {
   centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
   midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
+  empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), mercado: () => import('./views/mercado.js'),
+  inventario: () => import('./views/inventario.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'),
 };
+// telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
+const WORLD = new Set(['centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { mapa: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';
@@ -453,6 +457,7 @@ async function route() {
   const parts = path.split('/').filter(Boolean);
   // a 2.0 abre na cidade (Command Center); quem escolheu "Hoje" continua abrindo nele
   let name = parts[0] || (store.settings.homePage === 'hoje' ? 'hoje' : 'centro');
+  if (name === 'economia') { location.replace(`#/${parts[1] === 'banco' ? 'banco' : ['empresas', ...parts.slice(1)].join('/')}`); return; }
   if (!VIEWS[name]) name = 'dashboard';
   if (name === 'estudos' && parts[1] === 'livros') { location.replace('#/livros'); return; }
   if (parts[0] === 'capturar') { location.replace('#/dashboard'); setTimeout(() => openCapture(), 300); return; }
@@ -460,6 +465,7 @@ async function route() {
   document.body.classList.remove('sidebar-open', 'assistant-open');
   closeSheet();
   document.body.classList.toggle('on-full-page', FULL_PAGE.has(name));
+  document.body.classList.toggle('world-mode', WORLD.has(name));
   document.body.dataset.route = name;
   if (name === 'assistente') { store.chatUnread = 0; document.querySelectorAll('.chat-head').forEach((h) => h.remove()); }
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* ignore */ } }

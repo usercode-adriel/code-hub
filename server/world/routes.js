@@ -408,12 +408,14 @@ router.post('/mundo/imoveis/:id/:acao', (req, res) => {
     if (req.params.acao === 'comprar') {
       if (pr.ownerType !== 'cidade') throw new Error('Esse imóvel não está à venda');
       verifyPin(ctx.w, req.body?.pin);
-      debit(ctx.w, price, `Compra: ${pr.name}`, ctx.at, 'imovel'); pr.ownerType = 'user'; pr.ownerId = 'me';
+      debit(ctx.w, price, `Compra: ${pr.name}`, ctx.at, 'imovel'); pr.ownerType = 'user'; pr.ownerId = 'me'; eco(ctx.w).treasury = round2((eco(ctx.w).treasury || 0) + price); // o imóvel era da cidade: o dinheiro vai para o tesouro
       record(ctx, { type: 'imovel-usuario', cat: 'local', title: `Você comprou ${pr.name}`, text: `${price.toLocaleString('pt-BR')} NXC.`, actors: ['me'], refs: [{ t: 'district', id: pr.districtId }], importance: 2 });
       addXp(ctx.w, 60);
     } else if (req.params.acao === 'vender') {
       if (pr.ownerType !== 'user') throw new Error('Esse imóvel não é seu');
       const v = round2(price * 0.95);
+      if ((eco(ctx.w).treasury || 0) < v) throw new Error('A prefeitura não tem caixa para recomprar esse imóvel agora. Tente outro dia.');
+      eco(ctx.w).treasury = round2(eco(ctx.w).treasury - v);
       credit(ctx.w, v, `Venda: ${pr.name}`, ctx.at, 'venda'); pr.ownerType = 'cidade'; pr.ownerId = null;
       record(ctx, { type: 'imovel-venda', cat: 'local', title: `Você vendeu ${pr.name}`, text: `${v.toLocaleString('pt-BR')} NXC.`, actors: ['me'], importance: 1 });
     } else throw new Error('Ação inválida');
