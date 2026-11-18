@@ -1,0 +1,137 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Mapa vivo — conceito</title>
+<link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/society.css">
+<style>
+html,body{margin:0;height:100%;background:#07051a;font-family:Poppins,system-ui,sans-serif;color:#ece9ff;overflow:hidden}
+#map{position:absolute;inset:0;background:#0b0818}
+.cm{background:#0e1730}
+.hud{position:absolute;z-index:5;background:linear-gradient(165deg,rgba(33,22,72,.84),rgba(14,10,33,.88));border:1px solid rgba(168,120,255,.32);border-radius:16px;backdrop-filter:blur(10px);box-shadow:0 18px 50px -20px #000,0 0 30px -14px rgba(168,85,247,.6)}
+.hud h4{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a99be0}
+/* topo esquerdo: relógio e velocidade */
+#clock{left:20px;top:18px;padding:12px 16px;display:flex;gap:16px;align-items:center}
+#clock .t{display:grid;line-height:1.1}#clock .t b{font-size:26px;letter-spacing:.04em;color:#f5f0ff;text-shadow:0 0 16px rgba(168,85,247,.8)}#clock .t small{font-size:11px;color:#a99be0}
+.spd{display:flex;gap:4px}.spd i{font-style:normal;font-size:12px;font-weight:700;padding:6px 10px;border-radius:9px;background:rgba(168,120,255,.12);color:#c9bdf0;border:1px solid rgba(168,120,255,.18)}
+.spd i.on{background:linear-gradient(100deg,#7c3aed,#a855f7);color:#fff;border-color:transparent;box-shadow:0 6px 18px -8px #a855f7}
+.wx{font-size:13px;color:#d8e8ff}
+/* topo direito: online agora */
+#online{right:20px;top:18px;width:290px;padding:14px}
+#online .row{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(168,120,255,.1)}
+#online .row:last-child{border:0}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;border:2px solid rgba(255,255,255,.7);flex:none}
+#online .nm{display:grid;line-height:1.15;min-width:0}#online .nm b{font-size:12.5px}#online .nm small{font-size:10.5px;color:#a99be0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;display:inline-block;margin-right:6px}
+/* rota */
+#route{left:20px;bottom:20px;width:360px;padding:16px}
+#route .to{display:flex;gap:12px;align-items:center}
+#route .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#7c3aed,#22d3ee);box-shadow:0 0 22px -4px #a855f7;font-size:20px}
+#route .to b{font-size:15px;display:block}#route .to small{color:#a99be0;font-size:11.5px}
+.bar{height:8px;border-radius:6px;background:rgba(255,255,255,.1);margin:14px 0 6px;overflow:hidden}.bar i{display:block;height:100%;width:38%;background:linear-gradient(90deg,#a855f7,#22d3ee);box-shadow:0 0 14px #a855f7}
+.eta{display:flex;justify-content:space-between;font-size:11.5px;color:#c9bdf0}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.modes span{padding:8px 6px;border-radius:11px;text-align:center;font-size:11px;background:rgba(168,120,255,.1);border:1px solid rgba(168,120,255,.2)}
+.modes span.on{background:rgba(34,211,238,.16);border-color:#22d3ee;color:#fff}.modes b{display:block;font-size:12px}
+/* feed ao vivo */
+#feed{right:20px;bottom:20px;width:340px;padding:14px}
+#feed .l{font-size:12px;line-height:1.35;padding:4px 0;color:#d6cdf5}
+#feed .l b{font-weight:700}
+.live{display:inline-flex;gap:6px;align-items:center;float:right;font-size:10px;color:#fb7185;letter-spacing:.1em}.live i{width:7px;height:7px;border-radius:50%;background:#fb7185;box-shadow:0 0 8px #fb7185}
+/* legenda */
+#legend{left:50%;transform:translateX(-50%);bottom:18px;padding:8px 16px;display:flex;gap:16px;font-size:11px;color:#c9bdf0;white-space:nowrap}
+#legend span{display:inline-flex;gap:6px;align-items:center}#legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.cm-tools{right:auto!important;left:20px;bottom:auto!important;top:110px}
+.mock-pulse{fill:none;stroke-width:3;animation:mp 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mp{from{transform:scale(.6);opacity:1}to{transform:scale(1.9);opacity:0}}
+</style></head><body>
+<div id="map"></div>
+<div class="hud" id="clock"><div class="t"><b id="ck">19:42</b><small id="dy">Quarta · Dia 12</small></div><div class="wx" id="wx">☁ 26°C</div>
+  <div class="spd"><i>⏸</i><i>1×</i><i class="on">4×</i><i>16×</i></div></div>
+<div class="hud" id="online"><h4><span class="dot"></span>Online agora · <span id="cnt">48</span></h4><div id="olist"></div></div>
+<div class="hud" id="route"><h4>Deslocamento</h4><div class="to"><span class="ic">🚕</span><div><b id="dest">—</b><small id="addr">—</small></div></div>
+  <div class="bar"><i></i></div><div class="eta"><span id="eta1">—</span><span id="eta2">—</span></div><div class="modes" id="modes"></div></div>
+<div class="hud" id="feed"><h4>Ao vivo na cidade <span class="live"><i></i>AO VIVO</span></h4><div id="flist"></div></div>
+<div class="hud" id="legend"><span><i style="background:#a855f7"></i>Você</span><span><i style="background:#22d3ee"></i>Amigos</span><span><i style="background:#f59e0b"></i>Cidadãos</span><span><i style="background:#ef4444"></i>Alertas</span><span><i style="background:#facc15"></i>Eventos</span></div>
+<script type="module">
+import { api } from '/js/api.js';
+import { cityMap } from '/js/world/citymap.js';
+const NS='http://www.w3.org/2000/svg';
+const [geo, layers, resumo] = await Promise.all([api.get('/mundo/mapa/geo'), api.get('/mundo/mapa/camadas'), api.get('/mundo/resumo')]);
+const map = cityMap(document.getElementById('map'), geo, {});
+map.setData(layers);
+// escolhe um destino realista e a rota
+let best=null;
+for (const pl of layers.places.filter(p=>p.open && p.shop)) { try { const r=await api.get('/mundo/rota?de=eu&para='+pl.id); if(r.meters>700&&r.meters<2600){best={pl,r};break;} } catch{} }
+if(!best){ const pl=layers.places.find(p=>p.shop); best={pl, r:await api.get('/mundo/rota?de=eu&para='+pl.id)}; }
+const {pl,r}=best; const path=r.path;
+map.drawRoute(path);
+const xs=path.map(p=>p[0]), ys=path.map(p=>p[1]);
+const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
+const w=Math.max(760,(Math.max(...xs)-Math.min(...xs))*1.9);
+map.focus(cx,cy,w);
+const svg=document.querySelector('#map svg'); const vb=svg.getAttribute('viewBox').split(' ').map(Number);
+const k=vb[2]/svg.clientWidth;
+// PRNG fixo
+let sd=7; const rnd=()=>{sd=(sd*9301+49297)%233280;return sd/233280;};
+const g=(n,at)=>{const e=document.createElementNS(NS,n);for(const [a,b] of Object.entries(at||{}))e.setAttribute(a,b);return e;};
+const overlay=g('g',{class:'mock'}); const defs=g('defs'); svg.appendChild(defs); svg.appendChild(overlay);
+const inWin=(p)=>p[0]>vb[0]+vb[2]*.06&&p[0]<vb[0]+vb[2]*.94&&p[1]>vb[1]+vb[3]*.1&&p[1]<vb[1]+vb[3]*.9;
+const edges=[...geo.edges.rua,...geo.edges.avenida].filter(([a,b])=>inWin(geo.nodes[a])&&inWin(geo.nodes[b]));
+const NAMES=['Rafaela Mendes','Diego Duarte','Lucas Silva','Camila Rocha','Bruno Castro','Isabela Souza','Thiago Lima','Marina Costa','Pedro Alves','Júlia Ramos','Felipe Nunes','Larissa Dias','Gustavo Reis','Beatriz Melo','André Pinto','Sofia Barros','Rodrigo Lopes','Carla Freitas','Henrique Gomes','Priya Sharma','Matheus Ribeiro','Letícia Moura','Vinícius Cruz','Natália Teles','Davi Monteiro','Yasmin Duarte','Caio Prado','Elisa Vaz'];
+const COL=['#f59e0b','#ec4899','#14b8a6','#8b5cf6','#f97316','#ef4444','#22c55e','#3b82f6'];
+const DO=['a caminho do trabalho','passeando','indo ao Mercado','voltando para casa','a caminho do banco','indo almoçar','correndo no parque','a caminho de um evento'];
+const chars=[]; const used=[];
+for(let tries=0;tries<400&&chars.length<30;tries++){
+  const [a,b]=edges[Math.floor(rnd()*edges.length)]; const A=geo.nodes[a],B=geo.nodes[b]; const len=Math.hypot(B[0]-A[0],B[1]-A[1]); if(len<30)continue;
+  const t=.35+rnd()*.5; const P=[A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t];
+  if(used.some(u=>Math.hypot(u[0]-P[0],u[1]-P[1])<vb[2]*.045))continue;
+  used.push(P); const dir=[(B[0]-A[0])/len,(B[1]-A[1])/len]; const L=Math.min(t*len,vb[2]*.05);
+  chars.push({P,S:[P[0]-dir[0]*L,P[1]-dir[1]*L],name:NAMES[chars.length%NAMES.length],col:COL[chars.length%COL.length],friend:chars.length%6===2,doing:DO[chars.length%DO.length]});
+}
+const label=(x,y,text,col,big)=>{const f=(big?12:10.5)*k; const wd=text.length*f*.56+f*1.2;
+  const gg=g('g'); gg.appendChild(g('rect',{x:x-wd/2,y:y-f*1.6,width:wd,height:f*1.9,rx:f*.6,fill:'rgba(14,10,33,.88)',stroke:col,'stroke-width':1.2*k}));
+  const tx=g('text',{x,y:y-f*.28,'text-anchor':'middle',fill:'#fff','font-size':f,'font-weight':700,'font-family':'Poppins,sans-serif'}); tx.textContent=text; gg.appendChild(tx); return gg;};
+chars.forEach((c,i)=>{
+  const id='tg'+i; const lg=g('linearGradient',{id,gradientUnits:'userSpaceOnUse',x1:c.S[0],y1:c.S[1],x2:c.P[0],y2:c.P[1]});
+  lg.appendChild(g('stop',{offset:0,'stop-color':c.col,'stop-opacity':0})); lg.appendChild(g('stop',{offset:1,'stop-color':c.col,'stop-opacity':.95})); defs.appendChild(lg);
+  overlay.appendChild(g('line',{x1:c.S[0],y1:c.S[1],x2:c.P[0],y2:c.P[1],stroke:`url(#${id})`,'stroke-width':5*k,'stroke-linecap':'round'}));
+  const col=c.friend?'#22d3ee':c.col;
+  overlay.appendChild(g('circle',{cx:c.P[0],cy:c.P[1],r:15*k,fill:col,opacity:.22}));
+  overlay.appendChild(g('circle',{cx:c.P[0],cy:c.P[1],r:10.5*k,fill:col,stroke:'#fff','stroke-width':2*k}));
+  const ini=g('text',{x:c.P[0],y:c.P[1]+3.6*k,'text-anchor':'middle',fill:'#fff','font-size':9.5*k,'font-weight':800,'font-family':'Poppins,sans-serif'}); ini.textContent=c.name.split(' ').map(s=>s[0]).join('').slice(0,2); overlay.appendChild(ini);
+  if(i<12) overlay.appendChild(label(c.P[0],c.P[1]-16*k,c.name.split(' ')[0],col,false));
+});
+// VOCÊ, em trânsito ao longo da rota
+const seg=[]; let tot=0; for(let i=1;i<path.length;i++){const d=Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]);seg.push(d);tot+=d;}
+let acc=0,idx=0,target=tot*.38; while(idx<seg.length&&acc+seg[idx]<target){acc+=seg[idx];idx++;}
+const f=(target-acc)/(seg[idx]||1); const Y=[path[idx][0]+(path[idx+1][0]-path[idx][0])*f,path[idx][1]+(path[idx+1][1]-path[idx][1])*f];
+const done=path.slice(0,idx+1).concat([Y]);
+overlay.appendChild(g('polyline',{points:done.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#c4b5fd','stroke-width':9*k,'stroke-linecap':'round','stroke-linejoin':'round',opacity:.35}));
+overlay.appendChild(g('circle',{cx:Y[0],cy:Y[1],r:20*k,class:'mock-pulse',stroke:'#a855f7'}));
+overlay.appendChild(g('circle',{cx:Y[0],cy:Y[1],r:15*k,fill:'#a855f7',stroke:'#fff','stroke-width':3*k}));
+const you=g('text',{x:Y[0],y:Y[1]+4.5*k,'text-anchor':'middle',fill:'#fff','font-size':12*k,'font-weight':800,'font-family':'Poppins,sans-serif'});you.textContent='EU';overlay.appendChild(you);
+overlay.appendChild(label(Y[0],Y[1]-22*k,`Você · táxi · ${r.fares.taxi.minutes} min`,'#a855f7',true));
+// destino
+overlay.appendChild(g('circle',{cx:pl.x,cy:pl.y-18*k,r:26*k,class:'mock-pulse',stroke:'#22d3ee'}));
+overlay.appendChild(label(pl.x,pl.y-58*k,pl.name,'#22d3ee',true));
+// HUD
+const now=new Date(); document.getElementById('ck').textContent=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const gd=Math.floor((resumo.gameMinutes||0)/1440)+1; document.getElementById('dy').textContent=now.toLocaleDateString('pt-BR',{weekday:'long'}).replace(/^./,m=>m.toUpperCase())+' · Dia '+gd;
+if(resumo.weather) document.getElementById('wx').textContent=`${resumo.weather.icon} ${resumo.weather.temp}°C`;
+document.getElementById('cnt').textContent=chars.length+18;
+document.getElementById('olist').innerHTML=chars.slice(0,6).map(c=>`<div class="row"><span class="av" style="background:${c.friend?'#22d3ee':c.col}">${c.name.split(' ').map(s=>s[0]).join('').slice(0,2)}</span><div class="nm"><b>${c.name}</b><small>${c.doing}</small></div></div>`).join('');
+document.getElementById('dest').textContent=pl.name; document.getElementById('addr').textContent=pl.address||'';
+const km=r.meters>=1000?(r.meters/1000).toFixed(1).replace('.',',')+' km':Math.round(r.meters)+' m';
+const arr=new Date(now.getTime()+r.fares.taxi.minutes*60000);
+document.getElementById('eta1').textContent=km+' · '+r.streets.slice(0,2).join(' → ');
+document.getElementById('eta2').textContent='chega às '+arr.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+document.getElementById('modes').innerHTML=Object.entries(r.fares).map(([key,f])=>`<span class="${key==='taxi'?'on':''}"><b>${f.label}</b>${f.minutes} min · ${f.fee?Math.round(f.fee)+' NXC':'grátis'}</span>`).join('');
+const sh=layers.places.filter(p=>p.shop).map(p=>p.name);
+const P=(i)=>sh[i%sh.length];
+const lines=[
+ `<span style="color:#fb923c">●</span> <b style="color:#fbbf24">${chars[3].name.split(' ')[0]}</b> saiu do ${P(1)}`,
+ `<span style="color:#22d3ee">🛒</span> <b style="color:#67e8f9">${chars[5].name.split(' ')[0]}</b> comprou <i>Mapa Inteligente</i> na ${P(0)}`,
+ `<span style="color:#f472b6">#Promoção</span> Café especial −20% no ${P(2)}`,
+ `<span style="color:#a78bfa">➜</span> <b style="color:#c4b5fd">${chars[7].name.split(' ')[0]}</b> está a caminho do ${P(3)}`,
+ `<span style="color:#ef4444">🚓</span> Prisão em flagrante divulgada pela polícia`,
+ `<span style="color:#34d399">●</span> <b style="color:#6ee7b7">${chars[9].name.split(' ')[0]}</b> entrou na ${P(4)}`];
+document.getElementById('flist').innerHTML=lines.map(l=>`<div class="l">${l}</div>`).join('');
+document.title='ready';
+</script></body></html>
