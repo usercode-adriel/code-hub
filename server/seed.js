@@ -1,7 +1,7 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
 
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.2.0';
 
 // Histórico de versões publicado como notificação de "atualização do sistema".
 export const CHANGELOG = [
@@ -72,6 +72,16 @@ export const CHANGELOG = [
     message: 'O hub virou uma cidade que vive sozinha, mesmo com a tela fechada. As pessoas têm rotina, emprego, dinheiro, amizades, namoros, rivalidades e fofocas; '
       + 'empresas lucram, contratam, lançam produtos e quebram; há bolsa, banco com empréstimos, imóveis, eleições, leis com efeito real, notícias escritas por jornalistas da cidade, '
       + 'TV, rádio, cinema, comunidades, uma internet própria, mapa, arquivo histórico e relatório do que aconteceu enquanto você estava fora. Abra pelo globo no menu.',
+  },
+  {
+    version: '2.2.0',
+    title: 'Codeniac Digital Society: Nexus City 🏙️',
+    message: 'Novo início no estilo de jogo, com perfil, cidade, eventos, redes sociais, economia, notícias e aplicativos. Mapa de Nexus City com ruas, avenidas, rodovias, rio e parques: '
+      + 'toque num lugar para ver dono, equipe, horário e produtos, trace a rota e vá a pé, de ônibus ou táxi. Banco Nexus com senha de 4 dígitos, score de 0 a 1000, '
+      + 'empréstimos com contrato e parcelas, cartão virtual, cofrinhos, Pix e cobranças por atraso. A conta começa em zero: o dinheiro vem de trabalho, freelas e vendas. '
+      + 'Lojas de verdade com estoque e vendedores de IA que negociam e lembram de você; o que você compra vai para o inventário e tem efeito real (Central de Comando, '
+      + 'Mapa Inteligente, smartphone para ligar, câmera, Clube VIP e mais). Amigos emprestam dinheiro conforme a confiança, vaquinhas são fiscalizadas, '
+      + 'e a polícia e a Justiça só punem com provas.',
   },
 ];
 

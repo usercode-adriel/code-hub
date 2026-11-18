@@ -1,12 +1,12 @@
 // 02 · SOCIAL WORLD — relacionamentos, eventos e convites, pedidos de ajuda, comunidades e investigações.
 import { shell, face, bindEntities, evRow, api, esc, timeAgo, icon, toast, modal, num } from '../world/wui.js';
 
-const TABS = [['relacoes', 'Relacionamentos', 'heart'], ['eventos', 'Eventos', 'calendar'], ['pedidos', 'Pedidos', 'inbox'], ['comunidades', 'Comunidades', 'layers'], ['investigacoes', 'Investigações', 'search']];
+const TABS = [['relacoes', 'Relacionamentos', 'heart'], ['eventos', 'Eventos', 'calendar'], ['pedidos', 'Pedidos', 'inbox'], ['comunidades', 'Comunidades', 'layers'], ['emprestimos', 'Empréstimos', 'wallet'], ['investigacoes', 'Investigações', 'search']];
 const REL_ORDER = ['namoro', 'casado', 'familia', 'melhor-amigo', 'amigo', 'colega', 'conhecido', 'rival', 'inimigo', 'desconhecido'];
 
 export default async function render(el, parts = []) {
   const tab = TABS.some(([k]) => k === parts[0]) ? parts[0] : 'relacoes';
-  const body = shell(el, 'social', { title: 'Social World', sub: 'Quem são as pessoas na sua vida e o que elas acham de você.' });
+  const body = shell(el, 'social', { title: 'Social', sub: 'Quem são as pessoas na sua vida e o que elas acham de você.' });
   el.querySelector('#wActs').innerHTML = `<a class="btn sm primary" href="#/rede">${icon('users', 13)} Abrir a Rede</a>`;
   body.innerHTML = `<div class="w-tabs">${TABS.map(([k, l, ic]) => `<a href="#/social/${k}" class="${k === tab ? 'on' : ''}">${icon(ic, 14)} ${l}</a>`).join('')}</div><div id="sBody"><div class="skeleton" style="height:200px"></div></div>`;
   const box = body.querySelector('#sBody');
@@ -16,6 +16,7 @@ export default async function render(el, parts = []) {
   if (tab === 'pedidos') await pedidos(box);
   if (tab === 'comunidades') await (parts[1] ? comunidade(box, parts[1]) : comunidades(box));
   if (tab === 'investigacoes') await investigacoes(box);
+  if (tab === 'emprestimos') await emprestimos(box);
 }
 
 async function relacoes(box) {
@@ -98,4 +99,29 @@ async function investigacoes(box) {
       <small class="muted">Começou ${esc(timeAgo(i.startedAt))} · passou por ${i.spread} pessoa(s)</small>
       <ol class="w-chain">${i.revealed.map((x) => `<li>${x.fromPerson ? `<a class="w-link" data-person="${esc(x.fromPerson.id)}">${esc(x.fromPerson.name)}</a> contou para ` : '<b>Origem:</b> '}<a class="w-link" data-person="${esc(x.person.id)}">${esc(x.person.name)}</a><p>"${esc(x.text)}" <small class="muted">(${esc(x.truth)})</small></p></li>`).join('')}</ol>
       ${i.origin ? `<p><b>Quem começou:</b> <a class="w-link" data-person="${esc(i.origin.id)}">${esc(i.origin.name)}</a></p>` : ''}</div>`).join('') || `<div class="w-empty">${icon('search', 30)}<b>Nenhuma investigação</b></div>`}`;
+}
+
+// pedir dinheiro emprestado a amigos: a pessoa decide pelo que tem, pela confiança em você e pelo seu histórico
+async function emprestimos(box) {
+  const [list, bank] = await Promise.all([api.get('/mundo/relacoes'), api.get('/mundo/banco')]);
+  const friends = list.filter((p) => p.friend || ['amigo', 'melhor-amigo', 'namoro', 'casado', 'familia', 'colega'].includes(p.relation.type));
+  const phone = (await api.get('/mundo/inventario').catch(() => ({ installed: {} }))).installed.phone;
+  box.innerHTML = `<div class="w-panel"><p class="muted">Só quem tem relação com você empresta. Cada pessoa olha o próprio bolso, quanto confia em você e se você já deu calote. Se não pagar no prazo, a amizade sofre e pode virar processo.</p>
+    ${bank.friendLoans.filter((l) => l.status === 'aberto').map((l) => `<div class="bq-debt"><span data-person="${esc(l.lenderId)}">${face(l.lender, 28)}</span><div><b>Você deve ${esc(l.lender.name)}</b><small>vence ${new Date(l.due).toLocaleDateString('pt-BR')}</small></div><em>${l.amount.toLocaleString('pt-BR')} NXC</em><a class="btn sm outline" href="#/banco/amigos">Pagar</a></div>`).join('')}
+    <div class="w-people">${friends.map((p) => `<div class="w-person"><span data-person="${esc(p.id)}">${face(p, 44)}</span><b>${esc(p.name)}</b><span class="w-chip rel-${esc(p.relation.type)}">${esc(p.relation.label)}</span>
+      <small class="muted">confiança ${p.relation.trust}</small><div class="bq-acts sm"><button class="btn sm primary" data-ask="${esc(p.id)}">Pedir emprestado</button>${phone && p.friend ? `<button class="btn sm outline" data-call="${esc(p.id)}">${icon('chat', 12)} Ligar</button>` : ''}</div></div>`).join('') || '<p class="muted">Você ainda não tem amigos para pedir. Faça amizades na Rede.</p>'}</div></div>`;
+  box.querySelectorAll('[data-ask]').forEach((b) => { b.onclick = () => {
+    const p = friends.find((x) => x.id === b.dataset.ask);
+    import('../ui.js').then(({ formModal }) => formModal({ title: `Pedir dinheiro a ${p.name}`, submit: 'Pedir', fields: [{ name: 'valor', label: 'Quanto (NXC)', type: 'number', value: 200 }, { name: 'dias', label: 'Devolvo em (dias)', type: 'number', value: 7 }],
+      onSubmit: async (d) => {
+        const r = await api.post('/mundo/amigos/emprestimo', { personaId: p.id, valor: Number(d.valor), dias: Number(d.dias) });
+        const ok = ['aceito', 'parcial', 'condicoes'].includes(r.decision);
+        modal({ title: p.name, body: `<div class="mk-sl-h">${face(r.persona, 44)}<p class="mk-bubble">“${esc(r.text)}”</p></div>${ok ? `<p>Oferta: <b>${r.offer.toLocaleString('pt-BR')} NXC</b>, devolver em ${r.dueDays} dias${r.interest ? ` com ${Math.round(r.interest * 100)}% a mais` : ''}.</p><div class="form-actions"><button class="btn outline" data-close>Recusar</button><button class="btn primary" data-acc>Aceitar</button></div>` : '<div class="form-actions"><button class="btn primary" data-close>Ok</button></div>'}`,
+          onMount: (m, close) => { m.querySelector('[data-acc]')?.addEventListener('click', async () => { try { await api.post(`/mundo/amigos/emprestimo/${r.id}/aceitar`); toast('Dinheiro recebido', `${r.offer} NXC de ${p.name}.`, 'success'); close(); emprestimos(box); } catch (err) { toast('Não deu', err.message, 'error'); } }); } });
+        return r;
+      } }));
+  }; });
+  box.querySelectorAll('[data-call]').forEach((b) => { b.onclick = async () => {
+    try { const r = await api.post(`/mundo/ligar/${b.dataset.call}`); if (!r.answered) { toast('Ninguém atendeu', r.text, 'info'); return; } if (r.conversationId) { localStorage.setItem('codeniac.conv', r.conversationId); localStorage.setItem('codeniac.autocall', r.conversationId); } location.hash = '#/assistente'; } catch (err) { toast('Não deu', err.message, 'error'); }
+  }; });
 }

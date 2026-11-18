@@ -71,6 +71,8 @@ export default async function render(el, parts = [], query = new URLSearchParams
     const ta = root.querySelector('#rdText'); const send = root.querySelector('#rdSend'); const prev = root.querySelector('#rdPrev');
     const upd = () => { root.querySelector('#rdCount').textContent = `${ta.value.length}/600`; send.disabled = !ta.value.trim() && !photo; };
     ta.oninput = upd;
+    // câmera profissional (comprada no Mercado): descreva a foto e ela é gerada no estilo de jogo
+    api.get('/mundo/inventario').then((d) => { if (d.installed?.camera && !root.querySelector('#rdCam')) ta.insertAdjacentHTML('afterend', '<input id="rdCam" class="rd-cam" placeholder="📷 Câmera Lumen: descreva a foto do post (opcional)" maxlength="200" aria-label="Foto da câmera">'); }).catch(() => {});
     ta.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send.click(); };
     root.querySelector('#rdPic').onclick = () => root.querySelector('#rdFile').click();
     root.querySelector('#rdFile').onchange = async (e) => {
@@ -81,7 +83,9 @@ export default async function render(el, parts = [], query = new URLSearchParams
     send.onclick = async () => {
       send.disabled = true;
       try {
-        const p = await api.post('/rede/posts', { text: ta.value, image: photo });
+        const cam = root.querySelector('#rdCam');
+        const p = await api.post('/rede/posts', { text: ta.value, image: photo, photo: cam?.value || undefined });
+        if (cam) cam.value = '';
         ta.value = ''; photo = null; prev.hidden = true; upd();
         if (!posts.some((x) => x.id === p.id)) { posts.unshift(p); prependPost(p); }
         toast('Postado!', 'As pessoas da rede vão ver e reagir nos próximos minutos.', 'success');

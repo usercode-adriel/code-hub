@@ -3,11 +3,17 @@
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { esc, timeAgo, toast, modal, initials, confirmDialog } from '../ui.js';
+import { store } from '../store.js';
+// fecha o menu "Mais" ao tocar fora (um único ouvinte para o app todo)
+document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.wx-more[open]')) if (!d.contains(e.target)) d.open = false; }, true);
 
+// navegação principal (como na referência) e o menu "Mais"
 export const ENVS = [
-  ['centro', 'Início', 'dashboard'], ['mapa', 'Mapa', 'pin'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe'], ['midia', 'Mídia', 'news'],
-  ['governo', 'Governo', 'scale'], ['economia', 'Economia', 'wallet'], ['arquivo', 'Arquivo', 'book'], ['controle', 'IA', 'cpu'], ['diversao', 'Diversão', 'play'],
+  ['centro', 'Início', 'dashboard'], ['mapa', 'Mapa', 'pin'], ['social', 'Social', 'users'], ['internet', 'Internet', 'globe'], ['mercado', 'Mercado', 'bag'],
+  ['empresas', 'Empresas', 'briefcase'], ['banco', 'Banco', 'wallet'], ['policia', 'Polícia', 'shield'], ['justica', 'Justiça', 'scale'], ['inventario', 'Inventário', 'layers'], ['midia', 'Notícias', 'news'],
 ];
+export const MORE = [['governo', 'Governo', 'flag'], ['arquivo', 'Arquivo', 'book'], ['controle', 'Controle da IA', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub pessoal', 'dashboard']];
+const ENV_OF = { economia: 'empresas', rede: 'social', busca: 'internet' };
 export const CAT_ICON = { politica: 'scale', economia: 'trending', tecnologia: 'cpu', entretenimento: 'play', esportes: 'trophy', seguranca: 'shield', ciencia: 'sparkles', celebridades: 'star', sociedade: 'users', local: 'pin', pessoal: 'heart' };
 export const CAT_LABEL = { politica: 'Política', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes', seguranca: 'Segurança', ciencia: 'Ciência', celebridades: 'Celebridades', sociedade: 'Sociedade', local: 'Local', pessoal: 'Vida pessoal' };
 export const CAT_COLOR = { politica: '#f59e0b', economia: '#22c55e', tecnologia: '#06b6d4', entretenimento: '#a855f7', esportes: '#84cc16', seguranca: '#ef4444', ciencia: '#6366f1', celebridades: '#ec4899', sociedade: '#3b82f6', local: '#14b8a6', pessoal: '#f472b6' };
@@ -18,12 +24,61 @@ export const pct = (v) => `${v > 0 ? '+' : ''}${(Number(v) || 0).toLocaleString(
 
 // moldura de cada ambiente: barra de navegação + área do conteúdo
 export function shell(el, env, { title = '', sub = '' } = {}) {
+  const cur = ENV_OF[env] || env;
+  const user = store.user || {};
   el.innerHTML = `<div class="w-env" data-env="${env}">
-    <nav class="w-nav" aria-label="Ambientes do System 2.0">${ENVS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === env ? 'on' : ''}">${icon(ic, 15)}<span>${l}</span></a>`).join('')}</nav>
+    <header class="wx-top">
+      <a class="wx-brand" href="#/centro" aria-label="Codeniac Digital Society"><span class="wx-logo">${icon('globe', 20)}</span><span class="wx-name"><b>Codeniac</b><small>Digital Society</small></span></a>
+      <nav class="w-nav wx-nav" aria-label="Ambientes do System 2.0">${ENVS.map(([k, l, ic]) => `<a href="#/${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 14)}<span>${l}</span></a>`).join('')}
+        <details class="wx-more ${MORE.some(([k]) => k === cur) ? 'on' : ''}"><summary>${icon('more', 14)}<span>Mais</span></summary><div class="wx-more-menu">${MORE.map(([k, l, ic]) => `<a href="#/${k}">${icon(ic, 14)} ${l}</a>`).join('')}</div></details></nav>
+      <div class="wx-right"><a class="wx-ic" href="#/notifications" aria-label="Notificações">${icon('bell', 17)}</a><span class="wx-online"><i></i>Online</span>
+        <a class="wx-me" href="#/profile" aria-label="Meu perfil">${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : `<span>${esc(initials(user.name || 'Eu'))}</span>`}</a></div>
+    </header>
     ${title ? `<header class="w-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
     <div class="w-body" id="wBody"></div></div>`;
-  el.querySelector('.w-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  el.querySelector('.wx-nav .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   return el.querySelector('#wBody');
+}
+// identificador único de operação: o servidor nunca processa a mesma operação duas vezes
+export const opId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+// senha bancária de 4 dígitos com teclado numérico (a senha só vai ao servidor, nunca fica salva no navegador)
+export function askPin(title = 'Senha bancária', hint = 'Digite sua senha de 4 dígitos') {
+  return new Promise((resolve) => {
+    let pin = ''; let done = false;
+    modal({
+      title,
+      body: `<div class="pin-pad"><p class="muted">${esc(hint)}</p><div class="pin-dots">${'<i></i>'.repeat(4)}</div>
+        <div class="pin-keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'x', 0, 'ok'].map((k) => `<button type="button" data-k="${k}" ${k === 'ok' ? 'class="ok" disabled' : ''}>${k === 'x' ? '⌫' : k === 'ok' ? '✓' : k}</button>`).join('')}</div></div>`,
+      onMount: (m, closeFn) => {
+        const dots = [...m.querySelectorAll('.pin-dots i')]; const ok = m.querySelector('[data-k="ok"]');
+        const paint = () => { dots.forEach((d, i) => d.classList.toggle('on', i < pin.length)); ok.disabled = pin.length !== 4; };
+        const press = (k) => { if (k === 'x') pin = pin.slice(0, -1); else if (k === 'ok') { if (pin.length === 4) { done = true; closeFn(); resolve(pin); } } else if (pin.length < 4) pin += k; paint(); };
+        m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => press(b.dataset.k); });
+        m.addEventListener('keydown', (e) => { if (/^\d$/.test(e.key)) press(e.key); if (e.key === 'Backspace') press('x'); if (e.key === 'Enter') press('ok'); });
+        new MutationObserver((_, obs) => { if (!document.body.contains(m)) { obs.disconnect(); if (!done) resolve(null); } }).observe(document.body, { childList: true });
+      },
+    });
+  });
+}
+// executa uma operação que pede senha; se não houver senha criada, cria primeiro
+export async function withPin(fn, title) {
+  for (;;) {
+    const pin = await askPin(title);
+    if (!pin) return null;
+    try { return await fn(pin); } catch (err) {
+      if (/bloqueada/i.test(err.message)) throw err;
+      if (/senha incorreta/i.test(err.message)) { toast('Senha incorreta', err.message, 'error'); continue; }
+      if (/crie sua senha/i.test(err.message)) { await createPin(); continue; }
+      throw err;
+    }
+  }
+}
+export async function createPin() {
+  const a = await askPin('Crie sua senha bancária', 'Escolha 4 números. Ela protege compras, transferências, saques e empréstimos.');
+  if (!a) return false;
+  const b = await askPin('Confirme a senha', 'Digite os mesmos 4 números');
+  if (a !== b) { toast('As senhas não conferem', 'Tente de novo.', 'error'); return false; }
+  try { await api.post('/mundo/banco/senha', { pin: a }); toast('Senha criada 🔒', 'Guardamos só uma versão criptografada dela.', 'success'); return true; } catch (err) { toast('Não deu', err.message, 'error'); return false; }
 }
 export function nascendo(body, retry) {
   body.innerHTML = `<div class="w-born"><div class="w-born-orb"></div><h2>A cidade está nascendo…</h2><p>As primeiras pessoas estão chegando, abrindo empresas e formando partidos. Isso leva alguns segundos.</p></div>`;

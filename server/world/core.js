@@ -19,11 +19,14 @@ export const PACES = {
 };
 // Categorias usadas pelas notícias, pelo arquivo e pelos filtros.
 export const CATS = {
-  politica: 'Política', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes',
+  politica: 'Política', justica: 'Justiça', economia: 'Economia', tecnologia: 'Tecnologia', entretenimento: 'Entretenimento', esportes: 'Esportes',
   seguranca: 'Segurança', ciencia: 'Ciência', celebridades: 'Celebridades', sociedade: 'Sociedade', local: 'Local', pessoal: 'Vida pessoal',
 };
 
 const hooks = { event: [], hourly: [], daily: [], genesis: [], tick: [] };
+// atualizações de esquema: rodam uma vez em mundos novos e antigos, na ordem em que foram registradas
+const upgrades = [];
+export const onUpgrade = (n, fn) => upgrades.push([n, fn]);
 const handlers = {};
 export const onEvent = (fn) => hooks.event.push(fn);
 export const onHourly = (fn) => hooks.hourly.push(fn);
@@ -31,6 +34,8 @@ export const onDaily = (fn) => hooks.daily.push(fn);
 export const onGenesis = (fn) => hooks.genesis.push(fn);
 export const onTick = (fn) => hooks.tick.push(fn);
 export const handle = (kind, fn) => { handlers[kind] = fn; };
+// serviços que um módulo oferece aos outros sem criar ciclos de importação (ex.: abrir inquérito, entregar item)
+export const services = {};
 
 // ---------------------------------------------------------------- estado
 export function world(userId) {
@@ -119,6 +124,14 @@ function runQueue(ctx, until) {
 // ---------------------------------------------------------------- tempo
 const MAX_CATCHUP_HOURS = 7 * 24;
 
+function runUpgrades(base) {
+  const w = base.w; const schema = w.core.schema || 1;
+  const pending = upgrades.filter(([n]) => n > schema).sort((a, b) => a[0] - b[0]);
+  if (!pending.length) return false;
+  const ctx = { ...base, at: new Date() };
+  for (const [n, fn] of pending) { try { fn(ctx); } catch (err) { console.error(`[mundo] atualização ${n}:`, err); } w.core.schema = Math.max(w.core.schema || 1, n); }
+  return true;
+}
 export async function worldTick(user, { live = true } = {}) {
   const w = world(user.id);
   if (w.core.cfg.enabled === false) return;
@@ -132,9 +145,13 @@ export async function worldTick(user, { live = true } = {}) {
     record(ctx, { type: 'genese', cat: 'local', title: 'Codeniac Society começa a ser registrada', text: 'A partir deste momento, tudo o que acontece na cidade passa a fazer parte da história. Pessoas, empresas, partidos e clubes que já existiam aparecem como "da gênese".', importance: 4, origin: 'genese' });
     w.core.lastHour = hourKey();
     w.core.lastDay = dayKey();
+    runUpgrades(base);
     saveWorld();
     return;
   }
+
+  // novos módulos entram em mundos que já existiam (uma vez só)
+  if (runUpgrades(base)) saveWorld();
 
   // horas que passaram desde a última vez (recupera o tempo desligado)
   const nowD = new Date();
