@@ -57,24 +57,30 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   const BD = () => city.bounds || { x0: 0, y0: 0, x1: city.W, y1: city.H };
   let coastPaths = null;
   function coastP() {
-    if (coastPaths || !city.coast) return coastPaths;
-    const mk = (off, cl) => { const p = new Path2D(); city.coast.poly(off, 1440, cl).forEach(([px, py], k) => (k ? p.lineTo(px, py) : p.moveTo(px, py))); p.closePath(); return p; };
-    coastPaths = { land: mk(0), grass: mk(-34, 320), shallow: mk(26), foam1: mk(5), foam2: mk(14) };
+    if (coastPaths || !city.coast?.land) return coastPaths;
+    const mk = (polys) => { const p = new Path2D(); for (const poly of polys) { poly.forEach(([px, py], k) => (k ? p.lineTo(px, py) : p.moveTo(px, py))); p.closePath(); } return p; };
+    coastPaths = { land: mk(city.coast.land), lakes: mk(city.coast.lakes || []), hasLakes: (city.coast.lakes || []).length > 0 };
     return coastPaths;
   }
+  const BW = 34 * 2; // areia dos dois lados da linha da costa (mesma regra da máscara)
   function drawCoast(x, rect) {
     const C = coastP(); if (!C) return;
     x.fillStyle = pat.water; x.fillRect(rect[0], rect[1], CH, CH);
     x.save(); x.lineJoin = 'round';
-    x.strokeStyle = 'rgba(120,190,245,.55)'; x.lineWidth = 52; x.stroke(C.shallow);
-    x.strokeStyle = 'rgba(160,215,250,.6)'; x.lineWidth = 22; x.stroke(C.foam2);
-    x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 2; x.setLineDash([10, 7]); x.stroke(C.foam2); x.setLineDash([]);
-    x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 3; x.stroke(C.foam1);
-    x.fillStyle = pat.sand; x.fill(C.land);
-    x.strokeStyle = 'rgba(201,170,104,.7)'; x.lineWidth = 2; x.stroke(C.grass);
-    x.fillStyle = pat.grass; x.fill(C.grass);
+    x.strokeStyle = 'rgba(120,190,245,.5)'; x.lineWidth = BW + 70; x.stroke(C.land);
+    x.strokeStyle = 'rgba(160,215,250,.6)'; x.lineWidth = BW + 30; x.stroke(C.land);
+    x.strokeStyle = 'rgba(255,255,255,.85)'; x.lineWidth = BW + 8; x.stroke(C.land);
+    x.fillStyle = pat.grass; x.fill(C.land);
+    x.strokeStyle = pat.sand; x.lineWidth = BW; x.stroke(C.land);
+    if (C.hasLakes) {
+      x.fillStyle = pat.water; x.fill(C.lakes);
+      x.save(); x.clip(C.lakes); x.strokeStyle = 'rgba(140,200,245,.55)'; x.lineWidth = BW + 40; x.stroke(C.lakes); x.restore();
+      x.strokeStyle = pat.sand; x.lineWidth = BW; x.stroke(C.lakes);
+    }
     x.restore();
   }
+  // sprites das folhas extras ('x:chave') e do pacote de decoração ('d:chave')
+  const sprImg = (spr, base) => (spr.startsWith('x:') ? img(`extra/${spr.slice(2)}`) : spr.startsWith('d:') ? img(`deco/${spr.slice(2)}`) : img(`${base}/${spr}`));
   const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'access', 'road', 'cross', 'runway'];
 
   function fillShape(x, g, style) {
@@ -86,6 +92,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     for (const g of sorted) {
       if (g.island) { fillShape(x, g, pat.park); x.fillStyle = '#e8e4da'; x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.lineWidth = 2; x.strokeStyle = '#e8e4da'; x.stroke(); continue; }
       if (g.pool) { x.fillStyle = '#e8eef2'; x.fillRect(g.x - 2, g.y - 2, g.w + 4, g.h + 4); fillShape(x, g, '#4cb4f0'); x.fillStyle = '#8fd4ff'; x.fillRect(g.x + 2, g.y + 2, g.w - 8, 1); continue; }
+      if (g.tex) { const im = sprImg(g.tex); if (im) { if (g.rot) { x.save(); x.translate(g.x + g.w / 2, g.y + g.h / 2); x.rotate(g.rot); x.drawImage(im, -g.w / 2, -g.h / 2, g.w, g.h); x.restore(); } else x.drawImage(im, g.x, g.y, g.w, g.h); continue; } }
       if (g.mat === 'access') { x.fillStyle = pat.road; x.fillRect(g.x, g.y, g.w, g.h); x.fillStyle = '#8f8a80'; x.fillRect(g.x, g.y, g.w, 1); x.fillRect(g.x, g.y + g.h - 1, g.w, 1); x.fillStyle = 'rgba(236,235,230,.7)'; for (let k = g.x + 6; k < g.x + g.w - 6; k += 12) x.fillRect(k, g.y + g.h / 2 - 0.5, 6, 1); continue; }
       if (g.mat === 'front') { if (frontImg) { for (let k = g.x; k < g.x + g.w; k += 16) { const w = Math.min(16, g.x + g.w - k); x.drawImage(frontImg, 0, 0, w, 11, k, g.y, w, g.h); } } else fillShape(x, g, pat.walk); continue; }
       const style = g.mat === 'grass' ? (g.park ? pat.park : pat.grass) : g.mat === 'cross' ? pat.road : g.mat === 'pond' ? pat.water : pat[g.mat] || pat.grass;
@@ -258,8 +265,8 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
 
   function drawProp(x, p) {
-    if (p.spr.startsWith('d:')) {
-      const im = img(`deco/${p.spr.slice(2)}`); if (!im) return;
+    if (p.spr.startsWith('d:') || p.spr.startsWith('x:')) {
+      const im = sprImg(p.spr); if (!im) return;
       if (p.rot) { x.save(); x.translate(p.x, p.y - p.h / 2); x.rotate(p.rot); x.drawImage(im, -p.w / 2, -p.h / 2, p.w, p.h); x.restore(); return; }
       if (p.solid || p.h > 14) { x.fillStyle = 'rgba(10,14,30,.22)'; x.beginPath(); x.ellipse(p.x + 1, p.y - 1, p.w * 0.42, Math.max(1.5, p.w * 0.14), 0, 0, Math.PI * 2); x.fill(); }
       x.drawImage(im, p.x - p.w / 2, p.y - p.h, p.w, p.h); return;
@@ -285,7 +292,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     // espuma e água rasa na praia da orla oeste (mesmo acabamento da costa nova)
     if (city.coast && rect[0] < 240 && rect[2] > 150 && rect[3] > 0 && rect[1] < (city.core?.h || city.H)) { const y0 = Math.max(0, rect[1]); const hh = Math.min(city.core?.h || city.H, rect[3]) - y0; x.fillStyle = 'rgba(120,190,245,.55)'; x.fillRect(206, y0, 26, hh); x.fillStyle = 'rgba(160,215,250,.6)'; x.fillRect(214, y0, 14, hh); x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(226, y0, 3, hh); x.fillStyle = 'rgba(255,255,255,.75)'; for (let k = y0 - (y0 % 17); k < y0 + hh; k += 17) x.fillRect(217, k, 2, 10); }
     roadMarks(x, rect);
-    for (const d of bin.d) { const im = img(`deco/${d.spr}`); if (!im) continue; if (d.rot) { x.save(); x.translate(d.x + d.w / 2, d.y + d.h / 2); x.rotate(d.rot); x.drawImage(im, -d.w / 2, -d.h / 2, d.w, d.h); x.restore(); } else x.drawImage(im, d.x, d.y, d.w, d.h); }
+    for (const d of bin.d) { const im = sprImg(d.spr, 'deco'); if (!im) continue; if (d.rot) { x.save(); x.translate(d.x + d.w / 2, d.y + d.h / 2); x.rotate(d.rot); x.drawImage(im, -d.w / 2, -d.h / 2, d.w, d.h); x.restore(); } else x.drawImage(im, d.x, d.y, d.w, d.h); }
     const lit = [];
     x.imageSmoothingEnabled = true;
     // construções e objetos ordenados pela base (y), como num RPG top-down
@@ -311,17 +318,17 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
 
   // mapa geral reduzido (0,25 px por unidade): zoom afastado e minimapa
-  const OV = 0.25;
+  let OV = 0.25;
   const overview = document.createElement('canvas');
   // rect: redesenha só uma área (depois de uma reforma); sem rect, o mapa geral inteiro
   function drawOverview(rect = null) {
-    const bd = BD(); const W2 = (bd.x1 - bd.x0) * OV; const H2 = (bd.y1 - bd.y0) * OV;
+    const bd = BD(); if (!rect) OV = Math.min(0.25, 2048 / Math.max(bd.x1 - bd.x0, bd.y1 - bd.y0)); const W2 = Math.round((bd.x1 - bd.x0) * OV); const H2 = Math.round((bd.y1 - bd.y0) * OV);
     if (!rect && (overview.width !== W2 || overview.height !== H2)) { overview.width = W2; overview.height = H2; }
     const x = overview.getContext('2d'); x.setTransform(OV, 0, 0, OV, -bd.x0 * OV, -bd.y0 * OV); x.imageSmoothingEnabled = true;
     x.save(); if (rect) { x.beginPath(); x.rect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]); x.clip(); }
     const hit = (o, m = 0) => !rect || (o.x - m < rect[2] && o.x + (o.w || 0) + m > rect[0] && o.y - m - 60 < rect[3] && o.y + (o.h || 0) + m > rect[1]);
     x.fillStyle = '#2f6fd0'; x.fillRect(bd.x0, bd.y0, bd.x1 - bd.x0, bd.y1 - bd.y0);
-    const C = coastP(); if (C) { x.strokeStyle = '#7fbff0'; x.lineWidth = 40; x.stroke(C.shallow); x.fillStyle = '#e8cf8a'; x.fill(C.land); x.fillStyle = '#4f9a3a'; x.fill(C.grass); } else { x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H); }
+    const C = coastP(); if (C) { x.lineJoin = 'round'; x.strokeStyle = '#7fbff0'; x.lineWidth = BW + 60; x.stroke(C.land); x.fillStyle = '#4f9a3a'; x.fill(C.land); x.strokeStyle = '#e8cf8a'; x.lineWidth = BW; x.stroke(C.land); if (C.hasLakes) { x.fillStyle = '#2f6fd0'; x.fill(C.lakes); x.strokeStyle = '#e8cf8a'; x.stroke(C.lakes); } } else { x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H); }
     const core = city.core || { w: city.W, h: city.H }; x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, core.w, core.h);
     const col = { access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
     for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? '#56a640' : col[m]);
@@ -343,7 +350,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   const dark = document.createElement('canvas'); const dctx = dark.getContext('2d');
 
   return {
-    overview, OV, glow, cone,
+    overview, get OV() { return OV; }, glow, cone,
     beginFrame() { rendersThisFrame = 0; },
     // desenha o chão/construções visíveis no contexto já transformado para o mundo
     drawWorld(ctx, view, z) {

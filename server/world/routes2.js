@@ -19,7 +19,7 @@ import { peopleView, housesPublic, housePublic, live } from './living.js';
 import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { driveState, park, infraction, damage, tow, incident } from './drive.js';
-import { construtoraView, buyObra, expandCity, saveReforma, obraInventory } from './construtora.js';
+import { construtoraView, saveReforma } from './construtora.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
@@ -293,7 +293,7 @@ router.post('/mundo/lojas/:id/avaliar', (req, res) => { const ctx = ctxOf(req); 
 // ---------------------------------------------------------------- inventário
 router.get('/mundo/inventario', (req, res) => {
   const w = world(req.user.id); const u = account(w);
-  res.json({ obra: obraInventory(w), items: inv(w).slice().reverse().map(publicItem), installed: u.installed || {}, vipUntil: u.vipUntil || null, memCap: u.memCap || 40, friends: people(w).filter((p) => p.friend).map((p) => ({ id: p.id, name: p.name })), hasCompany: companies(w).some((c) => c.founderId === 'me' && c.status !== 'falida') });
+  res.json({ items: inv(w).slice().reverse().map(publicItem), installed: u.installed || {}, vipUntil: u.vipUntil || null, memCap: u.memCap || 40, friends: people(w).filter((p) => p.friend).map((p) => ({ id: p.id, name: p.name })), hasCompany: companies(w).some((c) => c.founderId === 'me' && c.status !== 'falida') });
 });
 router.post('/mundo/inventario/:id/:acao', (req, res) => { const ctx = ctxOf(req); run(res, () => itemAction(ctx, req.params.id, req.params.acao, req.body || {})); });
 
@@ -468,8 +468,6 @@ router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); r
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
 // Construtora Nexus e modo Reforma
 router.get('/mundo/construtora', (req, res) => { const w = world(req.user.id); res.json(construtoraView(w)); });
-router.post('/mundo/construtora/comprar', (req, res) => { const ctx = ctxOf(req); run(res, () => buyObra(ctx, req.body || {})); });
-router.post('/mundo/construtora/expandir', (req, res) => { const ctx = ctxOf(req); run(res, () => expandCity(ctx)); });
 router.post('/mundo/cidade2d/reforma', (req, res) => { const w = world(req.user.id); run(res, () => saveReforma(w, req.body || {})); });
 router.get('/mundo/veiculos', (req, res) => {
   const w = world(req.user.id); const shop = places(w).find((p) => p.name === 'Oficina Turbo');

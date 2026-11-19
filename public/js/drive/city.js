@@ -5,10 +5,10 @@
 import { BLD } from './bldmeta.js';
 import { DECO } from './decometa.js';
 import { SOLID, WALK, ROAD, CROSS, LOT, WATER, GRASS, RUNWAY, PLAZA, SAND } from './world.js';
-import { PAD, BOUNDS, BEACH, CATALOG, coastOf, genKey, placed } from './obra.js';
+import { CATALOG, genKey, placed } from './obra.js';
+import { terrainOf } from './terreno.js';
 
 export const W = 4096; export const H = 2816; export const CS = 4;
-const TERRAIN = new Map(); // máscara do terreno em volta, por formato e nível (só muda quando a costa muda)
 
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const snap = (v) => Math.round(v / CS) * CS;
@@ -44,7 +44,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   const R = rng(seed);
   const RF = reforma || {}; const DEL = new Set(RF.del || []);
   const userAdd = (RF.add || []).map((a) => [a, placed(a)]).filter(([, o]) => o);
-  const userFloor = (RF.floor || []).filter((f) => CATALOG[f.k]?.kind === 'floor').map((f) => ({ mat: CATALOG[f.k].mat, shape: 'rect', x: f.x, y: f.y, w: 32, h: 32, u: 1 }));
+  const userFloor = (RF.floor || []).filter((f) => CATALOG[f.k]?.kind === 'floor').map((f) => ({ mat: CATALOG[f.k].mat, shape: 'rect', x: f.x, y: f.y, w: 32, h: 32, u: 1, tex: CATALOG[f.k].tex, rot: f.r || 0 }));
   const reserved = userFloor.map((f) => [f.x, f.y, f.w, f.h]);
   const pick = (a) => a[Math.floor(R() * a.length)];
   const nodes = {}; const roads = [];
@@ -549,24 +549,18 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   const wb = blds.find((b) => b.spr === 'warehouse-brick') || blds.find((b) => b.spr === 'industrial');
   if (wb) pois.push({ id: 'construtora', label: 'Construtora Nexus', at: [Math.round(wb.x + wb.w / 2), Math.round(wb.y + 12)], route: '#/construtora', icon: 'building' });
   // ---------------------------------------------------------------- terreno em volta (expansões) e costa
-  const coast = coastOf(RF.shape, RF.level);
-  const emw = (W + 2 * PAD) / CS; const emh = (H + 2 * PAD) / CS; const o = PAD / CS;
-  const ck = `${coast.shape}|${coast.level}`;
-  if (!TERRAIN.has(ck)) {
-    const t = new Uint8Array(emw * emh);
-    for (let j = 0; j < emh; j++) for (let i = 0; i < emw; i++) { if (i >= o && i < o + mw && j >= o && j < o + mh) continue; const z = coast.zone((i - o + 0.5) * CS, (j - o + 0.5) * CS); t[j * emw + i] = z === 0 ? WATER : z === 1 ? SAND : GRASS; }
-    TERRAIN.clear(); TERRAIN.set(ck, t);
-  }
-  const emask = TERRAIN.get(ck).slice(); const eh = new Uint8Array(emw * emh);
-  for (let j = 0; j < mh; j++) { emask.set(mask.subarray(j * mw, (j + 1) * mw), (j + o) * emw + o); eh.set(heights.subarray(j * mw, (j + 1) * mw), (j + o) * emw + o); }
-  const eFill = (c, x, y, w, h) => { const ax = Math.max(0, Math.floor((x + PAD) / CS)); const ay = Math.max(0, Math.floor((y + PAD) / CS)); const bx = Math.min(emw, Math.ceil((x + w + PAD) / CS)); const by = Math.min(emh, Math.ceil((y + h + PAD) / CS)); for (let j = ay; j < by; j++) emask.fill(c, j * emw + ax, j * emw + bx); };
+  const coast = terrainOf(RF.shape || 'continente'); const BB = coast.bounds; const OX = -BB.x0; const OY = -BB.y0;
+  const emw = coast.mw; const emh = coast.mh; const oi = OX / CS; const oj = OY / CS;
+  const emask = coast.grid.slice(); const eh = new Uint8Array(emw * emh);
+  for (let j = 0; j < mh; j++) { emask.set(mask.subarray(j * mw, (j + 1) * mw), (j + oj) * emw + oi); eh.set(heights.subarray(j * mw, (j + 1) * mw), (j + oj) * emw + oi); }
+  const eFill = (c, x, y, w, h) => { const ax = Math.max(0, Math.floor((x + OX) / CS)); const ay = Math.max(0, Math.floor((y + OY) / CS)); const bx = Math.min(emw, Math.ceil((x + w + OX) / CS)); const by = Math.min(emh, Math.ceil((y + h + OY) / CS)); for (let j = ay; j < by; j++) emask.fill(c, j * emw + ax, j * emw + bx); };
   // ruas que saíam do mapa continuam pelo terreno novo até a praia (com barreira no fim)
   const stubs = [];
   for (const s2 of segs) {
     const ends = s2.v ? [[s2.y0, -1], [s2.y1, 1]] : [[s2.x0, -1], [s2.x1, 1]];
     for (const [e, dir] of ends) {
       if (s2.v ? (e > 0 && e < H) : (e > 0 && e < W)) continue;
-      let L = 0; while (L < PAD - 8) { const px = s2.v ? s2.x : e + dir * (L + 8); const py = s2.v ? e + dir * (L + 8) : s2.y; if (coast.zone(px, py) !== 2) break; L += 8; }
+      let L = 0; while (L < 900) { const px = s2.v ? s2.x : e + dir * (L + 8); const py = s2.v ? e + dir * (L + 8) : s2.y; if (coast.zone(px, py) !== 2) break; L += 8; }
       L -= 24; if (L < 24) continue;
       const half = s2.w / 2;
       const rr = s2.v ? [s2.x - half, dir < 0 ? e - L : e, s2.w, L] : [dir < 0 ? e - L : e, s2.y - half, L, s2.w];
@@ -580,11 +574,11 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   }
   // construções e objetos do jogador fora do núcleo (e de novo dentro dele, já valem no mapa grande)
   for (const f of userFloor) eFill(code[f.mat], f.x, f.y, f.w, f.h);
-  for (const b of blds) if (b.user) { eFill(SOLID, b.x, b.y, b.w, b.h); const ax = Math.floor((b.x + PAD) / CS); const ay = Math.floor((b.y + PAD) / CS); const hgt = Math.min(250, b.floors * 9 + 6); for (let j = ay; j < Math.ceil((b.y + b.h + PAD) / CS) && j < emh; j++) for (let i = ax; i < Math.ceil((b.x + b.w + PAD) / CS) && i < emw; i++) if (i >= 0 && j >= 0) eh[j * emw + i] = Math.max(eh[j * emw + i], hgt); }
+  for (const b of blds) if (b.user) { eFill(SOLID, b.x, b.y, b.w, b.h); const ax = Math.floor((b.x + OX) / CS); const ay = Math.floor((b.y + OY) / CS); const hgt = Math.min(250, b.floors * 9 + 6); for (let j = ay; j < Math.ceil((b.y + b.h + OY) / CS) && j < emh; j++) for (let i = ax; i < Math.ceil((b.x + b.w + OX) / CS) && i < emw; i++) if (i >= 0 && j >= 0) eh[j * emw + i] = Math.max(eh[j * emw + i], hgt); }
   for (const p of props) if (p.solid && (p.user || p.x < 0 || p.y < 0 || p.x > W || p.y > H)) { const r = p.spr.startsWith('arvore') ? 4 : 3; eFill(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); }
 
   return {
-    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: PAD, oy: PAD, bounds: BOUNDS, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
+    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: OX, oy: OY, bounds: BB, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
     R: { w: W, h: H, nodes, roads, lights, lots: [], pois, regions, radars: [
       { at: [704, 760], limit: 50 }, { at: [1728, 2000], limit: 50 }, { at: [2200, 576], limit: 50 }, { at: [3300, 1504], limit: 50 }, { at: [1200, 2304], limit: 50 }, { at: [2752, 1900], limit: 50 }, { at: [1600, 1248], limit: 40 }, { at: [900, 928], limit: 40 },
     ] },

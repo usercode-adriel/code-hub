@@ -9,7 +9,7 @@ import { peopleView } from './living.js';
 import { remember, genderize } from '../social.js';
 import { round2, nowIso, cap } from './util.js';
 import { reformaPublic } from './construtora.js';
-import { BOUNDS } from '../../public/js/drive/obra.js';
+import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
 
 export const MAP = { v: 'v3', w: 4096, h: 2816 };
 export const FINES = {

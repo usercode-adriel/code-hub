@@ -9,7 +9,7 @@ import { esc, toast } from '../ui.js';
 import { buildGraph, lightState, nearestWalk, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY } from '../drive/world.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
-import { loadAssets } from '../drive/assets.js';
+import { loadAssets, extrasOf } from '../drive/assets.js';
 import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
 import { createPeds, stepPeds, gather } from '../drive/peds.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
@@ -57,6 +57,7 @@ export default async function render(el, params = new URLSearchParams()) {
   const world = buildGraph(city.R);
   const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars });
   syncWorld();
+  await assets.ensure(extrasOf(city));
   const R = createRenderer(city, assets, { mobile: touch });
   $('#d2Load').remove();
   const IMG = assets.img;
@@ -103,6 +104,7 @@ export default async function render(el, params = new URLSearchParams()) {
     const t0 = performance.now();
     Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
+    assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
   }
   const ED = createEditor({ stage, cam, city, world, assets, api, toast, rebuild: rebuildCity, onExit: (rf) => { reforma = { ...(reforma || {}), ...rf }; cam.follow = true; } });
   $('#d2GearB').addEventListener('pointerup', () => { if (me.mode !== 'car') return; const c = me.car; c.gear = c.gear === 'D' ? 'N' : c.gear === 'N' ? 'R' : 'D'; });
@@ -451,15 +453,17 @@ export default async function render(el, params = new URLSearchParams()) {
     if (p.h < 120) lights.push({ cone: true, x: p.x + ca * p.L * 0.5, y: p.y + sa * p.L * 0.5, a: p.a, r: 110, color: '#fff7dc', ka: 0.15, k: 0.8 });
   }
   function drawMini() {
-    mctx.imageSmoothingEnabled = true; mctx.drawImage(R.overview, 0, 0, 192, 132);
-    const mb = R.bounds; const kx = 192 / (mb.x1 - mb.x0); const ky = 132 / (mb.y1 - mb.y0); const X = (v) => (v - mb.x0) * kx; const Y = (v) => (v - mb.y0) * ky;
+    // mapa inteiro sem distorcer (faixas de mar nas sobras)
+    const mb = R.bounds; const kk = Math.min(192 / (mb.x1 - mb.x0), 132 / (mb.y1 - mb.y0)); const kx = kk; const ky = kk; const mx = (192 - (mb.x1 - mb.x0) * kk) / 2; const my = (132 - (mb.y1 - mb.y0) * kk) / 2;
+    mctx.fillStyle = '#2f6fd0'; mctx.fillRect(0, 0, 192, 132); mctx.imageSmoothingEnabled = true; mctx.drawImage(R.overview, mx, my, 192 - mx * 2, 132 - my * 2);
+    const X = (v) => mx + (v - mb.x0) * kx; const Y = (v) => my + (v - mb.y0) * ky;
     mctx.strokeStyle = 'rgba(255,255,255,.9)'; mctx.lineWidth = 1; mctx.strokeRect(X(cam.x - cam.vw / 2 / cam.z), Y(cam.y - cam.vh / 2 / cam.z), (cam.vw / cam.z) * kx, (cam.vh / cam.z) * ky);
     for (const o of own) { mctx.fillStyle = (o.health ?? 100) <= 0 ? '#ff4d5e' : o.kind === 'aviao' ? '#f7c948' : '#2fd27a'; mctx.fillRect(X(o.x) - 2, Y(o.y) - 2, 4, 4); }
     for (const inc of INC.list) { mctx.fillStyle = '#ff4d5e'; mctx.beginPath(); mctx.arc(X(inc.x), Y(inc.y), 3, 0, Math.PI * 2); mctx.fill(); }
     if (INC.chase.on && INC.chase.car) { mctx.fillStyle = Math.floor(Date.now() / 250) % 2 ? '#3a7aff' : '#ff3a3a'; mctx.fillRect(X(INC.chase.car.x) - 2, Y(INC.chase.car.y) - 2, 4, 4); }
     const p = me.car || me.plane || me; mctx.fillStyle = '#38d6f5'; mctx.beginPath(); mctx.arc(X(p.x), Y(p.y), 3.2, 0, Math.PI * 2); mctx.fill(); mctx.strokeStyle = '#0a0d2b'; mctx.stroke();
   }
-  mini.onclick = (e) => { const r = mini.getBoundingClientRect(); const mb = R.bounds; cam.follow = false; cam.x = cam.tx = mb.x0 + ((e.clientX - r.left) / r.width) * (mb.x1 - mb.x0); cam.y = cam.ty = mb.y0 + ((e.clientY - r.top) / r.height) * (mb.y1 - mb.y0); };
+  mini.onclick = (e) => { const r = mini.getBoundingClientRect(); const mb = R.bounds; const kk = Math.min(192 / (mb.x1 - mb.x0), 132 / (mb.y1 - mb.y0)); const mx = (192 - (mb.x1 - mb.x0) * kk) / 2; const my = (132 - (mb.y1 - mb.y0) * kk) / 2; cam.follow = false; cam.x = cam.tx = mb.x0 + (((e.clientX - r.left) / r.width) * 192 - mx) / kk; cam.y = cam.ty = mb.y0 + (((e.clientY - r.top) / r.height) * 132 - my) / kk; };
 
   // ---------------- HUD
   let lastPrompt = ''; let lastDash = '';
@@ -536,7 +540,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED };
-  if (params.has('reforma')) setTimeout(() => ED.open(reforma), 50); // inspeção (testes automáticos)
+  if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
 }

@@ -12,7 +12,27 @@ export function loadAssets() {
     for (const k of Object.keys(deco)) meta[`deco/${k}`] = deco[k];
     const img = {};
     await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = `/assets/rpg/${k}.png`; })));
-    return { meta, roles, img };
+    // sprites extras da Construtora: carregados só quando usados (no mapa ou na prévia do editor)
+    const pend = new Map();
+    const loadExtra = (k) => {
+      if (img[`extra/${k}`]) return Promise.resolve(true);
+      if (pend.has(k)) return pend.get(k);
+      const p = new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[`extra/${k}`] = i; img[`bld/x:${k}`] = i; ok(true); }; i.onerror = () => ok(false); i.src = `/assets/rpg/extra/${k}.png`; });
+      pend.set(k, p); return p;
+    };
+    // carrega o que falta; devolve true se algo novo chegou (aí os blocos do mapa precisam ser redesenhados)
+    const ensure = async (keys) => { const miss = [...new Set(keys)].filter((k) => !img[`extra/${k}`]); if (!miss.length) return false; await Promise.all(miss.map(loadExtra)); return true; };
+    return { meta, roles, img, ensure };
   })();
   return cache;
+}
+// chaves das folhas extras usadas por uma cidade gerada (construções, objetos, peças no chão e pisos)
+export function extrasOf(city) {
+  const out = [];
+  const take = (s) => { if (s && s.startsWith('x:')) out.push(s.slice(2)); };
+  for (const b of city.blds) if (b.user) take(b.spr);
+  for (const p of city.props) if (p.user) take(p.spr);
+  for (const d of city.decals || []) if (d.user) take(d.spr);
+  for (const g of city.ground) if (g.u) take(g.tex);
+  return out;
 }

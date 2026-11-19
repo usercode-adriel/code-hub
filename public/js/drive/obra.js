@@ -1,8 +1,9 @@
-// Construtora + Reforma — catálogo de tudo o que pode ser comprado e colocado na cidade (prédios, decoração,
+// Construtora + Reforma — catálogo de tudo o que pode ser colocado na cidade (uso livre) (prédios, decoração,
 // natureza, mobiliário e pisos), formatos do mapa e expansões de terreno. Usado pelo servidor (preços, validação)
 // e pelo navegador (loja, editor e geração da cidade). Só dados e contas: nada de desenho aqui.
 import { BLD } from './bldmeta.js';
 import { DECO } from './decometa.js';
+import { EXTRA } from './extrameta.js';
 
 // núcleo da cidade gerada e margem de terreno em volta (onde a cidade pode crescer)
 export const CORE = { w: 4096, h: 2816 };
@@ -16,6 +17,7 @@ const SEA_X = 232; const SAND_X = 320; // mar e praia da orla oeste do núcleo
 
 // formatos do mapa (superelipse |x/rx|^n + |y/ry|^n = 1; quanto maior o n, mais quadrado)
 export const SHAPES = {
+  continente: { label: 'Continente com ilhas (padrão)' },
   quadrado: { label: 'Quadrado com cantos suaves', n: 10 },
   arredondado: { label: 'Arredondado', n: 4 },
   circular: { label: 'Circular / oval', n: 2 },
@@ -24,7 +26,7 @@ export const SHAPES = {
 
 // raio da costa em função do ângulo, para um formato e nível de expansão
 export function coastOf(shape = 'quadrado', level = 0) {
-  const S = SHAPES[shape] || SHAPES.quadrado; const n = S.n;
+  const S = SHAPES[shape]?.n ? SHAPES[shape] : SHAPES.quadrado; const n = S.n;
   // centro da parte em terra do núcleo (a oeste dele já é mar)
   const hw = (CORE.w - SEA_X) / 2; const hh = CORE.h / 2; const cx = SEA_X + hw; const cy = hh; const k = 2 ** (1 / n); // k: menor escala que ainda contém o núcleo
   const margin = 150; const nz = S.noise ? 70 : 0;
@@ -91,7 +93,7 @@ export const FLOORS = {
   areia: { name: 'Areia', mat: 'sand', price: 8, color: '#e8cf8a' },
   agua: { name: 'Água (lago)', mat: 'pond', price: 25, color: '#2f6fd0' },
 };
-export const CATS = [['predios', 'Prédios'], ['natureza', 'Natureza e canteiros'], ['mobiliario', 'Mobiliário urbano'], ['sinalizacao', 'Sinalização e postes'], ['comercio', 'Comércio e fachadas'], ['obras', 'Obras e indústria'], ['pisos', 'Ruas e pisos']];
+export const CATS = [['predios', 'Prédios'], ['relevo', 'Relevo, lagos e rios'], ['veiculos', 'Veículos e barcos'], ['natureza', 'Natureza e canteiros'], ['mobiliario', 'Mobiliário urbano'], ['sinalizacao', 'Sinalização e postes'], ['comercio', 'Comércio e fachadas'], ['obras', 'Obras e indústria'], ['pisos', 'Ruas e pisos']];
 const catOfDeco = (k) => (/arvore|coqueiro|flores|arbusto|canteiro|jardim|chafariz/.test(k) ? 'natureza'
   : /placa|poste|semaforo|faixa|boeiro|grade-rua/.test(k) ? 'sinalizacao'
     : /quiosque|feira|banca|maq-|fachada|toldo|outdoor|guarda-sol/.test(k) ? 'comercio'
@@ -114,6 +116,13 @@ function buildCatalog() {
     const pk = Object.keys(PSZ).find((n) => k.startsWith(n)) || 'lixeira'; const [w, h] = PSZ[pk];
     C[`props/${k}`] = { key: `props/${k}`, kind: 'prop', cat: catOfDeco(k), spr: k, name: NAMES[k] || k, w, h, solid: !SOFT.test(k) && !/toldo|fachada/.test(k), lamp: /poste/.test(k), price: roundP(20 + w * h * 0.6), img: `/assets/rpg/props/${k}.png` };
   }
+  // folhas extras (cidade filipina, natureza, cidade 16 bit, prédios modernos)
+  for (const [k, [pw, ph, name, cat, kind, f, mat]] of Object.entries(EXTRA)) {
+    const w = Math.round(pw * f * 10) / 10; const h = Math.round(ph * f * 10) / 10; const img = `/assets/rpg/extra/${k}.png`;
+    if (kind === 'F') C[`x/${k}`] = { key: `x/${k}`, kind: 'floor', cat: 'pisos', mat, tex: `x:${k}`, name, w: TILE, h: TILE, price: 0, color: '#777', img, unit: 'bloco 32×32' };
+    else if (kind === 'B') C[`x/${k}`] = { key: `x/${k}`, kind: 'bld', cat, spr: `x:${k}`, name, w: Math.round(w), h: Math.round(h), solid: true, price: 0, img };
+    else C[`x/${k}`] = { key: `x/${k}`, kind: kind === 'D' ? 'decal' : 'prop', cat, spr: `x:${k}`, name, w, h, solid: kind === 'P', lamp: /poste|lampiao/.test(k) || undefined, price: 0, img };
+  }
   for (const [k, f] of Object.entries(FLOORS)) C[`piso/${k}`] = { key: `piso/${k}`, kind: 'floor', cat: 'pisos', mat: f.mat, name: f.name, w: TILE, h: TILE, price: f.price, color: f.color, unit: 'bloco 32×32' };
   return C;
 }
@@ -124,8 +133,8 @@ export const genKey = (o) => `${o.spr || o.kind}@${Math.round(o.x)},${Math.round
 // item colocado pelo jogador → objeto da cidade
 export function placed(a) {
   const c = CATALOG[a.k]; if (!c) return null;
-  const s = Math.max(0.5, Math.min(2, Number(a.s) || 1));
+  const s = Math.max(0.3, Math.min(4, Number(a.s) || 1));
   if (c.kind === 'bld') return { kind: 'sprite', spr: c.spr, x: a.x, y: a.y, w: c.w * s, h: c.h * s, floors: Math.max(1, Math.round((c.h / c.w) * 4 * s)), user: a.id };
-  if (c.kind === 'decal') return { decal: true, spr: c.spr.slice(2), x: a.x - (c.w * s) / 2, y: a.y - (c.h * s) / 2, w: c.w * s, h: c.h * s, rot: a.r || 0, user: a.id };
-  return { spr: c.spr, x: a.x, y: a.y, w: c.w * s, h: c.h * s, solid: c.solid, ht: /arvore|coqueiro/.test(c.spr) ? 18 : 6, deco: true, lamp: c.lamp || undefined, rot: a.r || 0, user: a.id };
+  if (c.kind === 'decal') return { decal: true, spr: c.spr.startsWith('d:') ? c.spr.slice(2) : c.spr, x: a.x - (c.w * s) / 2, y: a.y - (c.h * s) / 2, w: c.w * s, h: c.h * s, rot: a.r || 0, user: a.id };
+  return { spr: c.spr, x: a.x, y: a.y, w: c.w * s, h: c.h * s, solid: c.solid, ht: c.cat === 'relevo' ? Math.min(200, Math.round(c.h * s * 0.8)) : /arvore|coqueiro|palmeira|pinheiro/.test(c.spr) ? 18 : 6, deco: true, lamp: c.lamp || undefined, rot: a.r || 0, user: a.id };
 }

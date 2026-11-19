@@ -799,3 +799,18 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .ed-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 @media (max-width: 700px) { .ed-top button span, .ed-top a span { display: none; } .ed-title { font-size: 12px; } .ed-items button { width: 70px; } .ed-items button img { height: 38px; } }
 @media (max-width: 700px) { .ob-bar .sh-chips { flex-basis: 100%; } .ob-q { max-width: none; flex: 1; } }
+.ed-q { display: block; width: min(320px, 100%); margin: 0 0 6px; padding: 6px 10px; border-radius: 9px; background: #0e1238; border: 1px solid #2c3470; color: #fff; font-size: 12px; box-sizing: border-box; }
+.ed-none { color: #aab1e6; font-size: 12px; margin: 8px; }
+.ob-use { justify-content: center; width: 100%; box-sizing: border-box; }
+.ed-card { max-height: 86%; overflow-y: auto; box-sizing: border-box; }
+@media (max-width: 700px) {
+  .ed-top { flex-wrap: nowrap; overflow-x: auto; gap: 4px; margin: 6px; padding: 4px 6px; scrollbar-width: none; }
+  .ed-title { display: none; } .ed-tools, .ed-acts { flex-wrap: nowrap; margin-left: 0; }
+  .ed-top button, .ed-top a { min-width: 30px; height: 30px; padding: 0 6px; font-size: 13px; flex: none; }
+  .ed-status { font-size: 11px; padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96%; }
+  .ed-pal { padding: 4px 6px 6px; } .ed-cats { margin-bottom: 4px; } .ed-cats button { padding: 4px 8px; font-size: 11px; }
+  .ed-q { padding: 4px 8px; margin-bottom: 4px; font-size: 12px; }
+  .ed-items button { width: 58px; padding: 3px; } .ed-items button img { height: 30px; max-width: 52px; } .ed-items button span { font-size: 9px; height: 20px; } .ed-items button b { font-size: 9px; }
+  .ed-sw { width: 28px; height: 28px; }
+  .d2.edit .d2-mini { display: none; }
+}

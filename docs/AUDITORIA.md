@@ -85,10 +85,10 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Compra direta liberada em todas as lojas
 
 ### Construtora e modo Reforma
-- [x] Construtora Nexus (`#/construtora`, `server/world/construtora.js`): vende todos os assets das folhas (65 prédios, natureza, mobiliário, sinalização, fachadas, obras) e pisos (rua, calçada, praça, estacionamento, grama, areia, água); a compra vai para o estoque de obra (aparece no Inventário)
-- [x] Expansões de terreno (4 níveis) e formato do mapa (quadrado, arredondado, circular, ilha) com costa detalhada: areia, água rasa e espuma (`public/js/drive/obra.js`)
-- [x] Botão Reforma no mapa (`public/js/drive/editor.js`): mover, colocar (com prévia verde/vermelha), apagar qualquer item (os comprados voltam ao estoque), pintar piso arrastando, girar, tamanho, desfazer, salvamento automático; o servidor confere o estoque
-- [x] A cidade é gerada com a reforma (`generateCity(seed, { reforma })`): demolições, construções e pisos entram na colisão; ruas que saíam do mapa seguem até a praia
+- [x] Construtora Nexus (`#/construtora`): catálogo livre (sem compra) com todos os assets das folhas — prédios (incl. cidade filipina, cidade 16 bit e prédios modernos), relevo (montanhas, penhascos, vulcão, cavernas), lagos, rios e cachoeiras, natureza, mobiliário, sinalização, veículos e barcos, fachadas, obras e pisos texturizados (ruas, cruzamentos, curvas, terra, areia, dunas, ferrovia, estacionamento); “Usar no mapa” abre o editor com o item escolhido
+- [x] Recortes das folhas extras: `tools/drive/extra.py` → `public/assets/rpg/extra` + `public/js/drive/extrameta.js` (carregados só quando usados)
+- [x] Mapa em formato de continente original com ilhas (`public/js/drive/terreno.js`): costa recortada, ilha-barreira com laguna, ilhotas, arquipélago, península, lagos; praia, água rasa e espuma; outros formatos continuam no seletor
+- [x] Botão Reforma no mapa (`public/js/drive/editor.js`): mover, colocar com prévia, apagar qualquer item, pintar piso com pincel 1×1 a 8×8, girar, tamanho de 30% a 400%, busca na paleta, desfazer, salvamento automático
 
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.

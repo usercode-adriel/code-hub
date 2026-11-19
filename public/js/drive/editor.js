@@ -1,8 +1,9 @@
 // Modo Reforma (editor da cidade, estilo construtor de cidades): mover a câmera, colocar o que foi comprado na
-// Construtora, apagar qualquer coisa (inclusive o que já existia), pintar ruas/calçadas/praças/água em blocos de
+// catálogo da Construtora (tudo liberado), apagar qualquer coisa (inclusive o que já existia), pintar ruas/calçadas/praças/água em blocos de
 // 32×32 e escolher o formato do mapa. Cada mudança refaz a cidade (geração determinística + reforma) e é salva
-// sozinha no servidor, que confere o estoque comprado.
-import { CATALOG, CATS, SHAPES, TILE, genKey, coastOf } from './obra.js';
+// sozinha no servidor.
+import { CATALOG, CATS, SHAPES, TILE, genKey } from './obra.js';
+import { shapePolys } from './terreno.js';
 import { at, SOLID, WATER, ROAD, CROSS, RUNWAY, GRASS, SAND, PLAZA, LOT } from './world.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,34 +24,34 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
       <div class="ed-acts">
         <button data-e="rot" title="Girar (R)">⟳</button><button data-e="minus" title="Menor">−</button><button data-e="plus" title="Maior">＋</button>
         <button data-e="undo" title="Desfazer (Ctrl+Z)">↶</button><button data-e="shape" title="Formato do mapa">◯<span>Formato</span></button>
-        <a href="#/construtora" title="Comprar mais">🛒<span>Construtora</span></a><button data-e="exit" class="ok">✔<span>Concluir</span></button>
+        <a href="#/construtora" title="Ver o catálogo completo">📚<span>Catálogo</span></a><button data-e="exit" class="ok">✔<span>Concluir</span></button>
       </div></div>
     <div class="ed-status" id="edStatus"></div>
-    <div class="ed-pal"><div class="ed-cats" id="edCats"></div><div class="ed-items" id="edItems"></div></div>
+    <div class="ed-pal"><div class="ed-cats" id="edCats"></div><input class="ed-q" id="edQ" placeholder="Buscar item…" autocomplete="off" aria-label="Buscar item"><div class="ed-items" id="edItems"></div></div>
     <div class="ed-modal" id="edShape" hidden></div>`;
   stage.appendChild(box);
 
-  const S = { on: false, tool: 'pan', sel: null, cat: 'predios', rot: 0, scale: 1, hover: null, owned: {}, rf: null, hist: [], saveT: 0, saving: false, dirty: false, rebuildT: 0, pend: false };
+  const S = { on: false, tool: 'pan', sel: null, cat: 'predios', rot: 0, scale: 1, brush: 1, q: '', hover: null, rf: null, hist: [], saveT: 0, saving: false, dirty: false, rebuildT: 0, pend: false };
   let seq = 0;
   const uid = () => `u${Date.now().toString(36)}${(seq++).toString(36)}`.slice(0, 24);
   const used = () => { const n = {}; for (const a of S.rf.add) n[a.k] = (n[a.k] || 0) + 1; for (const f of S.rf.floor) n[f.k] = (n[f.k] || 0) + 1; return n; };
-  const avail = (k, u = used()) => Math.max(0, (S.owned[k] || 0) - (u[k] || 0));
   const status = (t, kind = '') => { const el = $('#edStatus'); el.textContent = t; el.className = `ed-status ${kind}`; };
   const snapshot = () => { S.hist.push(JSON.stringify(S.rf)); if (S.hist.length > 60) S.hist.shift(); };
 
   // ---------------------------------------------------------------- paleta
   function drawPalette() {
     const u = used();
-    const mine = Object.values(CATALOG).filter((c) => (S.owned[c.key] || 0) > 0);
-    $('#edCats').innerHTML = CATS.map(([k, l]) => { const n = mine.filter((c) => c.cat === k).length; return `<button data-c="${k}" class="${S.cat === k ? 'on' : ''}">${l}${n ? ` <i>${n}</i>` : ''}</button>`; }).join('');
-    const list = Object.values(CATALOG).filter((c) => c.cat === S.cat).sort((a, b) => (avail(b.key, u) > 0) - (avail(a.key, u) > 0));
-    $('#edItems').innerHTML = list.map((c) => { const n = avail(c.key, u); return `<button data-k="${esc(c.key)}" class="${S.sel === c.key ? 'on' : ''} ${n ? '' : 'off'}" title="${esc(c.name)}">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : `<i class="ed-sw" style="--c:${esc(c.color)}"></i>`}<span>${esc(c.name)}</span><b>${n ? `${n}` : 'comprar'}</b></button>`; }).join('');
-    $('#edCats').querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { S.cat = b.dataset.c; drawPalette(); }; });
-    $('#edItems').querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => {
-      const c = CATALOG[b.dataset.k];
-      if (!avail(c.key)) { toast('Sem estoque', `Compre ${c.name} na Construtora Nexus (${c.price.toLocaleString('pt-BR')} NXC${c.kind === 'floor' ? ' por bloco' : ''}).`, 'info'); return; }
-      S.sel = c.key; S.rot = 0; S.scale = 1; setTool(c.kind === 'floor' ? 'floor' : 'place'); drawPalette();
-    }; });
+    $('#edCats').innerHTML = CATS.map(([k, l]) => `<button data-c="${k}" class="${!S.q && S.cat === k ? 'on' : ''}">${l}</button>`).join('');
+    const q = S.q.toLowerCase();
+    const list = Object.values(CATALOG).filter((c) => (q ? c.name.toLowerCase().includes(q) : c.cat === S.cat));
+    $('#edItems').innerHTML = list.slice(0, 400).map((c) => `<button data-k="${esc(c.key)}" class="${S.sel === c.key ? 'on' : ''}" title="${esc(c.name)}">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : `<i class="ed-sw" style="--c:${esc(c.color)}"></i>`}<span>${esc(c.name)}</span>${u[c.key] ? `<b>${u[c.key]} no mapa</b>` : ''}</button>`).join('') || '<p class="ed-none">Nada encontrado.</p>';
+    $('#edCats').querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { S.cat = b.dataset.c; S.q = ''; $('#edQ').value = ''; drawPalette(); }; });
+    $('#edItems').querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => select(b.dataset.k); });
+  }
+  function select(k) {
+    const c = CATALOG[k]; if (!c) return;
+    S.sel = c.key; S.rot = 0; S.scale = 1; setTool(c.kind === 'floor' ? 'floor' : 'place'); drawPalette();
+    if (c.img?.includes('/extra/')) assets.ensure?.([c.img.split('/').pop().replace('.png', '')]);
   }
   function setTool(t) {
     if ((t === 'place' && (!S.sel || CATALOG[S.sel].kind === 'floor')) || (t === 'floor' && (!S.sel || CATALOG[S.sel].kind !== 'floor'))) {
@@ -61,15 +62,15 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
     S.tool = t;
     box.querySelectorAll('[data-t]').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
     stage.dataset.edtool = t;
-    if (t === 'erase') status('Toque no que quer remover. Itens comprados voltam para o estoque.', 'tip');
+    if (t === 'erase') status('Toque no que quer remover (vale também para o que já existia na cidade).', 'tip');
     else if (t === 'pan') status('Arraste para mover a câmera. Roda/pinça para zoom.', 'tip');
-    else if (S.sel) status(`${CATALOG[S.sel].name}: ${avail(S.sel)} disponível(is). ${t === 'floor' ? 'Arraste para pintar.' : 'Toque no mapa para colocar.'}`, 'tip');
+    else if (S.sel) status(`${CATALOG[S.sel].name}: ${t === 'floor' ? `arraste para pintar (pincel ${S.brush}×${S.brush}; − e ＋ mudam o pincel, ⟳ gira).` : 'toque no mapa para colocar (− e ＋ mudam o tamanho, ⟳ gira).'}`, 'tip');
   }
 
   // ---------------------------------------------------------------- regras de colocação
   function ghostOf(wx, wy) {
     const c = S.sel && CATALOG[S.sel]; if (!c) return null;
-    if (c.kind === 'floor') { const x = Math.floor(wx / TILE) * TILE; const y = Math.floor(wy / TILE) * TILE; return { c, x, y, w: TILE, h: TILE, ok: floorOk(x, y, c) }; }
+    if (c.kind === 'floor') { const n = S.brush; const x = (Math.floor(wx / TILE) - Math.floor((n - 1) / 2)) * TILE; const y = (Math.floor(wy / TILE) - Math.floor((n - 1) / 2)) * TILE; return { c, x, y, n, w: TILE * n, h: TILE * n, ok: floorOk(x, y, c, true) }; }
     const s = S.scale; const w = c.w * s; const h = c.h * s;
     if (c.kind === 'bld') { const x = Math.round((wx - w / 2) / 4) * 4; const y = Math.round((wy - h / 2) / 4) * 4; return { c, x, y, w, h, ok: bldOk(x, y, w, h) }; }
     if (c.kind === 'decal') return { c, x: Math.round(wx), y: Math.round(wy), w, h, ok: !bad(at(world, wx, wy)) };
@@ -82,11 +83,11 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
     for (let yy = y + 2; yy < y + h; yy += 4) for (let xx = x + 2; xx < x + w; xx += 4) if (!BLD_OK.has(at(world, xx, yy))) return false;
     return true;
   }
-  function floorOk(x, y, c) {
+  function floorOk(x, y, c, preview = false) {
     const cx = x + TILE / 2; const cy = y + TILE / 2;
-    if (city.coast && city.coast.zone(cx, cy) === 0) return false; // mar aberto: só com expansão
+    if (cx < city.bounds.x0 || cy < city.bounds.y0 || cx > city.bounds.x1 || cy > city.bounds.y1) return false;
     const mine = S.rf.floor.find((f) => f.x === x && f.y === y);
-    if (mine?.k === c.key) return false;
+    if (!preview && mine?.k === c.key && (mine.r || 0) === (c.tex ? Math.round(S.rot * 100) / 100 : 0)) return false;
     for (const [dx, dy] of [[2, 2], [TILE - 2, 2], [2, TILE - 2], [TILE - 2, TILE - 2], [TILE / 2, TILE / 2]]) {
       const code = at(world, x + dx, y + dy);
       if (code === SOLID) return false;
@@ -129,25 +130,26 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
 
   function place(wx, wy) {
     const g = ghostOf(wx, wy); if (!g) { status('Escolha um item na paleta primeiro.', 'tip'); return; }
-    if (!avail(g.c.key)) { toast('Acabou o estoque', `Compre mais ${g.c.name} na Construtora.`, 'info'); return; }
     if (!g.ok) { status(g.c.kind === 'bld' ? 'Não cabe aqui: construções vão em grama, areia, praça ou estacionamento livres.' : 'Aqui não dá (rua, água ou algo no caminho).', 'err'); return; }
     snapshot();
     const a = { id: uid(), k: g.c.key, x: g.x, y: g.y }; if (S.rot) a.r = S.rot; if (S.scale !== 1) a.s = S.scale;
     S.rf.add.push(a);
     changed(g.c.kind === 'bld' ? pad(g.x, g.y, g.w, g.h) : pad(g.x - g.w / 2, g.y - g.h, g.w, g.h));
-    status(`${g.c.name} colocado · ${avail(g.c.key)} restante(s)`, 'ok');
+    status(`${g.c.name} colocado`, 'ok');
   }
   const painted = new Set();
   function paint(wx, wy) {
-    const g = ghostOf(wx, wy); if (!g || g.c.kind !== 'floor') return;
-    const key = `${g.x},${g.y}`; if (painted.has(key)) return; painted.add(key);
-    if (!g.ok) return;
-    const old = S.rf.floor.findIndex((f) => f.x === g.x && f.y === g.y);
-    if (old < 0 && !avail(g.c.key)) { status(`Acabaram os blocos de ${g.c.name}. Compre mais na Construtora.`, 'err'); return; }
-    if (!painted.snap) { snapshot(); painted.snap = true; }
-    if (old >= 0) S.rf.floor.splice(old, 1);
-    S.rf.floor.push({ k: g.c.key, x: g.x, y: g.y });
-    changed(pad(g.x, g.y, TILE, TILE, 40));
+    const c = S.sel && CATALOG[S.sel]; if (!c || c.kind !== 'floor') return;
+    const n = S.brush; const bx = Math.floor(wx / TILE) - Math.floor((n - 1) / 2); const by = Math.floor(wy / TILE) - Math.floor((n - 1) / 2);
+    let any = false;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = (bx + i) * TILE; const y = (by + j) * TILE; const key = `${x},${y}`; if (painted.has(key)) continue; painted.add(key);
+      if (!floorOk(x, y, c)) continue;
+      if (!painted.snap) { snapshot(); painted.snap = true; }
+      const old = S.rf.floor.findIndex((f) => f.x === x && f.y === y); if (old >= 0) S.rf.floor.splice(old, 1);
+      const f = { k: c.key, x, y }; if (S.rot && c.tex) f.r = Math.round(S.rot * 100) / 100; S.rf.floor.push(f); any = true;
+    }
+    if (any) changed([bx * TILE - 40, by * TILE - 40, (bx + n) * TILE + 40, (by + n) * TILE + 40]);
   }
   function erase(wx, wy) {
     const h = hitAt(wx, wy); if (!h) { status('Nada para apagar aqui (o chão original só muda pintando outro piso por cima).', 'tip'); return; }
@@ -157,7 +159,7 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
     else if (o.user) { const i = S.rf.add.findIndex((a) => a.id === o.user); if (i >= 0) { name = CATALOG[S.rf.add[i].k]?.name || ''; S.rf.add.splice(i, 1); } }
     else { S.rf.del.push(genKey(o)); name = 'item da cidade'; }
     if (h.t !== 'f') changed(h.t === 'b' ? pad(o.x, o.y, o.w, o.h) : h.t === 'd' ? pad(o.x, o.y, o.w, o.h) : pad(o.x - o.w / 2, o.y - o.h, o.w, o.h));
-    status(`Removido: ${name}${o.user || h.t === 'f' ? ' (voltou para o estoque)' : ''}`, 'ok');
+    status(`Removido: ${name}`, 'ok');
   }
   function undo() {
     const last = S.hist.pop(); if (!last) { status('Nada para desfazer.', 'tip'); return; }
@@ -165,24 +167,29 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
   }
   function shapeModal() {
     const m = $('#edShape'); m.hidden = false;
-    m.innerHTML = `<div class="ed-card"><h3>Formato do mapa</h3><p>A cidade continua igual; muda o contorno da costa e do terreno em volta. Expansões compradas: ${S.rf.level} de 4.</p>
-      <div class="ed-shapes">${Object.entries(SHAPES).map(([k, s]) => `<button data-s="${k}" class="${S.rf.shape === k ? 'on' : ''}"><canvas width="120" height="90" data-p="${k}"></canvas><span>${esc(s.label)}</span></button>`).join('')}</div>
-      <div class="ed-row"><a class="cx-btn ghost" href="#/construtora">Comprar expansão</a><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    m.innerHTML = `<div class="ed-card"><h3>Formato do mapa</h3><p>A cidade continua igual; muda o contorno da terra, das ilhas e dos lagos em volta.</p>
+      <div class="ed-shapes">${Object.entries(SHAPES).map(([k, s]) => `<button data-s="${k}" class="${S.rf.shape === k ? 'on' : ''}"><canvas width="120" height="96" data-p="${k}"></canvas><span>${esc(s.label)}</span></button>`).join('')}</div>
+      <div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
     m.querySelectorAll('canvas[data-p]').forEach((cv) => {
-      const g = cv.getContext('2d'); const co = coastOf(cv.dataset.p, S.rf.level); const b = city.bounds; const k = Math.min(120 / (b.x1 - b.x0), 90 / (b.y1 - b.y0));
-      g.fillStyle = '#2f6fd0'; g.fillRect(0, 0, 120, 90); g.save(); g.scale(k, k); g.translate(-b.x0, -b.y0);
-      g.fillStyle = '#e8cf8a'; g.beginPath(); co.poly(0, 180).forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
-      g.fillStyle = '#4f9a3a'; g.beginPath(); co.poly(-60, 180, 320).forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.fill();
+      const g = cv.getContext('2d'); const P = shapePolys(cv.dataset.p); const b = P.bounds; const k = Math.min(120 / (b.x1 - b.x0), 96 / (b.y1 - b.y0));
+      g.fillStyle = '#2f6fd0'; g.fillRect(0, 0, 120, 96); g.save(); g.translate((120 - (b.x1 - b.x0) * k) / 2, (96 - (b.y1 - b.y0) * k) / 2); g.scale(k, k); g.translate(-b.x0, -b.y0);
+      const path = (polys) => { g.beginPath(); for (const poly of polys) { poly.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); } };
+      g.fillStyle = '#4f9a3a'; path(P.land); g.fill(); g.fillStyle = '#2f6fd0'; path(P.lakes); g.fill();
       g.fillStyle = '#6b6f7a'; g.fillRect(320, 0, (city.core?.w || 4096) - 320, city.core?.h || 2816); g.restore();
     });
-    m.querySelectorAll('[data-s]').forEach((b) => { b.onclick = () => { if (S.rf.shape === b.dataset.s) return; snapshot(); S.rf.shape = b.dataset.s; changed(null, true); m.hidden = true; status(`Formato: ${SHAPES[S.rf.shape].label}`, 'ok'); }; });
+    m.querySelectorAll('[data-s]').forEach((b) => { b.onclick = () => { if (S.rf.shape === b.dataset.s) return; snapshot(); S.rf.shape = b.dataset.s; status('Gerando o terreno…', 'warn'); m.hidden = true; setTimeout(() => { changed(null, true); status(`Formato: ${SHAPES[S.rf.shape].label}`, 'ok'); }, 30); }; });
     m.querySelector('[data-x]').onclick = () => { m.hidden = true; };
   }
 
   box.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => setTool(b.dataset.t); });
-  box.querySelector('[data-e="rot"]').onclick = () => { S.rot = (S.rot + Math.PI / 2) % (Math.PI * 2); status(`Rotação ${Math.round((S.rot * 180) / Math.PI)}° (vale para decoração, não para prédios)`, 'tip'); };
-  box.querySelector('[data-e="minus"]').onclick = () => { S.scale = Math.max(0.6, Math.round((S.scale - 0.1) * 10) / 10); status(`Tamanho ${Math.round(S.scale * 100)}%`, 'tip'); };
-  box.querySelector('[data-e="plus"]').onclick = () => { S.scale = Math.min(1.6, Math.round((S.scale + 0.1) * 10) / 10); status(`Tamanho ${Math.round(S.scale * 100)}%`, 'tip'); };
+  box.querySelector('[data-e="rot"]').onclick = () => { S.rot = (S.rot + Math.PI / 2) % (Math.PI * 2); status(`Rotação ${Math.round((S.rot * 180) / Math.PI)}° (decoração, peças no chão e pisos; prédios não giram)`, 'tip'); };
+  const size = (d) => {
+    if (S.tool === 'floor') { S.brush = Math.max(1, Math.min(8, S.brush + d)); status(`Pincel ${S.brush}×${S.brush} blocos`, 'tip'); return; }
+    S.scale = Math.max(0.3, Math.min(4, Math.round((S.scale + d * (S.scale >= 1.5 ? 0.25 : 0.1)) * 100) / 100)); status(`Tamanho ${Math.round(S.scale * 100)}%`, 'tip');
+  };
+  box.querySelector('[data-e="minus"]').onclick = () => size(-1);
+  box.querySelector('[data-e="plus"]').onclick = () => size(1);
+  $('#edQ').oninput = () => { S.q = $('#edQ').value.trim(); drawPalette(); };
   box.querySelector('[data-e="undo"]').onclick = undo;
   box.querySelector('[data-e="shape"]').onclick = shapeModal;
   box.querySelector('[data-e="exit"]').onclick = () => close();
@@ -190,15 +197,13 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
   addEventListener('keydown', keyd);
 
   // ---------------------------------------------------------------- abrir / fechar
-  async function open(reforma) {
-    S.rf = JSON.parse(JSON.stringify({ shape: 'quadrado', level: 0, add: [], floor: [], del: [], ...(reforma || {}) }));
-    delete S.rf.owned; delete S.rf.updatedAt;
-    S.owned = { ...(reforma?.owned || {}) }; S.hist = [];
+  async function open(reforma, item = null) {
+    S.rf = JSON.parse(JSON.stringify({ shape: 'continente', add: [], floor: [], del: [], ...(reforma || {}) }));
+    delete S.rf.owned; delete S.rf.updatedAt; delete S.rf.level; S.hist = [];
     S.on = true; box.hidden = false; stage.classList.add('edit'); cam.follow = false;
-    try { const d = await api.get('/mundo/construtora'); S.owned = Object.fromEntries(d.items.filter((i) => i.owned).map((i) => [i.key, i.owned])); S.rf.level = d.level; if (d.level !== reforma?.level) changed(null, true); } catch { /* usa o que veio com o mapa */ }
-    const mine = Object.values(CATALOG).find((c) => S.owned[c.key]); if (mine) S.cat = mine.cat;
     drawPalette(); setTool('pan');
-    status(Object.keys(S.owned).length ? 'Escolha um item na paleta e toque no mapa. Arraste para mover a câmera.' : 'Seu estoque de obra está vazio: compre na Construtora (botão 🛒). Você já pode apagar itens da cidade e mudar o formato do mapa.', 'tip');
+    if (item && CATALOG[item]) { S.cat = CATALOG[item].cat; select(item); }
+    else status('Tudo liberado: escolha um item na paleta e toque no mapa. Arraste para mover a câmera.', 'tip');
   }
   async function close() {
     if (!S.on) return;
@@ -236,10 +241,12 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
       const g = ghostOf(wx, wy); if (!g) return;
       ctx.globalAlpha = 0.72;
       const c = g.c;
-      if (c.kind === 'floor') { ctx.fillStyle = c.color; ctx.fillRect(g.x, g.y, TILE, TILE); }
-      else if (c.kind === 'bld') { const im = IMG[`bld/${c.spr}`]; if (im) ctx.drawImage(im, g.x, g.y, g.w, g.h); }
+      if (c.kind === 'floor') {
+        const im = c.tex && IMG[`extra/${c.tex.slice(2)}`];
+        for (let j = 0; j < g.n; j++) for (let i = 0; i < g.n; i++) { const tx = g.x + i * TILE; const ty = g.y + j * TILE; if (im) { ctx.save(); ctx.translate(tx + TILE / 2, ty + TILE / 2); ctx.rotate(S.rot); ctx.drawImage(im, -TILE / 2, -TILE / 2, TILE, TILE); ctx.restore(); } else { ctx.fillStyle = c.color; ctx.fillRect(tx, ty, TILE, TILE); } }
+      } else if (c.kind === 'bld') { const im = IMG[`bld/${c.spr}`]; if (im) ctx.drawImage(im, g.x, g.y, g.w, g.h); }
       else {
-        const im = c.spr.startsWith('d:') ? IMG[`deco/${c.spr.slice(2)}`] : IMG[`props/${c.spr}`];
+        const im = c.spr.startsWith('x:') ? IMG[`extra/${c.spr.slice(2)}`] : c.spr.startsWith('d:') ? IMG[`deco/${c.spr.slice(2)}`] : IMG[`props/${c.spr}`];
         if (im) { ctx.save(); if (c.kind === 'decal') { ctx.translate(g.x, g.y); ctx.rotate(S.rot); ctx.drawImage(im, -g.w / 2, -g.h / 2, g.w, g.h); } else { ctx.translate(g.x, g.y - g.h / 2); ctx.rotate(S.rot); ctx.drawImage(im, -g.w / 2, -g.h / 2, g.w, g.h); } ctx.restore(); }
       }
       ctx.globalAlpha = 1;
