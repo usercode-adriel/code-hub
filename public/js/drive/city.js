@@ -162,8 +162,12 @@ export function generateCity(seed = 20261119) {
   // prédio único centralizado no espaço (w×h máximos), mantendo a proporção
   const fitIn = (spr, x0, y0, w, h, extra) => { const [sw, sh] = BLD[spr]; const k = Math.min(w / sw, h / sh); return B({ kind: 'sprite', spr, x: x0 + (w - sw * k) / 2, y: y0 + (h - sh * k) / 2, w: sw * k, h: sh * k, floors: Math.max(2, Math.round((sh / sw) * 4)), ...extra }); };
 
+  // tamanho de cada objeto decorativo (unidades do mapa), na proporção do sprite
+  const PSZ = { arvore: [24, 40], arbusto: [17, 23], canteiro: [26, 16], banco: [24, 15], lixeira: [8, 13], hidrante: [8, 11], chafariz: [44, 39], jardim0: [30, 27], 'guarda-sol': [22, 19], banca: [24, 29] };
+  const PD = (spr, x, y, solid = true) => { const k = Object.keys(PSZ).find((n) => spr.startsWith(n)) || 'lixeira'; const [w, h] = PSZ[k]; P(spr, x, y, w, h, solid, { ht: k === 'arvore' ? 18 : 6, deco: true }); };
   for (const bl of blocks) {
     const [x0, y0, x1, y1] = bl.r; const bw = x1 - x0; const bh = y1 - y0; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
+    const nB0 = blds.length;
     if (bl.zone !== 'bosque' && bl.zone !== 'aeroporto') regions.push({ name: REGION[bl.zone] || 'Nexus City', rect: [x0 - 24, y0 - 24, x1 + 24, y1 + 24] });
     switch (bl.zone) {
       case 'residencial': case 'rio': {
@@ -336,6 +340,20 @@ export function generateCity(seed = 20261119) {
       }
       default: break;
     }
+    // calçada com meio-fio na frente de cada prédio (onde ele não está num estacionamento)
+    if (!['estacionamento', 'shopping', 'terminal', 'concessionaria', 'posto', 'galpoes', 'fabrica', 'tanques', 'conteineres'].includes(bl.zone)) {
+      for (const b of blds.slice(nB0)) if (b.kind === 'sprite' && b.spr !== 'stadium') G('front', b.x - 2, b.y + b.h - 2, b.w + 4, 11);
+    }
+    // estádio: lixeiras, bancos e canteiros em volta
+    if (bl.zone === 'estadio') {
+      const st = blds.slice(nB0).find((b) => b.spr === 'stadium');
+      if (st) {
+        const cyc = ['lixeira0', 'banco0', 'canteiro1', 'lixeira2', 'banco1', 'canteiro2'];
+        let k = 0;
+        for (let x = st.x + 10; x < st.x + st.w - 10; x += 22) PD(cyc[k++ % cyc.length], x, st.y + st.h + 14);
+        for (let x = st.x + 16; x < st.x + st.w - 10; x += 30) PD(k++ % 2 ? 'canteiro0' : 'lixeira1', x, y1 - 30);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- aeroporto
@@ -374,11 +392,11 @@ export function generateCity(seed = 20261119) {
 
   // ---------------------------------------------------------------- máscara de colisão e alturas
   const mw = W / CS; const mh = H / CS; const mask = new Uint8Array(mw * mh).fill(GRASS); const heights = new Uint8Array(mw * mh);
-  const code = { pond: WATER, water: WATER, sand: SAND, grass: GRASS, walk: WALK, road: ROAD, cross: CROSS, lot: LOT, runway: RUNWAY, plaza: PLAZA };
+  const code = { front: WALK, pond: WATER, water: WATER, sand: SAND, grass: GRASS, walk: WALK, road: ROAD, cross: CROSS, lot: LOT, runway: RUNWAY, plaza: PLAZA };
   const fillRect = (c, x, y, w, h) => { const ax = Math.max(0, Math.floor(x / CS)); const ay = Math.max(0, Math.floor(y / CS)); const bx = Math.min(mw, Math.ceil((x + w) / CS)); const by = Math.min(mh, Math.ceil((y + h) / CS)); for (let j = ay; j < by; j++) mask.fill(c, j * mw + ax, j * mw + bx); };
   const fillEll = (c, x, y, w, h) => { const cx = x + w / 2; const cy = y + h / 2; const ax = Math.max(0, Math.floor(x / CS)); const ay = Math.max(0, Math.floor(y / CS)); const bx = Math.min(mw, Math.ceil((x + w) / CS)); const by = Math.min(mh, Math.ceil((y + h) / CS)); for (let j = ay; j < by; j++) for (let i = ax; i < bx; i++) { const px = (i + 0.5) * CS; const py = (j + 0.5) * CS; if (((px - cx) / (w / 2)) ** 2 + ((py - cy) / (h / 2)) ** 2 <= 1) mask[j * mw + i] = c; } };
   // ordem: base → água/areia → quadras → calçadas → ruas → faixas → aeroporto → pontes
-  const order = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'walk', 'road', 'cross', 'runway'];
+  const order = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'road', 'cross', 'runway'];
   for (const m of order) for (const g of ground) if (g.mat === m) (g.shape === 'ellipse' ? fillEll : fillRect)(code[m], g.x, g.y, g.w, g.h);
   for (const g of ground) if (g.island) fillEll(SOLID, g.x + 6, g.y + 6, g.w - 12, g.h - 12);
   for (const b of bridges) { fillRect(WALK, b.x, b.y, b.w, b.h); fillRect(ROAD, b.x + 16, b.y, b.w - 32, b.h); fillRect(SOLID, b.x, b.y, 3, b.h); fillRect(SOLID, b.x + b.w - 3, b.y, 3, b.h); }
@@ -402,7 +420,42 @@ export function generateCity(seed = 20261119) {
     const ax = Math.floor(b.x / CS); const ay = Math.floor(b.y / CS); const bx2 = Math.ceil((b.x + b.w) / CS); const by2 = Math.ceil((b.y + b.h) / CS);
     for (let j = ay; j < by2; j++) for (let i = ax; i < bx2; i++) if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], hgt);
   }
-  for (const p of props) if (p.solid) { const r = p.spr.startsWith('arvore') ? 4 : 3; fillRect(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); const i = Math.floor(p.x / CS); const j = Math.floor(p.y / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.h || 10); }
+  // ---------------------------------------------------------------- decoração (preenche cada espaço livre)
+  {
+    const free = (x, y, r) => { for (let dy = -r; dy <= r; dy += CS) for (let dx = -r; dx <= r; dx += CS) { const i = Math.floor((x + dx) / CS); const j = Math.floor((y + dy) / CS); if (i < 0 || j < 0 || i >= mw || j >= mh) return false; const c = mask[j * mw + i]; if (c !== GRASS && c !== PLAZA) return false; } return true; };
+    const occ = new Set(); const key = (x, y) => `${Math.floor(x / 22)},${Math.floor(y / 22)}`;
+    for (const p of props) occ.add(key(p.x, p.y));
+    const near = (x, y) => occ.has(key(x, y));
+    const inAirport = (x, y) => x > 2780 && y < 1236;
+    const GREEN = ['arvore0', 'arvore1', 'arvore2', 'arvore3', 'arvore4', 'arvore2', 'arvore3', 'arbusto0', 'arbusto1', 'canteiro0', 'canteiro1', 'canteiro2', 'banco0', 'banco1', 'jardim0', 'lixeira0'];
+    const PAVED = ['canteiro0', 'canteiro1', 'canteiro2', 'lixeira0', 'lixeira1', 'lixeira2', 'banco0', 'banco1', 'arvore0', 'arvore2', 'arbusto1', 'guarda-sol0'];
+    for (let y = 24; y < H - 24; y += 22) for (let x = 330; x < W - 16; x += 22) {
+      if (inAirport(x, y) || near(x, y)) continue;
+      const jx = x + (R() - 0.5) * 6; const jy = y + (R() - 0.5) * 6;
+      const i = Math.floor(jx / CS); const j = Math.floor(jy / CS); const c = mask[j * mw + i];
+      if (c !== GRASS && c !== PLAZA) continue;
+      if (!free(jx, jy, 10)) continue;
+      if (R() > (c === GRASS ? 0.8 : 0.6)) continue;
+      const spr = pick(c === GRASS ? GREEN : PAVED);
+      PD(spr, jx, jy + 6); occ.add(key(jx, jy));
+      // banco ganha uma lixeira do lado
+      if (spr.startsWith('banco') && free(jx + 16, jy, 6)) { PD('lixeira1', jx + 14, jy + 6); occ.add(key(jx + 14, jy)); }
+    }
+    // calçadas: hidrantes, lixeiras e canteiros entre os postes
+    const nodesL = Object.values(nodes);
+    for (const s2 of segs) {
+      const off = s2.w / 2 + 13; const len = s2.v ? s2.y1 - s2.y0 : s2.x1 - s2.x0; let k = 0;
+      for (let t = 88; t < len; t += 96) for (const side of [-1, 1]) {
+        const x = s2.v ? s2.x + side * off : s2.x0 + t; const y = s2.v ? s2.y0 + t : s2.y + side * off;
+        if (nodesL.some(([nx, ny]) => Math.abs(nx - x) < s2.w + 14 && Math.abs(ny - y) < s2.w + 14) || x < 240 || x > W - 8 || y < 8 || y > H - 8) continue;
+        if (s2.v && y > 1980 && y < 2084 && s2.x < 1440) continue;
+        const i = Math.floor(x / CS); const j = Math.floor(y / CS); if (mask[j * mw + i] !== WALK) continue;
+        const spr = ['hidrante', 'lixeira0', 'canteiro0', 'lixeira2', 'hidrante', 'lixeira1'][k++ % 6];
+        P(spr, x, y + (s2.v ? 0 : 4), PSZ[spr.replace(/\d$/, '')]?.[0] || 6, PSZ[spr.replace(/\d$/, '')]?.[1] || 9, false, { deco: true, ht: 4 });
+      }
+    }
+  }
+  for (const p of props) if (p.solid) { const r = p.spr.startsWith('arvore') ? 4 : 3; fillRect(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); const i = Math.floor(p.x / CS); const j = Math.floor(p.y / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.ht || 10); }
 
   return {
     W, H, CS, mw, mh, mask, heights, ground, blds, props, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
