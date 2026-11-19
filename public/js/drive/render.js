@@ -45,10 +45,36 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   // índice espacial dos elementos por bloco
   const bins = new Map(); const binKey = (i, j) => `${i},${j}`;
   const addBin = (kind, o, x, y, w, h) => { for (let i = Math.floor(x / CH); i <= Math.floor((x + w) / CH); i++) for (let j = Math.floor(y / CH); j <= Math.floor((y + h) / CH); j++) { const k = binKey(i, j); let b = bins.get(k); if (!b) bins.set(k, (b = { g: [], b: [], p: [], d: [] })); b[kind].push(o); } };
-  city.ground.forEach((g, i) => { g.i = i; addBin('g', g, g.x - 4, g.y - 4, g.w + 8, g.h + 8); });
-  city.blds.forEach((b, i) => { b.i = i; addBin('b', b, b.x - 4, b.y - 50, b.w + 30, b.h + 60); });
-  city.props.forEach((p, i) => { p.i = i; const r = Math.max(p.w, p.h); addBin('p', p, p.x - r, p.y - r - 4, r * 2, r + 8); });
-  (city.decals || []).forEach((d) => addBin('d', d, d.x, d.y, d.w, d.h));
+  function index() {
+    bins.clear();
+    city.ground.forEach((g, i) => { g.i = i; addBin('g', g, g.x - 4, g.y - 4, g.w + 8, g.h + 8); });
+    city.blds.forEach((b, i) => { b.i = i; addBin('b', b, b.x - 4, b.y - 50, b.w + 30, b.h + 60); });
+    city.props.forEach((p, i) => { p.i = i; const r = Math.max(p.w, p.h); addBin('p', p, p.x - r, p.y - r - 4, r * 2, r + 8); });
+    (city.decals || []).forEach((d) => addBin('d', d, d.x, d.y, d.w, d.h));
+  }
+  index();
+  // limites do mapa (núcleo da cidade + terreno das expansões) e a costa desenhada
+  const BD = () => city.bounds || { x0: 0, y0: 0, x1: city.W, y1: city.H };
+  let coastPaths = null;
+  function coastP() {
+    if (coastPaths || !city.coast) return coastPaths;
+    const mk = (off, cl) => { const p = new Path2D(); city.coast.poly(off, 1440, cl).forEach(([px, py], k) => (k ? p.lineTo(px, py) : p.moveTo(px, py))); p.closePath(); return p; };
+    coastPaths = { land: mk(0), grass: mk(-34, 320), shallow: mk(26), foam1: mk(5), foam2: mk(14) };
+    return coastPaths;
+  }
+  function drawCoast(x, rect) {
+    const C = coastP(); if (!C) return;
+    x.fillStyle = pat.water; x.fillRect(rect[0], rect[1], CH, CH);
+    x.save(); x.lineJoin = 'round';
+    x.strokeStyle = 'rgba(120,190,245,.55)'; x.lineWidth = 52; x.stroke(C.shallow);
+    x.strokeStyle = 'rgba(160,215,250,.6)'; x.lineWidth = 22; x.stroke(C.foam2);
+    x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 2; x.setLineDash([10, 7]); x.stroke(C.foam2); x.setLineDash([]);
+    x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 3; x.stroke(C.foam1);
+    x.fillStyle = pat.sand; x.fill(C.land);
+    x.strokeStyle = 'rgba(201,170,104,.7)'; x.lineWidth = 2; x.stroke(C.grass);
+    x.fillStyle = pat.grass; x.fill(C.grass);
+    x.restore();
+  }
   const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'access', 'road', 'cross', 'runway'];
 
   function fillShape(x, g, style) {
@@ -56,7 +82,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     if (g.shape === 'ellipse') { x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(g.x, g.y, g.w, g.h);
   }
   function drawGround(x, list) {
-    const sorted = list.slice().sort((a, b) => MAT_ORDER.indexOf(a.mat) - MAT_ORDER.indexOf(b.mat) || a.i - b.i);
+    const sorted = list.slice().sort((a, b) => (a.u || 0) - (b.u || 0) || MAT_ORDER.indexOf(a.mat) - MAT_ORDER.indexOf(b.mat) || a.i - b.i);
     for (const g of sorted) {
       if (g.island) { fillShape(x, g, pat.park); x.fillStyle = '#e8e4da'; x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.lineWidth = 2; x.strokeStyle = '#e8e4da'; x.stroke(); continue; }
       if (g.pool) { x.fillStyle = '#e8eef2'; x.fillRect(g.x - 2, g.y - 2, g.w + 4, g.h + 4); fillShape(x, g, '#4cb4f0'); x.fillStyle = '#8fd4ff'; x.fillRect(g.x + 2, g.y + 2, g.w - 8, 1); continue; }
@@ -252,10 +278,14 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     x.setTransform(PXU, 0, 0, PXU, -i * CH * PXU, -j * CH * PXU);
     const rect = [i * CH, j * CH, (i + 1) * CH, (j + 1) * CH];
     const bin = bins.get(binKey(i, j)) || { g: [], b: [], p: [], d: [] };
-    x.fillStyle = pat.grass; x.fillRect(rect[0], rect[1], CH, CH);
+    const core = city.core || { w: city.W, h: city.H };
+    if (rect[0] < 0 || rect[1] < 0 || rect[2] > core.w || rect[3] > core.h) { drawCoast(x, rect); x.fillStyle = pat.grass; const ax = Math.max(0, rect[0]); const ay = Math.max(0, rect[1]); const bx = Math.min(core.w, rect[2]); const by = Math.min(core.h, rect[3]); if (bx > ax && by > ay) x.fillRect(ax, ay, bx - ax, by - ay); }
+    else { x.fillStyle = pat.grass; x.fillRect(rect[0], rect[1], CH, CH); }
     drawGround(x, bin.g);
+    // espuma e água rasa na praia da orla oeste (mesmo acabamento da costa nova)
+    if (city.coast && rect[0] < 240 && rect[2] > 150 && rect[3] > 0 && rect[1] < (city.core?.h || city.H)) { const y0 = Math.max(0, rect[1]); const hh = Math.min(city.core?.h || city.H, rect[3]) - y0; x.fillStyle = 'rgba(120,190,245,.55)'; x.fillRect(206, y0, 26, hh); x.fillStyle = 'rgba(160,215,250,.6)'; x.fillRect(214, y0, 14, hh); x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(226, y0, 3, hh); x.fillStyle = 'rgba(255,255,255,.75)'; for (let k = y0 - (y0 % 17); k < y0 + hh; k += 17) x.fillRect(217, k, 2, 10); }
     roadMarks(x, rect);
-    for (const d of bin.d) { const im = img(`deco/${d.spr}`); if (im) x.drawImage(im, d.x, d.y, d.w, d.h); }
+    for (const d of bin.d) { const im = img(`deco/${d.spr}`); if (!im) continue; if (d.rot) { x.save(); x.translate(d.x + d.w / 2, d.y + d.h / 2); x.rotate(d.rot); x.drawImage(im, -d.w / 2, -d.h / 2, d.w, d.h); x.restore(); } else x.drawImage(im, d.x, d.y, d.w, d.h); }
     const lit = [];
     x.imageSmoothingEnabled = true;
     // construções e objetos ordenados pela base (y), como num RPG top-down
@@ -282,16 +312,26 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
 
   // mapa geral reduzido (0,25 px por unidade): zoom afastado e minimapa
   const OV = 0.25;
-  const overview = document.createElement('canvas'); overview.width = city.W * OV; overview.height = city.H * OV;
-  {
-    const x = overview.getContext('2d'); x.setTransform(OV, 0, 0, OV, 0, 0); x.imageSmoothingEnabled = true;
-    x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H);
+  const overview = document.createElement('canvas');
+  // rect: redesenha só uma área (depois de uma reforma); sem rect, o mapa geral inteiro
+  function drawOverview(rect = null) {
+    const bd = BD(); const W2 = (bd.x1 - bd.x0) * OV; const H2 = (bd.y1 - bd.y0) * OV;
+    if (!rect && (overview.width !== W2 || overview.height !== H2)) { overview.width = W2; overview.height = H2; }
+    const x = overview.getContext('2d'); x.setTransform(OV, 0, 0, OV, -bd.x0 * OV, -bd.y0 * OV); x.imageSmoothingEnabled = true;
+    x.save(); if (rect) { x.beginPath(); x.rect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]); x.clip(); }
+    const hit = (o, m = 0) => !rect || (o.x - m < rect[2] && o.x + (o.w || 0) + m > rect[0] && o.y - m - 60 < rect[3] && o.y + (o.h || 0) + m > rect[1]);
+    x.fillStyle = '#2f6fd0'; x.fillRect(bd.x0, bd.y0, bd.x1 - bd.x0, bd.y1 - bd.y0);
+    const C = coastP(); if (C) { x.strokeStyle = '#7fbff0'; x.lineWidth = 40; x.stroke(C.shallow); x.fillStyle = '#e8cf8a'; x.fill(C.land); x.fillStyle = '#4f9a3a'; x.fill(C.grass); } else { x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H); }
+    const core = city.core || { w: city.W, h: city.H }; x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, core.w, core.h);
     const col = { access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
-    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m) fillShape(x, g, g.island ? '#56a640' : col[m]);
+    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? '#56a640' : col[m]);
+    for (const g of city.ground) if (g.u && hit(g)) fillShape(x, g, col[g.mat] || '#4f9a3a');
     x.fillStyle = '#f2c94c'; for (const s of city.segs) if (s.w >= 48) { if (s.v) x.fillRect(s.x - 2, s.y0, 4, s.y1 - s.y0); else x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 4); }
-    for (const b of city.blds) { if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
-    x.fillStyle = '#2f7a2a'; for (const p of city.props) if (p.spr.startsWith('arvore') || p.spr.startsWith('arbusto')) { x.beginPath(); x.ellipse(p.x, p.y - 10, 9, 9, 0, 0, Math.PI * 2); x.fill(); }
+    for (const b of city.blds) { if (!hit(b)) continue; if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
+    x.fillStyle = '#2f7a2a'; for (const p of city.props) if (hit(p, 20) && (p.spr.startsWith('arvore') || p.spr.startsWith('arbusto'))) { x.beginPath(); x.ellipse(p.x, p.y - 10, 9, 9, 0, 0, Math.PI * 2); x.fill(); }
+    x.restore();
   }
+  drawOverview();
 
   // luz: brilho radial e cone de farol pré-desenhados
   const glow = document.createElement('canvas'); glow.width = glow.height = 64;
@@ -308,14 +348,15 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     // desenha o chão/construções visíveis no contexto já transformado para o mundo
     drawWorld(ctx, view, z) {
       const [x0, y0, x1, y1] = view;
-      if (z < 0.55) { ctx.imageSmoothingEnabled = true; ctx.drawImage(overview, x0 * OV, y0 * OV, (x1 - x0) * OV, (y1 - y0) * OV, x0, y0, x1 - x0, y1 - y0); return []; }
+      const bd = BD();
+      if (z < 0.55) { ctx.imageSmoothingEnabled = true; ctx.drawImage(overview, (x0 - bd.x0) * OV, (y0 - bd.y0) * OV, (x1 - x0) * OV, (y1 - y0) * OV, x0, y0, x1 - x0, y1 - y0); return []; }
       ctx.imageSmoothingEnabled = false;
       const lit = [];
-      for (let i = Math.max(0, Math.floor(x0 / CH)); i <= Math.min(Math.ceil(city.W / CH) - 1, Math.floor(x1 / CH)); i++) {
-        for (let j = Math.max(0, Math.floor(y0 / CH)); j <= Math.min(Math.ceil(city.H / CH) - 1, Math.floor(y1 / CH)); j++) {
+      for (let i = Math.max(Math.floor(bd.x0 / CH), Math.floor(x0 / CH)); i <= Math.min(Math.ceil(bd.x1 / CH) - 1, Math.floor(x1 / CH)); i++) {
+        for (let j = Math.max(Math.floor(bd.y0 / CH), Math.floor(y0 / CH)); j <= Math.min(Math.ceil(bd.y1 / CH) - 1, Math.floor(y1 / CH)); j++) {
           const ch = getChunk(i, j);
           if (ch) { ctx.drawImage(ch.c, i * CH, j * CH, CH + 0.75, CH + 0.75); for (const l of ch.lit) lit.push(l); }
-          else ctx.drawImage(overview, i * CH * OV, j * CH * OV, CH * OV, CH * OV, i * CH, j * CH, CH, CH);
+          else ctx.drawImage(overview, (i * CH - bd.x0) * OV, (j * CH - bd.y0) * OV, CH * OV, CH * OV, i * CH, j * CH, CH, CH);
         }
       }
       return lit;
@@ -350,5 +391,13 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
       ctx.restore();
     },
     stats: () => ({ chunks: chunks.size }),
+    // depois de uma reforma: reindexa, descarta os blocos em cache (todos ou só os da área) e refaz o mapa geral
+    reset({ rect = null, coast = false, overview: ov = true } = {}) {
+      index(); if (coast) coastPaths = null;
+      if (!rect) chunks.clear();
+      else for (const k of [...chunks.keys()]) { const [i, j] = k.split(',').map(Number); if ((i + 1) * CH >= rect[0] && i * CH <= rect[2] && (j + 1) * CH >= rect[1] && j * CH <= rect[3]) chunks.delete(k); }
+      if (ov) drawOverview(rect);
+    },
+    get bounds() { return BD(); },
   };
 }

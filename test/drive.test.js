@@ -65,3 +65,33 @@ test('ocorrências do mapa viram acontecimento e ferem o morador atropelado', as
   assert.throws(() => D.incident(ctx, { tipo: 'inventada' }), /desconhecida/);
   assert.equal(D.infraction(ctx, { tipo: 'fuga' }).fine.amount, 2934);
 });
+
+test('Construtora e Reforma: compra vai para o estoque, reforma salva só até o comprado e a cidade muda', async () => {
+  const ctx = T.ctx();
+  const C = await import('../server/world/construtora.js');
+  const { generateCity } = await import('../public/js/drive/city.js');
+  bankOf(T.w).balance = 200000;
+  const v = C.construtoraView(T.w);
+  assert.ok(v.items.length > 150 && v.items.some((i) => i.key === 'bld/stadium') && v.items.some((i) => i.key === 'piso/rua'), 'todos os assets à venda');
+  const r = C.buyObra(ctx, { key: 'bld/house', qty: 2 });
+  assert.equal(r.owned, 2);
+  C.buyObra(ctx, { key: 'piso/rua', qty: 3 });
+  assert.throws(() => C.buyObra(ctx, { key: 'bld/inexistente' }), /não encontrado/);
+  assert.equal(C.expandCity(ctx).level, 1);
+  const add = [{ id: 'a1', k: 'bld/house', x: 2100, y: -260 }, { id: 'a2', k: 'bld/house', x: 2200, y: -260 }];
+  const floor = [{ k: 'piso/rua', x: 2048, y: -96 }, { k: 'piso/rua', x: 2080, y: -96 }];
+  assert.throws(() => C.saveReforma(T.w, { add: [...add, { id: 'a3', k: 'bld/house', x: 2300, y: -260 }] }), /só comprou 2/);
+  assert.throws(() => C.saveReforma(T.w, { floor: [{ k: 'piso/rua', x: 5, y: 7 }] }), /grade/);
+  const s = C.saveReforma(T.w, { shape: 'ilha', add, floor, del: ['house@768,196'] });
+  assert.deepEqual(s.saved, { add: 2, floor: 2, del: 1 });
+  assert.deepEqual(C.obraInventory(T.w).find((o) => o.key === 'bld/house'), { key: 'bld/house', name: 'Casa de telhado vermelho', cat: 'predios', img: '/assets/rpg/bld/house.png', color: null, owned: 2, placed: 2, available: 0 });
+  const st = D.driveState(T.w);
+  assert.equal(st.reforma.shape, 'ilha'); assert.equal(st.reforma.level, 1);
+  const base = generateCity(); const city = generateCity(undefined, { reforma: st.reforma });
+  assert.ok(base.blds.some((b) => b.spr === 'house' && b.x === 768 && b.y === 196) && !city.blds.some((b) => b.spr === 'house' && b.x === 768 && b.y === 196), 'demolição vale');
+  assert.equal(city.blds.filter((b) => b.user).length, 2);
+  const at = (x, y) => city.mask[Math.floor((y + city.oy) / city.CS) * city.mw + Math.floor((x + city.ox) / city.CS)];
+  assert.equal(at(2060, -80), 2, 'rua pintada vira pista');
+  assert.equal(at(2130, -220), 0, 'prédio novo é sólido');
+  assert.equal(at(-1400, -1400), 5, 'fora da ilha é mar');
+});

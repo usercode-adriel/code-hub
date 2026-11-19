@@ -84,6 +84,12 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Celular: controles de voo, botões suaves, tela cheia e tela girada
 - [x] Compra direta liberada em todas as lojas
 
+### Construtora e modo Reforma
+- [x] Construtora Nexus (`#/construtora`, `server/world/construtora.js`): vende todos os assets das folhas (65 prédios, natureza, mobiliário, sinalização, fachadas, obras) e pisos (rua, calçada, praça, estacionamento, grama, areia, água); a compra vai para o estoque de obra (aparece no Inventário)
+- [x] Expansões de terreno (4 níveis) e formato do mapa (quadrado, arredondado, circular, ilha) com costa detalhada: areia, água rasa e espuma (`public/js/drive/obra.js`)
+- [x] Botão Reforma no mapa (`public/js/drive/editor.js`): mover, colocar (com prévia verde/vermelha), apagar qualquer item (os comprados voltam ao estoque), pintar piso arrastando, girar, tamanho, desfazer, salvamento automático; o servidor confere o estoque
+- [x] A cidade é gerada com a reforma (`generateCity(seed, { reforma })`): demolições, construções e pisos entram na colisão; ruas que saíam do mapa seguem até a praia
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

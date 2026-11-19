@@ -8,6 +8,8 @@ import { residents, personById, bumpUser } from './agents.js';
 import { peopleView } from './living.js';
 import { remember, genderize } from '../social.js';
 import { round2, nowIso, cap } from './util.js';
+import { reformaPublic } from './construtora.js';
+import { BOUNDS } from '../../public/js/drive/obra.js';
 
 export const MAP = { v: 'v3', w: 4096, h: 2816 };
 export const FINES = {
@@ -33,7 +35,7 @@ export function driveState(w) {
   const people = residents(w).filter((p) => p.agent?.status === 'ativo' && !(p.agent.injuredUntil && p.agent.injuredUntil > nowIso()))
     .sort((a, b) => out.has(b.id) - out.has(a.id)).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, out: out.has(p.id) }));
   const today = nowIso().slice(0, 10);
-  return { map: MAP, cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance };
+  return { map: MAP, reforma: reformaPublic(w), cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance };
 }
 
 const mine = (w, itemId) => { const it = (account(w).inventory || []).find((x) => x.id === itemId); if (!it || !(VEHICLES[it.key] || AIRCRAFT[it.key])) throw new BankError('Esse veículo não é seu'); return it; };
@@ -42,7 +44,7 @@ export function park(w, { itemId, x, y, a }) {
   const u = account(w); mine(w, itemId);
   const n = (v, lo, hi) => Math.max(lo, Math.min(hi, Number(v) || 0));
   u.devices ??= {}; u.devices.parked ??= {};
-  u.devices.parked[itemId] = { map: MAP.v, x: round2(n(x, 0, MAP.w)), y: round2(n(y, 0, MAP.h)), a: round2(n(a, -10, 10)), at: nowIso() };
+  u.devices.parked[itemId] = { map: MAP.v, x: round2(n(x, BOUNDS.x0, BOUNDS.x1)), y: round2(n(y, BOUNDS.y0, BOUNDS.y1)), a: round2(n(a, -10, 10)), at: nowIso() };
   return u.devices.parked[itemId];
 }
 

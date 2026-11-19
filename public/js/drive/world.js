@@ -166,8 +166,10 @@ function buildMask(world) {
   }
   return m;
 }
-export const at = (world, x, y) => { if (x < 0 || y < 0 || x >= world.W || y >= world.H) return SOLID; const cs = world.cs || 1; return world.mask[((y / cs) | 0) * world.mw + ((x / cs) | 0)]; };
-export const heightAt = (world, x, y) => { if (!world.heights || x < 0 || y < 0 || x >= world.W || y >= world.H) return 0; const cs = world.cs || 1; return world.heights[((y / cs) | 0) * world.mw + ((x / cs) | 0)]; };
+// mapa com margem (expansões): as coordenadas podem ser negativas; ox/oy deslocam o índice da máscara
+const inB = (w, x, y) => { const b = w.bounds; return b ? x >= b.x0 && y >= b.y0 && x < b.x1 && y < b.y1 : x >= 0 && y >= 0 && x < w.W && y < w.H; };
+export const at = (world, x, y) => { if (!inB(world, x, y)) return SOLID; const cs = world.cs || 1; return world.mask[(((y + (world.oy || 0)) / cs) | 0) * world.mw + (((x + (world.ox || 0)) / cs) | 0)]; };
+export const heightAt = (world, x, y) => { if (!world.heights || !inB(world, x, y)) return 0; const cs = world.cs || 1; return world.heights[(((y + (world.oy || 0)) / cs) | 0) * world.mw + (((x + (world.ox || 0)) / cs) | 0)]; };
 export function regionAt(world, x, y) { const r = world.regions.find((g) => x >= g.rect[0] && x < g.rect[2] && y >= g.rect[1] && y < g.rect[3]); return r?.name || 'Nexus City'; }
 // ponto andável mais próximo (para sair do carro)
 export function nearestWalk(world, x, y, maxR = 40, ok = canWalk) {

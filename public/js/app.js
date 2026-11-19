@@ -35,15 +35,15 @@ const VIEWS = {
   inventario: () => import('./views/inventario.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'),
   organizacoes: () => import('./views/organizacoes.js'), acontecimentos: () => import('./views/acontecimentos.js'), cidade: () => import('./views/cidade.js'),
   hospital: () => import('./views/hospital.js'), empregos: () => import('./views/empregos.js'), propriedades: () => import('./views/propriedades.js'),
-  veiculos: () => import('./views/veiculos.js'), vida: () => import('./views/vida.js'),
+  veiculos: () => import('./views/veiculos.js'), vida: () => import('./views/vida.js'), construtora: () => import('./views/construtora.js'),
 };
 // atalhos da barra lateral que abrem telas existentes
 const ALIAS = { loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
-const WORLD = new Set(['hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
+const WORLD = new Set(['construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'centro';

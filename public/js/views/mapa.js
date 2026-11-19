@@ -13,7 +13,7 @@ const hhmm = (d) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-
 
 export default async function render(el, parts, params = new URLSearchParams()) {
   // o Mapa agora é a cidade 2D dirigível; o mapa de bairros continua para rotas, lugares (#/mapa/<id>) e casas
-  if (!parts?.[0] && !['classico', 'casa', 'bairro', 'rota'].some((k) => params.has(k))) return (await import('./cidade2d.js')).default(el);
+  if (!parts?.[0] && !['classico', 'casa', 'bairro', 'rota'].some((k) => params.has(k))) return (await import('./cidade2d.js')).default(el, params);
   const body = shell(el, 'mapa');
   bindEntities(body);
   body.innerHTML = '<div class="skeleton" style="height:100%;min-height:70vh"></div>';

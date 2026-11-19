@@ -42,7 +42,8 @@ export function stepPlane(p, input, world, dt) {
   }
   p.x += Math.cos(p.a) * p.v * dt; p.y += Math.sin(p.a) * p.v * dt;
   // limites do mapa: faz a curva sozinho para voltar
-  if (p.x < 60 || p.y < 60 || p.x > world.W - 60 || p.y > world.H - 60) { p.x = Math.max(40, Math.min(world.W - 40, p.x)); p.y = Math.max(40, Math.min(world.H - 40, p.y)); if (!p.ground) p.a += Math.PI * dt; }
+  const b = world.bounds || { x0: 0, y0: 0, x1: world.W, y1: world.H };
+  if (p.x < b.x0 + 60 || p.y < b.y0 + 60 || p.x > b.x1 - 60 || p.y > b.y1 - 60) { p.x = Math.max(b.x0 + 40, Math.min(b.x1 - 40, p.x)); p.y = Math.max(b.y0 + 40, Math.min(b.y1 - 40, p.y)); if (!p.ground) p.a += Math.PI * dt; }
   // obstáculos pela altura (asas e fuselagem)
   if (!p.ground) {
     for (const [u, w] of [[0, 0], [p.L * 0.4, 0], [0, p.W * 0.4], [0, -p.W * 0.4]]) {

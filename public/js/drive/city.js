@@ -5,8 +5,10 @@
 import { BLD } from './bldmeta.js';
 import { DECO } from './decometa.js';
 import { SOLID, WALK, ROAD, CROSS, LOT, WATER, GRASS, RUNWAY, PLAZA, SAND } from './world.js';
+import { PAD, BOUNDS, BEACH, CATALOG, coastOf, genKey, placed } from './obra.js';
 
 export const W = 4096; export const H = 2816; export const CS = 4;
+const TERRAIN = new Map(); // máscara do terreno em volta, por formato e nível (só muda quando a costa muda)
 
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const snap = (v) => Math.round(v / CS) * CS;
@@ -37,8 +39,13 @@ const ZONES = [
 const ZONES2 = [['posto', 'galpoes', 'galpoes', 'tanques'], ['galpoes', 'conteineres', 'fabrica', 'galpoes'], ['conteineres', 'galpoes', 'fabrica', 'galpoes']];
 const REGION = { hoteis: 'Distrito Hoteleiro', estadio: 'Estádio', residencial: 'Bairro Residencial', empresarial: 'Distrito Empresarial', banco: 'Distrito Empresarial', praia: 'Orla', comercial: 'Centro Comercial', shopping: 'Centro Comercial', praca: 'Praça Central', hospital: 'Centro', policia: 'Centro', terminal: 'Terminal Rodoviário', prefeitura: 'Centro Cívico', estacionamento: 'Centro', concessionaria: 'Centro', escola: 'Vila Escolar', rio: 'Beira-Rio', lago: 'Parque do Lago', parque: 'Parque Sul', posto: 'Área Industrial', galpoes: 'Área Industrial', tanques: 'Área Industrial', conteineres: 'Porto Seco', fabrica: 'Área Industrial' };
 
-export function generateCity(seed = 20261119) {
+// reforma: { shape, level, add: [{id,k,x,y,r,s}], del: [chaves de itens gerados], floor: [{k,x,y}] } (modo Reforma)
+export function generateCity(seed = 20261119, { reforma = null } = {}) {
   const R = rng(seed);
+  const RF = reforma || {}; const DEL = new Set(RF.del || []);
+  const userAdd = (RF.add || []).map((a) => [a, placed(a)]).filter(([, o]) => o);
+  const userFloor = (RF.floor || []).filter((f) => CATALOG[f.k]?.kind === 'floor').map((f) => ({ mat: CATALOG[f.k].mat, shape: 'rect', x: f.x, y: f.y, w: 32, h: 32, u: 1 }));
+  const reserved = userFloor.map((f) => [f.x, f.y, f.w, f.h]);
   const pick = (a) => a[Math.floor(R() * a.length)];
   const nodes = {}; const roads = [];
   const nid = (x, y) => `n${x}_${y}`;
@@ -449,10 +456,15 @@ export function generateCity(seed = 20261119) {
       if (c === WALK) { fillRect(LOT, dx, dy, ww, hh); driveways.push([dx, dy, ww, hh]); }
     }
   }
+  for (const f of userFloor) { ground.push(f); fillRect(code[f.mat], f.x, f.y, f.w, f.h); }
   // cerca do aeroporto (portão aberto para o pátio)
   const fence = [[2800, 8, 1288, 4], [2800, 8, 4, 1112], [4084, 8, 4, 1112], [2800, 1116, 100, 4], [2964, 1116, 1124, 4]];
   for (const f of fence) fillRect(SOLID, ...f);
   for (const f of beachFence) fillRect(SOLID, ...f);
+  // reforma: demolições de construções geradas e construções do jogador
+  for (let i = blds.length - 1; i >= 0; i--) if (DEL.has(genKey(blds[i]))) { const b = blds[i]; reserved.push([b.x, b.y, b.w, b.h]); blds.splice(i, 1); }
+  for (const [, o] of userAdd) if (o.kind === 'sprite') blds.push(o);
+  for (const [, o] of userAdd) if (!o.kind && !o.decal) props.push(o);
   for (const b of blds) {
     const hgt = Math.min(250, b.floors * 9 + 6);
     if (b.round) fillEll(SOLID, b.x, b.y, b.w, b.h); else if (b.canopy) { fillRect(SOLID, b.x + 10, b.y + 10, 8, 8); fillRect(SOLID, b.x + b.w - 18, b.y + 10, 8, 8); fillRect(SOLID, b.x + b.w / 2 - 4, b.y + b.h - 20, 8, 8); } else fillRect(SOLID, b.x, b.y, b.w, b.h);
@@ -468,8 +480,11 @@ export function generateCity(seed = 20261119) {
     const inAirport = (x, y) => x > 2780 && y < 1236;
     const GREEN = ['d:arvore', 'd:arvore', 'd:arvore-vaso', 'd:arvore-vaso2', 'd:flores-v', 'd:flores-b', 'd:flores-a', 'd:arbusto-c', 'd:arbusto-c2', 'd:arbusto-vaso', 'd:banco', 'd:banco2', 'd:lixeira-verde', 'arvore0', 'arvore1', 'arvore2', 'arvore3', 'arvore4', 'arvore2', 'arvore3', 'arbusto0', 'arbusto1', 'canteiro0', 'canteiro1', 'canteiro2', 'banco0', 'banco1', 'jardim0', 'lixeira0'];
     const PAVED = ['d:arvore-vaso', 'd:arvore-vaso2', 'd:arbusto-vaso2', 'd:flores-v', 'd:flores-a', 'd:banco', 'd:lixeira-cinza', 'd:correio-azul', 'd:correio-vermelho', 'd:maq-bebida', 'd:maq-lanche', 'd:orelhao', 'd:banca-jornal', 'd:telefone', 'd:quiosque', 'd:feira', 'canteiro0', 'canteiro1', 'canteiro2', 'lixeira0', 'lixeira1', 'lixeira2', 'banco0', 'banco1', 'arvore0', 'arvore2', 'arbusto1', 'guarda-sol0'];
+    const inRes = (x, y) => reserved.some(([rx, ry, rw, rh]) => x > rx - 12 && x < rx + rw + 12 && y > ry - 12 && y < ry + rh + 24);
     for (let y = 24; y < H - 24; y += 22) for (let x = 330; x < W - 16; x += 22) {
-      if (inAirport(x, y) || near(x, y)) continue;
+      if (inAirport(x, y) || near(x, y) || inRes(x, y)) continue;
+      // sorteio próprio de cada ponto: editar um lugar não muda a decoração do resto da cidade
+      const R = rng(seed ^ Math.imul(x, 73856093) ^ Math.imul(y, 19349663)); const pick = (a) => a[Math.floor(R() * a.length)];
       const jx = x + (R() - 0.5) * 6; const jy = y + (R() - 0.5) * 6;
       const i = Math.floor(jx / CS); const j = Math.floor(jy / CS); const c = mask[j * mw + i];
       if (c !== GRASS && c !== PLAZA) continue;
@@ -523,10 +538,53 @@ export function generateCity(seed = 20261119) {
       }
     }
   }
+  if (DEL.size) {
+    for (let i = props.length - 1; i >= 0; i--) { const p = props[i]; if (p.user || !DEL.has(genKey(p))) continue; props.splice(i, 1); if (p.lamp) for (let k = lamps.length - 1; k >= 0; k--) if (Math.abs(lamps[k][0] - p.x) < 4 && Math.abs(lamps[k][1] - p.y) < 10) lamps.splice(k, 1); }
+    for (let i = decals.length - 1; i >= 0; i--) if (DEL.has(genKey(decals[i]))) decals.splice(i, 1);
+  }
+  for (const [, o] of userAdd) { if (o.decal) decals.push(o); else if (o.lamp) lamps.push([o.x, o.y]); }
   for (const p of props) if (p.solid) { const r = p.spr.startsWith('arvore') ? 4 : 3; fillRect(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); const i = Math.floor(p.x / CS); const j = Math.floor(p.y / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.ht || 10); }
 
+  // Construtora Nexus (loja do modo Reforma) num galpão da área industrial
+  const wb = blds.find((b) => b.spr === 'warehouse-brick') || blds.find((b) => b.spr === 'industrial');
+  if (wb) pois.push({ id: 'construtora', label: 'Construtora Nexus', at: [Math.round(wb.x + wb.w / 2), Math.round(wb.y + 12)], route: '#/construtora', icon: 'building' });
+  // ---------------------------------------------------------------- terreno em volta (expansões) e costa
+  const coast = coastOf(RF.shape, RF.level);
+  const emw = (W + 2 * PAD) / CS; const emh = (H + 2 * PAD) / CS; const o = PAD / CS;
+  const ck = `${coast.shape}|${coast.level}`;
+  if (!TERRAIN.has(ck)) {
+    const t = new Uint8Array(emw * emh);
+    for (let j = 0; j < emh; j++) for (let i = 0; i < emw; i++) { if (i >= o && i < o + mw && j >= o && j < o + mh) continue; const z = coast.zone((i - o + 0.5) * CS, (j - o + 0.5) * CS); t[j * emw + i] = z === 0 ? WATER : z === 1 ? SAND : GRASS; }
+    TERRAIN.clear(); TERRAIN.set(ck, t);
+  }
+  const emask = TERRAIN.get(ck).slice(); const eh = new Uint8Array(emw * emh);
+  for (let j = 0; j < mh; j++) { emask.set(mask.subarray(j * mw, (j + 1) * mw), (j + o) * emw + o); eh.set(heights.subarray(j * mw, (j + 1) * mw), (j + o) * emw + o); }
+  const eFill = (c, x, y, w, h) => { const ax = Math.max(0, Math.floor((x + PAD) / CS)); const ay = Math.max(0, Math.floor((y + PAD) / CS)); const bx = Math.min(emw, Math.ceil((x + w + PAD) / CS)); const by = Math.min(emh, Math.ceil((y + h + PAD) / CS)); for (let j = ay; j < by; j++) emask.fill(c, j * emw + ax, j * emw + bx); };
+  // ruas que saíam do mapa continuam pelo terreno novo até a praia (com barreira no fim)
+  const stubs = [];
+  for (const s2 of segs) {
+    const ends = s2.v ? [[s2.y0, -1], [s2.y1, 1]] : [[s2.x0, -1], [s2.x1, 1]];
+    for (const [e, dir] of ends) {
+      if (s2.v ? (e > 0 && e < H) : (e > 0 && e < W)) continue;
+      let L = 0; while (L < PAD - 8) { const px = s2.v ? s2.x : e + dir * (L + 8); const py = s2.v ? e + dir * (L + 8) : s2.y; if (coast.zone(px, py) !== 2) break; L += 8; }
+      L -= 24; if (L < 24) continue;
+      const half = s2.w / 2;
+      const rr = s2.v ? [s2.x - half, dir < 0 ? e - L : e, s2.w, L] : [dir < 0 ? e - L : e, s2.y - half, L, s2.w];
+      const wk = s2.v ? [[rr[0] - 12, rr[1], 12, L], [rr[0] + s2.w, rr[1], 12, L]] : [[rr[0], rr[1] - 12, L, 12], [rr[0], rr[1] + s2.w, L, 12]];
+      for (const k of wk) { ground.push({ mat: 'walk', shape: 'rect', x: k[0], y: k[1], w: k[2], h: k[3], ext: 1 }); eFill(WALK, ...k); }
+      ground.push({ mat: 'road', shape: 'rect', x: rr[0], y: rr[1], w: rr[2], h: rr[3], ext: 1 }); eFill(ROAD, ...rr);
+      stubs.push(rr);
+      const ex = s2.v ? s2.x : e + dir * (L - 4); const ey = s2.v ? e + dir * (L - 4) : s2.y;
+      for (let k = -1; k <= 1; k++) PX('barreira', s2.v ? ex + k * (s2.w / 3) : ex, (s2.v ? ey : ey + k * (s2.w / 3)) + 5, true);
+    }
+  }
+  // construções e objetos do jogador fora do núcleo (e de novo dentro dele, já valem no mapa grande)
+  for (const f of userFloor) eFill(code[f.mat], f.x, f.y, f.w, f.h);
+  for (const b of blds) if (b.user) { eFill(SOLID, b.x, b.y, b.w, b.h); const ax = Math.floor((b.x + PAD) / CS); const ay = Math.floor((b.y + PAD) / CS); const hgt = Math.min(250, b.floors * 9 + 6); for (let j = ay; j < Math.ceil((b.y + b.h + PAD) / CS) && j < emh; j++) for (let i = ax; i < Math.ceil((b.x + b.w + PAD) / CS) && i < emw; i++) if (i >= 0 && j >= 0) eh[j * emw + i] = Math.max(eh[j * emw + i], hgt); }
+  for (const p of props) if (p.solid && (p.user || p.x < 0 || p.y < 0 || p.x > W || p.y > H)) { const r = p.spr.startsWith('arvore') ? 4 : 3; eFill(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); }
+
   return {
-    W, H, CS, mw, mh, mask, heights, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
+    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: PAD, oy: PAD, bounds: BOUNDS, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
     R: { w: W, h: H, nodes, roads, lights, lots: [], pois, regions, radars: [
       { at: [704, 760], limit: 50 }, { at: [1728, 2000], limit: 50 }, { at: [2200, 576], limit: 50 }, { at: [3300, 1504], limit: 50 }, { at: [1200, 2304], limit: 50 }, { at: [2752, 1900], limit: 50 }, { at: [1600, 1248], limit: 40 }, { at: [900, 928], limit: 40 },
     ] },

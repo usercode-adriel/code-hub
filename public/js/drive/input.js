@@ -1,7 +1,7 @@
 // Controles: teclado (W/S/A/D, setas, espaço, E, F, Shift), mouse (roda = zoom, arrastar = explorar) e, no celular,
 // controles virtuais com multitoque: joystick a pé; volante ◀ ▶, acelerador, freio, marcha D/N/R e entrar/sair
 // dirigindo; potência, subir/descer pilotando. Pinça para zoom. Funciona com a tela girada (modo paisagem forçado).
-export function createInput(stage, { onEnter, onZoom, onPan, onTap } = {}) {
+export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, paint } = {}) {
   const keys = new Set();
   const st = { throttle: 0, brake: 0, steer: 0, hand: 0, mx: 0, my: 0, autoGear: true, keys, touch: matchMedia('(pointer: coarse)').matches };
   const rot = () => stage.dataset.rot === '1';
@@ -60,20 +60,23 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap } = {}) {
 
   // ---- mapa: roda, arrastar e pinça ----
   const cv = stage.querySelector('canvas');
-  const pts = new Map(); let pinch = null; let drag = null;
+  const pts = new Map(); let pinch = null; let drag = null; let painting = false;
   cv.addEventListener('wheel', (e) => { e.preventDefault(); const [lx, ly] = local(e.clientX, e.clientY); onZoom?.(e.deltaY < 0 ? 1.15 : 1 / 1.15, lx, ly); }, { passive: false });
   cv.addEventListener('pointerdown', (e) => {
     cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
-    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; drag = null; }
-    else { const [lx, ly] = local(e.clientX, e.clientY); drag = { x: e.clientX, y: e.clientY, moved: 0, lx, ly }; }
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; drag = null; if (painting) { painting = false; paint.end(); } }
+    else { const [lx, ly] = local(e.clientX, e.clientY); drag = { x: e.clientX, y: e.clientY, moved: 0, lx, ly }; if (paint?.active()) { painting = true; paint.at(lx, ly); } }
   });
+  // passar o mouse por cima (prévia do modo Reforma)
+  cv.addEventListener('pointermove', (e) => { if (!pts.has(e.pointerId) && e.pointerType === 'mouse') onHover?.(...local(e.clientX, e.clientY)); });
   cv.addEventListener('pointermove', (e) => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (painting && pts.size === 1) { const [lx, ly] = local(e.clientX, e.clientY); onHover?.(lx, ly); paint.at(lx, ly); return; }
     if (pinch && pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); const [lx, ly] = local((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); onZoom?.(d / pinch.d, lx, ly); pinch.d = d; return; }
     if (drag) { const dx = e.clientX - drag.x; const dy = e.clientY - drag.y; drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY; if (drag.moved > 6) onPan?.(...localDelta(dx, dy)); }
   });
-  const end = (e) => { if (drag && drag.moved <= 6 && pts.size === 1) onTap?.(drag.lx, drag.ly); pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null; };
+  const end = (e) => { if (painting) { painting = false; paint.end(); pts.delete(e.pointerId); if (!pts.size) drag = null; return; } if (drag && drag.moved <= 6 && pts.size === 1) onTap?.(drag.lx, drag.ly); pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null; };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 
   st.read = () => {
@@ -96,11 +99,12 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap } = {}) {
 // CameraSystem — segue o jogador suavemente (olhando à frente do veículo), zoom com limites, sem tremor
 export function createCamera(world) {
   const cam = { x: 900, y: 500, z: 3, tx: 900, ty: 500, tz: null, follow: true, vw: 800, vh: 600, zmin: 0.3, zmax: 6 };
-  cam.resize = (w, h) => { cam.vw = w; cam.vh = h; cam.zmin = Math.max(w / world.W, h / world.H); cam.z = Math.max(cam.zmin, Math.min(cam.zmax, cam.z)); cam.clamp(); };
+  const B = () => world.bounds || { x0: 0, y0: 0, x1: world.W, y1: world.H };
+  cam.resize = (w, h) => { const b = B(); cam.vw = w; cam.vh = h; cam.zmin = Math.max(w / (b.x1 - b.x0), h / (b.y1 - b.y0), 0.12); cam.z = Math.max(cam.zmin, Math.min(cam.zmax, cam.z)); cam.clamp(); };
   cam.clamp = () => {
-    const hw = cam.vw / 2 / cam.z; const hh = cam.vh / 2 / cam.z;
-    cam.x = hw * 2 >= world.W ? world.W / 2 : Math.max(hw, Math.min(world.W - hw, cam.x));
-    cam.y = hh * 2 >= world.H ? world.H / 2 : Math.max(hh, Math.min(world.H - hh, cam.y));
+    const b = B(); const hw = cam.vw / 2 / cam.z; const hh = cam.vh / 2 / cam.z;
+    cam.x = hw * 2 >= b.x1 - b.x0 ? (b.x0 + b.x1) / 2 : Math.max(b.x0 + hw, Math.min(b.x1 - hw, cam.x));
+    cam.y = hh * 2 >= b.y1 - b.y0 ? (b.y0 + b.y1) / 2 : Math.max(b.y0 + hh, Math.min(b.y1 - hh, cam.y));
   };
   cam.update = (dt, target) => {
     if (cam.follow && target) { cam.tx = target.x; cam.ty = target.y; }

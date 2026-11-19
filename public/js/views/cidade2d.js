@@ -15,6 +15,7 @@ import { createPeds, stepPeds, gather } from '../drive/peds.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
 import { createPlane, stepPlane, knots, feet } from '../drive/plane.js';
 import { createIncidents } from '../drive/incidents.js';
+import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
 import { cityNow, refreshStatus } from '../chrome.js';
 import { personCard } from '../world/wui.js';
@@ -23,12 +24,12 @@ import { store } from '../store.js';
 const POI_IC = { hospital: '✚', shield: '★', flame: '▲', cart: '🛒', fuel: '⛽', scale: '⚖', trophy: '⚽', rocket: '✈', wallet: '$', bag: '🛍', sun: '☘', car: '🚗', briefcase: '⚓', building: '⌂', flag: '⚑', school: '✎', bus: '🚌' };
 const nightOf = (h) => (h >= 20 || h < 5 ? 1 : h >= 17.5 ? (h - 17.5) / 2.5 : h < 7 ? (7 - h) / 2 : 0);
 
-export default async function render(el) {
+export default async function render(el, params = new URLSearchParams()) {
   el.innerHTML = `<div class="d2" id="d2">
     <canvas class="d2-cv" aria-label="Mapa jogável de Nexus City"></canvas>
     <div class="d2-load" id="d2Load"><div class="skeleton" style="width:220px;height:14px;border-radius:7px"></div><small>Montando Nexus City…</small></div>
     <div class="d2-top"><div class="d2-where"><b id="d2Reg">Nexus City</b><small id="d2Time">--:--</small></div>
-      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
+      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
     <div class="d2-wanted" id="d2Want" hidden></div>
     <canvas class="d2-mini" id="d2Mini" width="192" height="132" aria-label="Minimapa"></canvas>
     <div class="d2-dash" id="d2Dash" hidden></div>
@@ -51,9 +52,11 @@ export default async function render(el) {
   try { [assets, state] = await Promise.all([loadAssets(), api.get('/mundo/cidade2d')]); } catch (err) { $('#d2Load').innerHTML = `<b>Não foi possível abrir o mapa</b><small>${esc(err.message)}</small>`; return; }
   if (!alive) return;
   await new Promise((r) => setTimeout(r, 0));
-  const city = generateCity();
+  let reforma = state.reforma || null;
+  const city = generateCity(undefined, { reforma });
   const world = buildGraph(city.R);
-  Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, pois: city.pois, regions: city.regions, radars: city.R.radars });
+  const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars });
+  syncWorld();
   const R = createRenderer(city, assets, { mobile: touch });
   $('#d2Load').remove();
   const IMG = assets.img;
@@ -92,9 +95,16 @@ export default async function render(el) {
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
 
   // ---------------- entrada
-  const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => tap(sx, sy) });
+  const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
   input.touchUI = touch;
-  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
+  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
+  // modo Reforma: refaz a cidade com a reforma (geração + edições) e descarta só os blocos afetados
+  function rebuildCity(rf, rect, full) {
+    const t0 = performance.now();
+    Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
+    R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
+  }
+  const ED = createEditor({ stage, cam, city, world, assets, api, toast, rebuild: rebuildCity, onExit: (rf) => { reforma = { ...(reforma || {}), ...rf }; cam.follow = true; } });
   $('#d2GearB').addEventListener('pointerup', () => { if (me.mode !== 'car') return; const c = me.car; c.gear = c.gear === 'D' ? 'N' : c.gear === 'N' ? 'R' : 'D'; });
 
   const regionAt = (p) => { const r = city.regions.find((g) => p.x >= g.rect[0] && p.x < g.rect[2] && p.y >= g.rect[1] && p.y < g.rect[3]); if (r) return r.name; let best = null; let bd = Infinity; for (const g of city.regions) { const dx = Math.max(g.rect[0] - p.x, 0, p.x - g.rect[2]); const dy = Math.max(g.rect[1] - p.y, 0, p.y - g.rect[3]); const d = dx + dy; if (d < bd) { bd = d; best = g; } } return best?.name || 'Nexus City'; };
@@ -403,6 +413,7 @@ export default async function render(el) {
     for (const f of INC.fx) { const im = fxFrame(f.kind, f.t, f.secs); if (!im) continue; const s = (f.kind === 'explosao' ? 46 : 24) * f.scale; ctx.drawImage(im, f.x - s / 2, f.y - s * (f.kind === 'fogo' ? 1 : 0.6), s, s); if (f.kind !== 'fumaca') lights.push({ x: f.x, y: f.y - 8, r: f.kind === 'explosao' ? 120 : 60, color: '#ff8a3a', ka: 0.6, halo: 0.6 }); if (f.kind === 'fogo' && Math.random() < 0.2) puff(f.x, f.y - 16, 1.6); }
     for (const p of particles) { const im = IMG[`fx/fumaca${Math.floor(p.t * 3) % 6}`]; if (!im) continue; ctx.globalAlpha = Math.max(0, 0.6 * (1 - p.t / p.life)); const s = p.s * (1 + p.t); ctx.drawImage(im, p.x - s / 2, p.y - s / 2, s, s); }
     ctx.globalAlpha = 1;
+    ED.draw(ctx, z);
     // luzes da cidade à noite
     if (night > 0.03) {
       for (const [lx, ly] of city.lamps) if (lx > view[0] - 40 && lx < view[2] + 40 && ly > view[1] - 40 && ly < view[3] + 40) lights.push({ x: lx, y: ly - 22, r: 32, color: '#ffd27a', ka: 0.32, halo: 0.42, lamp: true });
@@ -441,14 +452,14 @@ export default async function render(el) {
   }
   function drawMini() {
     mctx.imageSmoothingEnabled = true; mctx.drawImage(R.overview, 0, 0, 192, 132);
-    const kx = 192 / world.W; const ky = 132 / world.H;
-    mctx.strokeStyle = 'rgba(255,255,255,.9)'; mctx.lineWidth = 1; mctx.strokeRect((cam.x - cam.vw / 2 / cam.z) * kx, (cam.y - cam.vh / 2 / cam.z) * ky, (cam.vw / cam.z) * kx, (cam.vh / cam.z) * ky);
-    for (const o of own) { mctx.fillStyle = (o.health ?? 100) <= 0 ? '#ff4d5e' : o.kind === 'aviao' ? '#f7c948' : '#2fd27a'; mctx.fillRect(o.x * kx - 2, o.y * ky - 2, 4, 4); }
-    for (const inc of INC.list) { mctx.fillStyle = '#ff4d5e'; mctx.beginPath(); mctx.arc(inc.x * kx, inc.y * ky, 3, 0, Math.PI * 2); mctx.fill(); }
-    if (INC.chase.on && INC.chase.car) { mctx.fillStyle = Math.floor(Date.now() / 250) % 2 ? '#3a7aff' : '#ff3a3a'; mctx.fillRect(INC.chase.car.x * kx - 2, INC.chase.car.y * ky - 2, 4, 4); }
-    const p = me.car || me.plane || me; mctx.fillStyle = '#38d6f5'; mctx.beginPath(); mctx.arc(p.x * kx, p.y * ky, 3.2, 0, Math.PI * 2); mctx.fill(); mctx.strokeStyle = '#0a0d2b'; mctx.stroke();
+    const mb = R.bounds; const kx = 192 / (mb.x1 - mb.x0); const ky = 132 / (mb.y1 - mb.y0); const X = (v) => (v - mb.x0) * kx; const Y = (v) => (v - mb.y0) * ky;
+    mctx.strokeStyle = 'rgba(255,255,255,.9)'; mctx.lineWidth = 1; mctx.strokeRect(X(cam.x - cam.vw / 2 / cam.z), Y(cam.y - cam.vh / 2 / cam.z), (cam.vw / cam.z) * kx, (cam.vh / cam.z) * ky);
+    for (const o of own) { mctx.fillStyle = (o.health ?? 100) <= 0 ? '#ff4d5e' : o.kind === 'aviao' ? '#f7c948' : '#2fd27a'; mctx.fillRect(X(o.x) - 2, Y(o.y) - 2, 4, 4); }
+    for (const inc of INC.list) { mctx.fillStyle = '#ff4d5e'; mctx.beginPath(); mctx.arc(X(inc.x), Y(inc.y), 3, 0, Math.PI * 2); mctx.fill(); }
+    if (INC.chase.on && INC.chase.car) { mctx.fillStyle = Math.floor(Date.now() / 250) % 2 ? '#3a7aff' : '#ff3a3a'; mctx.fillRect(X(INC.chase.car.x) - 2, Y(INC.chase.car.y) - 2, 4, 4); }
+    const p = me.car || me.plane || me; mctx.fillStyle = '#38d6f5'; mctx.beginPath(); mctx.arc(X(p.x), Y(p.y), 3.2, 0, Math.PI * 2); mctx.fill(); mctx.strokeStyle = '#0a0d2b'; mctx.stroke();
   }
-  mini.onclick = (e) => { const r = mini.getBoundingClientRect(); cam.follow = false; cam.x = cam.tx = ((e.clientX - r.left) / r.width) * world.W; cam.y = cam.ty = ((e.clientY - r.top) / r.height) * world.H; };
+  mini.onclick = (e) => { const r = mini.getBoundingClientRect(); const mb = R.bounds; cam.follow = false; cam.x = cam.tx = mb.x0 + ((e.clientX - r.left) / r.width) * (mb.x1 - mb.x0); cam.y = cam.ty = mb.y0 + ((e.clientY - r.top) / r.height) * (mb.y1 - mb.y0); };
 
   // ---------------- HUD
   let lastPrompt = ''; let lastDash = '';
@@ -490,7 +501,7 @@ export default async function render(el) {
     const t = Date.now() / 1000;
     const inp = input.read();
     stepAnim(dt);
-    if (me.mode === 'car' && !me.anim) {
+    if (ED.on) { if (inp.mx || inp.my) cam.pan(-inp.mx * 700 * dt, -inp.my * 700 * dt); } else if (me.mode === 'car' && !me.anim) {
       const c = me.car; if (inp.gearTap) { inp.gearTap = false; }
       const v0 = c.v;
       stepCar(c, inp, world, dt, [...T.cars, ...own.filter((o) => o !== c && (o.kind === 'carro' || o.ground))]);
@@ -512,9 +523,9 @@ export default async function render(el) {
     const tgtV = me.car || me.plane;
     const tgt = tgtV ? { x: tgtV.x + Math.cos(tgtV.a) * tgtV.v * 0.35, y: tgtV.y + Math.sin(tgtV.a) * tgtV.v * 0.35 } : me;
     cam.update(dt, tgt);
-    if (inp.mx || inp.my || inp.throttle) cam.follow = true;
+    if (!ED.on && (inp.mx || inp.my || inp.throttle)) cam.follow = true;
     if (flash > 0) flash = Math.max(0, flash - dt * 2.5);
-    const tD = performance.now(); draw(t, window.__forceNight ?? nightOf(cityNow().hour)); perf.draw = (perf.draw || 0) + performance.now() - tD;
+    const tD = performance.now(); draw(t, ED.on ? 0 : window.__forceNight ?? nightOf(cityNow().hour)); perf.draw = (perf.draw || 0) + performance.now() - tD;
     perf.frames++; perf.work += performance.now() - nowMs;
     // qualidade adaptativa: se o aparelho não aguenta, baixa a resolução da tela do mapa
     qa.n++; qa.t += dt; if (qa.t > 2.5) { const fps = qa.n / qa.t; qa.n = 0; qa.t = 0; if (fps < 42 && qa.level < 2) { qa.level++; qa.dpr = qa.level === 1 ? 1.15 : 0.85; resize(); } }
@@ -524,8 +535,9 @@ export default async function render(el) {
     towIllegal(nowMs);
   }
   raf = requestAnimationFrame(frame);
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R }; // inspeção (testes automáticos)
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED };
+  if (params.has('reforma')) setTimeout(() => ED.open(reforma), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
-  return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
+  return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
 }
 export { canWalk, WATER, RUNWAY, gather };

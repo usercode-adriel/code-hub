@@ -10,7 +10,7 @@ import { esc, initials } from './ui.js';
 export const CITY_NAV = [
   ['centro', 'Início', 'home', '#8b7bff'], ['mapa', 'Mapa', 'map', '#38bdf8'], ['vida', 'Minha Vida', 'user', '#f472b6'],
   ['inventario', 'Inventário', 'layers', '#c084fc'], ['mercado', 'Loja', 'cart', '#fb923c'], ['empregos', 'Empregos', 'briefcase', '#facc15'],
-  ['veiculos', 'Veículos', 'car', '#60a5fa'], ['propriedades', 'Propriedades', 'building', '#34d399'], ['empresas', 'Economia', 'trending', '#4ade80'],
+  ['veiculos', 'Veículos', 'car', '#60a5fa'], ['propriedades', 'Propriedades', 'building', '#34d399'], ['construtora', 'Construtora', 'layers', '#f59e0b'], ['empresas', 'Economia', 'trending', '#4ade80'],
   ['organizacoes', 'Organizações', 'users', '#a78bfa'], ['assistente', 'Chat', 'chat', '#22d3ee'], ['settings', 'Configurações', 'settings', '#94a3b8'],
 ];
 export const CITY_PLACES = [
