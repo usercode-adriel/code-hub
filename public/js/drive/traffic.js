@@ -62,21 +62,23 @@ export function stepTraffic(T, world, dt, t, ctx) {
   for (const c of T.cars) {
     if (c.mode === 'chase' || c.mode === 'parked') continue; // perseguição é controlada pelo sistema de ocorrências
     if (c.wrecked > 0) { c.wrecked -= dt; c.v = 0; if (c.wrecked <= 0) c.smoke = 0; continue; }
-    let vmax = c.maxV * (c.siren ? 1.2 : 1); let stop = Infinity;
+    // motorista distraído (acidentes): não respeita sinal, faixa nem distância e acelera
+    const rk = Boolean(c.reckless);
+    let vmax = c.maxV * (c.siren ? 1.2 : rk ? 1.15 : 1); let stop = Infinity;
     if (!c.turn) {
       const L = c.lane; const rem = L.path.len - c.s; const n = L.to;
       if (L.narrow) vmax = Math.min(vmax, 28);
       if (n.kind === 'round') vmax = Math.min(vmax, 22 + rem * 0.5);
       else if (n.kind !== 'exit' && rem < 45) vmax = Math.min(vmax, 24 + rem * 0.6);
-      if (n.light && !c.siren) {
+      if (n.light && !c.siren && !rk) {
         const st = lightState(n, L.axis, t);
         if (st === 'red' || (st === 'yellow' && rem > 12)) stop = Math.min(stop, rem - 2);
       } else if (n.out.length > 2 && n.kind !== 'round' && rem < 30) vmax = Math.min(vmax, c.siren ? 26 : 18);
-      if (rem < 34 && ctx.crossing.has(n.id)) stop = Math.min(stop, rem - 2);
+      if (rem < 34 && ctx.crossing.has(n.id) && !rk) stop = Math.min(stop, rem - 2);
       if (c.target && c.target.lane === L) stop = Math.min(stop, c.target.s - c.s); // chegou ao local da ocorrência
     } else vmax = Math.min(vmax, c.lane.to.kind === 'round' ? 24 : 26);
     const look = 28 + c.v * 1.1;
-    const d = c.ghost > 0 ? Infinity : ahead(c, obstacles, look);
+    const d = c.ghost > 0 || rk ? Infinity : ahead(c, obstacles, look);
     if (d < Infinity) stop = Math.min(stop, d);
     const desired = Math.min(vmax, stop < Infinity ? Math.sqrt(Math.max(0, 2 * 70 * Math.max(0, stop))) : vmax);
     if (c.v < desired) c.v = Math.min(desired, c.v + 26 * dt); else c.v = Math.max(desired, c.v - 90 * dt);

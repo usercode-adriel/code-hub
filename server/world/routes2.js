@@ -20,6 +20,7 @@ import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { driveState, park, infraction, damage, tow, incident } from './drive.js';
 import { construtoraView, saveReforma } from './construtora.js';
+import { flightBoard } from './flights.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
@@ -466,6 +467,8 @@ router.post('/mundo/cidade2d/infracao', (req, res) => { const ctx = ctxOf(req); 
 router.post('/mundo/cidade2d/dano', (req, res) => { const w = world(req.user.id); run(res, () => damage(w, req.body || {})); });
 router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); run(res, () => tow(ctx, req.body || {})); });
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
+// painel de voos do Aeroporto Nexus
+router.get('/mundo/voos', (req, res) => { const w = world(req.user.id); res.json(flightBoard(w)); });
 // Construtora Nexus e modo Reforma
 router.get('/mundo/construtora', (req, res) => { const w = world(req.user.id); res.json(construtoraView(w)); });
 router.post('/mundo/cidade2d/reforma', (req, res) => { const w = world(req.user.id); run(res, () => saveReforma(w, req.body || {})); });

@@ -27,7 +27,8 @@ export const AIRCRAFT = {
   'air-mono-azul': { name: 'Monomotor Azulão', base: 158000, seats: 4, tier: 'monomotor', sprite: 'mono-azul', air: { thrust: 48, vmax: 240, vstall: 98, turn: 0.9 } },
   'air-jato-branco': { name: 'Jato Executivo Nexus', base: 690000, seats: 8, tier: 'jato', sprite: 'jato-branco', air: { thrust: 80, vmax: 420, vstall: 140, turn: 0.7 } },
   // folha "Aviação — variações & danificados" (cada uma tem sprite inteiro e danificado)
-  'aero-biplano': { name: 'Biplano Clássico Sol', base: 98000, seats: 2, tier: 'biplano', sprite: 'av-biplano', L: 40, air: { thrust: 40, vmax: 190, vstall: 78, turn: 1.15 } },
+  // fora de venda (removido do aeroporto); continua aqui só para quem já tinha comprado
+  'aero-biplano': { name: 'Biplano Clássico Sol', base: 98000, seats: 2, tier: 'biplano', sprite: 'av-biplano', L: 40, retired: true, air: { thrust: 40, vmax: 190, vstall: 78, turn: 1.15 } },
   'aero-mono-branco': { name: 'Monomotor Gaivota', base: 138000, seats: 2, tier: 'monomotor', sprite: 'av-mono-branco', L: 40, air: { thrust: 47, vmax: 235, vstall: 92, turn: 1 } },
   'aero-mono-azul': { name: 'Monomotor Turbo Anil', base: 172000, seats: 4, tier: 'monomotor', sprite: 'av-mono-azul', L: 42, air: { thrust: 52, vmax: 255, vstall: 96, turn: 0.95 } },
   'aero-jato-vermelho': { name: 'Jato Acrobático Rubi', base: 540000, seats: 2, tier: 'jato', sprite: 'av-jato-vermelho', L: 46, air: { thrust: 88, vmax: 430, vstall: 128, turn: 1.05 } },
@@ -96,12 +97,17 @@ onUpgrade(16, (ctx) => {
   const node = freeNode(w, 'tech', { used }); const [x, y] = pos(w, node);
   w.city.places.push({ id: uid(), name: 'Hangar Nexus Aviação', kind: 'aviacao', sub: 'Aeronaves e escola de voo', districtId: districtOfNode(w, node) || 'tech', node, x, y, address: address(w, node), hours: [6, 22],
     companyId: null, status: 'aberto', hidden: false, security: 0.6, reputation: 4.4, ratings: [], banned: [], ledger: [], createdAt: ctx.at.toISOString(),
-    catalog: Object.keys(AIRCRAFT).map((k) => ({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) })) });
+    catalog: Object.keys(AIRCRAFT).filter((k) => !AIRCRAFT[k].retired).map((k) => ({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) })) });
 });
 // aeronaves novas (folha de aviação) chegam ao hangar que já existe
 onUpgrade(17, (ctx) => {
   const w = ctx.w; if (!w.city) return;
   const shop = places(w).find((p) => p.name === 'Hangar Nexus Aviação'); if (!shop) return;
   shop.catalog ??= [];
-  for (const k of Object.keys(AIRCRAFT)) if (!shop.catalog.some((x) => x.key === k)) shop.catalog.push({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) });
+  for (const k of Object.keys(AIRCRAFT)) if (!AIRCRAFT[k].retired && !shop.catalog.some((x) => x.key === k)) shop.catalog.push({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) });
+// biplano saiu do aeroporto: some da vitrine do hangar
+onUpgrade(18, (ctx) => {
+  const shop = ctx.w.city && places(ctx.w).find((p) => p.name === 'Hangar Nexus Aviação'); if (!shop?.catalog) return;
+  shop.catalog = shop.catalog.filter((x) => !AIRCRAFT[x.key]?.retired);
+});
 });

@@ -30,7 +30,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
   function create(type, x, y, info = {}) {
     const inc = { id: Math.random().toString(36).slice(2), type, x, y, t: 0, units: [], injured: info.injured || [], fire: info.fire || 0, culprit: info.culprit || false, done: false, ...info };
     list.push(inc);
-    gather(P, x, y, type === 'queda-aviao' ? 260 : 170);
+    gather(P, x, y, type === 'queda-aviao' ? 260 : info.npc ? 240 : 170); // grupos de curiosos se juntam em volta
     if (inc.injured.length || type === 'queda-aviao') dispatch('ambulancia', inc);
     dispatch('policia', inc);
     if (inc.fire) dispatch('bombeiros', inc);

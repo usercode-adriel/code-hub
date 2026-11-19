@@ -998,10 +998,11 @@ export async function socialStep(user) {
 
 // ---------------------------------------------------------------- usado pelo mundo vivo
 // Post de uma pessoa causado por um acontecimento do mundo (com o horário do acontecimento).
-export function worldPost(ctx, p, text, { kind = 'texto', photo = null, rumorId = null, refs = null } = {}) {
+export function worldPost(ctx, p, text, { kind = 'texto', photo = null, image = null, rumorId = null, refs = null } = {}) {
   const s = net(ctx.uid);
   if (!p || !s.personas.includes(p) || !String(text || '').trim()) return null;
-  const post = makePost(s, p, text, { at: ctx.at.toISOString(), kind });
+  // image: foto pronta (ex.: cena em pixel do mapa), sem passar pelo gerador de imagens
+  const post = makePost(s, p, text, { at: ctx.at.toISOString(), kind: image ? 'foto' : kind, image });
   if (rumorId) post.rumorId = rumorId;
   if (refs) post.refs = refs;
   if (photo && ctx.live && imagesOn(s) && chance(0.6)) queuePostImage(ctx.uid, post, photo);

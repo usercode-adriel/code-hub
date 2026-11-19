@@ -6,7 +6,7 @@ export const SCHEDULE = [
   { at: 6.5, kind: 'chegada', spr: 'av-airliner', L: 96, label: 'Voo NX 101 pousando' },
   { at: 8, kind: 'partida', spr: 'av-airliner', L: 96, label: 'Voo NX 102 decolando' },
   { at: 9.25, kind: 'patrulha', spr: 'av-heli-policia', L: 48, heli: true, label: 'Helicóptero da polícia em patrulha' },
-  { at: 10.5, kind: 'sobrevoo', spr: 'av-biplano', L: 40, label: 'Biplano de passeio sobre a orla' },
+  { at: 10.5, kind: 'sobrevoo', spr: 'av-mono-branco', L: 40, label: 'Monomotor de passeio sobre a orla' },
   { at: 12, kind: 'chegada', spr: 'av-executivo', L: 60, label: 'Jato executivo pousando' },
   { at: 14, kind: 'esquadrilha', spr: 'av-jato-vermelho', L: 46, label: 'Esquadrilha de jatos sobre a cidade' },
   { at: 15.5, kind: 'partida', spr: 'av-executivo', L: 60, label: 'Jato executivo decolando' },
@@ -32,15 +32,25 @@ function route(kind, b, R) {
   return [[from[0], from[1], h, v], [cx + (R() - 0.5) * 800, cy + (R() - 0.5) * 600, h, v], [to[0], to[1], h, v]];
 }
 
-export function createSky(world) {
-  const S = { flights: [], parked: [], lastHour: null, banner: null, seq: 0 };
+// portas do terminal (frente do prédio, no pátio) e a escada do avião estacionado
+const DOORS = [[3060, 1118], [3150, 1118], [3240, 1118], [3330, 1118], [3420, 1118]];
+const STAIR = [PARK[0] - 16, PARK[1] + 22];
+
+// chrFor(pessoa) → sprite animado do passageiro (o mapa passa a mesma escolha dos pedestres)
+export function createSky(world, { chrFor = () => null } = {}) {
+  const S = { flights: [], parked: [], lastHour: null, banner: null, seq: 0, walkers: [], board: null, boarded: new Set() };
+  // agenda do servidor (número do voo, cidade, passageiros) para o horário de um voo do mapa
+  const infoOf = (at) => S.board?.flights.find((f) => !f.tomorrow && f.at === at) || null;
+  const label = (sl) => { const f = infoOf(sl.at); if (!f) return sl.label; return f.kind === 'partida' ? `Voo ${f.num} decolando rumo a ${f.city}` : `Voo ${f.num} pousando, vindo de ${f.city}`; };
+  // passageiro andando entre o terminal e o avião (some ao chegar)
+  const walker = (p, from, to, i) => S.walkers.push({ name: p?.name || null, real: Boolean(p?.id), spr: chrFor(p || { id: `vis${S.seq++}` }), x: from[0] + (Math.random() - 0.5) * 8, y: from[1], to: [to[0] + (Math.random() - 0.5) * 6, to[1]], v: 8 + Math.random() * 3, a: 0, delay: i * (1.4 + Math.random()), phase: Math.random() * 6 });
   const R = Math.random;
   S.spawn = (sl) => {
     const pts = route(sl.kind, world.bounds || { x0: 0, y0: 0, x1: world.W, y1: world.H }, R);
-    const mk = (dx, dy, lead = 0) => ({ id: `sky${S.seq++}`, kind: 'aviao', ai: true, sprite: sl.spr, L: sl.L, W: sl.L, heli: Boolean(sl.heli), pts: pts.map((p) => [p[0] + dx, p[1] + dy, p[2], p[3]]), i: 0, t: 0, x: pts[0][0] + dx, y: pts[0][1] + dy, h: pts[0][2], v: pts[0][3], a: 0, ground: pts[0][2] <= 0, smoke: sl.kind === 'esquadrilha', lead, health: 100 });
+    const mk = (dx, dy, lead = 0) => ({ slotAt: sl.at, id: `sky${S.seq++}`, kind: 'aviao', ai: true, sprite: sl.spr, L: sl.L, W: sl.L, heli: Boolean(sl.heli), pts: pts.map((p) => [p[0] + dx, p[1] + dy, p[2], p[3]]), i: 0, t: 0, x: pts[0][0] + dx, y: pts[0][1] + dy, h: pts[0][2], v: pts[0][3], a: 0, ground: pts[0][2] <= 0, smoke: sl.kind === 'esquadrilha', lead, health: 100 });
     if (sl.kind === 'partida') { const i = S.parked.findIndex((p) => p.sprite === sl.spr); if (i >= 0) S.parked.splice(i, 1); }
     if (sl.kind === 'esquadrilha') { S.flights.push(mk(0, 0), mk(-60, -50, 1), mk(-60, 50, 1)); } else S.flights.push(mk(0, 0));
-    S.banner = { text: sl.label, until: performance.now() + 9000 };
+    S.banner = { text: label(sl), until: performance.now() + 9000 };
   };
   // aviões parados no pátio quando o mapa abre (alguns já "chegaram")
   S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-airliner', L: 96, W: 96, x: PARK[0] + 150, y: PARK[1] + 130, a: -Math.PI / 2, h: 0, ground: true, health: 100 });
@@ -49,6 +59,24 @@ export function createSky(world) {
   S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-heli-policia', L: 48, W: 48, x: 2960, y: 870, a: -Math.PI / 2, h: 0, ground: true, heli: true, health: 100 });
 
   S.step = (dt, hour) => {
+    // embarque: entre 27 e 5 minutos antes da partida, passageiros saem do terminal até a escada do avião
+    for (const sl of SCHEDULE) {
+      if (sl.kind !== 'partida') continue;
+      const h = (sl.at - hour + 24) % 24;
+      if (h > 0.45 || h < 0.08 || S.boarded.has(sl.at)) { if (h > 1) S.boarded.delete(sl.at); continue; }
+      S.boarded.add(sl.at);
+      if (!S.parked.some((p) => p.sprite === sl.spr && Math.hypot(p.x - PARK[0], p.y - PARK[1]) < 40)) S.parked.push({ kind: 'aviao', ai: true, sprite: sl.spr, L: sl.L, W: sl.L, x: PARK[0], y: PARK[1], a: -Math.PI / 2, h: 0, ground: true, health: 100 });
+      const info = infoOf(sl.at); const pax = info?.pax || [];
+      const n = Math.min(14, pax.length + 5 + Math.floor(Math.random() * 6));
+      for (let i = 0; i < n; i++) walker(pax[i] || null, DOORS[i % DOORS.length], STAIR, i * 1.6);
+      S.banner = { text: info ? `Embarque do voo ${info.num} para ${info.city} · ${info.gate}` : 'Embarque no pátio', until: performance.now() + 9000 };
+    }
+    for (let i = S.walkers.length - 1; i >= 0; i--) {
+      const w = S.walkers[i]; if (w.delay > 0) { w.delay -= dt; continue; }
+      const dx = w.to[0] - w.x; const dy = w.to[1] - w.y; const d = Math.hypot(dx, dy); const st = w.v * dt;
+      if (d <= st) { S.walkers.splice(i, 1); continue; }
+      w.x += (dx / d) * st; w.y += (dy / d) * st; w.a = Math.atan2(dy, dx); w.t = (w.t || 0) + st;
+    }
     // horários: dispara quando o relógio da cidade passa por um horário marcado
     if (S.lastHour != null) {
       const crossed = (t) => (S.lastHour <= hour ? t > S.lastHour && t <= hour : t > S.lastHour || t <= hour);
@@ -59,7 +87,14 @@ export function createSky(world) {
       const f = S.flights[k]; const b = f.pts[f.i + 1];
       if (!b) {
         S.flights.splice(k, 1);
-        if (f.h <= 1 && !f.lead) S.parked.push({ ...f, pts: null, v: 0, ground: true, a: -Math.PI / 2 }); // chegou: estaciona
+        if (f.h <= 1 && !f.lead) {
+          S.parked.push({ ...f, pts: null, v: 0, ground: true, a: -Math.PI / 2 }); // chegou: estaciona
+          // desembarque: passageiros descem a escada e vão para o terminal
+          const info = infoOf(f.slotAt); const pax = info?.pax || [];
+          const n = Math.min(12, pax.length + 4 + Math.floor(Math.random() * 5));
+          for (let i = 0; i < n; i++) walker(pax[i] || null, STAIR, DOORS[i % DOORS.length], i);
+          S.banner = { text: info ? `Desembarque do voo ${info.num} (${info.city}) no ${info.gate}` : 'Desembarque no pátio', until: performance.now() + 8000 };
+        }
         continue;
       }
       const a = f.pts[f.i]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;

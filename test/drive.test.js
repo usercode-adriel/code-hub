@@ -120,3 +120,18 @@ test('aviação: aeronaves novas no hangar e física de decolagem, helicóptero,
   let land = null; for (let k = 0; k < 900 && !land; k++) { const e = stepPlane(h, { lever: -0.35 }, world, 1 / 30); if (e?.landed || e?.damage || e?.crash) land = e; }
   assert.deepEqual(land, { landed: true });
 });
+
+test('aeroporto e trânsito: agenda de voos com moradores, sem repetir passageiro; batida vira notícia', async () => {
+  const Fl = await import('../server/world/flights.js');
+  const b = Fl.flightBoard(T.w);
+  assert.ok(b.flights.length >= 5 && b.flights.every((f) => f.num && f.city && f.status));
+  const pax = b.flights.filter((f) => f.kind === 'partida').flatMap((f) => f.pax.map((p) => p.id));
+  assert.equal(new Set(pax).size, pax.length, 'cada morador em um voo só');
+  const V = await import('../server/world/vehicles.js');
+  assert.equal(V.AIRCRAFT['aero-biplano'].retired, true, 'biplano fora do aeroporto');
+  const p = (await import('../server/world/agents.js')).residents(T.w)[3];
+  const r = D.incident(T.ctx(), { tipo: 'acidente', personaId: p.id, regiao: 'Centro', culpa: false, npc: true });
+  assert.equal(r.ok, true);
+  assert.ok(p.agent.injuredUntil > new Date().toISOString(), 'ferido vai para o hospital');
+  assert.ok((T.w.events || []).some((e) => e.title.includes(p.name) && e.title.includes('batida')), 'vira notícia');
+});

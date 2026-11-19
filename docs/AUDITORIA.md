@@ -103,6 +103,12 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Jogador anda nas 4 direções com o passo pela distância percorrida; botão de visual no mapa (salvo no aparelho)
 - [x] Personagem padrão do jogador (`tools/drive/heroi.py`): parado e caminhada nas 4 direções + corrida para os lados; apertar 2× a direção (ou tocar 2× no joystick) corre com o dobro da velocidade
 
+### Aeroporto vivo e acidentes de trânsito
+- [x] Agenda de voos (`server/world/flights.js`, `GET /mundo/voos`): número, destino/origem, portão, status e moradores de verdade como passageiros; embarque com posts, decolagem (viajam alguns dias), chegada (voltam), notícias; painel ✈ no mapa e aviso do próximo voo no aeroporto
+- [x] No mapa: passageiros caminham do terminal até a escada do avião no embarque e descem no desembarque; biplano fora do hangar e do céu
+- [x] Acidentes entre moradores (`public/js/drive/accidents.js`): motorista distraído ignora sinal e distância; colisão real com carro (batida) e com quem atravessa fora da faixa (atropelamento); ferido fica no local até a ambulância e vai ao hospital; curiosos em volta; carros rebocados depois
+- [x] Notícia + post de testemunha com foto em pixel (cenas do mapa em `public/assets/social`)
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

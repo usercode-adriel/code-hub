@@ -837,3 +837,17 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .d2-looks i { display: block; height: 52px; background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated; }
 .d2-look { z-index: 8; }
 .d2-joy.run { border-color: #fbbf24 !important; box-shadow: 0 0 0 3px rgba(251,191,36,.35); }
+/* ---------- aeroporto: painel de voos e próximo voo ---------- */
+.d2-air { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 4; padding: 6px 14px; border-radius: 12px; background: rgba(10,13,43,.9); border: 2px solid rgba(251,191,36,.7); color: #fde68a; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.d2.edit .d2-air { display: none; }
+.d2-air:not([hidden]) ~ .d2-sky, .d2-sky:not([hidden]) + .d2-air { top: 96px; }
+.fb-card { width: min(860px, 96%); }
+.fb-t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.fb-t th { text-align: left; color: #fbbf24; font-weight: 700; padding: 6px; border-bottom: 2px solid #2c3470; font-family: monospace; text-transform: uppercase; font-size: 11px; }
+.fb-t td { padding: 7px 6px; border-bottom: 1px solid #222a66; vertical-align: middle; color: #e6e8ff; }
+.fb-t td small { display: block; color: #8b93c9; font-size: 10.5px; }
+.fb-t td i { font-style: normal; font-weight: 700; color: var(--c); border: 1px solid var(--c); border-radius: 8px; padding: 2px 7px; white-space: nowrap; }
+.fb-pax { display: flex; flex-wrap: wrap; gap: 4px; } .fb-pax span { display: inline-flex; align-items: center; gap: 3px; background: #1b2150; border-radius: 10px; padding: 1px 7px 1px 1px; font-size: 11px; }
+.fb-pax img { width: 18px; height: 18px; border-radius: 50%; image-rendering: pixelated; }
+.d2-fb { z-index: 8; }
+@media (max-width: 700px) { .fb-t th:nth-child(4), .fb-t td:nth-child(4) { display: none; } .fb-t { font-size: 11px; } }

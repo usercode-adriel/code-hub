@@ -83,6 +83,11 @@ export function stepPeds(P, world, dt, t, cars, view) {
       p.face = p.lookAt[0] < p.x ? -1 : 1;
       continue;
     }
+    if (p.state === 'jay') { // atravessando fora da faixa (sem olhar)
+      const j = p.jay; const dx = j.to[0] - p.x; const dy = j.to[1] - p.y; const d = Math.hypot(dx, dy); const st = j.v * dt;
+      if (d <= st) { p.state = 'walk'; p.jay = null; place(p); } else { p.x += (dx / d) * st; p.y += (dy / d) * st; p.a = Math.atan2(dy, dx); }
+      continue;
+    }
     if (p.pause > 0) { p.pause -= dt; continue; }
     if (p.state === 'wait' || p.state === 'cross') {
       const c = p.cross;

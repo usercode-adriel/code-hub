@@ -11,12 +11,13 @@ import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
-import { createPeds, stepPeds, gather, chrRow, CHR_KEYS } from '../drive/peds.js';
+import { createPeds, stepPeds, gather, chrRow, CHR_KEYS, spriteFor } from '../drive/peds.js';
 import { CHR } from '../drive/chrmeta.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
 import { createPlane, stepPlane, knots, feet, vRotate } from '../drive/plane.js';
 import { createSky } from '../drive/sky.js';
 import { createIncidents } from '../drive/incidents.js';
+import { createAccidents } from '../drive/accidents.js';
 import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
 import { cityNow, refreshStatus } from '../chrome.js';
@@ -31,8 +32,8 @@ export default async function render(el, params = new URLSearchParams()) {
     <canvas class="d2-cv" aria-label="Mapa jogável de Nexus City"></canvas>
     <div class="d2-load" id="d2Load"><div class="skeleton" style="width:220px;height:14px;border-radius:7px"></div><small>Montando Nexus City…</small></div>
     <div class="d2-top"><div class="d2-where"><b id="d2Reg">Nexus City</b><small id="d2Time">--:--</small></div>
-      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="look" title="Escolher o visual do seu personagem" aria-label="Visual do personagem">${icon('user', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
-    <div class="d2-wanted" id="d2Want" hidden></div><div class="d2-sky" id="d2Sky" hidden></div>
+      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="voos" title="Painel de voos do Aeroporto Nexus" aria-label="Voos">✈</button><button data-z="look" title="Escolher o visual do seu personagem" aria-label="Visual do personagem">${icon('user', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
+    <div class="d2-wanted" id="d2Want" hidden></div><div class="d2-sky" id="d2Sky" hidden></div><button class="d2-air" id="d2Air" hidden></button>
     <canvas class="d2-mini" id="d2Mini" width="192" height="132" aria-label="Minimapa"></canvas>
     <div class="d2-dash" id="d2Dash" hidden></div>
     <div class="d2-prompt" id="d2Prompt" hidden></div>
@@ -95,20 +96,41 @@ export default async function render(el, params = new URLSearchParams()) {
   const cam = createCamera(world); cam.z = touch ? 2.6 : 2.4; cam.x = cam.tx = me.x; cam.y = cam.ty = me.y;
   const particles = [];
   const notify = (t, m, k = 'info') => toast(t, m, k);
-  const report = (body) => api.post('/mundo/cidade2d/ocorrencia', { ...body, regiao: regionAt(me.car || me.plane || me) }).catch(() => {});
-  const SKY = createSky(world);
+  const report = (body) => api.post('/mundo/cidade2d/ocorrencia', { regiao: regionAt(me.car || me.plane || me), ...body }).catch(() => {});
+  const SKY = createSky(world, { chrFor: (p) => spriteFor(p, assets.roles, p.id) });
+  // agenda de voos do servidor (painel, nomes dos passageiros); atualiza a cada 30 s
+  const loadBoard = () => api.get('/mundo/voos').then((b) => { SKY.board = b; }).catch(() => {});
+  loadBoard(); const boardTimer = setInterval(loadBoard, 30000);
+  let ACC = null; // acidentes entre moradores (criado depois das ocorrências)
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
+  ACC = createAccidents({ T, P, INC, report, regionAt: (p) => regionAt(p), notify });
 
   // ---------------- entrada
   const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
   input.touchUI = touch;
-  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } if (z === 'look') { pickLook(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
+  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } if (z === 'look') { pickLook(); return; } if (z === 'voos') { flightPanel(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
   // modo Reforma: refaz a cidade com a reforma (geração + edições) e descarta só os blocos afetados
   function rebuildCity(rf, rect, full) {
     const t0 = performance.now();
     Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
+  }
+  // painel de voos (partidas e chegadas do dia, status, portão e passageiros conhecidos)
+  const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+  const ST_COL = { Programado: '#94a3b8', 'Check-in aberto': '#38bdf8', Embarque: '#fbbf24', 'Portas fechadas': '#fb923c', Decolou: '#2fd27a', 'Em voo': '#2fd27a', Previsto: '#94a3b8', 'Em aproximação': '#fbbf24', Pousou: '#2fd27a', Desembarcado: '#64748b' };
+  async function flightPanel() {
+    let m = stage.querySelector('.d2-fb'); if (m) { m.remove(); return; }
+    await loadBoard(); const b = SKY.board; if (!b) { toast('Painel de voos', 'Sem conexão com o aeroporto agora.', 'info'); return; }
+    m = document.createElement('div'); m.className = 'd2-fb ed-modal';
+    const row = (f) => `<tr><td><b>${esc(f.num)}</b><small>${esc(f.plane)}</small></td><td>${f.kind === 'partida' ? '🛫' : '🛬'} ${esc(f.city)}</td><td>${hhmm(f.at)}${f.tomorrow ? '<small>amanhã</small>' : ''}</td><td>${esc(f.gate)}</td><td><i style="--c:${ST_COL[f.status] || '#94a3b8'}">${esc(f.status)}</i></td>
+      <td class="fb-pax">${f.pax.map((p) => `<span title="${esc(p.name)}">${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : ''}${esc(p.name.split(' ')[0])}</span>`).join('') || `<small>${f.visitors} passageiros</small>`}</td></tr>`;
+    m.innerHTML = `<div class="ed-card fb-card"><h3>✈ Aeroporto Internacional Nexus</h3><p>Agora: ${hhmm(b.hour)} · moradores com nome estão nos voos marcados; o embarque começa ~30 min antes no pátio.</p>
+      <table class="fb-t"><thead><tr><th>Voo</th><th>Destino / origem</th><th>Hora</th><th>Portão</th><th>Status</th><th>Passageiros</th></tr></thead><tbody>${b.flights.map(row).join('')}</tbody></table>
+      <div class="ed-row"><button class="cx-btn ghost" data-go>Ir ao aeroporto</button><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    stage.appendChild(m);
+    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-go]').onclick = () => { m.remove(); cam.follow = false; cam.x = cam.tx = 3300; cam.y = cam.ty = 960; cam.z = Math.max(cam.z, 2); };
   }
   // visual do jogador: escolhe um dos personagens animados (fica salvo neste aparelho)
   function pickLook() {
@@ -415,6 +437,7 @@ export default async function render(el, params = new URLSearchParams()) {
     for (const c of T.cars) if (inV(c)) items.push([c.y, 1, c]);
     for (const o of own) if (inV(o, 70) && !(o.kind === 'aviao' && !o.ground)) items.push([o.y, o.kind === 'aviao' ? 3 : 2, o]);
     for (const o of SKY.parked) if (inV(o, 90)) items.push([o.y, 3, o]);
+    for (const w of SKY.walkers) if (w.delay <= 0 && inV(w, 20)) items.push([w.y, 5, w]);
     for (const o of SKY.flights) if (o.ground && inV(o, 90)) items.push([o.y, 3, o]);
     items.push([me.y, 4, me]);
     items.sort((a, b) => a[0] - b[0]);
@@ -435,6 +458,7 @@ export default async function render(el, params = new URLSearchParams()) {
         if (hp <= 0) { const f = fxFrame('fogo', t + o.L, 1); if (f) ctx.drawImage(f, o.x - 6 + Math.cos(o.a) * o.L * 0.3, o.y - 14 + Math.sin(o.a) * o.L * 0.3, 12, 14); }
         if (night > 0.05 && o === me.car) addCarLights(lights, o);
       } else if (kind === 3) drawPlane(o);
+      else if (kind === 5) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), Math.floor(o.t / 3.2) % 4, 15); }
       else drawMe(t);
     }
     // aviões em voo por cima de tudo (com sombra no chão)
@@ -512,6 +536,11 @@ export default async function render(el, params = new URLSearchParams()) {
         <span class="d2-gauge"><em>saúde</em><i class="d2-hp"><i style="width:${hp}%;background:${hp > 60 ? '#2fd27a' : hp > 30 ? '#f7c948' : '#ff4d5e'}"></i></i></span></div>${pl.stall ? '<div class="d2-stall">ESTOL</div>' : ''}`;
     }
     if (dash !== lastDash) { lastDash = dash; const d = $('#d2Dash'); d.hidden = !dash; d.innerHTML = dash; }
+    // no aeroporto: próximo voo (toque abre o painel)
+    const air = $('#d2Air'); const inAir = regionAt(me.car || me.plane || me) === 'Aeroporto Nexus' && !ED.on && SKY.board;
+    const nx = inAir ? SKY.board.flights.find((f) => !['Desembarcado', 'Em voo'].includes(f.status)) : null;
+    const at = nx ? `✈ ${nx.num} · ${nx.kind === 'partida' ? 'para' : 'de'} ${nx.city} · ${hhmm(nx.at)} · ${nx.status}` : '';
+    if (air.dataset.t !== at) { air.dataset.t = at; air.hidden = !at; air.textContent = at; }
     const sb = $('#d2Sky'); const ban = SKY.banner && SKY.banner.until > performance.now() ? SKY.banner.text : '';
     if (sb.dataset.t !== ban) { sb.dataset.t = ban; sb.hidden = !ban; sb.textContent = ban ? `✈ ${ban}` : ''; }
     const ch = INC.chase; const wv = $('#d2Want');
@@ -558,10 +587,10 @@ export default async function render(el, params = new URLSearchParams()) {
     } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]); me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
-    const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
+    const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido' || p.state === 'jay').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
-    INC.step(dt, me); SKY.step(dt, cityNow().hour);
+    INC.step(dt, me); SKY.step(dt, cityNow().hour); ACC.step(dt, viewC);
     for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     for (let i = particles.length - 1; i >= 0; i--) if (particles[i].t > particles[i].life) particles.splice(i, 1);
     const tgtV = me.car || me.plane;
@@ -579,10 +608,11 @@ export default async function render(el, params = new URLSearchParams()) {
     towIllegal(nowMs);
   }
   raf = requestAnimationFrame(frame);
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY };
+  $('#d2Air').onclick = () => flightPanel();
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }
-  return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
+  return () => { alive = false; clearInterval(boardTimer); cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
 }
 export { canWalk, WATER, RUNWAY, gather };

@@ -9,6 +9,8 @@ import { peopleView } from './living.js';
 import { remember, genderize } from '../social.js';
 import { round2, nowIso, cap } from './util.js';
 import { reformaPublic } from './construtora.js';
+import { photo } from './flights.js';
+import { worldPost } from '../social.js';
 import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
 
 export const MAP = { v: 'v3', w: 4096, h: 2816 };
@@ -96,26 +98,33 @@ export function infraction(ctx, { tipo, kmh, limite, veiculo }) {
 // ocorrência do mapa: vira notícia/acontecimento real; moradores atropelados ficam feridos (internados) e lembram disso
 const TITLES = {
   atropelamento: (n, r, c) => `${n || 'Pedestre'} é atropelado(a)${r ? ` em ${r}` : ''}${c ? ' — motorista era o(a) jogador(a)' : ''}`,
-  acidente: (n, r) => `Acidente de trânsito${r ? ` em ${r}` : ''}`,
+  acidente: (n, r) => (n ? `${n} se fere em batida de carros${r ? ` em ${r}` : ''}` : `Acidente de trânsito${r ? ` em ${r}` : ''}`),
   'queda-aviao': (n, r) => `Avião cai${r ? ` em ${r}` : ''}: bombeiros e ambulâncias no local`,
   'perseguicao-presa': () => 'Polícia encerra perseguição e aborda motorista',
   'perseguicao-fuga': () => 'Motorista despista a polícia após perseguição',
 };
-export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo }) {
+export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc }) {
   const w = ctx.w; const u = account(w);
   if (!TITLES[tipo]) throw new BankError('Ocorrência desconhecida');
   u.mapIncidents ??= []; const today = nowIso().slice(0, 10);
-  if (u.mapIncidents.filter((x) => x.slice(0, 10) === today).length >= 20) return { ok: false, reason: 'limite' };
+  if (u.mapIncidents.filter((x) => x.slice(0, 10) === today).length >= 40) return { ok: false, reason: 'limite' };
   u.mapIncidents.push(nowIso()); u.mapIncidents = u.mapIncidents.slice(-40);
   const p = personId(w, personaId);
   const reg = String(regiao || '').slice(0, 40);
-  if (tipo === 'atropelamento' && p) {
+  if ((tipo === 'atropelamento' || tipo === 'acidente') && p) {
     p.agent.injuredUntil = new Date(Date.now() + 2 * 3600000).toISOString();
     p.mood = { emotion: 'assustada', intensity: 0.8, reason: 'foi atropelada(o) e está no hospital' };
-    try { remember(p, genderize(p, `Fui atropelada(o)${reg ? ` em ${reg}` : ''}${culpa ? ' por um carro dirigido por quem eu conheço da cidade' : ''}. Fui levada(o) ao Hospital Nexus.`)); } catch { /* sem memória */ }
+    try { remember(p, genderize(p, tipo === 'acidente' ? `Sofri uma batida de carro${reg ? ` em ${reg}` : ''}. Fui levada(o) ao Hospital Nexus.` : `Fui atropelada(o)${reg ? ` em ${reg}` : ''}${culpa ? ' por um carro dirigido por quem eu conheço da cidade' : ''}. Fui levada(o) ao Hospital Nexus.`)); } catch { /* sem memória */ }
     if (culpa) bumpUser(ctx, p, -12, { trust: -10, note: 'Me atropelou.' });
   }
   const imp = tipo === 'queda-aviao' ? 4 : tipo === 'atropelamento' ? 3 : 2;
+  // nas redes: uma testemunha posta a foto do local (cena em pixel do mapa)
+  if (['atropelamento', 'acidente', 'queda-aviao'].includes(tipo)) {
+    const wit = residents(w).filter((x) => x.id !== p?.id && x.agent?.status === 'ativo');
+    const who = wit[Math.floor(Math.random() * wit.length)];
+    const what = tipo === 'atropelamento' ? `Acabei de ver um atropelamento${reg ? ` em ${reg}` : ''} 😰 a ambulância já tá chegando` : tipo === 'acidente' ? `Batida feia${reg ? ` em ${reg}` : ''} agora há pouco 🚗💥 juntou gente e a ambulância veio` : `Um avião caiu${reg ? ` perto de ${reg}` : ''}!! 😱 bombeiros no local`;
+    if (who) try { worldPost(ctx, who, genderize(who, `${what}${p ? `. Força, ${p.name.split(' ')[0]}! 🙏` : ''}`), { image: photo('acidente') }); } catch { /* sem rede */ }
+  }
   record(ctx, { type: `mapa-${tipo}`, cat: 'seguranca', title: TITLES[tipo](p?.name || nome, reg, culpa), text: veiculo ? `Veículo envolvido: ${String(veiculo).slice(0, 40)}.` : '', actors: [...(culpa ? ['me'] : []), ...(p ? [p.id] : [])], importance: imp });
   services.live?.(w, { kind: tipo === 'atropelamento' || tipo === 'queda-aviao' ? 'atendimento' : 'ocorrencia', personaId: p?.id || (culpa ? 'me' : null), name: p?.name || (culpa ? 'Você' : null), text: TITLES[tipo](p?.name || nome, reg, false) });
   return { ok: true };
