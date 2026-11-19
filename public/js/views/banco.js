@@ -2,14 +2,17 @@
 // Senha de 4 dígitos para operações sensíveis (só a versão criptografada fica no servidor).
 import { shell, bindEntities, face, nx, api, esc, icon, toast, modal, withPin, createPin, opId, timeAgo, confirmDialog } from '../world/wui.js';
 import { formModal } from '../ui.js';
+import { livePanel } from '../world/live.js';
+import { myAvatar } from '../chrome.js';
 
-const TABS = [['inicio', 'Início', 'wallet'], ['emprestimos', 'Empréstimos', 'trending'], ['pendencias', 'Pendências', 'bell'], ['cartao', 'Cartão', 'layers'], ['cofrinhos', 'Cofrinhos', 'star'], ['amigos', 'Amigos e vaquinha', 'users'], ['extrato', 'Extrato', 'list'], ['seguranca', 'Segurança', 'shield']];
+const TABS = [['inicio', 'Conta', 'wallet'], ['emprestimos', 'Empréstimos', 'trending'], ['pendencias', 'Pendências', 'bell'], ['cartao', 'Cartão', 'layers'], ['cofrinhos', 'Cofrinhos', 'star'], ['amigos', 'Amigos e vaquinha', 'users'], ['extrato', 'Extrato', 'list'], ['seguranca', 'Segurança', 'shield']];
 const dt = (s) => new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 const ST = { aberta: 'Em aberto', paga: 'Paga', atrasada: 'Atrasada', ativo: 'Em dia', quitado: 'Quitado', inadimplente: 'Inadimplente', renegociado: 'Renegociado', aberto: 'Em aberto', pago: 'Pago', calote: 'Não pago', ativa: 'Ativa', liberada: 'Liberada', 'em-analise': 'Em análise', bloqueada: 'Bloqueada pela polícia', encerrada: 'Encerrada' };
 
 export default async function render(el, parts) {
   const tab = TABS.some(([k]) => k === parts[0]) ? parts[0] : 'inicio';
   const body = shell(el, 'banco');
+  let stopLive = null;
   body.innerHTML = `<div class="bk"><nav class="bq-tabs">${TABS.map(([k, l, ic]) => `<a href="#/banco/${k}" class="${k === tab ? 'on' : ''}">${icon(ic, 14)} ${l}</a>`).join('')}</nav><div id="bkBody"><div class="skeleton" style="height:260px"></div></div></div>`;
   const host = body.querySelector('#bkBody');
   bindEntities(host);
@@ -18,7 +21,7 @@ export default async function render(el, parts) {
   const act = async (fn, okTitle, okMsg) => { try { const r = await fn(); if (r !== null && r !== undefined) { toast(okTitle, typeof okMsg === 'function' ? okMsg(r) : okMsg || '', 'success'); await reload(); } return r; } catch (err) { fail(err); return null; } };
 
   function paint(b) {
-    if (!b.hasPin && tab !== 'seguranca') {
+    if (!b.hasPin && !['seguranca', 'inicio'].includes(tab)) {
       host.innerHTML = `<div class="w-panel bq-setup">${icon('shield', 34)}<h2>Crie sua senha bancária</h2><p class="muted">Ela protege compras, transferências, saques e empréstimos. São 4 números, e só guardamos uma versão criptografada.</p><button class="btn primary" id="bkPin">Criar senha agora</button></div>`;
       host.querySelector('#bkPin').onclick = async () => { if (await createPin()) reload(); };
       return;
@@ -26,6 +29,7 @@ export default async function render(el, parts) {
     const views = { inicio, emprestimos, pendencias, cartao, cofrinhos, amigos, extrato, seguranca };
     host.innerHTML = views[tab](b);
     bind(b);
+    if (tab === 'inicio') mountManager(b);
   }
 
   // ------------------------------------------------ telas
@@ -35,26 +39,69 @@ export default async function render(el, parts) {
     return `<div class="bq-gauge"><svg viewBox="0 0 120 70"><path d="M8,64 A52,52 0 0 1 112,64" fill="none" stroke="var(--bg-card-2)" stroke-width="10" stroke-linecap="round"/><path d="M8,64 A52,52 0 0 1 112,64" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(len * a).toFixed(1)} ${len.toFixed(1)}"/></svg>
       <b>${b.score}</b><small>${esc(b.band.label)}</small></div>`;
   }
+  // Início do banco (layout da referência): gerente de IA com balão de fala, ações, chat, LIVE do banco e cartão da conta
   function inicio(b) {
-    const open = b.contracts.filter((c) => ['ativo', 'inadimplente'].includes(c.status));
-    const pend = b.debts.filter((d) => d.status !== 'paga').length + (b.card?.bills || []).filter((x) => x.status !== 'paga').length + open.reduce((s, c) => s + c.schedule.filter((i) => i.status === 'atrasada').length, 0);
-    return `<div class="bq-grid">
-      <section class="bq-card w-panel"><div class="bq-brand">${icon('wallet', 16)} Banco Nexus</div>
-        <small>Saldo disponível</small><div class="bq-bal">${nx(b.balance)}</div>
-        <div class="bq-sub"><span>Bloqueado <b>${nx(b.blocked)}</b></span><span>Em mãos <b>${nx(b.wallet)}</b></span><span>Dívida total <b class="${b.outstanding ? 'down' : ''}">${nx(b.outstanding)}</b></span></div>
-        ${b.late ? `<div class="bq-warn">${icon('bell', 13)} Você tem pendências em atraso. Isso derruba seu score e bloqueia novo crédito. <a href="#/banco/pendencias">Ver</a></div>` : ''}
-        <div class="bq-acts"><button class="btn primary" data-a="pix">${icon('send', 14)} Pix</button><button class="btn outline" data-a="sacar">${icon('download', 14)} Sacar</button><button class="btn outline" data-a="depositar">${icon('upload', 14)} Depositar</button><a class="btn outline" href="#/banco/emprestimos">${icon('trending', 14)} Empréstimo</a></div></section>
-      <section class="w-panel bq-score"><h3>Score de crédito</h3>${scoreGauge(b)}
-        <div class="bq-kv"><span>Limite de crédito</span><b>${nx(b.limit, 0)}</b></div><div class="bq-kv"><span>Renda média/dia</span><b>${nx(b.income)}</b></div><div class="bq-kv"><span>Juros da faixa</span><b>${(b.band.rate * 100).toFixed(1)}% / ${b.periodDays} dias</b></div>
-        <details><summary>Como o score funciona</summary><ul class="bq-bands">${b.bands.map((x) => `<li class="${x.label === b.band.label ? 'on' : ''}"><b>${x.min}+</b> ${esc(x.label)} <small>limite ${x.mult}× renda semanal · ${(x.rate * 100).toFixed(0)}%</small></li>`).join('')}</ul>
-          <p class="muted">Sobe pagando em dia, quitando dívidas e mantendo renda. Cai com atrasos, inadimplência e decisões judiciais.</p></details></section>
-      <section class="w-panel"><div class="w-ph"><h3>Resumo</h3></div>
-        <div class="bq-kv"><span>Contratos ativos</span><b>${open.length}</b></div><div class="bq-kv"><span>Pendências</span><b class="${pend ? 'down' : ''}">${pend}</b></div>
-        <div class="bq-kv"><span>Cartão</span><b>${b.card ? `final ${esc(b.card.last4)} · ${esc(b.card.status)}` : 'não solicitado'}</b></div><div class="bq-kv"><span>Cofrinhos</span><b>${nx(b.savings.reduce((s, x) => s + x.balance, 0))}</b></div>
-        ${b.blockedItems?.length ? `<h5>Valores bloqueados</h5>${b.blockedItems.map((x) => `<div class="bq-kv"><span>${esc(x.reason)}</span><b>${nx(x.amount)}</b></div>`).join('')}` : ''}</section>
-      <section class="w-panel bq-last"><div class="w-ph"><h3>Últimas movimentações</h3><a href="#/banco/extrato">Extrato ${icon('chevRight', 12)}</a></div>${b.history.slice(0, 8).map(row).join('') || '<p class="muted">Nenhuma movimentação ainda. Sua conta começa em 0 NXC: trabalhe, faça freelas ou venda algo.</p>'}</section>
-      <section class="w-panel"><div class="w-ph"><h3>Score recente</h3></div>${b.scoreLog.slice(0, 6).map((s) => `<div class="bq-kv"><span>${esc(s.reason)}</span><b class="${s.delta >= 0 ? 'up' : 'down'}">${s.delta > 0 ? '+' : ''}${s.delta}</b></div>`).join('') || '<p class="muted">Sem alterações ainda.</p>'}</section>
+    const pend = b.debts.filter((d) => d.status !== 'paga').length + (b.card?.bills || []).filter((x) => x.status !== 'paga').length + b.contracts.reduce((s, c) => s + c.schedule.filter((i) => i.status === 'atrasada').length, 0);
+    return `<div class="nb">
+      <section class="nb-hero cx-card">
+        <div class="nb-scene"><img class="nb-bg" src="/assets/pixel/scene-cidade.png" alt=""><img class="nb-bld" src="/assets/pixel/b-banco.png" alt="">
+          <div class="nb-logo"><b>NEXUS</b><small>BANK</small></div>
+          <div class="nb-mgr" id="nbMgr"><div class="skeleton" style="width:150px;height:150px;border-radius:20px"></div></div>
+          <div class="nb-bubble" id="nbBubble"><b>Olá!</b><p>Carregando atendimento…</p></div></div>
+        <div class="nb-acts">
+          <a class="nb-act" href="#/banco/emprestimos"><span style="--c:#f7c948">${icon('wallet', 20)}</span>Solicitar empréstimo</a>
+          <a class="nb-act" href="#/banco/pendencias"><span style="--c:#a78bfa">${icon('file', 20)}</span>Realizar pagamento${pend ? `<em>${pend}</em>` : ''}</a>
+          <button class="nb-act" data-a="saldo"><span style="--c:#fb923c">${icon('eye', 20)}</span>Ver meu saldo</button>
+          <a class="nb-act" href="#/banco/cofrinhos"><span style="--c:#2fd27a">${icon('trending', 20)}</span>Investir</a>
+          <button class="nb-act" data-a="falar"><span style="--c:#38d6f5">${icon('chat', 20)}</span>Falar com atendente</button>
+          <a class="nb-act" href="#/banco/extrato"><span style="--c:#c2c6ef">${icon('more', 20)}</span>Outros serviços</a>
+        </div>
+      </section>
+      <section class="nb-chat cx-card"><div class="nb-msgs" id="nbMsgs"></div>
+        <form class="nb-send" id="nbSend"><input name="m" placeholder="Digite sua mensagem para a gerente..." autocomplete="off" maxlength="400"><button class="cx-btn" aria-label="Enviar">${icon('send', 16)}</button></form></section>
+      <aside class="nb-live cx-card" id="nbLive"></aside>
+      <section class="nb-acc cx-card">
+        <header class="cx-card-h"><span class="cx-h-ic" style="--c:#38d6f5">${icon('wallet', 16)}</span><h3>Minha conta</h3></header>
+        <div class="nb-acc-top"><div><b class="nb-bal" id="nbBal">${nx(b.balance)}</b><small><i class="nb-n">N</i> Saldo disponível no Nexus</small>
+          ${b.wallet ? `<small>+ ${nx(b.wallet)} em mãos</small>` : ''}${b.blocked ? `<small class="down">${nx(b.blocked)} bloqueado</small>` : ''}</div>
+          <div class="nb-vcard ${b.card ? '' : 'none'}"><b>NEXUS</b><i class="nb-chip"></i><span>${b.card ? `**** ${esc(b.card.last4)}` : 'sem cartão'}</span></div></div>
+        <div class="nb-acc-acts"><button data-a="pix">${icon('send', 18)}<span>Transferir</span></button><a href="#/banco/pendencias">${icon('file', 18)}<span>Pagar</span></a>
+          <a href="#/banco/cofrinhos">${icon('trending', 18)}<span>Investir</span></a><a href="#/banco/extrato">${icon('list', 18)}<span>Extrato</span></a></div>
+        <div class="nb-score"><span>Score <b>${b.score}</b> · ${esc(b.band.label)}</span><span>Limite <b>${nx(b.limit, 0)}</b></span></div>
+        ${b.late ? `<div class="bq-warn">${icon('bell', 13)} Pendências em atraso derrubam seu score. <a href="#/banco/pendencias">Ver</a></div>` : ''}
+        ${b.hasPin ? '' : `<div class="bq-warn">${icon('shield', 13)} Crie sua senha bancária de 4 dígitos para operar. <a href="#/banco/seguranca">Criar</a></div>`}
+        <div class="nb-acc-row"><button class="cx-btn sm ghost" data-a="sacar">${icon('download', 13)} Sacar</button><button class="cx-btn sm ghost" data-a="depositar">${icon('upload', 13)} Depositar</button>${b.card ? '' : `<button class="cx-btn sm" data-a="card">${icon('layers', 13)} Pedir cartão</button>`}</div>
+      </section>
     </div>`;
+  }
+  // gerente: rosto em pixel, balão, conversa real com a pessoa que atende na agência
+  async function mountManager(b) {
+    stopLive?.(); stopLive = livePanel(host.querySelector('#nbLive'), { scope: 'banco', title: 'Live do Banco', art: '/assets/pixel/b-banco.png', n: 10, empty: 'Movimentações na agência e na sua conta aparecem aqui.' });
+    const msgs = host.querySelector('#nbMsgs'); const bubble = host.querySelector('#nbBubble');
+    let g;
+    try { g = await api.get('/mundo/banco/gerente'); } catch { return; }
+    const m = g.manager;
+    host.querySelector('#nbMgr').innerHTML = m ? `<img src="${esc(m.avatar || '')}" alt="${esc(m.name)}"><span class="nb-mgr-tag">${esc(m.name)} · Gerente</span>` : '';
+    const first = (g.greeting || '').split('!')[0];
+    bubble.innerHTML = `<b>${esc(first)}!</b><p>${esc((g.greeting || '').slice(first.length + 1).trim())}</p>`;
+    const msg = (x) => x.who === 'me' ? `<div class="nb-m me"><p>${esc(x.text)}</p><img src="${esc(myAvatar())}" alt=""><small>${new Date(x.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small></div>`
+      : `<div class="nb-m"><img src="${esc(m?.avatar || '')}" alt=""><p>${esc(x.text)}${x.action ? ` <a href="#/banco/${x.action === 'pix' ? 'inicio' : x.action}" ${x.action === 'pix' ? 'data-a="pix"' : ''}>Abrir ${icon('chevRight', 11)}</a>` : ''}</p><small>${new Date(x.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small></div>`;
+    const list = g.chat.length ? g.chat : [{ who: 'gerente', text: g.greeting, at: new Date().toISOString() }];
+    msgs.innerHTML = list.map(msg).join(''); msgs.scrollTop = msgs.scrollHeight;
+    const f = host.querySelector('#nbSend');
+    f.onsubmit = async (e) => {
+      e.preventDefault(); const t = f.m.value.trim(); if (!t) return; f.m.value = '';
+      msgs.insertAdjacentHTML('beforeend', msg({ who: 'me', text: t, at: new Date().toISOString() }) + '<div class="nb-typing"><i></i><i></i><i></i></div>'); msgs.scrollTop = msgs.scrollHeight;
+      try {
+        const r = await api.post('/mundo/banco/gerente', { mensagem: t });
+        msgs.querySelector('.nb-typing')?.remove();
+        msgs.insertAdjacentHTML('beforeend', msg({ who: 'gerente', text: r.text, action: r.action, at: new Date().toISOString() }));
+        bubble.innerHTML = `<b>${esc((m?.name || 'Gerente').split(' ')[0])}</b><p>${esc(r.text)}</p>`;
+      } catch (err) { msgs.querySelector('.nb-typing')?.remove(); fail(err); }
+      msgs.scrollTop = msgs.scrollHeight;
+    };
+    host.querySelector('[data-a="falar"]')?.addEventListener('click', () => f.m.focus());
+    host.querySelector('[data-a="saldo"]')?.addEventListener('click', () => { bubble.innerHTML = `<b>Seu saldo</b><p>${esc(nx(b.balance))} disponíveis${b.wallet ? ` e ${esc(nx(b.wallet))} em mãos` : ''}. Score ${b.score} (${esc(b.band.label)}).</p>`; });
   }
   const row = (h) => `<div class="bq-row"><span class="bq-ric ${h.amount >= 0 ? 'in' : 'out'}">${icon(h.amount >= 0 ? 'download' : 'upload', 13)}</span><div><b>${esc(h.desc)}</b><small>${new Date(h.at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}${h.type ? ` · ${esc(h.type)}` : ''}</small></div><em class="${h.amount >= 0 ? 'up' : 'down'}">${h.amount >= 0 ? '+' : ''}${nx(h.amount)}</em></div>`;
   function emprestimos(b) {
@@ -156,4 +203,5 @@ export default async function render(el, parts) {
     if (fil) fil.onchange = () => { host.querySelector('#bkHist').innerHTML = b.history.filter((h) => !fil.value || (fil.value === 'in' ? h.amount >= 0 : h.amount < 0)).map(row).join(''); };
   }
   try { await reload(); } catch (err) { host.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b></div>`; }
+  return () => stopLive?.();
 }

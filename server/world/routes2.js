@@ -1,6 +1,8 @@
 // Rotas da fase 2.2: mapa, deslocamento, banco, dinheiro entre pessoas, comércio, inventário, polícia e justiça.
 import express from 'express';
-import { world, publicEvent, CATS } from './core.js';
+import crypto from 'node:crypto';
+import { world, publicEvent, CATS, aiTake } from './core.js';
+import { geminiJSON } from '../assistant.js';
 import { saveWorld } from './store.js';
 import { people, residents, personById, agentOf, isAwake, isWorking, relType, REL_LABEL, userName, publicAgent } from './agents.js';
 import {
@@ -18,7 +20,7 @@ import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './de
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
-import { str, round2, clamp, nowIso, HOUR } from './util.js';
+import { str, round2, clamp, nowIso, HOUR, cap } from './util.js';
 import { single, removeUpload } from '../routes/uploads.js';
 
 const router = express.Router();
@@ -94,7 +96,7 @@ router.get('/mundo/ao-vivo', (req, res) => {
   const scope = String(req.query.scope || 'cidade'); const since = new Date(Date.now() - 6 * HOUR).toISOString();
   const placeId = scope.startsWith('place:') ? scope.slice(6) : null; const sc = LIVE_SCOPES[scope] || null;
   const placeKind = (id) => placeById(w, id)?.kind;
-  const face = (id) => { const p = id && personById(w, id); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : null; };
+  const face = (id) => { if (id === 'me') return { id: 'me', name: 'Você', me: true }; const p = id && personById(w, id); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : null; };
   let items = (live(w).items || []).filter((x) => x.at > since);
   if (placeId) items = items.filter((x) => x.placeId === placeId);
   else if (sc) items = items.filter((x) => sc.kinds.includes(x.kind) || (sc.placeKinds && x.placeId && sc.placeKinds.includes(placeKind(x.placeId))));
@@ -145,6 +147,66 @@ router.get('/mundo/banco', (req, res) => {
     friendLoans: loans(w).filter((l) => l.borrower === 'me').slice().reverse().map((l) => ({ ...l, lender: personById(w, l.lenderId) ? { id: l.lenderId, name: personById(w, l.lenderId).name, avatar: personById(w, l.lenderId).avatar, color: personById(w, l.lenderId).color } : { name: '—' } })),
     lentToFriends: people(w).filter((p) => (p.agent?.debtToUser || 0) > 0).map((p) => ({ id: p.id, name: p.name, amount: p.agent.debtToUser })),
     vaquinhas: (w.vaquinhas || []).slice().reverse(), motivos: VAQUINHA_MOTIVOS, baseRate: e.baseRate, inflation: e.inflation,
+  });
+});
+// movimentações do próprio jogador entram no LIVE do banco (só o que de fato aconteceu)
+const BANK_LIVE = [[/\/pix$|\/transferir$/, 'pix', 'fez uma transferência'], [/emprestimo\/contratar$/, 'emprestimo', 'contratou um empréstimo'], [/emprestimo\/pagar$/, 'pagamento', 'pagou uma parcela do empréstimo'],
+  [/emprestimo\/renegociar$/, 'emprestimo', 'renegociou uma dívida'], [/\/cartao$/, 'banco', 'recebeu o cartão Nexus'], [/fatura\//, 'pagamento', 'pagou a fatura do cartão'], [/debito\//, 'pagamento', 'pagou uma conta'], [/cofrinho$/, 'investimento', 'mexeu no cofrinho']];
+router.use('/mundo/banco', (req, res, next) => {
+  if (req.method === 'POST') res.on('finish', () => {
+    if (res.statusCode >= 400) return;
+    let hit = BANK_LIVE.find(([re]) => re.test(req.path));
+    if (/carteira$/.test(req.path)) hit = [null, req.body?.op === 'depositar' ? 'deposito' : 'saque', req.body?.op === 'depositar' ? 'depositou dinheiro' : 'sacou dinheiro'];
+    if (!hit) return;
+    const w = world(req.user.id); const ag = places(w).find((p) => p.kind === 'banco');
+    live(w).items.push({ id: crypto.randomUUID(), at: nowIso(), kind: hit[1], personaId: 'me', name: 'Você', text: `Você ${hit[2]}`, placeId: ag?.id || null, placeName: ag?.name || null });
+  });
+  next();
+});
+// gerente do Banco Nexus: uma pessoa real da cidade (quem atende na agência), que conversa sabendo da sua conta
+function bankAgency(w) { return places(w).find((p) => p.kind === 'banco' && !/filial/.test(p.name)) || places(w).find((p) => p.kind === 'banco'); }
+function managerOf(w, ag) { return ag?.sellerId ? personById(w, ag.sellerId) : null; }
+router.get('/mundo/banco/gerente', (req, res) => {
+  const w = world(req.user.id); const ag = bankAgency(w); const m = managerOf(w, ag);
+  const first = String(req.user.name || '').split(' ')[0];
+  res.json({ place: ag ? { id: ag.id, name: ag.name, open: isOpen(ag) } : null, manager: m ? { id: m.id, name: m.name, avatar: m.avatar, color: m.color, gender: m.gender } : null,
+    greeting: m ? `Olá, ${first}! Seja bem-vindo(a) ao Banco Nexus. Sou ${m.name.split(' ')[0]}, sua gerente${m.gender === 'm' ? '' : ''}. Como posso te ajudar hoje?`.replace('sua gerente', m.gender === 'm' ? 'seu gerente' : 'sua gerente') : 'Olá! Seja bem-vindo(a) ao Banco Nexus.',
+    chat: (ag?.bankChat || []).slice(-20) });
+});
+router.post('/mundo/banco/gerente', (req, res) => {
+  const ctx = ctxOf(req);
+  run(res, async () => {
+    const w = ctx.w; const ag = bankAgency(w); const m = managerOf(w, ag); const b = bankOf(w);
+    const msg = str(req.body?.mensagem, 400); if (!msg) throw new BankError('Escreva uma mensagem');
+    ag.bankChat ??= []; ag.bankChat.push({ who: 'me', text: msg, at: nowIso() });
+    const pend = (b.debts || []).filter((d) => d.status !== 'paga').length + (b.card?.bills || []).filter((x) => x.status !== 'paga').length;
+    const facts = `saldo ${round2(b.balance)} NXC, em mãos ${round2(b.wallet || 0)} NXC, score ${b.score} (${band(w).label}), limite de crédito ${round2(creditLimit(w))} NXC, dívida total ${round2(outstanding(w))} NXC, contratos ativos ${b.contracts.filter((c) => ['ativo', 'inadimplente'].includes(c.status)).length}, pendências ${pend}, cartão ${b.card ? `final ${b.card.last4}` : 'não tem'}`;
+    let text = null; let action = null;
+    const f = msg.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (/emprest|credito|dinheiro empre/.test(f)) action = 'emprestimos';
+    else if (/pix|transfer/.test(f)) action = 'pix';
+    else if (/fatura|conta|boleto|pagar|pendenc/.test(f)) action = 'pendencias';
+    else if (/cartao/.test(f)) action = 'cartao';
+    else if (/guardar|poupar|cofrinho|investi|render/.test(f)) action = 'cofrinhos';
+    else if (/extrato|movimenta/.test(f)) action = 'extrato';
+    if (m && aiTake(ctx)) {
+      try {
+        const out = await geminiJSON(`Você é ${m.name}, gerente do Banco Nexus em Nexus City (cidade simulada, moeda NXC). Jeito de falar: ${m.voice || 'cordial e profissional'}. Dados REAIS da conta do cliente ${userName(ctx)}: ${facts}.
+Responda em 1 a 3 frases, em português, de forma útil e honesta. Nunca invente aprovação: empréstimos dependem do limite e do score; explique o próximo passo no app (simular empréstimo, Pix, pagar pendências, cartão, cofrinhos). Nunca peça a senha. Mensagem: "${msg}". JSON: {"resposta":""}`, 500, 0.7);
+        text = str(out?.resposta, 500) || null;
+      } catch (err) { console.error('[banco] gerente:', err.message); }
+    }
+    if (!text) {
+      text = action === 'emprestimos' ? (creditLimit(w) > 0 ? `Seu limite hoje é de ${round2(creditLimit(w)).toLocaleString('pt-BR')} NXC com score ${b.score}. Posso simular para você: abra "Solicitar empréstimo" e escolha valor e parcelas.` : `No momento seu score (${b.score}) não libera crédito. Pagar as pendências em dia e ter renda ajuda a subir.`)
+        : action === 'pix' ? `Para enviar um Pix, toque em "Transferir" e use o @ da pessoa. Seu saldo disponível é ${round2(b.balance).toLocaleString('pt-BR')} NXC.`
+        : action === 'pendencias' ? (pend ? `Você tem ${pend} pendência(s). Recomendo pagar logo para não perder score: abra "Realizar pagamento".` : 'Você está em dia, sem contas pendentes. Parabéns!')
+        : action === 'cartao' ? (b.card ? `Seu cartão final ${b.card.last4} está ${b.card.status}. A fatura fecha a cada 7 dias.` : 'Você ainda não tem o cartão Nexus. Peça em "Cartão Nexus": a aprovação depende do seu score.')
+        : action === 'cofrinhos' ? 'Os cofrinhos rendem um pouco por dia e ajudam a juntar para metas. Abra "Investir" para criar um.'
+        : action === 'extrato' ? 'Seu extrato completo está em "Extrato", com entradas e saídas.'
+        : `Sua conta: saldo ${round2(b.balance).toLocaleString('pt-BR')} NXC, score ${b.score}. Posso ajudar com empréstimo, pagamentos, Pix, cartão ou cofrinhos.`;
+    }
+    ag.bankChat.push({ who: 'gerente', text, at: nowIso(), action }); cap(ag.bankChat, 40);
+    return { text, action, manager: m ? { id: m.id, name: m.name, avatar: m.avatar } : null };
   });
 });
 router.post('/mundo/banco/senha', (req, res) => { const w = world(req.user.id); run(res, () => { setPin(w, String(req.body?.pin || ''), req.body?.oldPin ? String(req.body.oldPin) : null); return { ok: true }; }); });
