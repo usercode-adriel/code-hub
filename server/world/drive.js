@@ -33,7 +33,7 @@ export function driveState(w) {
   const cars = all.map((c) => { const pk = u.devices.parked[c.id]; return { ...c, parked: pk && pk.map === MAP.v ? pk : null }; });
   const out = new Set(peopleView(w, { limit: 9999, horizon: 0 }).filter((p) => p.place !== 'em casa' && p.doing !== 'dormindo').map((p) => p.id));
   const people = residents(w).filter((p) => p.agent?.status === 'ativo' && !(p.agent.injuredUntil && p.agent.injuredUntil > nowIso()))
-    .sort((a, b) => out.has(b.id) - out.has(a.id)).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, out: out.has(p.id) }));
+    .sort((a, b) => out.has(b.id) - out.has(a.id)).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, gender: p.gender === 'm' ? 'm' : p.gender === 'f' ? 'f' : null, out: out.has(p.id) }));
   const today = nowIso().slice(0, 10);
   return { map: MAP, reforma: reformaPublic(w), cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance };
 }

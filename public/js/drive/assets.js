@@ -10,6 +10,9 @@ export function loadAssets() {
     for (const k of ['tiles/sidewalk', 'tiles/asphalt', 'tiles/front']) meta[k] = [16, 16];
     const deco = await (await fetch('/assets/rpg/deco/meta.json')).json();
     for (const k of Object.keys(deco)) meta[`deco/${k}`] = deco[k];
+    // personagens animados: folha 4×4 por personagem (frente, direita, costas, esquerda × 4 passos)
+    const chr = await (await fetch('/assets/rpg/chr/meta.json')).json();
+    for (const [k, v] of Object.entries(chr)) meta[`chr/${k}`] = [v.w * 4, v.h * 4];
     const img = {};
     await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = `/assets/rpg/${k}.png`; })));
     // sprites extras da Construtora: carregados só quando usados (no mapa ou na prévia do editor)

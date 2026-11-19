@@ -831,3 +831,8 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .d2.touch.flying .d2-sky { top: auto; bottom: 230px; }
 .d2.touch.flying .d2-sky { display: none !important; }
 @media (max-aspect-ratio: 1/1) { .d2.touch.flying:not(.fs) .d2-dash { top: 158px; transform: scale(.7); } }
+.d2-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px; max-height: 52vh; overflow-y: auto; }
+.d2-looks button { display: grid; justify-items: center; gap: 3px; padding: 6px 4px; border-radius: 10px; background: #1b2150; border: 2px solid #2c3470; color: #e6e8ff; font-size: 10.5px; cursor: pointer; }
+.d2-looks button.on { border-color: #fbbf24; }
+.d2-looks i { display: block; height: 52px; background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated; }
+.d2-look { z-index: 8; }

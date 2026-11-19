@@ -3,14 +3,32 @@
 // Reagem ao que acontece: curiosos se juntam perto de acidentes; atropelados ficam caídos até a ambulância.
 import { along, lightState, at, ROAD, canWalk } from './world.js';
 
-// sprite por profissão (folha de NPCs): policiais, saúde, obra; o resto usa civis variados
+// personagem por profissão (folhas animadas em public/assets/rpg/chr); quem não tem profissão marcada vira um
+// morador comum variado. O gênero do morador, quando conhecido, escolhe a versão feminina ou masculina.
+import { CHR } from './chrmeta.js';
+const FEM = new Set(['enfermeira', 'estudante-f', 'executiva', 'freira', 'idosa', 'mulher', 'empresaria', 'faxineira', 'medica', 'vendedora', 'estudante2']);
+const BY = {}; for (const [k, v] of Object.entries(CHR)) (BY[v.role] ??= []).push(k);
+const RULES = [
+  [/polic|delegad|guarda|investigador|detetive|seguran/, 'policia'], [/m[ée]dic|enfermeir|param[ée]dic|farmac|dentist|fisioterap|veterin|psic[óo]log/, 'saude'], [/bombeir/, 'bombeiro'],
+  [/pedreir|obra|eletricist|encanador|mec[âa]nic|constru|oper[áa]rio|engenheir|pintor|marceneir|carpinteir|serralheir/, 'obra'],
+  [/entreg|motoboy|carteir|motorista|taxist|caminhoneir|courier/, 'entrega'], [/faxin|limpeza|zelador|gari|diarista/, 'limpeza'],
+  [/vendedor|comerci|caixa|lojist|gar[çc]|cozinh|chef|padeir|barista|atendente|feirant|a[çc]ougu|confeiteir|recepcionist/, 'comercio'],
+  [/estudant|alun|estagi[áa]ri|universit/, 'estudante'], [/padre|freira|pastor|religios|frei|mission/, 'religioso'], [/aposentad|idos/, 'idoso'], [/turist/, 'turista'],
+  [/\bceo\b|dono|dona\b|s[óo]ci[oa]|fundador|governador|presidente|ministr|secret[áa]ri|editor|apresentador|influenc|execut|empres[áa]ri|gerent|diretor|advogad|banc[áa]ri|contador|economist|corretor|consultor|analist|programad|desenvolvedor|designer|jornalist|pol[íi]tic|prefeit|vereador|juiz|promotor|arquitet|professor|cientist|investidor/, 'executivo'],
+];
+const EVERYDAY = ['mulher', 'jovem', 'ciclista', 'estudante-mochila', 'estudante-f', 'estudante-m', 'executivo-terno', 'empresaria', 'trabalhador', 'idoso', 'idosa', 'turista', 'comerciante', 'vendedora', 'cadeirante', 'crianca', 'executiva', 'executivo2', 'estudante2', 'jovem', 'mulher'];
+export const CHR_KEYS = Object.keys(CHR);
 export function spriteFor(p, roles, seed) {
   const job = String(p.job || '').toLowerCase();
-  const of = (role) => roles.filter((r) => r[0] === role).map((r) => r[1]);
-  const pool = /polic|delegad|guarda|investigador/.test(job) ? of('policia') : /m[ée]dic|enfermeir|param[ée]dic|farmac/.test(job) ? of('saude') : /bombeir/.test(job) ? of('bombeiro') : /pedreir|obra|eletricist|encanador|mec[âa]nic|constru|oper[áa]rio/.test(job) ? of('obra') : of('civil');
+  const role = (RULES.find(([re]) => re.test(job)) || [])[1];
+  // morador com profissão que não está na lista: adulto comum (criança só entre os passantes sem profissão)
+  let pool = role && BY[role] ? BY[role] : job ? EVERYDAY.filter((k) => k !== 'crianca') : EVERYDAY;
+  if (p.gender) { const g = pool.filter((k) => (p.gender === 'f') === FEM.has(k)); if (g.length) pool = g; }
   let h = 0; for (const ch of String(p.id || seed)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return `npc/${pool[h % pool.length] || 'civil0'}`;
+  return `chr/${pool[h % pool.length]}`;
 }
+// linha da folha pela direção do movimento: 0 frente (descendo), 1 direita, 2 costas (subindo), 3 esquerda
+export const chrRow = (a) => { const dx = Math.cos(a); const dy = Math.sin(a); return Math.abs(dy) > Math.abs(dx) * 0.85 ? (dy > 0 ? 0 : 2) : dx > 0 ? 1 : 3; };
 
 export function createPeds(world, people, roles) {
   const walks = [];

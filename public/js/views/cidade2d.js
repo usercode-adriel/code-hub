@@ -11,7 +11,8 @@ import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
-import { createPeds, stepPeds, gather } from '../drive/peds.js';
+import { createPeds, stepPeds, gather, chrRow, CHR_KEYS } from '../drive/peds.js';
+import { CHR } from '../drive/chrmeta.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
 import { createPlane, stepPlane, knots, feet, vRotate } from '../drive/plane.js';
 import { createSky } from '../drive/sky.js';
@@ -30,7 +31,7 @@ export default async function render(el, params = new URLSearchParams()) {
     <canvas class="d2-cv" aria-label="Mapa jogável de Nexus City"></canvas>
     <div class="d2-load" id="d2Load"><div class="skeleton" style="width:220px;height:14px;border-radius:7px"></div><small>Montando Nexus City…</small></div>
     <div class="d2-top"><div class="d2-where"><b id="d2Reg">Nexus City</b><small id="d2Time">--:--</small></div>
-      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
+      <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="look" title="Escolher o visual do seu personagem" aria-label="Visual do personagem">${icon('user', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
     <div class="d2-wanted" id="d2Want" hidden></div><div class="d2-sky" id="d2Sky" hidden></div>
     <canvas class="d2-mini" id="d2Mini" width="192" height="132" aria-label="Minimapa"></canvas>
     <div class="d2-dash" id="d2Dash" hidden></div>
@@ -89,7 +90,7 @@ export default async function render(el, params = new URLSearchParams()) {
   school.id = 'escola'; school.health = 100; own.push(school);
   const cars = () => own.filter((o) => o.kind === 'carro');
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
-  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: `npc/civil${[...String(store.user?.name || 'eu')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 0) % 24}` };
+  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr'); if (saved && CHR[saved]) return `chr/${saved}`; const pool = ['aventureiro', 'jovem', 'mulher', 'executivo-terno', 'estudante-mochila', 'turista', 'empresaria', 'trabalhador']; return `chr/${pool[[...String(store.user?.name || 'eu')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 0) % pool.length]}`; })(), row: 0, walkT: 0 };
   [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
   const cam = createCamera(world); cam.z = touch ? 2.6 : 2.4; cam.x = cam.tx = me.x; cam.y = cam.ty = me.y;
   const particles = [];
@@ -101,13 +102,22 @@ export default async function render(el, params = new URLSearchParams()) {
   // ---------------- entrada
   const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
   input.touchUI = touch;
-  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
+  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } if (z === 'look') { pickLook(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
   // modo Reforma: refaz a cidade com a reforma (geração + edições) e descarta só os blocos afetados
   function rebuildCity(rf, rect, full) {
     const t0 = performance.now();
     Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
+  }
+  // visual do jogador: escolhe um dos personagens animados (fica salvo neste aparelho)
+  function pickLook() {
+    let m = stage.querySelector('.d2-look'); if (m) { m.remove(); return; }
+    m = document.createElement('div'); m.className = 'd2-look ed-modal';
+    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:400% 400%;aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    stage.appendChild(m);
+    m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
+    m.querySelector('[data-x]').onclick = () => m.remove();
   }
   const ED = createEditor({ stage, cam, city, world, assets, api, toast, rebuild: rebuildCity, onExit: (rf) => { reforma = { ...(reforma || {}), ...rf }; cam.follow = true; } });
   $('#d2GearB').addEventListener('pointerup', () => { if (me.mode !== 'car') return; const c = me.car; c.gear = c.gear === 'D' ? 'N' : c.gear === 'N' ? 'R' : 'D'; });
@@ -311,46 +321,34 @@ export default async function render(el, params = new URLSearchParams()) {
     return IMG[`fx/fumaca${Math.floor(t * 4) % 6}`];
   };
   const puff = (x, y, k = 1) => { if (particles.length < 120) particles.push({ x, y, t: 0, life: 1.6 + Math.random(), vx: (Math.random() - 0.5) * 4, vy: -6 - Math.random() * 4, s: (6 + Math.random() * 4) * k }); };
-  // animação de passo: a partir de cada sprite, dois quadros com uma perna à frente (a de cá sobe, a de lá desce)
-  // e o tronco levemente inclinado; ciclo: passo A → parado → passo B → parado
-  const walkCache = new Map();
-  function walkFrames(key) {
-    let f = walkCache.get(key); if (f) return f;
-    const im = IMG[key]; if (!im) return null;
-    const w = im.width; const h = im.height; const leg = Math.round(h * 0.3); const top = h - leg; const k = Math.max(1, Math.round(h * 0.045)); const half = Math.floor(w / 2);
-    const make = (left) => {
-      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-      x.drawImage(im, 0, 0, w, top, 0, left ? -1 : 0, w, top); // tronco balança 1 px
-      // perna da frente levanta (encurta), perna de trás estica para baixo
-      const [fx, bx] = left ? [0, half] : [half, 0];
-      x.drawImage(im, fx, top, half, leg, fx, top - k, half, leg);
-      x.drawImage(im, bx, top, w - half, leg - k, bx, top + k * 0.5, w - half, leg - k);
-      return c;
-    };
-    f = [make(true), im, make(false), im]; walkCache.set(key, f); return f;
+  // personagem da folha animada: linha pela direção (frente, direita, costas, esquerda), quadro pelo passo
+  function drawChr(key, x, y, row, frame, H) {
+    const im = IMG[key]; const m = CHR[key.slice(4)]; if (!im || !m) return false;
+    const W = (H * m.w) / m.h; ctx.drawImage(im, frame * m.w, row * m.h, m.w, m.h, x - W / 2, y - H, W, H); return true;
   }
-  const frameOf = (key, t, phase, speed = 1) => { const fr = walkFrames(key); return fr ? fr[Math.floor(t * 7 * speed + phase) % 4] : IMG[key]; };
   function drawPed(p, t) {
     if (p.state === 'levado') return;
     if (p.state === 'ferido') { const im = IMG['npc/caido']; if (im) ctx.drawImage(im, p.x - 9, p.y - 4, 18, 7); ctx.fillStyle = 'rgba(200,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 2, 4, 1.6, 0, 0, Math.PI * 2); ctx.fill(); return; }
-    const im = IMG[p.spr]; if (!im) return;
-    const [w, h] = meta(p.spr); const H = 13; const W = (H * w) / h;
-    const moving = p.state === 'walk' || p.state === 'cross';
-    const bob = moving && !p.pause ? Math.abs(Math.sin(t * 9 + p.phase)) * 0.9 : 0;
+    const moving = (p.state === 'walk' || p.state === 'cross') && !p.pause;
+    // olhando uma ocorrência: vira para ela; parado: mantém a última direção
+    const ang = p.state === 'olhando' && p.lookAt ? Math.atan2(p.lookAt[1] - p.y, p.lookAt[0] - p.x) : p.a;
+    if (moving || p.state === 'olhando' || p.row == null) p.row = chrRow(ang);
+    // o passo acompanha a velocidade (≈ 0,7 passo por unidade/s); parado fica no quadro de descanso
+    const frame = moving ? Math.floor(t * (p.v || 9) * 0.75 + p.phase * 4) % 4 : 0;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-    const fimg = moving && !p.pause ? frameOf(p.spr, t, p.phase * 3, p.v / 9) : im;
-    ctx.save(); ctx.translate(p.x, p.y - bob * 0.4); if (p.face < 0) ctx.scale(-1, 1); ctx.drawImage(fimg, -W / 2, -H, W, H); ctx.restore();
-    if (p.state === 'olhando') { ctx.fillStyle = '#fff'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.sin(t * 6 + p.phase) > 0 ? '!' : '?', p.x, p.y - H - 1); }
+    drawChr(p.spr, p.x, p.y + 0.5, p.row, frame, 15);
+    if (p.state === 'olhando') { ctx.fillStyle = '#fff'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.sin(t * 6 + p.phase) > 0 ? '!' : '?', p.x, p.y - 17); }
   }
   function drawMe(t) {
     if (me.mode !== 'foot' && !(me.anim && me.anim.kind === 'enter' && me.anim.t < 0.5) && !(me.anim && me.anim.kind === 'exit' && me.anim.t >= 0.25)) return;
-    const im = IMG[me.spr]; const [w, h] = meta(me.spr); const H = 14; const W = (H * w) / h;
+    const H = 16;
     ctx.fillStyle = 'rgba(56,214,245,.35)'; ctx.beginPath(); ctx.ellipse(me.x, me.y, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
     if (me.swim) { ctx.save(); ctx.beginPath(); ctx.rect(me.x - 10, me.y - H, 20, H * 0.55); ctx.clip(); }
-    const bob = me.moving ? Math.abs(Math.sin(t * 10)) * 1 : 0;
-    if (im) { const fimg = me.moving && !me.swim ? frameOf(me.spr, t, 0, 1.3) : im; ctx.save(); ctx.translate(me.x, me.y - bob * 0.4 - (me.swim ? -3 : 0)); if (Math.cos(me.a) < -0.2) ctx.scale(-1, 1); ctx.drawImage(fimg, -W / 2, -H, W, H); ctx.restore(); }
+    if (me.moving) me.row = chrRow(me.a);
+    const frame = me.moving && !me.swim ? Math.floor(me.walkT * 1.0) % 4 : 0;
+    drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), me.row || 0, frame, H);
     if (me.swim) { ctx.restore(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.ellipse(me.x, me.y - 5, 6 + Math.sin(t * 5) * 1.5, 2, 0, 0, Math.PI * 2); ctx.stroke(); }
-    ctx.fillStyle = '#38d6f5'; ctx.beginPath(); ctx.moveTo(me.x, me.y - H - 6); ctx.lineTo(me.x - 3, me.y - H - 10); ctx.lineTo(me.x + 3, me.y - H - 10); ctx.fill();
+    ctx.fillStyle = '#38d6f5'; ctx.beginPath(); ctx.moveTo(me.x, me.y - H - 4); ctx.lineTo(me.x - 3, me.y - H - 8); ctx.lineTo(me.x + 3, me.y - H - 8); ctx.fill();
   }
   // silhueta (sombra) e versão queimada de cada aeronave, prontas uma vez (filtros por quadro são caros no celular)
   const planeCache = new Map();
@@ -550,7 +548,7 @@ export default async function render(el, params = new URLSearchParams()) {
       if (ev?.crash) planeCrash(pl, ev.crash);
       else if (ev?.landed) toast('Pouso perfeito ✈', 'Bem-vindo(a) ao Aeroporto Nexus.', 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim) stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]);
+    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]); me.walkT += Math.hypot(me.x - ox, me.y - oy) / 3.2; } // um passo a cada ~3 unidades andadas
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
