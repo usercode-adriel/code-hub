@@ -6,6 +6,7 @@ import { account, debit, addXp } from './bank.js';
 import { worldPost, remember, genderize, personaAddedHooks } from '../social.js';
 import { rnd, pick, chance, clamp, uid, DAY, HOUR, gauss, poisson, cap, shuffle } from './util.js';
 import { notify } from '../notify.js';
+import { gameNow, cityHour } from './clock.js';
 import { courseLessons, maybeLecture } from './society.js';
 
 // ---------------------------------------------------------------- geografia (mapa 1000 × 600)
@@ -125,9 +126,13 @@ function weather(w, at) {
   const c = pick(m >= 4 && m <= 8 ? CONDS.slice(0, 6) : CONDS);
   w.city.weather = { base: base + Math.round(gauss(0, 2)), cond: c[0], icon: c[1], day: at.toISOString().slice(0, 10) };
 }
-export function weatherNow(w, at = new Date()) {
-  const wt = w.city?.weather; if (!wt) return null;
-  const h = at.getHours();
+// clima segue o relógio da cidade: muda a cada dia de Nexus City (40 min reais) e a temperatura acompanha a hora
+export function weatherNow(w) {
+  if (!w.city?.weather) return null;
+  const g = gameNow(); const gday = Math.floor((g - 3 * HOUR) / DAY);
+  if (w.city.weather.gday !== gday) { weather(w, new Date(g)); w.city.weather.gday = gday; }
+  const wt = w.city.weather;
+  const h = Math.floor(cityHour(g));
   const temp = Math.round(wt.base + Math.sin(((h - 9) / 24) * Math.PI * 2) * 4);
   return { temp, cond: wt.cond, icon: h >= 19 || h < 6 ? (wt.icon === '☀️' ? '🌙' : wt.icon) : wt.icon };
 }

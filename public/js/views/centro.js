@@ -5,6 +5,7 @@ import { on, store } from '../store.js';
 import { nascendo, face, nx, pct, spark, evRow, bindEntities, CAT_COLOR, api, esc, timeAgo, icon, modal } from '../world/wui.js';
 import { cityMap } from '../world/citymap.js';
 import { livePanel } from '../world/live.js';
+import { cityNow, setCityClock } from '../chrome.js';
 
 const QUICK = [
   ['#/empregos', 'briefcase', 'Trabalhar', '#fb923c'], ['#/mercado', 'cart', 'Comprar', '#a78bfa'], ['#/mapa?rota=1', 'car', 'Dirigir', '#60a5fa'],
@@ -27,6 +28,7 @@ export default async function render(el) {
   const load = async () => {
     const d = await api.get('/mundo/resumo');
     if (!d.born) { stop = nascendo(body, load); return; }
+    setCityClock(d.clock);
     paint(d);
   };
   const paint = (d) => {
@@ -94,13 +96,14 @@ export default async function render(el) {
         },
       });
       map.setData(layers);
+      const nightTick = () => map?.setNight?.(cityNow().night); nightTick(); clearInterval(drawMap.t); drawMap.t = setInterval(nightTick, 5000);
     } catch { host.innerHTML = '<p class="cx-mut" style="padding:20px">O mapa ainda está sendo desenhado…</p>'; }
   };
   bindEntities(body);
   await load();
   api.get('/mundo/relatorio').then((r) => { if (r) report(r); }).catch(() => {});
   off = on('world', (ev) => { if (ev.type === 'event' && ev.event.importance >= 3) { clearTimeout(pending); pending = setTimeout(() => load().catch(() => {}), 1500); } });
-  return () => { stop?.(); off?.(); clearTimeout(pending); stopLive?.(); map?.destroy?.(); };
+  return () => { stop?.(); off?.(); clearTimeout(pending); stopLive?.(); clearInterval(drawMap.t); map?.destroy?.(); };
 }
 
 function report(r) {

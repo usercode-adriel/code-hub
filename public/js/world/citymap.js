@@ -122,7 +122,7 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     ${mini ? '' : `<div class="cm-tools"><button class="cm-btn" data-z="in" aria-label="Aproximar">${icon('plus', 15)}</button><button class="cm-btn" data-z="out" aria-label="Afastar">${icon('minus', 15)}</button><button class="cm-btn" data-z="me" aria-label="Minha localização">${icon('target', 15)}</button><button class="cm-btn" data-z="all" aria-label="Ver a cidade toda">${icon('refresh', 14)}</button></div>`}</div>`;
   const svg = host.querySelector('svg');
   const bcv = document.createElement('canvas'); bcv.className = 'cm-cv'; svg.before(bcv);
-  let bmp = null; let baseRaf = 0;
+  let bmp = null; let baseRaf = 0; let night = false;
   const drawBase = () => {
     baseRaf = 0; if (!bmp) return;
     const W = svg.clientWidth; const H = svg.clientHeight; if (!W || !H) return;
@@ -137,6 +137,7 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     const sx1 = Math.min(bmp.width, Math.ceil(((cw - ox) / sc) * k)); const sy1 = Math.min(bmp.height, Math.ceil(((ch - oy) / sc) * k));
     if (sx1 <= sx0 || sy1 <= sy0) return;
     c.drawImage(bmp, sx0, sy0, sx1 - sx0, sy1 - sy0, ox + (sx0 / k) * sc, oy + (sy0 / k) * sc, ((sx1 - sx0) / k) * sc, ((sy1 - sy0) / k) * sc);
+    if (night) { c.fillStyle = 'rgba(8, 10, 46, .5)'; c.fillRect(0, 0, cw, ch); } // noite na cidade
   };
   const queueBase = () => { if (!baseRaf) baseRaf = requestAnimationFrame(drawBase); };
   rasterize(svg, geo).then((b) => { if (!b) return; bmp = b; const base = svg.querySelector('.cm-base'); if (base) base.innerHTML = ''; host.querySelector('.cm')?.classList.add('cv-ready'); drawBase(); });
@@ -274,6 +275,7 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     setFilter(f) { filter = f && f.size ? f : null; paint(); },
     select(id) { selected = id; paint(); const p = data.places.find((x) => x.id === id); if (p) focus(p.x, p.y, 700); },
     focus, view, setPeople,
+    setNight(v) { if (Boolean(v) !== night) { night = Boolean(v); host.querySelector('.cm')?.classList.toggle('night', night); queueBase(); } },
     destroy() { cancelAnimationFrame(raf); raf = 0; cancelAnimationFrame(baseRaf); clearTimeout(viewTimer); },
     drawRoute(pathPts) { routeG.innerHTML = pathPts?.length ? `<polyline points="${pathPts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#000" stroke-width="16" stroke-linejoin="round" opacity=".5"/><polyline class="cm-route-line" points="${pathPts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#a855f7" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>` : ''; },
   };

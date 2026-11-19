@@ -94,3 +94,12 @@ test('submundo: lojas clandestinas escondidas vendem itens que vão para o inven
   I.itemAction(T.ctx(), it.id, 'esconder');
   assert.equal(account(T.w).inventory.find((x) => x.id === it.id).state, 'escondido');
 });
+
+test('relógio da cidade: um dia dura 40 minutos reais', async () => {
+  const K = await import('../server/world/clock.js');
+  const t0 = Date.now();
+  assert.equal(K.gameNow(t0 + 40 * 60000) - K.gameNow(t0), 24 * 3600000);
+  assert.ok(Math.abs(K.realOf(K.gameNow(t0)) - t0) < 2);
+  const c = K.cityClock(T.w);
+  assert.equal(c.speed, 36); assert.ok(c.day >= 1); assert.ok(c.hour >= 0 && c.hour < 24);
+});

@@ -4,6 +4,7 @@
 import { shell, face, nx, bindEntities, personCard, api, esc, icon, toast } from '../world/wui.js';
 import { modal } from '../ui.js';
 import { cityMap } from '../world/citymap.js';
+import { cityNow, setCityClock } from '../chrome.js';
 
 const QUICK = [['loja-tec', 'Tecnologia'], ['loja-social', 'Social'], ['banco', 'Banco'], ['restaurante', 'Comer'], ['cafe', 'Cafés'], ['padaria', 'Padarias'], ['bar', 'Bares'], ['parque', 'Parques'], ['shopping', 'Shopping'], ['mercado', 'Mercados'], ['farmacia', 'Farmácias'], ['academia', 'Academias'], ['hotel', 'Hotéis'], ['cinema', 'Cinemas'], ['escola', 'Escolas'], ['clinica', 'Clínicas'], ['hospital', 'Saúde'], ['posto', 'Postos'], ['delegacia', 'Polícia'], ['tribunal', 'Justiça'], ['empresa', 'Empresas'], ['turismo', 'Turismo'], ['clube', 'Clubes']];
 const FEED_COLOR = { entrada: '#34d399', saida: '#fb923c', compra: '#22d3ee', promo: '#f472b6', noticia: '#a78bfa', alerta: '#ef4444' };
@@ -21,7 +22,7 @@ export default async function render(el, parts, params = new URLSearchParams()) 
   body.innerHTML = `<div class="lv">
     <div class="lv-stage" id="lvStage"></div>
     <div class="lv-hud lv-clock"><div class="lv-t"><b id="lvCk">--:--</b><small id="lvDy"></small></div><div class="lv-wx" id="lvWx"></div>
-      <div class="lv-spd" role="group" aria-label="Velocidade do tempo"><i title="Pausar (em breve)" class="off">⏸</i><i class="on" title="Tempo real">1×</i><i class="off" title="Acelerar o tempo da cidade (em breve)">4×</i><i class="off" title="Acelerar o tempo da cidade (em breve)">16×</i></div></div>
+      <div class="lv-spd" title="O tempo na cidade passa 36× mais rápido: um dia dura 40 minutos"><i class="on">⏱ 1 dia = 40 min</i></div></div>
     <div class="lv-top">
       <label class="gm-search">${icon('search', 15)}<input id="gmQ" placeholder="Buscar lugar, loja, rua…" autocomplete="off" aria-label="Buscar no mapa"><div class="gm-results" id="gmRes" hidden></div></label>
       <div class="gm-chips" id="gmChips">${quick.map(([k, l]) => `<button data-k="${k}" style="--c:${esc(layers.cats[k]?.color || '#64748b')}">${icon(layers.cats[k]?.icon || 'pin', 12)} ${l}</button>`).join('')}
@@ -49,10 +50,12 @@ export default async function render(el, parts, params = new URLSearchParams()) 
   if (layers.me?.xy) map.focus(layers.me.xy[0], layers.me.xy[1], 820);
 
   // ---------------------------------------------------------------- relógio
+  setCityClock(resumo.clock);
   const tickClock = () => {
-    const n = new Date(); $('#lvCk').textContent = hhmm(n);
-    const gd = Math.floor((resumo.gameMinutes || 0) / 1440) + 1;
-    $('#lvDy').textContent = `${n.toLocaleDateString('pt-BR', { weekday: 'long' }).replace(/^./, (m) => m.toUpperCase())} · Dia ${gd}`;
+    // relógio da cidade (36× mais rápido que o real)
+    const k = cityNow(); $('#lvCk').textContent = k.text;
+    $('#lvDy').textContent = `${k.weekday.replace(/^./, (m) => m.toUpperCase())}${k.day ? ` · Dia ${k.day}` : ''}`;
+    map.setNight?.(k.night);
     $('#lvWx').textContent = resumo.weather ? `${resumo.weather.icon} ${resumo.weather.temp}°C` : '';
   };
   tickClock();
@@ -166,7 +169,7 @@ export default async function render(el, parts, params = new URLSearchParams()) 
   if (hq) { const h = (layers.houses || []).find((x) => x.id === hq); const xy = h ? (h.xy || [h.x, h.y]) : null; if (xy?.[0] != null) map.focus(xy[0], xy[1], 420); }
   if (bq) { const d = geo.districts.find((x) => x.id === bq); if (d) { const cx = d.poly.reduce((a, p) => a + p[0], 0) / d.poly.length; const cy = d.poly.reduce((a, p) => a + p[1], 0) / d.poly.length; map.focus(cx, cy, 700); } }
   pullPeople(); pullFeed();
-  const timers = [setInterval(pullPeople, 6000), setInterval(pullFeed, 8000), setInterval(tickClock, 15000),
+  const timers = [setInterval(pullPeople, 6000), setInterval(pullFeed, 8000), setInterval(tickClock, 1500), setInterval(async () => { try { resumo.weather = (await api.get('/mundo/resumo')).weather; } catch { /* ok */ } }, 120000),
     setInterval(async () => { if (document.hidden) return; try { layers = await api.get('/mundo/mapa/camadas'); map.setData(layers); } catch { /* sem conexão */ } }, 60000)];
   return () => { alive = false; timers.forEach(clearInterval); map.destroy(); };
 }

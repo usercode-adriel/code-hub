@@ -34,6 +34,17 @@ const LIT = { banco: 'banco', economia: 'empresas', atividade: 'dashboard', busc
 const pxOf = (seed) => { let h = 0; for (const c of String(seed || 'eu')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `/assets/px/p${String(h % 123).padStart(3, '0')}.png`; };
 export const myAvatar = () => store.user?.avatar || pxOf(store.user?.id || store.user?.name);
 export const status = { data: null, at: 0 };
+// relógio da cidade: um dia em Nexus City dura 40 minutos reais (o servidor manda a mesma âncora e velocidade)
+const CLK = { speed: 36, anchor: Date.UTC(2026, 10, 1, 3, 0, 0), base: null };
+const TZ = -3 * 3600000; const dayIdx = (g) => Math.floor((g + TZ) / 86400000);
+export function cityNow() {
+  const g = CLK.anchor + (Date.now() - CLK.anchor) * CLK.speed;
+  const d = new Date(g + TZ); const h = d.getUTCHours(); const m = d.getUTCMinutes();
+  const day = CLK.base ? CLK.base.day + dayIdx(g) - dayIdx(CLK.base.game) : null;
+  return { game: g, hh: String(h).padStart(2, '0'), mm: String(m).padStart(2, '0'), hour: h + m / 60, night: h >= 19 || h < 6, day,
+    weekday: d.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC' }), text: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+}
+export function setCityClock(c) { if (c?.speed) { CLK.speed = c.speed; CLK.anchor = c.anchor; CLK.base = { day: c.day, game: c.game }; } }
 const fmt = (v) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
 export function renderSide(cur) {
@@ -81,11 +92,11 @@ export function renderDevices() {
     <button class="cx-dev-b" data-dev="phone" title="${ph ? esc(ph.name) : 'Sem celular'}" style="--sk:${esc(ph?.skin || '#475569')}">
       <span class="cx-dev-phone ${ph ? '' : 'off'}"><i></i></span><small>${ph ? esc(ph.name.split(' ')[0]) : 'Celular'}</small></button>
     <button class="cx-dev-b" data-dev="wallet" title="Carteira"><span class="cx-dev-ic">${icon('idcard', 20)}</span><small id="cxCash">${d.cash != null ? fmt(d.cash) : 'Carteira'}</small></button>
-    <button class="cx-dev-b" data-dev="clock" title="Relógio"><span class="cx-dev-clock" id="cxClock">--:--</span><small>${d.appointments ? `${d.appointments} comp.` : 'Relógio'}</small></button>`;
+    <button class="cx-dev-b" data-dev="clock" title="Relógio"><span class="cx-dev-clock" id="cxClock">--:--</span><small id="cxDay">${cityNow().day ? `Dia ${cityNow().day}` : 'Cidade'}</small></button>`;
   tickClock();
 }
-function tickClock() { const c = document.getElementById('cxClock'); if (c) c.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-setInterval(tickClock, 15000);
+function tickClock() { const c = document.getElementById('cxClock'); if (c) { const k = cityNow(); c.textContent = k.text; c.title = `Hora em Nexus City${k.day ? ` · Dia ${k.day}` : ''} (1 dia = 40 min)`; c.classList.toggle('night', k.night); } const dd = document.getElementById('cxDay'); if (dd && cityNow().day) dd.textContent = `Dia ${cityNow().day}`; }
+setInterval(tickClock, 1500);
 
 export function renderBottom(cur) {
   const lit = LIT[cur] || cur;
@@ -100,6 +111,7 @@ export async function refreshStatus(force = false) {
   if (!force && status.data && Date.now() - status.at < 12000) return status.data;
   try {
     status.data = await api.get('/mundo/status'); status.at = Date.now();
+    setCityClock(status.data.clock);
     const s = status.data.me || {};
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
     if (s.balance != null) set('cxBal', fmt(s.balance));

@@ -1,5 +1,6 @@
 // Rotas do System 2.0 (/api/mundo/...). Toda alteração passa pelas regras do mundo e vira registro histórico.
 import express from 'express';
+import { cityClock } from './clock.js';
 import { world, touch, activityReport, publicEvent, record, aiTake, aiReady, aiBudget, CATS, PACES, actorRef } from './core.js';
 import { saveWorld, resetWorld } from './store.js';
 import {
@@ -43,7 +44,7 @@ router.get('/mundo/resumo', (req, res) => {
   const nextInv = invites(w).filter((i) => i.status === 'agendado' && (i.user === 'aceito' || i.user === 'pendente')).sort((a, b) => a.at.localeCompare(b.at))[0];
   const el = w.politics?.election;
   res.json({
-    born: true, now: new Date().toISOString(), weather: weatherNow(w), gameMinutes: Math.round((Date.now() - new Date(w.core.genesisAt).getTime()) / 60000), heroImage: account(w).heroImage || w.city.heroImage || null, city: { name: w.city.name || 'Nexus City', residents: residents(w).length, people: people(w).length, districts: w.city.districts.filter((d) => !d.locked).length },
+    born: true, now: new Date().toISOString(), clock: cityClock(w), weather: weatherNow(w), gameMinutes: Math.round((Date.now() - new Date(w.core.genesisAt).getTime()) / 60000), heroImage: account(w).heroImage || w.city.heroImage || null, city: { name: w.city.name || 'Nexus City', residents: residents(w).length, people: people(w).length, districts: w.city.districts.filter((d) => !d.locked).length },
     me: { name: req.user.name, avatar: req.user.avatar || null, balance: u.bank.balance, wallet: u.bank.wallet || 0, score: u.bank.score || 0,
       popularity: (() => { const met = people(w).filter((p) => p.agent?.user?.metAt); return met.length ? Math.round((met.filter((p) => p.agent.user.aff > 15).length / met.length) * 100) : 0; })(),
       influence: Math.min(100, Math.round(Math.log10((u.fame || 0) + 1) * 28)), friends: people(w).filter((p) => p.friend).length,

@@ -18,6 +18,7 @@ import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } f
 import { peopleView, housesPublic, housePublic, live } from './living.js';
 import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
+import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
@@ -71,11 +72,12 @@ router.get('/mundo/mapa/pessoas', (req, res) => {
   const q = req.query; const num = (v) => (v === undefined || v === '' ? null : Number(v));
   const box = [num(q.x0), num(q.y0), num(q.x1), num(q.y1)];
   const bbox = box.every((v) => Number.isFinite(v)) ? box : null;
-  const now = Date.now(); let t = now;
-  if (Number.isFinite(Number(q.t))) t = Math.max(now - 24 * HOUR, Math.min(now + 24 * HOUR, Number(q.t))); // pré-visualização de outro horário do dia
+  // t no relógio da cidade (um dia = 40 min reais); ?t= permite pré-visualizar outro horário do dia da cidade
+  const now = gameNow(); let t = now;
+  if (Number.isFinite(Number(q.t))) t = Math.max(now - 24 * HOUR, Math.min(now + 24 * HOUR, Number(q.t)));
   const horizon = 6000;
   const online = residents(w).filter((p) => p.agent.status === 'ativo' && isAwake(p, new Date(t))).length;
-  res.json({ t, horizon, online, people: peopleView(w, { bbox, t, horizon }) });
+  res.json({ t, horizon, speed: SPEED, clock: cityClock(w), online, people: peopleView(w, { bbox, t, horizon }) });
 });
 // feed "ao vivo": entradas e saídas, compras e o que virou notícia
 router.get('/mundo/mapa/ao-vivo', (req, res) => {
@@ -450,7 +452,7 @@ router.get('/mundo/status', (req, res) => {
   let out = 0; let moving = 0;
   for (const p of peopleView(w, { limit: 9999, horizon: 0 })) { if (p.place !== 'em casa') out++; if (p.moving) moving++; }
   res.json({
-    born: true, now: new Date(t).toISOString(), city: w.city.name || 'Nexus City', population: res0.length, online: out, moving,
+    born: true, now: new Date(t).toISOString(), clock: cityClock(w), city: w.city.name || 'Nexus City', population: res0.length, online: out, moving,
     me: { name: req.user.name, avatar: req.user.avatar || null, level: u.level || 1, xp: u.xp || 0, nextXp: 40 * (u.level || 1) ** 2, balance: b.balance, wallet: b.wallet || 0, reputation: u.reputation, fame: u.fame || 0, underworld: u.underworld || 0, job: u.job?.role || null },
     devices: devicesOf(w),
   });

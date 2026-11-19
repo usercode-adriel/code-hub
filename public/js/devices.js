@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { icon } from './icons.js';
 import { esc, timeAgo } from './ui.js';
 import { store } from './store.js';
+import { cityNow } from './chrome.js';
 
 const nx = (v) => `${(Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} NXC`;
 let open = null;
@@ -29,7 +30,7 @@ export async function openPhone() {
   let d; try { d = await api.get('/mundo/dispositivos'); } catch (e) { close(); return; }
   const ph = d.phone;
   const now = new Date();
-  const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const time = cityNow().text;
   if (!ph) {
     const el = frame('phone', `<div class="cx-phone off" style="--sk:#475569"><button class="cx-x" data-close aria-label="Fechar">${icon('x', 16)}</button>
       <div class="cx-ph-screen"><div class="cx-ph-bar"><span>${time}</span><span>sem sinal</span></div>
@@ -72,9 +73,9 @@ export async function openClock() {
   loading('clock');
   let d; let n = { items: [] };
   try { [d, n] = await Promise.all([api.get('/mundo/dispositivos'), api.get('/notifications').catch(() => ({ items: [] }))]); } catch { close(); return; }
-  const zones = [['Nexus City', 'America/Sao_Paulo'], ['Lisboa', 'Europe/Lisbon'], ['Nova York', 'America/New_York'], ['Tóquio', 'Asia/Tokyo']];
+  const zones = [['Brasília (real)', 'America/Sao_Paulo'], ['Lisboa', 'Europe/Lisbon'], ['Nova York', 'America/New_York'], ['Tóquio', 'Asia/Tokyo']];
   const el = frame('clock', `<div class="cx-devcard cx-clockcard"><button class="cx-x" data-close aria-label="Fechar">${icon('x', 16)}</button>
-    <div class="cx-ck-face"><b id="ckBig">--:--:--</b><small>${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</small></div>
+    <div class="cx-ck-face"><small>Hora em Nexus City</small><b id="ckBig">--:--</b><small id="ckDay"></small><em class="cx-ck-note">1 dia na cidade = 40 minutos reais</em></div>
     <div class="cx-ck-zones">${zones.map(([l, z]) => `<div><small>${l}</small><b data-tz="${z}">--:--</b></div>`).join('')}</div>
     <h4>${icon('calendar', 14)} Compromissos</h4>
     ${d.clock.appointments.length ? `<div class="cx-ck-list">${d.clock.appointments.map((a) => `<a class="cx-ck-ap" href="#/social" data-close><b>${esc(a.title)}</b><small>${new Date(a.at).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · ${esc(a.place?.name || a.place || '')}${a.user === 'pendente' ? ' · aguardando resposta' : ''}</small></a>`).join('')}</div>` : '<p class="cx-mut">Nenhum compromisso marcado.</p>'}
@@ -82,7 +83,8 @@ export async function openClock() {
     <div class="cx-ck-list">${(n.items || []).slice(0, 5).map((x) => `<a class="cx-ck-ap" href="${esc(x.link || '#/notifications')}" data-close><b>${esc(x.title)}</b><small>${esc(timeAgo(x.createdAt))}</small></a>`).join('') || '<p class="cx-mut">Tudo em dia.</p>'}</div></div>`);
   const paint = () => {
     const big = el.querySelector('#ckBig'); if (!big) return clearInterval(t);
-    big.textContent = new Date().toLocaleTimeString('pt-BR');
+    const k = cityNow(); big.textContent = k.text; big.classList.toggle('night', k.night);
+    el.querySelector('#ckDay').textContent = `${k.weekday}${k.day ? ` · Dia ${k.day}` : ''} · ${k.night ? 'noite' : 'dia'}`;
     el.querySelectorAll('[data-tz]').forEach((b) => { b.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: b.dataset.tz }); });
   };
   const t = setInterval(paint, 1000); paint();

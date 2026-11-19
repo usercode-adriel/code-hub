@@ -8,6 +8,7 @@ import { places, PLACE_CATS } from './commerce.js';
 import { freeNode, pos, address, districtOfNode, walkPath, pointAlong, METERS_PER_UNIT } from './map.js';
 import { companyById } from './economy.js';
 import { uid, nowIso, HOUR, MIN, DAY, cap } from './util.js';
+import { gameNow, SPEED } from './clock.js';
 
 // ---------------------------------------------------------------- utilidades determinísticas
 function h32(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -174,7 +175,8 @@ function describe(p, seg, t) {
   if (seg.kind === 'work') return `trabalhando${seg.place ? ` em ${seg.place.name}` : ''}`;
   return `${kindVerb(seg.place)} ${seg.place.name}`.replace(/ em em /, ' em ');
 }
-export function whereIs(w, p, t = Date.now()) {
+// t = horário da CIDADE (relógio acelerado, ver clock.js)
+export function whereIs(w, p, t = gameNow()) {
   const a = p.agent;
   if (!a?.resident || a.status === 'saiu') return null;
   if (a.status === 'preso') { const st = places(w).find((x) => x.kind === 'delegacia'); return st ? { x: st.x, y: st.y, moving: false, doing: 'detida(o) na delegacia', place: st.name, placeId: st.id } : null; }
@@ -193,13 +195,14 @@ export function whereIs(w, p, t = Date.now()) {
 }
 
 // moradores que aparecem na área visível, com os próximos segundos para o navegador animar
-export function peopleView(w, { bbox = null, t = Date.now(), horizon = 6000, limit = 360, knownIds = null } = {}) {
+// horizon em ms REAIS (o navegador anima nesse intervalo); convertido para o relógio da cidade
+export function peopleView(w, { bbox = null, t = gameNow(), horizon = 6000, limit = 360, knownIds = null } = {}) {
   const out = [];
   for (const p of residents(w)) {
     const here = whereIs(w, p, t); if (!here) continue;
     if (bbox && (here.x < bbox[0] || here.x > bbox[2] || here.y < bbox[1] || here.y > bbox[3])) continue;
     let wp = null;
-    if (here.moving) { wp = []; for (const dt of [horizon / 3, (2 * horizon) / 3, horizon]) { const f = whereIs(w, p, t + dt); if (f) wp.push([Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]); } }
+    if (here.moving) { wp = []; for (const dt of [(horizon * SPEED) / 3, (2 * horizon * SPEED) / 3, horizon * SPEED]) { const f = whereIs(w, p, t + dt); if (f) wp.push([Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10]); } }
     out.push({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, x: Math.round(here.x * 10) / 10, y: Math.round(here.y * 10) / 10, wp, moving: here.moving, mode: here.mode || null, doing: here.doing, place: here.place || null,
       friend: Boolean(p.friend), known: Boolean(p.agent.user?.metAt), job: p.job || null });
   }
@@ -219,17 +222,24 @@ function segAt(plan, t) { return plan.find((s) => t >= s.t0 && t < s.t1) || null
 // detecta chegadas e saídas olhando só para o que mudou desde o último instante
 onTick((ctx) => {
   const w = ctx.w; if (!w.city) return;
-  const L = live(w); const now = Date.now(); const last = L.last || now; L.last = now;
-  if (now - last > 5 * MIN || now <= last) return; // depois de ficar fora, não despeja a história toda no feed
+  // L.lastG guarda o último instante no relógio da cidade (cada tick de 30 s reais = 18 min na cidade)
+  const L = live(w); const now = gameNow(); const last = L.lastG || now; L.lastG = now;
+  if (now - last > 5 * MIN * SPEED || now <= last) return; // depois de ficar fora, não despeja a história toda no feed
+  let n = 0;
   for (const p of residents(w)) {
     const a = p.agent; if (a.status !== 'ativo') continue;
-    const tz = (p.tz ?? -3) * HOUR; const ds = Math.floor((now + tz) / DAY) * DAY - tz;
-    if (Math.floor((last + tz) / DAY) !== Math.floor((now + tz) / DAY)) continue;
-    const plan = planOf(w, p, ds);
-    const s0 = segAt(plan, last); const s1 = segAt(plan, now);
-    if (!s0 || !s1 || s0 === s1) continue;
-    if (s0.type === 'move' && s1.type === 'stay' && s1.place && s1.kind !== 'home') liveEvent(w, { kind: 'entrada', personaId: p.id, name: p.name, placeId: s1.place.id, placeName: s1.place.name, text: 'entrou em' });
-    else if (s0.type === 'stay' && s0.place && s0.kind !== 'home' && s1.type === 'move') liveEvent(w, { kind: 'saida', personaId: p.id, name: p.name, placeId: s0.place.id, placeName: s0.place.name, text: 'saiu de' });
+    const tz = (p.tz ?? -3) * HOUR;
+    const days = new Set([Math.floor((last + tz) / DAY) * DAY - tz, Math.floor((now + tz) / DAY) * DAY - tz]);
+    for (const ds of days) {
+      const plan = planOf(w, p, ds);
+      for (let i = 0; i < plan.length; i++) {
+        const s1 = plan[i]; if (s1.t0 <= last || s1.t0 > now) continue;
+        const s0 = plan[i - 1];
+        if (s1.type === 'stay' && s1.place && s1.kind !== 'home' && s0?.type === 'move') { liveEvent(w, { kind: 'entrada', personaId: p.id, name: p.name, placeId: s1.place.id, placeName: s1.place.name, text: 'entrou em' }); n++; }
+        else if (s1.type === 'move' && s0?.type === 'stay' && s0.place && s0.kind !== 'home') { liveEvent(w, { kind: 'saida', personaId: p.id, name: p.name, placeId: s0.place.id, placeName: s0.place.name, text: 'saiu de' }); n++; }
+        if (n > 25) return;
+      }
+    }
   }
 });
 

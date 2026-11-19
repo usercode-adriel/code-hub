@@ -645,3 +645,6 @@ body.cx-on[data-route="mapa"] .cx-main.content, body.cx-on[data-route="assistent
   .cm .cm-wglow { display: none; }
   .cm .cm-trail { display: none; }
 }
+.cx-ck-note { font-style: normal; font-size: 11px; color: var(--cx-mut); }
+.cx-dev-clock.night, .cx-ck-face b.night { color: #a5b4fc; }
+.lv-spd i.on { font-style: normal; white-space: nowrap; }
