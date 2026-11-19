@@ -69,7 +69,9 @@ export function stepWalker(me, input, world, dt, blockers) {
   const dx = input.mx; const dy = input.my; const m = Math.hypot(dx, dy);
   if (m < 0.08) { me.moving = false; return; }
   const swim = at(world, me.x, me.y) === WATER; me.swim = swim;
-  const k = Math.min(1, m) * (swim ? 0.45 : 1); const vx = (dx / m) * WALK_V * k; const vy = (dy / m) * WALK_V * k;
+  // correndo (toque duplo): o dobro da velocidade da caminhada; nadando não dá para correr
+  me.run = Boolean(input.run) && !swim;
+  const k = Math.min(1, m) * (swim ? 0.45 : me.run ? 2 : 1); const vx = (dx / m) * WALK_V * k; const vy = (dy / m) * WALK_V * k;
   me.a = Math.atan2(vy, vx); me.moving = true;
   const free = (x, y) => canFoot(at(world, x, y)) && !blockers.some((o) => Math.abs(o.x - x) < 11 && Math.abs(o.y - y) < 11 && Math.hypot(o.x - x, o.y - y) < (o.L || 20) / 2 + 2);
   const nx = me.x + vx * dt; const ny = me.y + vy * dt;

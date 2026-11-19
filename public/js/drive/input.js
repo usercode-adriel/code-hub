@@ -8,9 +8,13 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
   // coordenadas do evento no sistema do palco (desfaz a rotação de 90° quando a tela está girada)
   const local = (cx, cy) => { const r = stage.getBoundingClientRect(); return rot() ? [cy - r.top, r.right - cx] : [cx - r.left, cy - r.top]; };
   const localDelta = (dx, dy) => (rot() ? [dy, -dx] : [dx, dy]);
+  // correr: apertar duas vezes seguidas a mesma tecla de direção (vale enquanto alguma direção estiver apertada)
+  const MOVE = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+  let lastTap = { k: '', t: 0 }; let runKey = false;
   const kd = (e) => {
     if (e.target.closest?.('input,textarea,select')) return;
     const k = e.key.toLowerCase();
+    if (MOVE.includes(k) && !e.repeat) { const now = performance.now(); if (lastTap.k === k && now - lastTap.t < 320) runKey = true; lastTap = { k, t: now }; }
     if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'e', 'f', 'shift', 'q', 'z', 'x'].includes(k)) e.preventDefault();
     if ((k === 'e' || k === 'f') && !e.repeat) onEnter?.();
     keys.add(k);
@@ -22,7 +26,7 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
   // ---- botões de toque (cada botão segura o próprio dedo) ----
   const held = new Map();
   const pad = { steer: 0, gas: 0, brake: 0, hand: 0, pup: 0, pdown: 0 };
-  const joy = { id: null, cx: 0, cy: 0, x: 0, y: 0 };
+  const joy = { id: null, cx: 0, cy: 0, x: 0, y: 0, last: 0, run: false };
   // alavanca de voo (celular): fica onde for deixada; para baixo = puxar (nariz para cima / subir)
   const lev = { id: null, v: 0, used: false };
   const levMove = (e) => {
@@ -39,7 +43,7 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
     e.preventDefault(); b.setPointerCapture?.(e.pointerId);
     const c = b.dataset.ctl;
     if (c === 'lever') { lev.id = e.pointerId; levMove(e); return; }
-    if (c === 'joy') { const r = b.getBoundingClientRect(); [joy.cx, joy.cy] = local(r.left + r.width / 2, r.top + r.height / 2); joy.id = e.pointerId; joyMove(e); return; }
+    if (c === 'joy') { const now = performance.now(); joy.run = now - joy.last < 360; joy.last = now; b.classList.toggle('run', joy.run); const r = b.getBoundingClientRect(); [joy.cx, joy.cy] = local(r.left + r.width / 2, r.top + r.height / 2); joy.id = e.pointerId; joyMove(e); return; }
     buzz();
     if (c === 'enter') { onEnter?.(); b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 150); return; }
     if (c === 'gear') { st.gearTap = true; b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 150); return; }
@@ -56,7 +60,7 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
   };
   const btnUp = (e) => {
     if (e.pointerId === lev.id) { lev.id = null; return; }
-    if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; const k = knob(); if (k) k.style.transform = ''; return; }
+    if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; joy.run = false; stage.querySelector('.d2-joy')?.classList.remove('run'); const k = knob(); if (k) k.style.transform = ''; return; }
     const c = held.get(e.pointerId); if (!c) return;
     held.delete(e.pointerId); for (const el of stage.querySelectorAll(`[data-ctl="${c}"]`)) el.classList.remove('on'); sync();
   };
@@ -102,6 +106,8 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
     // avião: W/S potência, A/D curva, Espaço/↑ sobe, Shift/↓ desce (no celular: botões próprios)
     st.plane = { up: K('w') || pad.gas, down: K('s') || pad.brake, left: K('a', 'arrowleft') || pad.steer < 0, right: K('d', 'arrowright') || pad.steer > 0, pitchUp: K(' ', 'arrowup') || pad.pup, pitchDown: K('shift', 'arrowdown') || pad.pdown, brake: K('s') || pad.brake };
     st.autoGear = !st.touchUI;
+    if (!MOVE.some((x) => keys.has(x))) runKey = false;
+    st.run = runKey || (joy.run && joy.id != null);
     if (st.touchUI && lev.used && !(K(' ', 'arrowup', 'shift', 'arrowdown'))) st.plane.lever = lev.v; // alavanca do celular
     else st.plane.lever = undefined;
     return st;

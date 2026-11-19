@@ -101,6 +101,7 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] 42 personagens das folhas enviadas (profissões, cotidiano e fantasia) em `public/assets/rpg/chr` (`tools/drive/chars.py`): folha 4×4 por personagem — frente, direita, costas, esquerda × 4 passos
 - [x] Moradores escolhem o personagem pela profissão e pelo gênero; passantes sem profissão variam; a linha segue a direção do movimento, o passo acompanha a velocidade, curiosos se viram para a ocorrência
 - [x] Jogador anda nas 4 direções com o passo pela distância percorrida; botão de visual no mapa (salvo no aparelho)
+- [x] Personagem padrão do jogador (`tools/drive/heroi.py`): parado e caminhada nas 4 direções + corrida para os lados; apertar 2× a direção (ou tocar 2× no joystick) corre com o dobro da velocidade
 
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.

@@ -36,7 +36,7 @@ export default async function render(el, params = new URLSearchParams()) {
     <canvas class="d2-mini" id="d2Mini" width="192" height="132" aria-label="Minimapa"></canvas>
     <div class="d2-dash" id="d2Dash" hidden></div>
     <div class="d2-prompt" id="d2Prompt" hidden></div>
-    <div class="d2-help" id="d2Help"><b>W A S D</b> andar/dirigir · <b>Espaço</b> freio de mão · <b>E</b> entrar/sair · <b>roda</b> zoom · <b>arrastar</b> explorar · no avião: <b>W/S</b> acelerar/reduzir, <b>A/D</b> virar, <b>Espaço</b> puxa a alavanca (sobe), <b>Shift</b> empurra (desce)</div>
+    <div class="d2-help" id="d2Help"><b>W A S D</b> andar/dirigir (aperte 2× para correr) · <b>Espaço</b> freio de mão · <b>E</b> entrar/sair · <b>roda</b> zoom · <b>arrastar</b> explorar · no avião: <b>W/S</b> acelerar/reduzir, <b>A/D</b> virar, <b>Espaço</b> puxa a alavanca (sobe), <b>Shift</b> empurra (desce)</div>
     <div class="d2-ctl d2-foot"><div class="d2-joy" data-ctl="joy"><i></i></div><button class="d2-act" data-ctl="enter" id="d2EnterF">Entrar</button></div>
     <div class="d2-ctl d2-drive"><div class="d2-steer"><button data-ctl="left" aria-label="Esquerda">${icon('chevLeft', 28)}</button><button data-ctl="right" aria-label="Direita">${icon('chevRight', 28)}</button></div>
       <div class="d2-pedals"><button class="d2-gearb" data-ctl="gear" id="d2GearB"><span>D</span><small>marcha</small></button><button class="d2-exit" data-ctl="enter">Sair</button><button class="d2-brake" data-ctl="brake">Freio</button><button class="d2-gas" data-ctl="gas">Acelerar</button></div></div>
@@ -90,7 +90,7 @@ export default async function render(el, params = new URLSearchParams()) {
   school.id = 'escola'; school.health = 100; own.push(school);
   const cars = () => own.filter((o) => o.kind === 'carro');
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
-  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr'); if (saved && CHR[saved]) return `chr/${saved}`; const pool = ['aventureiro', 'jovem', 'mulher', 'executivo-terno', 'estudante-mochila', 'turista', 'empresaria', 'trabalhador']; return `chr/${pool[[...String(store.user?.name || 'eu')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 0) % pool.length]}`; })(), row: 0, walkT: 0 };
+  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'heroi'}`; })(), row: 0, walkT: 0 };
   [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
   const cam = createCamera(world); cam.z = touch ? 2.6 : 2.4; cam.x = cam.tx = me.x; cam.y = cam.ty = me.y;
   const particles = [];
@@ -114,9 +114,9 @@ export default async function render(el, params = new URLSearchParams()) {
   function pickLook() {
     let m = stage.querySelector('.d2-look'); if (m) { m.remove(); return; }
     m = document.createElement('div'); m.className = 'd2-look ed-modal';
-    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:400% 400%;aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:${CHR[k].layout ? '700% 600%' : '400% 400%'};aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
     stage.appendChild(m);
-    m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
+    m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr2', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
     m.querySelector('[data-x]').onclick = () => m.remove();
   }
   const ED = createEditor({ stage, cam, city, world, assets, api, toast, rebuild: rebuildCity, onExit: (rf) => { reforma = { ...(reforma || {}), ...rf }; cam.follow = true; } });
@@ -345,8 +345,15 @@ export default async function render(el, params = new URLSearchParams()) {
     ctx.fillStyle = 'rgba(56,214,245,.35)'; ctx.beginPath(); ctx.ellipse(me.x, me.y, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
     if (me.swim) { ctx.save(); ctx.beginPath(); ctx.rect(me.x - 10, me.y - H, 20, H * 0.55); ctx.clip(); }
     if (me.moving) me.row = chrRow(me.a);
-    const frame = me.moving && !me.swim ? Math.floor(me.walkT * 1.0) % 4 : 0;
-    drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), me.row || 0, frame, H);
+    const m = CHR[me.spr.slice(4)]; const walking = me.moving && !me.swim;
+    if (m?.layout === 'heroi') {
+      // folha do jogador: linhas frente, costas, direita, esquerda (coluna 0 parado, 1–4 caminhada) e corrida
+      // para os lados (linhas 4 e 5, colunas 1–5); correndo para cima/baixo usa a caminhada mais rápida
+      const r = [0, 2, 1, 3][me.row || 0]; const side = r >= 2;
+      const [row, col] = !walking ? [r, 0] : me.run && side ? [r + 2, 1 + (Math.floor(me.walkT) % 5)] : [r, 1 + (Math.floor(me.walkT) % 4)];
+      drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), row, col, me.run && side && walking ? H * 0.94 : H);
+    } else drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), me.row || 0, walking ? Math.floor(me.walkT) % 4 : 0, H);
+    if (me.run && walking && Math.random() < 0.25) particles.push({ x: me.x - Math.cos(me.a) * 3, y: me.y, vx: 0, vy: -2, t: 0, life: 0.6, s: 3 });
     if (me.swim) { ctx.restore(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.ellipse(me.x, me.y - 5, 6 + Math.sin(t * 5) * 1.5, 2, 0, 0, Math.PI * 2); ctx.stroke(); }
     ctx.fillStyle = '#38d6f5'; ctx.beginPath(); ctx.moveTo(me.x, me.y - H - 4); ctx.lineTo(me.x - 3, me.y - H - 8); ctx.lineTo(me.x + 3, me.y - H - 8); ctx.fill();
   }
@@ -548,7 +555,7 @@ export default async function render(el, params = new URLSearchParams()) {
       if (ev?.crash) planeCrash(pl, ev.crash);
       else if (ev?.landed) toast('Pouso perfeito ✈', 'Bem-vindo(a) ao Aeroporto Nexus.', 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]); me.walkT += Math.hypot(me.x - ox, me.y - oy) / 3.2; } // um passo a cada ~3 unidades andadas
+    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]); me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
@@ -575,6 +582,7 @@ export default async function render(el, params = new URLSearchParams()) {
   window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
+  if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }
   return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
 }
 export { canWalk, WATER, RUNWAY, gather };

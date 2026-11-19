@@ -836,3 +836,4 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .d2-looks button.on { border-color: #fbbf24; }
 .d2-looks i { display: block; height: 52px; background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated; }
 .d2-look { z-index: 8; }
+.d2-joy.run { border-color: #fbbf24 !important; box-shadow: 0 0 0 3px rgba(251,191,36,.35); }
