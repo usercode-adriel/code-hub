@@ -634,3 +634,14 @@ body.cx-on[data-route="mapa"] .cx-main.content, body.cx-on[data-route="assistent
   .lv2-list { overflow: visible; max-height: none; }
   .nb-msgs { max-height: 320px; }
 }
+/* mapa: bitmap da cidade num canvas do tamanho da tela, SVG (marcadores, pessoas, rotas) por cima */
+.cm .cm-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; }
+.cm .cm-svg { position: relative; z-index: 1; }
+.cm.cv-ready { background: #2f6fd0; }
+/* sem desfoque/sombras por cima do mapa (cada quadro do arrasto ficava caro no celular) */
+.lv-hud { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(13, 17, 54, .94) !important; }
+@media (pointer: coarse), (max-width: 900px) {
+  .cm .cm-svg *, .cm .cm-wdot, .cm .cm-wglow { filter: none !important; }
+  .cm .cm-wglow { display: none; }
+  .cm .cm-trail { display: none; }
+}

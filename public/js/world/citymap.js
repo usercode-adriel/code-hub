@@ -88,26 +88,27 @@ function baseLayer(geo, path) {
     <path d="${path(geo.edges.avenida)}" stroke="${PX.lane}" stroke-width="1" stroke-dasharray="6 6" fill="none"/>
     <g>${geo.hw.map((h) => `<polyline points="${pts(h.pts)}" fill="none" stroke="${PX.curb}" stroke-width="${ROAD.rodovia[1] + 4}" stroke-linejoin="round"/><polyline points="${pts(h.pts)}" fill="none" stroke="${ROAD.rodovia[0]}" stroke-width="${ROAD.rodovia[1]}" stroke-linejoin="round"/><polyline points="${pts(h.pts)}" fill="none" stroke="${PX.lane}" stroke-width="1.2" stroke-dasharray="8 7" stroke-linejoin="round"/>`).join('')}</g>`;
 }
+// A camada fixa vira UM bitmap pequeno (1 pixel = 2 unidades do mapa), guardado em memória. Ele é desenhado num
+// <canvas> do tamanho da tela, recortando só a parte visível a cada movimento. Antes ele era uma <image> dentro do
+// SVG: com zoom no celular a imagem ampliada passava do limite da placa de vídeo e a tela "bugava".
 const pxCache = new Map();
 async function rasterize(svg, geo) {
-  const base = svg.querySelector('.cm-base'); if (!base || !window.Image) return;
+  const base = svg.querySelector('.cm-base'); if (!base || !window.Image) return null;
   const key = `${geo.w}x${geo.h}:${geo.nodes.length}:${(geo.blocks || []).length}:${geo.land.length}`;
-  let url = pxCache.get(key);
-  if (!url) {
-    const scale = 0.5; // 1 pixel da imagem = 2 unidades do mapa (zoom aproximado mostra os "pixels")
+  let bmp = pxCache.get(key);
+  if (!bmp) {
+    const scale = 0.5;
     const src = `<svg xmlns="http://www.w3.org/2000/svg" width="${geo.w * scale}" height="${geo.h * scale}" viewBox="0 0 ${geo.w} ${geo.h}" shape-rendering="crispEdges">${base.innerHTML}</svg>`;
     const blob = URL.createObjectURL(new Blob([src], { type: 'image/svg+xml' }));
     try {
       const img = new Image(); img.decoding = 'async';
       await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = blob; });
-      const cv = document.createElement('canvas'); cv.width = geo.w * scale; cv.height = geo.h * scale;
-      const cx = cv.getContext('2d'); cx.imageSmoothingEnabled = false; cx.drawImage(img, 0, 0, cv.width, cv.height);
-      url = await new Promise((ok) => cv.toBlob((b) => ok(URL.createObjectURL(b)), 'image/png'));
-      pxCache.set(key, url);
-    } catch { return; } finally { URL.revokeObjectURL(blob); }
+      bmp = document.createElement('canvas'); bmp.width = geo.w * scale; bmp.height = geo.h * scale;
+      const cx = bmp.getContext('2d'); cx.imageSmoothingEnabled = false; cx.drawImage(img, 0, 0, bmp.width, bmp.height);
+      pxCache.set(key, bmp);
+    } catch { return null; } finally { URL.revokeObjectURL(blob); }
   }
-  if (!svg.isConnected && !base.isConnected) return;
-  base.innerHTML = `<image href="${url}" x="0" y="0" width="${geo.w}" height="${geo.h}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+  return bmp;
 }
 
 export function cityMap(host, geo, { mini = false, onPick = null, onView = null } = {}) {
@@ -119,13 +120,33 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     ${mini ? '' : geo.labels.map((l) => `<text class="cm-label" x="${l.at[0]}" y="${l.at[1]}" text-anchor="middle">${esc(l.name.toUpperCase())}${l.locked ? ' · EM OBRAS' : ''}</text>`).join('')}
     <g class="cm-route"></g><g class="cm-layer"></g><g class="cm-walkers"></g></svg>
     ${mini ? '' : `<div class="cm-tools"><button class="cm-btn" data-z="in" aria-label="Aproximar">${icon('plus', 15)}</button><button class="cm-btn" data-z="out" aria-label="Afastar">${icon('minus', 15)}</button><button class="cm-btn" data-z="me" aria-label="Minha localização">${icon('target', 15)}</button><button class="cm-btn" data-z="all" aria-label="Ver a cidade toda">${icon('refresh', 14)}</button></div>`}</div>`;
-  const svg = host.querySelector('svg'); rasterize(svg, geo); const layer = host.querySelector('.cm-layer'); const routeG = host.querySelector('.cm-route'); const wl = host.querySelector('.cm-walkers');
+  const svg = host.querySelector('svg');
+  const bcv = document.createElement('canvas'); bcv.className = 'cm-cv'; svg.before(bcv);
+  let bmp = null; let baseRaf = 0;
+  const drawBase = () => {
+    baseRaf = 0; if (!bmp) return;
+    const W = svg.clientWidth; const H = svg.clientHeight; if (!W || !H) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1); const cw = Math.round(W * dpr); const ch = Math.round(H * dpr);
+    if (bcv.width !== cw || bcv.height !== ch) { bcv.width = cw; bcv.height = ch; }
+    const c = bcv.getContext('2d'); c.imageSmoothingEnabled = false;
+    c.fillStyle = '#2f6fd0'; c.fillRect(0, 0, cw, ch);
+    const sc = Math.min(cw / vb[2], ch / vb[3]); const ox = (cw - vb[2] * sc) / 2 - vb[0] * sc; const oy = (ch - vb[3] * sc) / 2 - vb[1] * sc;
+    // recorta só o trecho visível do bitmap (nada de imagem gigante)
+    const k = bmp.width / geo.w;
+    const sx0 = Math.max(0, Math.floor((-ox / sc) * k)); const sy0 = Math.max(0, Math.floor((-oy / sc) * k));
+    const sx1 = Math.min(bmp.width, Math.ceil(((cw - ox) / sc) * k)); const sy1 = Math.min(bmp.height, Math.ceil(((ch - oy) / sc) * k));
+    if (sx1 <= sx0 || sy1 <= sy0) return;
+    c.drawImage(bmp, sx0, sy0, sx1 - sx0, sy1 - sy0, ox + (sx0 / k) * sc, oy + (sy0 / k) * sc, ((sx1 - sx0) / k) * sc, ((sy1 - sy0) / k) * sc);
+  };
+  const queueBase = () => { if (!baseRaf) baseRaf = requestAnimationFrame(drawBase); };
+  rasterize(svg, geo).then((b) => { if (!b) return; bmp = b; const base = svg.querySelector('.cm-base'); if (base) base.innerHTML = ''; host.querySelector('.cm')?.classList.add('cv-ready'); drawBase(); });
+  const layer = host.querySelector('.cm-layer'); const routeG = host.querySelector('.cm-route'); const wl = host.querySelector('.cm-walkers');
   let vb = [0, 0, geo.w, geo.h]; let data = { places: [], events: [], alerts: [], houses: [], properties: [], me: null };
   let filter = null; let selected = null; let near = false;
   const px = () => vb[2] / Math.max(1, svg.clientWidth || 600); // unidades do mapa por pixel na tela
   let viewTimer = null;
   const set = () => {
-    svg.setAttribute('viewBox', vb.map((v) => Math.round(v)).join(' '));
+    svg.setAttribute('viewBox', vb.map((v) => Math.round(v)).join(' ')); queueBase();
     const n = vb[2] < 950; svg.classList.toggle('cm-near', vb[2] < 1100);
     if (n !== near) { near = n; paint(); } else scaleMarkers();
     if (onView) { clearTimeout(viewTimer); viewTimer = setTimeout(() => onView(view()), 350); }
@@ -247,13 +268,13 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     if (b.dataset.z === 'all') { vb = [0, 0, geo.w, geo.h]; set(); }
     if (b.dataset.z === 'me' && data.me?.xy) focus(data.me.xy[0], data.me.xy[1], 600);
   }; });
-  new ResizeObserver(() => { scaleMarkers(); lastK = 0; }).observe(svg);
+  new ResizeObserver(() => { scaleMarkers(); lastK = 0; queueBase(); }).observe(svg);
   return {
     setData(d) { data = { ...data, ...d }; paint(); },
     setFilter(f) { filter = f && f.size ? f : null; paint(); },
     select(id) { selected = id; paint(); const p = data.places.find((x) => x.id === id); if (p) focus(p.x, p.y, 700); },
     focus, view, setPeople,
-    destroy() { cancelAnimationFrame(raf); raf = 0; clearTimeout(viewTimer); },
+    destroy() { cancelAnimationFrame(raf); raf = 0; cancelAnimationFrame(baseRaf); clearTimeout(viewTimer); },
     drawRoute(pathPts) { routeG.innerHTML = pathPts?.length ? `<polyline points="${pathPts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#000" stroke-width="16" stroke-linejoin="round" opacity=".5"/><polyline class="cm-route-line" points="${pathPts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#a855f7" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>` : ''; },
   };
 }
