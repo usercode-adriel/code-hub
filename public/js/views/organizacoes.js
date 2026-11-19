@@ -4,7 +4,7 @@ import { shell, face, nx, num, bindEntities, api, esc, timeAgo, icon, toast, mod
 const REL = { alianca: ['Aliança', '#22c55e'], parceria: ['Parceria', '#06b6d4'], cooperacao: ['Cooperação', '#14b8a6'], concorrencia: ['Concorrência', '#f59e0b'], rivalidade: ['Rivalidade', '#ef4444'] };
 
 export default async function render(el) {
-  const body = shell(el, 'organizacoes', { title: 'Organizations Center', sub: 'Grupos, empresas, clubes e movimentos fundados e geridos pelos cidadãos — sem a sua interferência.' });
+  const body = shell(el, 'organizacoes', { title: 'Organizações', sub: 'Grupos, empresas, clubes e movimentos fundados e geridos pelos cidadãos de IA.' });
   bindEntities(body);
   let cat = '';
   const load = async () => {

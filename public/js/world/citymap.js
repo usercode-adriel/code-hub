@@ -171,9 +171,13 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
     const body = mk('g', { class: 'cm-wbody' }, g);
     mk('circle', { class: 'cm-wglow', r: 15 }, body); mk('circle', { class: 'cm-wdot', r: 10.5 }, body);
     const ini = mk('text', { class: 'cm-wini', y: 3.6, 'text-anchor': 'middle' }, body);
+    // rosto em pixel dentro do marcador (recortado em círculo)
+    const cid = `cmw${Math.random().toString(36).slice(2, 8)}`;
+    const clip = mk('clipPath', { id: cid }, body); mk('circle', { r: 9.5 }, clip);
+    const face = mk('image', { x: -9.5, y: -9.5, width: 19, height: 19, 'clip-path': `url(#${cid})`, style: 'image-rendering:pixelated', preserveAspectRatio: 'xMidYMid slice' }, body);
     const lab = mk('g', { class: 'cm-wlabel' }, body); mk('rect', { rx: 6 }, lab); const lt = mk('text', { 'text-anchor': 'middle' }, lab);
     g.dataset.person = p.id;
-    return { g, trail, body, ini, lab, lt, x: p.x, y: p.y, track: null, tStart: 0, dur: 6000, hist: [] };
+    return { g, trail, body, ini, face, lab, lt, x: p.x, y: p.y, track: null, tStart: 0, dur: 6000, hist: [] };
   }
   function setPeople(list, { horizon = 6000 } = {}) {
     if (mini) return;
@@ -186,7 +190,7 @@ export function cityMap(host, geo, { mini = false, onPick = null, onView = null 
       w.p = p;
       w.g.style.setProperty('--c', p.friend ? '#22d3ee' : (p.color || '#f59e0b'));
       w.g.classList.toggle('friend', Boolean(p.friend)); w.g.classList.toggle('car', p.mode === 'carro');
-      w.ini.textContent = p.name.split(' ').map((s) => s[0]).join('').slice(0, 2);
+      if (p.avatar) { if (w.face.getAttribute('href') !== p.avatar) w.face.setAttribute('href', p.avatar); w.ini.textContent = ''; } else w.ini.textContent = p.name.split(' ').map((s) => s[0]).join('').slice(0, 2);
       if (w.lt.textContent !== first) { w.lt.textContent = first; const wd = first.length * 6.3 + 12; w.lab.firstChild.setAttribute('x', -wd / 2); w.lab.firstChild.setAttribute('y', -29); w.lab.firstChild.setAttribute('width', wd); w.lab.firstChild.setAttribute('height', 17); w.lt.setAttribute('y', -16.5); }
       if (p.moving && p.wp?.length) {
         const far = Math.hypot(w.x - p.x, w.y - p.y) > 40;

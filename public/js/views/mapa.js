@@ -10,7 +10,7 @@ const FEED_COLOR = { entrada: '#34d399', saida: '#fb923c', compra: '#22d3ee', pr
 const FEED_ICON = { entrada: '●', saida: '●', compra: '🛒', promo: '', noticia: '📰', alerta: '🚓' };
 const hhmm = (d) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-export default async function render(el, parts) {
+export default async function render(el, parts, params = new URLSearchParams()) {
   const body = shell(el, 'mapa');
   bindEntities(body);
   body.innerHTML = '<div class="skeleton" style="height:100%;min-height:70vh"></div>';
@@ -67,7 +67,7 @@ export default async function render(el, parts) {
       if (!alive) return;
       lastPeople = d.people; map.setPeople(d.people, { horizon: d.horizon });
       $('#lvCnt').textContent = d.online;
-      $('#lvOnl').innerHTML = d.people.slice(0, 7).map((p) => `<button class="lv-row" data-person="${esc(p.id)}"><span class="lv-av" style="background:${p.friend ? '#22d3ee' : esc(p.color || '#f59e0b')}">${esc(p.name.split(' ').map((s) => s[0]).join('').slice(0, 2))}</span><span class="lv-nm"><b>${esc(p.name)}</b><small>${esc(p.doing)}</small></span></button>`).join('') || '<p class="muted">Ninguém por perto agora.</p>';
+      $('#lvOnl').innerHTML = d.people.slice(0, 7).map((p) => `<button class="lv-row" data-person="${esc(p.id)}">${p.avatar ? `<img class="lv-av lv-px" src="${esc(p.avatar)}" alt="" style="border-color:${p.friend ? '#22d3ee' : esc(p.color || '#f59e0b')}">` : `<span class="lv-av" style="background:${p.friend ? '#22d3ee' : esc(p.color || '#f59e0b')}">${esc(p.name.split(' ').map((s) => s[0]).join('').slice(0, 2))}</span>`}<span class="lv-nm"><b>${esc(p.name)}</b><small>${esc(p.doing)}</small></span></button>`).join('') || '<p class="muted">Ninguém por perto agora.</p>';
       $('#lvOnl').querySelectorAll('[data-person]').forEach((b) => { b.onclick = () => personCard(b.dataset.person); });
     } catch { /* sem conexão: segue com o que tem */ }
   }
@@ -161,6 +161,10 @@ export default async function render(el, parts) {
   }
 
   if (parts?.[0]) openPlace(parts[0]);
+  // atalhos vindos de outras telas: casa, bairro, busca
+  const hq = params.get('casa'); const bq = params.get('bairro');
+  if (hq) { const h = (layers.houses || []).find((x) => x.id === hq); const xy = h ? (h.xy || [h.x, h.y]) : null; if (xy?.[0] != null) map.focus(xy[0], xy[1], 420); }
+  if (bq) { const d = geo.districts.find((x) => x.id === bq); if (d) { const cx = d.poly.reduce((a, p) => a + p[0], 0) / d.poly.length; const cy = d.poly.reduce((a, p) => a + p[1], 0) / d.poly.length; map.focus(cx, cy, 700); } }
   pullPeople(); pullFeed();
   const timers = [setInterval(pullPeople, 6000), setInterval(pullFeed, 8000), setInterval(tickClock, 15000),
     setInterval(async () => { if (document.hidden) return; try { layers = await api.get('/mundo/mapa/camadas'); map.setData(layers); } catch { /* sem conexão */ } }, 60000)];

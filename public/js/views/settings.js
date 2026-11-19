@@ -63,6 +63,9 @@ function appearance(box) {
       <p class="sub">A imagem grande de Nexus City no painel. Envie um PNG ou JPG no mesmo formato (paisagem, por volta de 1280×640).</p>
       <div class="cover-set"><div class="cover-prev" id="coverPrev"></div>
         <div class="cover-acts"><button class="btn sm primary" id="coverUp">${icon('upload', 13)} Enviar imagem</button><button class="btn sm outline" id="coverReset">Voltar ao padrão</button></div></div></section>`;
+  // visual único Codeniac Society: temas e cores antigos não se aplicam mais (ficam guardados, mas escondidos)
+  for (const sec of new Set([...box.querySelectorAll('[data-theme],[data-color]')].map((x) => x.closest('section')))) sec?.remove();
+  box.insertAdjacentHTML('afterbegin', `<section class="card cx-look"><img src="/assets/pixel/skyline-wide.png" alt=""><div><h3 class="title">${icon('palette', 15)} Visual Codeniac Society</h3><p class="sub">Azul-marinho profundo, cartões sólidos azul/roxo e arte em pixel 16-bit, igual em todas as telas. Os temas antigos foram aposentados para manter a identidade da cidade.</p><a class="btn sm primary" href="#/vida">${icon('user', 13)} Trocar meu rosto em pixel</a></div></section>`);
   box.querySelectorAll('[data-theme]').forEach((b) => { b.onclick = () => { patch({ theme: b.dataset.theme, themeVars: {}, ...presetLayout(b.dataset.theme) }); appearance(box); }; });
   box.querySelectorAll('[data-color]').forEach((i) => {
     i.oninput = () => { i.nextElementSibling.querySelector('small').textContent = i.value; applySettings({ ...store.settings, themeVars: { ...store.settings.themeVars, [i.dataset.color]: i.value } }); };

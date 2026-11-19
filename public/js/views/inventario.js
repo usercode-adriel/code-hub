@@ -2,27 +2,36 @@
 import { shell, bindEntities, nx, api, esc, icon, toast, timeAgo, confirmDialog } from '../world/wui.js';
 import { formModal } from '../ui.js';
 
-const ACT = { instalar: ['Instalar', 'download'], ativar: ['Ativar', 'zap'], usar: ['Usar', 'play'], transferir: ['Presentear', 'heart'], vender: ['Revender', 'wallet'], descartar: ['Descartar', 'trash'] };
-const STATE = { novo: 'Novo', instalado: 'Instalado', ativo: 'Ativo', usado: 'Usado' };
+const ACT = { instalar: ['Instalar', 'download'], ativar: ['Ativar', 'zap'], usar: ['Usar', 'play'], equipar: ['Equipar', 'check'], esconder: ['Esconder / tirar', 'eye'], transferir: ['Presentear', 'heart'], vender: ['Revender', 'wallet'], descartar: ['Descartar', 'trash'] };
+const CATS = [['', 'Tudo'], ['tecnologia', 'Tecnologia'], ['celular', 'Celulares'], ['veiculos', 'Veículos'], ['social', 'Social'], ['geral', 'Consumo'], ['submundo', 'Submundo']];
+const catOf = (it) => (it.phone ? 'celular' : it.category);
+const STATE = { novo: 'Novo', instalado: 'Instalado', ativo: 'Ativo', usado: 'Usado', equipado: 'Equipado', guardado: 'Guardado', escondido: 'Escondido em casa' };
 const INSTALLED = { central: ['Central de Comando', 'cpu', '#/centro'], mapa: ['Mapa Inteligente', 'pin', '#/mapa'], phone: ['Smartphone', 'chat', '#/social'], camera: ['Câmera', 'camera', '#/rede'], kit: ['Kit do Empreendedor', 'rocket', '#/empresas/empresa'] };
 
 export default async function render(el) {
   const body = shell(el, 'inventario');
   bindEntities(body);
+  let cat = '';
   const load = async () => {
     const d = await api.get('/mundo/inventario');
     const vip = d.vipUntil && d.vipUntil > new Date().toISOString();
     const inst = Object.entries(d.installed).filter(([k, v]) => v && INSTALLED[k]);
-    body.innerHTML = `<div class="iv">
-      <section class="w-panel iv-top"><div><h1>${icon('layers', 22)} Inventário</h1><p class="muted">${d.items.length} item(ns). Itens comprados nas lojas do mapa ficam aqui com histórico completo.</p></div>
-        <div class="iv-inst">${inst.map(([k]) => `<a class="w-chip ok" href="${INSTALLED[k][2]}">${icon(INSTALLED[k][1], 11)} ${INSTALLED[k][0]}</a>`).join('')}${vip ? `<span class="w-chip gold">${icon('star', 11)} VIP até ${new Date(d.vipUntil).toLocaleDateString('pt-BR')}</span>` : ''}<span class="w-chip">Memória dos amigos: ${d.memCap} lembranças</span></div></section>
-      ${d.items.length ? `<div class="iv-grid">${d.items.map((it) => `<article class="w-panel iv-item ${esc(it.state)}"><div class="iv-h"><span class="mk-ic sm">${icon(it.icon, 16)}</span><div><b>${esc(it.name)}</b><small>${STATE[it.state] || it.state} · ${esc(it.compatibility)}</small></div></div>
-          <p class="muted">${esc(it.desc || '')}</p>
-          <div class="iv-meta"><span>Pago: <b>${nx(it.price, 0)}</b></span><span>${esc(it.placeName || '')}</span><span>${esc(timeAgo(it.acquiredAt))}</span></div>
-          <details><summary>Histórico</summary><ul class="gm-hist">${it.history.map((h) => `<li><small class="muted">${new Date(h.at).toLocaleDateString('pt-BR')}</small> ${esc(h.text)}</li>`).join('')}</ul></details>
-          <div class="iv-acts">${it.actions.map((a) => `<button class="btn sm ${['instalar', 'ativar', 'usar'].includes(a) ? 'primary' : a === 'descartar' ? 'ghost' : 'outline'}" data-id="${esc(it.id)}" data-a="${a}">${icon(ACT[a]?.[1] || 'check', 12)} ${ACT[a]?.[0] || a}</button>`).join('')}</div></article>`).join('')}</div>`
-        : `<div class="w-panel w-empty">${icon('bag', 30)}<b>Inventário vazio</b><p class="muted">Vá ao Mercado: Central de Comando, Mapa Inteligente, smartphone, câmera, Clube VIP e mais.</p><a class="btn primary" href="#/mercado">Abrir o Mercado</a></div>`}
+    const list = d.items.filter((it) => !cat || catOf(it) === cat);
+    const total = d.items.reduce((n, it) => n + (it.price || 0), 0);
+    body.innerHTML = `<div class="iv2">
+      <header class="iv2-head cx-card"><span class="cx-h-ic" style="--c:#c084fc">${icon('layers', 18)}</span><div><h1>Inventário</h1><p class="cx-mut">${d.items.length} item(ns) · ${nx(total, 0)} investidos. Tudo o que você compra nas lojas do mapa fica aqui, com histórico.</p></div>
+        <div class="iv-inst">${inst.map(([k]) => `<a class="w-chip ok" href="${INSTALLED[k][2]}">${icon(INSTALLED[k][1], 11)} ${INSTALLED[k][0]}</a>`).join('')}${vip ? `<span class="w-chip gold">${icon('star', 11)} VIP até ${new Date(d.vipUntil).toLocaleDateString('pt-BR')}</span>` : ''}</div></header>
+      <div class="sh-chips">${CATS.filter(([k]) => !k || d.items.some((it) => catOf(it) === k)).map(([k, l]) => `<button data-cat="${k}" class="${cat === k ? 'on' : ''}">${l}${k ? ` (${d.items.filter((it) => catOf(it) === k).length})` : ''}</button>`).join('')}</div>
+      ${list.length ? `<div class="iv2-grid">${list.map((it) => `<article class="iv2-item st-${esc(it.state)} ${it.illegal ? 'illegal' : ''}">
+          <div class="iv2-art"><img src="${esc(it.art || '')}" alt="" onerror="this.style.visibility='hidden'"><span class="iv2-st">${STATE[it.state] || it.state}</span>${it.illegal ? '<span class="iv2-ill">clandestino</span>' : ''}</div>
+          <b>${esc(it.name)}</b>
+          <small class="cx-mut">${it.phone ? `${esc(it.phone.tierLabel)} · ${it.phone.apps} apps · ${it.phone.camera} MP` : esc(it.desc || '')}</small>
+          <div class="iv-meta"><span>Pago <b>${nx(it.price, 0)}</b></span><span>${esc(it.placeName || '')}</span><span>${esc(timeAgo(it.acquiredAt))}</span></div>
+          <div class="iv2-acts">${it.actions.map((a) => `<button class="cx-btn sm ${['instalar', 'ativar', 'usar', 'equipar'].includes(a) ? '' : 'ghost'}" data-id="${esc(it.id)}" data-a="${a}" title="${ACT[a]?.[0] || a}">${icon(ACT[a]?.[1] || 'check', 12)} ${['instalar', 'ativar', 'usar', 'equipar'].includes(a) ? (ACT[a]?.[0] || a) : ''}</button>`).join('')}</div>
+          <details><summary>Histórico</summary><ul class="gm-hist">${it.history.map((h) => `<li><small class="cx-mut">${new Date(h.at).toLocaleDateString('pt-BR')}</small> ${esc(h.text)}</li>`).join('')}</ul></details></article>`).join('')}</div>`
+        : `<div class="cx-card iv2-empty"><img src="/assets/items/central-comando.png" alt=""><b>${d.items.length ? 'Nada nesta categoria' : 'Inventário vazio'}</b><p class="cx-mut">Celulares, carros, softwares, câmera, Clube VIP e mais nas lojas do mapa.</p><a class="cx-btn" href="#/mercado">${icon('cart', 14)} Ir às lojas</a></div>`}
     </div>`;
+    body.querySelectorAll('[data-cat]').forEach((b) => { b.onclick = () => { cat = b.dataset.cat; load(); }; });
     body.querySelectorAll('[data-a]').forEach((b) => { b.onclick = () => act(d, d.items.find((x) => x.id === b.dataset.id), b.dataset.a); });
   };
   const run = async (it, a, extra = {}) => {
