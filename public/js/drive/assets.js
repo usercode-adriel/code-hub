@@ -8,6 +8,8 @@ export function loadAssets() {
     const bld = await (await fetch('/assets/rpg/bld/meta.json')).json();
     for (const k of Object.keys(bld)) { meta[`bld/${k}`] = bld[k]; meta[`bld/${k}-lit`] = bld[k]; }
     for (const k of ['tiles/sidewalk', 'tiles/asphalt', 'tiles/front']) meta[k] = [16, 16];
+    const deco = await (await fetch('/assets/rpg/deco/meta.json')).json();
+    for (const k of Object.keys(deco)) meta[`deco/${k}`] = deco[k];
     const img = {};
     await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = `/assets/rpg/${k}.png`; })));
     return { meta, roles, img };

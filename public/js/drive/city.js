@@ -3,6 +3,7 @@
 // máscara de colisão (4 unidades por célula), altura das construções (para os aviões), luzes, pontos de interesse,
 // bairros, aeroporto e vagas. Unidade = 1 "pixel de arte"; 1 unidade ≈ 0,2 m.
 import { BLD } from './bldmeta.js';
+import { DECO } from './decometa.js';
 import { SOLID, WALK, ROAD, CROSS, LOT, WATER, GRASS, RUNWAY, PLAZA, SAND } from './world.js';
 
 export const W = 4096; export const H = 2816; export const CS = 4;
@@ -75,6 +76,7 @@ export function generateCity(seed = 20261119) {
   const blds = []; const props = []; const lamps = []; const pois = []; const regions = []; const spots = [];
   // mar, praia e cinturões verdes
   G('water', 0, 0, 232, H); G('sand', 232, 0, 88, H);
+  const beachFence = [];
   G('water', 0, 1992, 1504, 80);
   // rio cruza as quadras da beira-rio: margens de areia
   G('sand', 0, 1976, 1440, 16); G('sand', 0, 2072, 1440, 16);
@@ -133,7 +135,7 @@ export function generateCity(seed = 20261119) {
       while (y < y1 - depth - minW) { const h = Math.min(y1 - depth - 4 - y, minW + Math.floor(R() * (maxW - minW))); const x = side === 'w' ? x0 : x1 - depth; make(x, y, depth, h - 4, side); y += h; }
     }
   }
-  const tree = (x, y, big = true) => { const k = Math.floor(R() * 5); P(big ? `arvore${k}` : `arbusto${k % 2}`, x, y, big ? 20 : 14, big ? 34 : 18, true, { h: 18 }); };
+  const tree = (x, y, big = true) => { const k = Math.floor(R() * 5); if (big && R() < 0.4) PX(R() < 0.5 ? 'arvore' : 'arvore-vaso', x, y, true); else P(big ? `arvore${k}` : `arbusto${k % 2}`, x, y, big ? 20 : 14, big ? 34 : 18, true, { ht: 18 }); };
 
   // ---------------------------------------------------------------- prédios em sprite (folhas de pixel art)
   // cada prédio ocupa exatamente o retângulo desenhado (largura sai da proporção do sprite)
@@ -141,8 +143,9 @@ export function generateCity(seed = 20261119) {
   const SPw = (spr, x, y, w, extra = {}) => { const [sw, sh] = BLD[spr] || [100, 150]; return B({ kind: 'sprite', spr, x, y, w, h: (w * sh) / sw, floors: Math.max(1, Math.round((sh / sw) * 4)), ...extra }); };
   const wOfS = (spr, h) => { const [sw, sh] = BLD[spr] || [100, 150]; return (h * sw) / sh; };
   // fileira de prédios da esquerda para a direita, sorteando entre os sprites que cabem (copiando os mesmos quando precisa)
+  const ACCESS = { on: false };
   function row(x0, x1, y, h, list, { gap = 6, trees = 0, center = true } = {}) {
-    const items = []; let x = x0;
+    const items = []; let x = x0; if (ACCESS.on) ground.push({ mat: 'access', shape: 'rect', x: snap(x0 - 20), y: snap(y + h + 8), w: snap(x1 - x0 + 40), h: 12 });
     for (;;) {
       const fit = list.filter((k) => wOfS(k, h) <= x1 - x);
       if (!fit.length) break;
@@ -163,14 +166,30 @@ export function generateCity(seed = 20261119) {
   const fitIn = (spr, x0, y0, w, h, extra) => { const [sw, sh] = BLD[spr]; const k = Math.min(w / sw, h / sh); return B({ kind: 'sprite', spr, x: x0 + (w - sw * k) / 2, y: y0 + (h - sh * k) / 2, w: sw * k, h: sh * k, floors: Math.max(2, Math.round((sh / sw) * 4)), ...extra }); };
 
   // tamanho de cada objeto decorativo (unidades do mapa), na proporção do sprite
+  // sprites da folha "City Decorations & Details": nome, altura (unidades), sólido
+  const DH = { arvore: 40, coqueiro: 46, 'arvore-vaso': 26, 'arvore-vaso2': 26, 'flores-v': 12, 'flores-b': 12, 'flores-a': 12, 'arbusto-c': 13, 'arbusto-c2': 13, 'arbusto-vaso': 14, 'arbusto-vaso2': 18,
+    banco: 13, banco2: 13, 'lixeira-verde': 11, 'lixeira-cinza': 11, 'correio-azul': 12, 'correio-vermelho': 12, poste: 26, 'poste-duplo': 26, 'poste-triplo': 28, 'poste-madeira': 30,
+    grade: 15, grade2: 15, cerca: 12, barreira: 11, cone: 8, cavalete: 10, tambor: 9, hidrante: 10, 'banca-jornal': 18, telefone: 20, 'ponto-onibus': 22, 'placa-onibus': 18,
+    'placa-direcao': 22, 'placa-hotel': 24, 'placa-bar': 24, 'placa-motel': 24, 'placa-p': 15, 'placa-proibido': 15, 'placa-50': 15, 'placa-pare': 15, 'placa-pedestre': 15, semaforo: 16,
+    'maq-bebida': 17, 'maq-lanche': 17, orelhao: 16, quiosque: 22, feira: 20, guarita: 20, 'caixa-luz': 15, armario: 15, armario2: 15, caixotes: 15, pneus: 10, barril: 14, cavalete2: 11 };
+  const PX = (name, x, y, solid = false, extra = {}) => { const [sw, sh] = DECO[name] || [40, 40]; const h = extra.size || DH[name] || 14; const w = (h * sw) / sh; P(`d:${name}`, x, y, w, h, solid, { ht: name.startsWith('arvore') || name === 'coqueiro' ? 18 : 6, deco: true, ...extra }); };
   const PSZ = { arvore: [24, 40], arbusto: [17, 23], canteiro: [26, 16], banco: [24, 15], lixeira: [8, 13], hidrante: [8, 11], chafariz: [44, 39], jardim0: [30, 27], 'guarda-sol': [22, 19], banca: [24, 29] };
   const PD = (spr, x, y, solid = true) => { const k = Object.keys(PSZ).find((n) => spr.startsWith(n)) || 'lixeira'; const [w, h] = PSZ[k]; P(spr, x, y, w, h, solid, { ht: k === 'arvore' ? 18 : 6, deco: true }); };
+  // orla: coqueiros na areia, cerca de madeira na divisa com o calçadão (com passagens), bancos voltados para o mar
+  for (let y = 40; y < H - 40; y += 30) {
+    if (y > 1970 && y < 2100) continue;
+    const pass = Math.floor(y / 30) % 7 === 0; // passagem para a areia
+    if (!pass) { PX('cerca', 312, y + 8, false, { rot: Math.PI / 2, size: 14 }); beachFence.push([308, y - 9, 6, 30]); }
+    else PX('banco', 300, y + 6);
+  }
+  for (let y = 30; y < H - 30; y += 44) { if (y > 1960 && y < 2110) continue; PX('coqueiro', 252 + ((y * 7) % 30), y + 20, true); if ((y / 44) % 3 < 1) P(`guarda-sol${(y / 44) % 2 | 0}`, 286, y + 34, 18, 16, false, { deco: true, ht: 4 }); }
   for (const bl of blocks) {
     const [x0, y0, x1, y1] = bl.r; const bw = x1 - x0; const bh = y1 - y0; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
     const nB0 = blds.length;
     if (bl.zone !== 'bosque' && bl.zone !== 'aeroporto') regions.push({ name: REGION[bl.zone] || 'Nexus City', rect: [x0 - 24, y0 - 24, x1 + 24, y1 + 24] });
     switch (bl.zone) {
       case 'residencial': case 'rio': {
+        ACCESS.on = true;
         const parts = bl.zone === 'rio' ? [[y0, 1960], [2104, y1]] : [[y0, y1]];
         if (bl.zone === 'rio') { G('grass', x0, y0, bw, 1976 - y0, 'rect', { yard: true }); G('grass', x0, 2088, bw, y1 - 2088, 'rect', { yard: true }); }
         else G('grass', x0, y0, bw, bh, 'rect', { yard: true });
@@ -183,6 +202,7 @@ export function generateCity(seed = 20261119) {
         break;
       }
       case 'praia': {
+        ACCESS.on = true;
         G('grass', x0, y0, bw, bh);
         let yy = y0 + 4; const H = 118;
         while (yy + H <= y1 - 4) { row(x0 + 4, x1 - 4, yy, H, ['apt-beige', 'hotel-tall', 'tower-beige', 'apt-green', 'res-a1', 'hotel'], { gap: 14, trees: 0.5 }); yy += H + 24; }
@@ -225,13 +245,25 @@ export function generateCity(seed = 20261119) {
       case 'praca': case 'lago': case 'parque': {
         G('grass', x0, y0, bw, bh, 'rect', { park: true });
         G('plaza', cx - 12, y0, 24, bh); G('plaza', x0, cy - 12, bw, 24);
-        if (bl.zone === 'praca') { G('plaza', cx - 70, cy - 70, 140, 140, 'ellipse'); P('chafariz', cx, cy + 14, 44, 40, true, { h: 6 }); poi('praca', 'Praça Central', cx, cy + 40, '#/social/eventos', 'sun'); }
+        if (bl.zone === 'praca') { G('plaza', cx - 70, cy - 70, 140, 140, 'ellipse'); P('chafariz', cx, cy + 14, 44, 40, true, { ht: 6 }); poi('praca', 'Praça Central', cx, cy + 40, '#/social/eventos', 'sun'); }
         if (bl.zone === 'lago') { G('pond', 1432, 1974, 240, 180, 'ellipse'); G('pond', x0, 1992, 1440 - x0 + 4, 80); poi('parque', 'Parque do Lago', cx, y0 + 30, '#/social/eventos', 'sun'); }
         if (bl.zone === 'parque') { G('pond', cx + 50, cy + 40, 90, 60, 'ellipse'); poi('parque2', 'Parque Sul', cx, cy - 30, '#/social/eventos', 'sun'); }
         for (let k = 0; k < Math.floor((bw * bh) / 9000); k++) { const tx = x0 + 20 + R() * (bw - 40); const ty = y0 + 20 + R() * (bh - 40); if (Math.abs(tx - cx) < 26 || Math.abs(ty - cy) < 26) continue; if (bl.zone === 'lago' && Math.hypot((tx - 1552) / 130, (ty - 2064) / 100) < 1) continue; tree(tx, ty, R() < 0.8); }
         if (bl.zone !== 'lago') for (let k = 0; k < 6; k++) P(`banco${k % 2}`, cx - 60 + k * 24, cy + 22, 18, 10, false);
         else for (let k = 0; k < 4; k++) P(`banco${k % 2}`, cx - 40 + k * 26, y1 - 30, 18, 10, false);
-        P('banca0', cx + 40, cy - 30, 20, 22, true, { h: 6 });
+        if (bl.zone !== 'lago') P('banca0', cx + 40, cy - 30, 20, 22, true, { ht: 6 });
+        else {
+          // orla do lago: bancos, postes e flores na margem (fora da água e longe do canal)
+          for (let k = 0; k < 18; k++) {
+            const a = (k / 18) * Math.PI * 2; if (Math.abs(Math.cos(a) + 1) < 0.35) continue;
+            const bx = 1552 + Math.cos(a) * 142; const by = 2064 + Math.sin(a) * 112; if (Math.abs(bx - cx) < 16) continue;
+            const t = k % 3; PX(t === 0 ? 'poste-triplo' : t === 1 ? 'banco' : 'flores-b', bx, by + 6, t !== 1, t === 0 ? { lamp: true } : {}); if (t === 0) lamps.push([bx, by + 6]);
+          }
+          P('banca0', 1552 + 96, 2064 - 132, 20, 22, true, { ht: 6 });
+        }
+        // bancos e postes ornamentais em volta da praça central do parque
+        if (bl.zone !== 'lago') for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; const r = bl.zone === 'praca' ? 84 : 56; const bx = cx + Math.cos(a) * r; const by = cy + Math.sin(a) * r * 0.8; PX(k % 3 === 0 ? 'poste-triplo' : k % 3 === 1 ? 'banco' : 'flores-v', bx, by + 8, k % 3 !== 1, k % 3 === 0 ? { lamp: true } : {}); if (k % 3 === 0) lamps.push([bx, by + 8]); }
+        PX('quiosque', x0 + 30, y0 + 40, true); PX('maq-bebida', x0 + 50, y0 + 40, true); PX('lixeira-verde', x0 + 62, y0 + 40);
         break;
       }
       case 'hospital': {
@@ -252,7 +284,8 @@ export function generateCity(seed = 20261119) {
       case 'terminal': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: false, bus: true });
         const bs = row(x0 + 4, x1 - 4, y0 + 4, 104, ['busterminal'], { gap: 4 });
-        for (let k = 0; k < 5; k++) P('ponto', x0 + 30 + k * ((bw - 60) / 4), y0 + 130, 30, 14, false);
+        for (let k = 0; k < 5; k++) PX('ponto-onibus', x0 + 30 + k * ((bw - 60) / 4), y0 + 150);
+        PX('placa-onibus', x0 + 12, y0 + 150); PX('maq-lanche', x1 - 14, y0 + 150, true); PX('maq-bebida', x1 - 28, y0 + 150, true);
         poi('terminal', 'Terminal Rodoviário', cx, y1 + 20, '#/acontecimentos', 'bus');
         if (bs[0]) bs[0].label = 'Terminal Rodoviário';
         break;
@@ -340,6 +373,7 @@ export function generateCity(seed = 20261119) {
       }
       default: break;
     }
+    ACCESS.on = false;
     // calçada com meio-fio na frente de cada prédio (onde ele não está num estacionamento)
     if (!['estacionamento', 'shopping', 'terminal', 'concessionaria', 'posto', 'galpoes', 'fabrica', 'tanques', 'conteineres'].includes(bl.zone)) {
       for (const b of blds.slice(nB0)) if (b.kind === 'sprite' && b.spr !== 'stadium') G('front', b.x - 2, b.y + b.h - 2, b.w + 4, 11);
@@ -348,6 +382,8 @@ export function generateCity(seed = 20261119) {
     if (bl.zone === 'estadio') {
       const st = blds.slice(nB0).find((b) => b.spr === 'stadium');
       if (st) {
+        for (let x = st.x + 20; x < st.x + st.w - 10; x += 60) { PX('banco', x, st.y + st.h + 30); PX('lixeira-cinza', x + 18, st.y + st.h + 30); PX('flores-b', x + 34, st.y + st.h + 30); }
+        PX('quiosque', st.x + 10, y1 - 60, true); PX('feira', st.x + 40, y1 - 60, true); PX('maq-bebida', st.x + 66, y1 - 60, true); PX('maq-lanche', st.x + 80, y1 - 60, true);
         const cyc = ['lixeira0', 'banco0', 'canteiro1', 'lixeira2', 'banco1', 'canteiro2'];
         let k = 0;
         for (let x = st.x + 10; x < st.x + st.w - 10; x += 22) PD(cyc[k++ % cyc.length], x, st.y + st.h + 14);
@@ -386,17 +422,19 @@ export function generateCity(seed = 20261119) {
       const x = s.v ? s.x + side * off : s.x0 + t; const y = s.v ? s.y0 + t : s.y + side * off;
       if (nearNode(x, y, s.w + 10) || x < 240 || y < 0 || x > W || y > H) continue;
       if (s.v && y > 1990 && y < 2076 && s.x < 1440) continue;
-      lamps.push([x, y]); P(`poste${(s.v ? 0 : 2) + (side > 0 ? 1 : 0)}`, x, y + (s.v ? 0 : side > 0 ? 6 : 0), 6, 18, false, { lamp: true });
+      const ind = x > 2752 && y > 1504; const centro = x > 640 && x < 2752 && y < 1504;
+      const kind = ind ? 'poste-madeira' : s.w >= 48 ? (Math.floor(t / 96) % 3 === 0 ? 'poste-triplo' : 'poste-duplo') : centro ? (Math.floor(t / 96) % 2 ? 'poste' : 'poste-duplo') : 'poste';
+      lamps.push([x, y]); PX(kind, x, y + (s.v ? 0 : side > 0 ? 6 : 0), false, { lamp: true });
     }
   }
 
   // ---------------------------------------------------------------- máscara de colisão e alturas
   const mw = W / CS; const mh = H / CS; const mask = new Uint8Array(mw * mh).fill(GRASS); const heights = new Uint8Array(mw * mh);
-  const code = { front: WALK, pond: WATER, water: WATER, sand: SAND, grass: GRASS, walk: WALK, road: ROAD, cross: CROSS, lot: LOT, runway: RUNWAY, plaza: PLAZA };
+  const code = { access: LOT, front: WALK, pond: WATER, water: WATER, sand: SAND, grass: GRASS, walk: WALK, road: ROAD, cross: CROSS, lot: LOT, runway: RUNWAY, plaza: PLAZA };
   const fillRect = (c, x, y, w, h) => { const ax = Math.max(0, Math.floor(x / CS)); const ay = Math.max(0, Math.floor(y / CS)); const bx = Math.min(mw, Math.ceil((x + w) / CS)); const by = Math.min(mh, Math.ceil((y + h) / CS)); for (let j = ay; j < by; j++) mask.fill(c, j * mw + ax, j * mw + bx); };
   const fillEll = (c, x, y, w, h) => { const cx = x + w / 2; const cy = y + h / 2; const ax = Math.max(0, Math.floor(x / CS)); const ay = Math.max(0, Math.floor(y / CS)); const bx = Math.min(mw, Math.ceil((x + w) / CS)); const by = Math.min(mh, Math.ceil((y + h) / CS)); for (let j = ay; j < by; j++) for (let i = ax; i < bx; i++) { const px = (i + 0.5) * CS; const py = (j + 0.5) * CS; if (((px - cx) / (w / 2)) ** 2 + ((py - cy) / (h / 2)) ** 2 <= 1) mask[j * mw + i] = c; } };
   // ordem: base → água/areia → quadras → calçadas → ruas → faixas → aeroporto → pontes
-  const order = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'road', 'cross', 'runway'];
+  const order = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'access', 'road', 'cross', 'runway'];
   for (const m of order) for (const g of ground) if (g.mat === m) (g.shape === 'ellipse' ? fillEll : fillRect)(code[m], g.x, g.y, g.w, g.h);
   for (const g of ground) if (g.island) fillEll(SOLID, g.x + 6, g.y + 6, g.w - 12, g.h - 12);
   for (const b of bridges) { fillRect(WALK, b.x, b.y, b.w, b.h); fillRect(ROAD, b.x + 16, b.y, b.w - 32, b.h); fillRect(SOLID, b.x, b.y, 3, b.h); fillRect(SOLID, b.x + b.w - 3, b.y, 3, b.h); }
@@ -414,6 +452,7 @@ export function generateCity(seed = 20261119) {
   // cerca do aeroporto (portão aberto para o pátio)
   const fence = [[2800, 8, 1288, 4], [2800, 8, 4, 1112], [4084, 8, 4, 1112], [2800, 1116, 100, 4], [2964, 1116, 1124, 4]];
   for (const f of fence) fillRect(SOLID, ...f);
+  for (const f of beachFence) fillRect(SOLID, ...f);
   for (const b of blds) {
     const hgt = Math.min(250, b.floors * 9 + 6);
     if (b.round) fillEll(SOLID, b.x, b.y, b.w, b.h); else if (b.canopy) { fillRect(SOLID, b.x + 10, b.y + 10, 8, 8); fillRect(SOLID, b.x + b.w - 18, b.y + 10, 8, 8); fillRect(SOLID, b.x + b.w / 2 - 4, b.y + b.h - 20, 8, 8); } else fillRect(SOLID, b.x, b.y, b.w, b.h);
@@ -427,8 +466,8 @@ export function generateCity(seed = 20261119) {
     for (const p of props) occ.add(key(p.x, p.y));
     const near = (x, y) => occ.has(key(x, y));
     const inAirport = (x, y) => x > 2780 && y < 1236;
-    const GREEN = ['arvore0', 'arvore1', 'arvore2', 'arvore3', 'arvore4', 'arvore2', 'arvore3', 'arbusto0', 'arbusto1', 'canteiro0', 'canteiro1', 'canteiro2', 'banco0', 'banco1', 'jardim0', 'lixeira0'];
-    const PAVED = ['canteiro0', 'canteiro1', 'canteiro2', 'lixeira0', 'lixeira1', 'lixeira2', 'banco0', 'banco1', 'arvore0', 'arvore2', 'arbusto1', 'guarda-sol0'];
+    const GREEN = ['d:arvore', 'd:arvore', 'd:arvore-vaso', 'd:arvore-vaso2', 'd:flores-v', 'd:flores-b', 'd:flores-a', 'd:arbusto-c', 'd:arbusto-c2', 'd:arbusto-vaso', 'd:banco', 'd:banco2', 'd:lixeira-verde', 'arvore0', 'arvore1', 'arvore2', 'arvore3', 'arvore4', 'arvore2', 'arvore3', 'arbusto0', 'arbusto1', 'canteiro0', 'canteiro1', 'canteiro2', 'banco0', 'banco1', 'jardim0', 'lixeira0'];
+    const PAVED = ['d:arvore-vaso', 'd:arvore-vaso2', 'd:arbusto-vaso2', 'd:flores-v', 'd:flores-a', 'd:banco', 'd:lixeira-cinza', 'd:correio-azul', 'd:correio-vermelho', 'd:maq-bebida', 'd:maq-lanche', 'd:orelhao', 'd:banca-jornal', 'd:telefone', 'd:quiosque', 'd:feira', 'canteiro0', 'canteiro1', 'canteiro2', 'lixeira0', 'lixeira1', 'lixeira2', 'banco0', 'banco1', 'arvore0', 'arvore2', 'arbusto1', 'guarda-sol0'];
     for (let y = 24; y < H - 24; y += 22) for (let x = 330; x < W - 16; x += 22) {
       if (inAirport(x, y) || near(x, y)) continue;
       const jx = x + (R() - 0.5) * 6; const jy = y + (R() - 0.5) * 6;
@@ -437,9 +476,10 @@ export function generateCity(seed = 20261119) {
       if (!free(jx, jy, 10)) continue;
       if (R() > (c === GRASS ? 0.8 : 0.6)) continue;
       const spr = pick(c === GRASS ? GREEN : PAVED);
-      PD(spr, jx, jy + 6); occ.add(key(jx, jy));
+      if (spr.startsWith('d:')) PX(spr.slice(2), jx, jy + 6, !/flores|banco|lixeira/.test(spr)); else PD(spr, jx, jy + 6);
+      occ.add(key(jx, jy));
       // banco ganha uma lixeira do lado
-      if (spr.startsWith('banco') && free(jx + 16, jy, 6)) { PD('lixeira1', jx + 14, jy + 6); occ.add(key(jx + 14, jy)); }
+      if (/banco/.test(spr) && free(jx + 18, jy, 6)) { PX('lixeira-verde', jx + 18, jy + 6); occ.add(key(jx + 18, jy)); }
     }
     // calçadas: hidrantes, lixeiras e canteiros entre os postes
     const nodesL = Object.values(nodes);
@@ -450,15 +490,43 @@ export function generateCity(seed = 20261119) {
         if (nodesL.some(([nx, ny]) => Math.abs(nx - x) < s2.w + 14 && Math.abs(ny - y) < s2.w + 14) || x < 240 || x > W - 8 || y < 8 || y > H - 8) continue;
         if (s2.v && y > 1980 && y < 2084 && s2.x < 1440) continue;
         const i = Math.floor(x / CS); const j = Math.floor(y / CS); if (mask[j * mw + i] !== WALK) continue;
-        const spr = ['hidrante', 'lixeira0', 'canteiro0', 'lixeira2', 'hidrante', 'lixeira1'][k++ % 6];
-        P(spr, x, y + (s2.v ? 0 : 4), PSZ[spr.replace(/\d$/, '')]?.[0] || 6, PSZ[spr.replace(/\d$/, '')]?.[1] || 9, false, { deco: true, ht: 4 });
+        const spr = ['hidrante', 'lixeira-cinza', 'arvore-vaso', 'correio-azul', 'hidrante', 'lixeira-verde', 'banca-jornal', 'arbusto-vaso', 'telefone', 'placa-proibido', 'correio-vermelho', 'orelhao'][k++ % 12];
+        PX(spr, x, y + (s2.v ? 0 : 4), false);
+      }
+    }
+  }
+  // placas de sinalização e boeiros
+  const decals = [];
+  {
+    const radar50 = [[704, 760], [1728, 2000], [2200, 576], [3300, 1504], [1200, 2304], [2752, 1900]];
+    for (const [rx2, ry2] of radar50) PX('placa-50', rx2 + 30, ry2 - 22);
+    for (const [id, [nx, ny, k]] of Object.entries(nodes)) {
+      if (k === 'exit' || k === 'round') continue;
+      let wv = 0; let wh = 0; for (const s2 of segs) { if (s2.v && s2.x === nx && ny >= s2.y0 && ny <= s2.y1) wv = Math.max(wv, s2.w); if (!s2.v && s2.y === ny && nx >= s2.x0 && nx <= s2.x1) wh = Math.max(wh, s2.w); }
+      const ox = wv / 2 + 9; const oy = wh / 2 + 9;
+      if (k === 'corner') { PX('placa-pedestre', nx + ox, ny + oy + 6); continue; }
+      if (!lights.includes(id)) { PX('placa-pare', nx - ox, ny - oy + 6); PX('placa-pare', nx + ox, ny + oy + 6); }
+      else PX('placa-pedestre', nx - ox, ny + oy + 6);
+      if ((wv === 48 || wh === 48) && (nx + ny) % 3 === 0) PX('placa-direcao', nx + ox + 4, ny - oy + 4);
+    }
+    for (const d of driveways) PX('placa-p', d[0] - 6, d[1] + (d[1] % 2 ? 4 : 16));
+    // boeiros na pista (perto do meio-fio) e tampas de bueiro no meio da faixa
+    for (const s2 of segs) {
+      const len = s2.v ? s2.y1 - s2.y0 : s2.x1 - s2.x0; let k = 0;
+      for (let t = 70; t < len - 40; t += 140) {
+        const side = k++ % 2 ? 1 : -1; const off = s2.w / 2 - 5;
+        const x = s2.v ? s2.x + side * off : s2.x0 + t; const y = s2.v ? s2.y0 + t : s2.y + side * off;
+        if (nodesList.some(([nx, ny]) => Math.abs(nx - x) < s2.w + 20 && Math.abs(ny - y) < s2.w + 20)) continue;
+        if (s2.v && y > 1980 && y < 2084 && s2.x < 1440) continue;
+        decals.push({ spr: 'grade-rua', x: x - 4, y: y - 3, w: 8, h: 7 });
+        if (k % 3 === 0) { const mx = s2.v ? s2.x - side * s2.w * 0.24 : x + 40; const my = s2.v ? y + 40 : s2.y - side * s2.w * 0.24; decals.push({ spr: 'boeiro', x: mx - 5, y: my - 5, w: 10, h: 10 }); }
       }
     }
   }
   for (const p of props) if (p.solid) { const r = p.spr.startsWith('arvore') ? 4 : 3; fillRect(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); const i = Math.floor(p.x / CS); const j = Math.floor(p.y / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.ht || 10); }
 
   return {
-    W, H, CS, mw, mh, mask, heights, ground, blds, props, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
+    W, H, CS, mw, mh, mask, heights, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
     R: { w: W, h: H, nodes, roads, lights, lots: [], pois, regions, radars: [
       { at: [704, 760], limit: 50 }, { at: [1728, 2000], limit: 50 }, { at: [2200, 576], limit: 50 }, { at: [3300, 1504], limit: 50 }, { at: [1200, 2304], limit: 50 }, { at: [2752, 1900], limit: 50 }, { at: [1600, 1248], limit: 40 }, { at: [900, 928], limit: 40 },
     ] },

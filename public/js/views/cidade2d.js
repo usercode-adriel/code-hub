@@ -60,9 +60,9 @@ export default async function render(el) {
   const meta = (k) => assets.meta[k] || [40, 70];
 
   // ---------------- entidades
-  const T = createTraffic(world, { count: touch ? 22 : 34 });
+  const T = createTraffic(world, { count: touch ? 30 : 50 });
   const realPeople = state.people.slice(0, touch ? 30 : 46).map((p) => ({ ...p, real: true }));
-  const filler = Array.from({ length: touch ? 18 : 34 }, (_, i) => ({ id: `pass${i}`, name: 'Passante', job: i % 9 === 0 ? 'obra' : '' }));
+  const filler = Array.from({ length: touch ? 30 : 64 }, (_, i) => ({ id: `pass${i}`, name: 'Passante', job: i % 9 === 0 ? 'obra' : '' }));
   const P = createPeds(world, [...realPeople, ...filler], assets.roles);
   const sampleColor = (key) => { const im = IMG[key]; if (!im) return '#888'; const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.drawImage(im, im.width * 0.3, im.height * 0.55, im.width * 0.4, im.height * 0.15, 0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
   const now0 = Date.now();
@@ -362,8 +362,9 @@ export default async function render(el) {
         if (!n.light || !inV(n, 60)) continue; const hw = n.maxW / 2 + 6; const col = (s) => (s === 'green' ? '#2fd27a' : s === 'yellow' ? '#f7c948' : '#ff4d5e');
         const Hs = lightState(n, 'H', t); const Vs = lightState(n, 'V', t);
         for (const [dx, dy, s] of [[hw, -hw, Hs], [-hw, hw, Hs], [-hw, -hw, Vs], [hw, hw, Vs]]) {
-          ctx.fillStyle = '#20232c'; ctx.fillRect(n.x + dx - 1.6, n.y + dy - 5, 3.2, 7); ctx.fillStyle = '#3a3d48'; ctx.fillRect(n.x + dx - 0.5, n.y + dy + 2, 1, 4);
-          ctx.fillStyle = col(s); ctx.fillRect(n.x + dx - 1, n.y + dy + (s === 'red' ? -4 : s === 'yellow' ? -2 : 0), 2, 2);
+          const sm = IMG['deco/semaforo'];
+          if (sm) { const h = 16; const w = (h * sm.width) / sm.height; ctx.drawImage(sm, n.x + dx - w / 2, n.y + dy - h + 6, w, h); ctx.fillStyle = 'rgba(10,10,10,.75)'; for (const yy of [-8.8, -5.9, -3]) ctx.fillRect(n.x + dx - 1.5, n.y + dy + yy, 3, 2.4); ctx.fillStyle = col(s); ctx.fillRect(n.x + dx - 1.4, n.y + dy + (s === 'red' ? -8.7 : s === 'yellow' ? -5.8 : -2.9), 2.8, 2.2); }
+          else { ctx.fillStyle = '#20232c'; ctx.fillRect(n.x + dx - 1.6, n.y + dy - 5, 3.2, 7); ctx.fillStyle = col(s); ctx.fillRect(n.x + dx - 1, n.y + dy + (s === 'red' ? -4 : s === 'yellow' ? -2 : 0), 2, 2); }
           lights.push({ x: n.x + dx, y: n.y + dy - 2, r: 7, color: col(s), ka: 0.6, halo: 0.8 });
         }
       }
@@ -404,7 +405,7 @@ export default async function render(el) {
     ctx.globalAlpha = 1;
     // luzes da cidade à noite
     if (night > 0.03) {
-      for (const [lx, ly] of city.lamps) if (lx > view[0] - 40 && lx < view[2] + 40 && ly > view[1] - 40 && ly < view[3] + 40) lights.push({ x: lx, y: ly - 15, r: 30, color: '#ffd27a', ka: 0.32, halo: 0.42, lamp: true });
+      for (const [lx, ly] of city.lamps) if (lx > view[0] - 40 && lx < view[2] + 40 && ly > view[1] - 40 && ly < view[3] + 40) lights.push({ x: lx, y: ly - 22, r: 32, color: '#ffd27a', ka: 0.32, halo: 0.42, lamp: true });
       for (const [lx, ly, col] of city.runwayLights) if (lx > view[0] - 20 && lx < view[2] + 20 && ly > view[1] - 20 && ly < view[3] + 20) lights.push({ x: lx, y: ly, r: 8, color: col, ka: 0.9, halo: 0.9 });
       R.drawNight(ctx, cam, dpr, night, lights, lit);
     }

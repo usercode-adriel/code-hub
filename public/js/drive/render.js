@@ -44,11 +44,12 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   const img = (k) => assets.img[k];
   // índice espacial dos elementos por bloco
   const bins = new Map(); const binKey = (i, j) => `${i},${j}`;
-  const addBin = (kind, o, x, y, w, h) => { for (let i = Math.floor(x / CH); i <= Math.floor((x + w) / CH); i++) for (let j = Math.floor(y / CH); j <= Math.floor((y + h) / CH); j++) { const k = binKey(i, j); let b = bins.get(k); if (!b) bins.set(k, (b = { g: [], b: [], p: [] })); b[kind].push(o); } };
+  const addBin = (kind, o, x, y, w, h) => { for (let i = Math.floor(x / CH); i <= Math.floor((x + w) / CH); i++) for (let j = Math.floor(y / CH); j <= Math.floor((y + h) / CH); j++) { const k = binKey(i, j); let b = bins.get(k); if (!b) bins.set(k, (b = { g: [], b: [], p: [], d: [] })); b[kind].push(o); } };
   city.ground.forEach((g, i) => { g.i = i; addBin('g', g, g.x - 4, g.y - 4, g.w + 8, g.h + 8); });
   city.blds.forEach((b, i) => { b.i = i; addBin('b', b, b.x - 4, b.y - 50, b.w + 30, b.h + 60); });
-  city.props.forEach((p, i) => { p.i = i; addBin('p', p, p.x - p.w, p.y - p.h - 4, p.w * 2, p.h + 8); });
-  const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'road', 'cross', 'runway'];
+  city.props.forEach((p, i) => { p.i = i; const r = Math.max(p.w, p.h); addBin('p', p, p.x - r, p.y - r - 4, r * 2, r + 8); });
+  (city.decals || []).forEach((d) => addBin('d', d, d.x, d.y, d.w, d.h));
+  const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'access', 'road', 'cross', 'runway'];
 
   function fillShape(x, g, style) {
     x.fillStyle = style;
@@ -59,6 +60,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     for (const g of sorted) {
       if (g.island) { fillShape(x, g, pat.park); x.fillStyle = '#e8e4da'; x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.lineWidth = 2; x.strokeStyle = '#e8e4da'; x.stroke(); continue; }
       if (g.pool) { x.fillStyle = '#e8eef2'; x.fillRect(g.x - 2, g.y - 2, g.w + 4, g.h + 4); fillShape(x, g, '#4cb4f0'); x.fillStyle = '#8fd4ff'; x.fillRect(g.x + 2, g.y + 2, g.w - 8, 1); continue; }
+      if (g.mat === 'access') { x.fillStyle = pat.road; x.fillRect(g.x, g.y, g.w, g.h); x.fillStyle = '#8f8a80'; x.fillRect(g.x, g.y, g.w, 1); x.fillRect(g.x, g.y + g.h - 1, g.w, 1); x.fillStyle = 'rgba(236,235,230,.7)'; for (let k = g.x + 6; k < g.x + g.w - 6; k += 12) x.fillRect(k, g.y + g.h / 2 - 0.5, 6, 1); continue; }
       if (g.mat === 'front') { if (frontImg) { for (let k = g.x; k < g.x + g.w; k += 16) { const w = Math.min(16, g.x + g.w - k); x.drawImage(frontImg, 0, 0, w, 11, k, g.y, w, g.h); } } else fillShape(x, g, pat.walk); continue; }
       const style = g.mat === 'grass' ? (g.park ? pat.park : pat.grass) : g.mat === 'cross' ? pat.road : g.mat === 'pond' ? pat.water : pat[g.mat] || pat.grass;
       fillShape(x, g, style);
@@ -230,6 +232,12 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
 
   function drawProp(x, p) {
+    if (p.spr.startsWith('d:')) {
+      const im = img(`deco/${p.spr.slice(2)}`); if (!im) return;
+      if (p.rot) { x.save(); x.translate(p.x, p.y - p.h / 2); x.rotate(p.rot); x.drawImage(im, -p.w / 2, -p.h / 2, p.w, p.h); x.restore(); return; }
+      if (p.solid || p.h > 14) { x.fillStyle = 'rgba(10,14,30,.22)'; x.beginPath(); x.ellipse(p.x + 1, p.y - 1, p.w * 0.42, Math.max(1.5, p.w * 0.14), 0, 0, Math.PI * 2); x.fill(); }
+      x.drawImage(im, p.x - p.w / 2, p.y - p.h, p.w, p.h); return;
+    }
     const s = img(`props/${p.spr}`);
     if (s) { x.drawImage(s, p.x - p.w / 2, p.y - p.h, p.w, p.h); return; }
     if (p.spr === 'ponto') { x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(p.x - p.w / 2 + 2, p.y - p.h + 2, p.w, p.h); x.fillStyle = '#3a7ac8'; x.fillRect(p.x - p.w / 2, p.y - p.h, p.w, 4); x.fillStyle = '#9fd0f0'; x.fillRect(p.x - p.w / 2, p.y - p.h + 4, p.w, p.h - 8); x.fillStyle = '#8a5a34'; x.fillRect(p.x - p.w / 2 + 3, p.y - 5, p.w - 6, 3); return; }
@@ -243,10 +251,11 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     x.imageSmoothingEnabled = false;
     x.setTransform(PXU, 0, 0, PXU, -i * CH * PXU, -j * CH * PXU);
     const rect = [i * CH, j * CH, (i + 1) * CH, (j + 1) * CH];
-    const bin = bins.get(binKey(i, j)) || { g: [], b: [], p: [] };
+    const bin = bins.get(binKey(i, j)) || { g: [], b: [], p: [], d: [] };
     x.fillStyle = pat.grass; x.fillRect(rect[0], rect[1], CH, CH);
     drawGround(x, bin.g);
     roadMarks(x, rect);
+    for (const d of bin.d) { const im = img(`deco/${d.spr}`); if (im) x.drawImage(im, d.x, d.y, d.w, d.h); }
     const lit = [];
     x.imageSmoothingEnabled = true;
     // construções e objetos ordenados pela base (y), como num RPG top-down
@@ -277,7 +286,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   {
     const x = overview.getContext('2d'); x.setTransform(OV, 0, 0, OV, 0, 0); x.imageSmoothingEnabled = true;
     x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H);
-    const col = { front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
+    const col = { access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
     for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m) fillShape(x, g, g.island ? '#56a640' : col[m]);
     x.fillStyle = '#f2c94c'; for (const s of city.segs) if (s.w >= 48) { if (s.v) x.fillRect(s.x - 2, s.y0, 4, s.y1 - s.y0); else x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 4); }
     for (const b of city.blds) { if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
