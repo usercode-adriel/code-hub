@@ -40,7 +40,7 @@ const DENS = [
 ];
 onUpgrade(14, (ctx) => {
   const w = ctx.w; if (!w.city) return;
-  const used = new Set(places(w).map((p) => p.node));
+  const used = new Set([...places(w).map((p) => p.node), ...(w.city.houses || []).map((h) => h.node)]); // não ocupa terreno de casa
   const shady = shuffle(residents(w).filter((p) => p.agent?.status === 'ativo' && p.agent.traits.honesty < 0.45 && !p.agent.police && !p.agent.office));
   for (const d of DENS) {
     if (places(w).some((p) => p.name === d.name)) continue;

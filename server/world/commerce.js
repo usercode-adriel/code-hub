@@ -462,8 +462,7 @@ onDaily((ctx) => {
 export function buy(ctx, pl, key, { method = 'saldo', pin, offerId, targetId, opId }) {
   const w = ctx.w; const u = account(w);
   return once(w, opId, () => {
-    if (u.location?.placeId !== pl.id) throw new BankError('Você precisa estar na loja. Vá até ela pelo mapa.', 'NOT_HERE');
-    if (!isOpen(pl, ctx.at)) throw new BankError(`${pl.name} está fechada agora (horário: ${pl.hours[0]}h às ${pl.hours[1] % 24}h).`, 'CLOSED');
+    // compra direta liberada em todas as lojas: não precisa estar no local nem no horário (entrega pela loja)
     if ((pl.banned || []).some((b) => b.until > nowIso())) throw new BankError('O vendedor se recusa a te atender.', 'BANNED');
     const it = (pl.catalog || []).find((x) => x.key === key);
     if (!it) throw new BankError('Produto não encontrado');

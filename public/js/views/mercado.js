@@ -54,7 +54,7 @@ async function storePage(body, id) {
     const promoOn = s.promo && s.promo.until > new Date().toISOString();
     const cats = [...new Set(s.catalog.map((it) => it.cat))];
     const feat = (promoOn && s.catalog.find((c) => c.key === s.promo.key)) || (s.pitch && s.catalog.find((c) => c.key === s.pitch.offer.key)) || s.catalog.slice().sort((a, b) => b.price - a.price)[0];
-    const buyable = (it) => s.here && s.open && it.stock && !s.banned;
+    const buyable = (it) => it.stock && !s.banned; // compra direta liberada
     const card = (it) => `<article class="sp-card ${it.stock ? '' : 'out'}" style="--c:${CATCOL[it.cat] || '#a855f7'}">
         <div class="sp-art"><img src="${art(it.key)}" alt="">${it.promo ? `<span class="sp-promo">-${it.promo}%</span>` : ''}<span class="sp-stock ${it.stock ? (it.stock <= 2 ? 'low' : '') : 'zero'}">${it.stock ? `${it.stock} em estoque` : 'Esgotado'}</span></div>
         <b class="sp-nm">${esc(it.name)}</b><small class="sp-cat">${esc(CATNAME[it.cat] || it.cat || '')}</small>
@@ -66,10 +66,10 @@ async function storePage(body, id) {
       <header class="sp-hero cx-card"><img class="sp-hero-art" src="${storeArt(s.kind)}" alt="">
         <div class="sp-hero-tx"><h1>${esc(s.name)}</h1><small>${esc(s.kindLabel || '')}${s.sub ? ` · ${esc(s.sub)}` : ''}${s.company ? ` · <a data-company="${esc(s.company.id)}">${esc(s.company.name)}</a>` : ''}</small>
           <div class="sp-kv">${stars(s.reputation)} <span>${(s.reputation || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} · ${s.ratings.length} avaliações</span><span>${icon('clock', 12)} ${hrs(s.hours)} · <b class="${s.open ? 'up' : 'down'}">${s.open ? 'Aberta' : 'Fechada'}</b></span><span>${icon('pin', 12)} ${esc(s.address || '')}</span>${s.owner ? `<span>Dono(a): <a data-person="${esc(s.owner.id)}">${esc(s.owner.name)}</a></span>` : ''}${s.cashOnly ? `<span class="down">${icon('wallet', 12)} Só dinheiro vivo</span>` : ''}</div></div>
-        <div class="sp-hero-r">${s.here ? `<span class="sp-here">${icon('target', 13)} Você está na loja</span>` : `<a class="cx-btn" href="#/mapa/${esc(s.id)}">${icon('pin', 14)} Ir até a loja</a><small class="cx-mut">Você precisa estar aqui para comprar</small>`}
+        <div class="sp-hero-r">${s.here ? `<span class="sp-here">${icon('target', 13)} Você está na loja</span>` : `<a class="cx-btn ghost" href="#/mapa/${esc(s.id)}">${icon('pin', 14)} Ver no mapa</a><small class="cx-mut">Compra direta liberada: entrega pela loja</small>`}
           ${s.banned ? '<span class="sp-ban">O vendedor se recusa a te atender</span>' : ''}</div></header>
       ${feat ? `<section class="sp-feat cx-card" style="--c:${CATCOL[feat.cat] || '#a855f7'}"><img src="${art(feat.key)}" alt=""><div><small>${promoOn && feat.key === s.promo.key ? `PROMOÇÃO · ${s.promo.pct}% OFF até ${new Date(s.promo.until).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : s.pitch && feat.key === s.pitch.offer.key ? 'OFERTA DO VENDEDOR' : 'DESTAQUE DA LOJA'}</small><b>${esc(feat.name)}</b><p>${esc(feat.desc || '')}</p></div>
-        <div class="sp-feat-r"><em>${nx(s.pitch && feat.key === s.pitch.offer.key ? s.pitch.offer.price : feat.price, 0)}</em>${s.pitch && feat.key === s.pitch.offer.key ? `<button class="cx-btn" data-pitch ${s.here ? '' : 'disabled'}>Aceitar oferta</button>` : `<button class="cx-btn" data-buy="${esc(feat.key)}" ${buyable(feat) ? '' : 'disabled'}>${icon('cart', 14)} Comprar</button>`}</div></section>` : ''}
+        <div class="sp-feat-r"><em>${nx(s.pitch && feat.key === s.pitch.offer.key ? s.pitch.offer.price : feat.price, 0)}</em>${s.pitch && feat.key === s.pitch.offer.key ? `<button class="cx-btn" data-pitch>Aceitar oferta</button>` : `<button class="cx-btn" data-buy="${esc(feat.key)}" ${buyable(feat) ? '' : 'disabled'}>${icon('cart', 14)} Comprar</button>`}</div></section>` : ''}
       <div class="sp-cols">
         <section class="sp-main">
           <div class="sh-chips sp-cats"><button data-cf="" class="${catF ? '' : 'on'}">Tudo (${s.catalog.length})</button>${cats.map((c) => `<button data-cf="${esc(c)}" class="${catF === c ? 'on' : ''}">${esc(CATNAME[c] || c)}</button>`).join('')}</div>
@@ -130,7 +130,7 @@ async function storePage(body, id) {
           if (r.offerId && ['aceito', 'contraproposta'].includes(r.result)) {
             const chat = body.querySelector('#mkChat');
             chat?.insertAdjacentHTML('beforeend', `<button class="btn sm primary mk-deal" data-deal>${r.result === 'aceito' ? 'Fechar negócio' : 'Aceitar contraproposta'} · ${nx(r.price, 0)}</button>`);
-            chat?.querySelector('[data-deal]')?.addEventListener('click', () => (s.here ? doBuy(it.key, r.offerId) : toast('Vá até a loja', 'O preço vale por 10 minutos. Use o mapa para chegar.', 'info')));
+            chat?.querySelector('[data-deal]')?.addEventListener('click', () => doBuy(it.key, r.offerId));
           }
           return r;
         } });

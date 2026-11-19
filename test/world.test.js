@@ -35,9 +35,9 @@ test('mapa: o gerador é determinístico', () => {
 const shop = () => C.places(T.w).find((p) => p.name === 'Mercado Central');
 const openAt = (pl) => { const d = new Date(); d.setHours(pl.hours[0] + 1, 0, 0, 0); return d; };
 
-test('compra: precisa estar na loja', () => {
+test('compra direta: não exige estar na loja (mas exige senha)', () => {
   const pl = shop();
-  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '4826', opId: 'x0' }), (e) => e.code === 'NOT_HERE');
+  assert.throws(() => C.buy({ ...T.ctx(), at: openAt(pl) }, pl, 'cafe', { pin: '0000', opId: 'x0' }), (e) => e.code !== 'NOT_HERE');
 });
 
 test('compra sem saldo é atômica: nada muda', () => {
@@ -71,9 +71,10 @@ test('compra repetida com o mesmo identificador cobra uma vez só', () => {
   assert.equal(I.inv(T.w).filter((x) => x.id === r1.item.id).length, 1);
 });
 
-test('loja fechada não vende', () => {
+test('loja fechada também vende (compra direta liberada)', () => {
   const pl = shop(); const d = new Date(); d.setHours(4, 0, 0, 0);
-  assert.throws(() => C.buy({ ...T.ctx(), at: d }, pl, 'cafe', { pin: '4826', opId: 'x4' }), (e) => e.code === 'CLOSED');
+  const r = C.buy({ ...T.ctx(), at: d }, pl, 'cafe', { pin: '4826', opId: 'x4' });
+  assert.ok(r.item && r.price > 0);
 });
 
 test('revender um item tira o dinheiro de quem comprou (não cria dinheiro)', () => {

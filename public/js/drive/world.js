@@ -5,8 +5,13 @@
 //  - a máscara de colisão (1 byte por pixel do mapa): 0 sólido (prédios, árvores, água), 1 calçada, 2 rua,
 //    3 faixa de pedestre (rua onde se pode atravessar a pé), 4 estacionamento (carro e pedestre).
 export const SOLID = 0; export const WALK = 1; export const ROAD = 2; export const CROSS = 3; export const LOT = 4;
-export const canDrive = (c) => c === ROAD || c === CROSS || c === LOT;
-export const canWalk = (c) => c === WALK || c === CROSS || c === LOT;
+export const WATER = 5; export const GRASS = 6; export const RUNWAY = 7; export const PLAZA = 8; export const SAND = 9;
+// carros: pista, faixa, estacionamento e pistas do aeroporto
+export const canDrive = (c) => c === ROAD || c === CROSS || c === LOT || c === RUNWAY;
+// NPCs: só calçadas, faixas de pedestre, praças e estacionamentos
+export const canWalk = (c) => c === WALK || c === CROSS || c === LOT || c === PLAZA;
+// jogador a pé: qualquer lugar que não seja sólido (rua, calçada, grama, areia e até a água)
+export const canFoot = (c) => c !== SOLID;
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 const len = (v) => Math.hypot(v[0], v[1]);
@@ -48,6 +53,12 @@ const mkPath = (pts) => ({ pts, cum: cumOf(pts), get len() { return this.cum.at(
 
 export async function loadWorld() {
   const R = await (await fetch('/assets/drive/roads.json')).json();
+  const world = buildGraph(R);
+  world.mask = buildMask(world); world.cs = 1; world.mw = world.W;
+  return world;
+}
+// grafo de ruas (nós, trechos, faixas por sentido e calçadas) a partir da descrição das ruas
+export function buildGraph(R) {
   const nodes = {};
   for (const [id, [x, y, kind]] of Object.entries(R.nodes)) nodes[id] = { id, x, y, kind: kind || 'cross', edges: [], out: [], inn: [], maxW: 0 };
   const edges = [];
@@ -88,9 +99,7 @@ export async function loadWorld() {
   }
   const lights = new Set(R.lights || []);
   for (const n of Object.values(nodes)) { n.light = lights.has(n.id) ? { off: (n.x * 7 + n.y * 3) % 22 } : null; }
-  const world = { R, W: R.w, H: R.h, nodes, edges, lanes, mask: null, turnCache: new Map(), lots: R.lots || [], pois: R.pois || [], radars: R.radars || [], regions: R.regions || [] };
-  world.mask = buildMask(world);
-  return world;
+  return { R, W: R.w, H: R.h, nodes, edges, lanes, mask: null, cs: 1, mw: R.w, turnCache: new Map(), lots: R.lots || [], pois: R.pois || [], radars: R.radars || [], regions: R.regions || [] };
 }
 
 // semáforo: ciclo de 22 s; eixo H (leste-oeste) e V (norte-sul) alternam
@@ -157,11 +166,12 @@ function buildMask(world) {
   }
   return m;
 }
-export const at = (world, x, y) => { const xi = x | 0; const yi = y | 0; return xi < 0 || yi < 0 || xi >= world.W || yi >= world.H ? SOLID : world.mask[yi * world.W + xi]; };
+export const at = (world, x, y) => { if (x < 0 || y < 0 || x >= world.W || y >= world.H) return SOLID; const cs = world.cs || 1; return world.mask[((y / cs) | 0) * world.mw + ((x / cs) | 0)]; };
+export const heightAt = (world, x, y) => { if (!world.heights || x < 0 || y < 0 || x >= world.W || y >= world.H) return 0; const cs = world.cs || 1; return world.heights[((y / cs) | 0) * world.mw + ((x / cs) | 0)]; };
 export function regionAt(world, x, y) { const r = world.regions.find((g) => x >= g.rect[0] && x < g.rect[2] && y >= g.rect[1] && y < g.rect[3]); return r?.name || 'Nexus City'; }
 // ponto andável mais próximo (para sair do carro)
-export function nearestWalk(world, x, y, maxR = 40) {
-  for (let r = 0; r <= maxR; r += 2) for (let k = 0; k < Math.max(8, r * 2); k++) { const a = (k / Math.max(8, r * 2)) * Math.PI * 2; const px = x + Math.cos(a) * r; const py = y + Math.sin(a) * r; if (canWalk(at(world, px, py))) return [px, py]; }
+export function nearestWalk(world, x, y, maxR = 40, ok = canWalk) {
+  for (let r = 0; r <= maxR; r += 2) for (let k = 0; k < Math.max(8, r * 2); k++) { const a = (k / Math.max(8, r * 2)) * Math.PI * 2; const px = x + Math.cos(a) * r; const py = y + Math.sin(a) * r; if (ok(at(world, px, py))) return [px, py]; }
   return null;
 }
 // distância até o eixo de uma faixa de trânsito (para saber se um carro foi largado no meio da via)
@@ -169,4 +179,37 @@ export function laneDist(world, x, y) {
   let best = Infinity;
   for (const l of world.lanes) { const p = l.path.pts; for (let i = 1; i < p.length; i++) { const a = p[i - 1]; const b = p[i]; const d = sub(b, a); const L2 = d[0] * d[0] + d[1] * d[1] || 1; const t = Math.max(0, Math.min(1, ((x - a[0]) * d[0] + (y - a[1]) * d[1]) / L2)); best = Math.min(best, Math.hypot(x - a[0] - d[0] * t, y - a[1] - d[1] * t)); } }
   return best;
+}
+
+// faixa de trânsito mais próxima de um ponto (para viaturas voltarem à rota e para localizar ocorrências)
+export function nearestLane(world, x, y, filter = null) {
+  let best = null;
+  for (const l of world.lanes) {
+    if (filter && !filter(l)) continue;
+    const p = l.path.pts; const c = l.path.cum;
+    for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1]; const b = p[i]; const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
+      const d = Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t);
+      if (!best || d < best.d) best = { lane: l, s: c[i - 1] + (c[i] - c[i - 1]) * t, d };
+    }
+  }
+  return best;
+}
+// rota (sequência de nós) pelo grafo das faixas — Dijkstra
+export function routeNodes(world, fromId, toId, banEdge = null) {
+  if (fromId === toId) return [];
+  const dist = new Map([[fromId, 0]]); const prev = new Map(); const done = new Set(); const q = [[0, fromId]];
+  while (q.length) {
+    q.sort((a, b) => a[0] - b[0]); const [d, id] = q.shift();
+    if (done.has(id)) continue; done.add(id); if (id === toId) break;
+    for (const l of world.nodes[id].out) {
+      if (l.narrow || (id === fromId && banEdge && l.edge === banEdge)) continue;
+      const nd = d + l.path.len + 20; const to = l.to.id;
+      if (nd < (dist.get(to) ?? Infinity)) { dist.set(to, nd); prev.set(to, id); q.push([nd, to]); }
+    }
+  }
+  if (!prev.has(toId)) return null;
+  const out = []; let c = toId; while (c !== fromId) { out.unshift(c); c = prev.get(c); }
+  return out;
 }

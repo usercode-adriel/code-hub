@@ -704,3 +704,37 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .d2.touch .d2-prompt > * { padding: 8px 11px; font-size: 12px; }
 .d2.touch .d2-prompt b { display: none; }
 @media (max-width: 900px) { .d2 { height: calc(var(--vvh, 100dvh) - 62px - 80px - env(safe-area-inset-bottom)); } }
+
+/* ---------------- mapa jogável v3: voo, perseguição, tela cheia/girada, botões suaves ---------------- */
+.d2 { background: #2f6fd0; }
+.d2-only-touch { display: none !important; }
+.d2.touch .d2-only-touch { display: grid !important; }
+.d2-hp { display: block; width: 110px; height: 6px; margin-top: 4px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.d2-hp > i { display: block; height: 100%; transition: width .3s; }
+.d2-stall { padding: 6px 10px; border-radius: 9px; background: #ff4d5e; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 10px; animation: lvRec 0.8s infinite; }
+.d2-dash { gap: 12px; }
+.d2-wanted { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 4; display: grid; justify-items: center; padding: 8px 16px; border-radius: 14px; background: rgba(10, 13, 43, .92); border: 2px solid #ff4d5e; animation: d2w 0.9s infinite alternate; }
+.d2-wanted b { font-family: 'Press Start 2P', monospace; font-size: 10px; color: #ff4d5e; } .d2-wanted span { color: #f7c948; font-size: 16px; letter-spacing: 3px; } .d2-wanted small { font-size: 11px; color: var(--cx-text2); }
+@keyframes d2w { to { border-color: #3a7aff; } }
+.d2-help { top: auto; bottom: 150px; }
+/* botões de toque suaves: translúcidos, arredondados, com resposta ao toque */
+.d2.touch .d2-ctl button, .d2.touch .d2-joy { backdrop-filter: none; transition: transform .08s, filter .08s, background .15s; }
+.d2.touch .d2-ctl button.on { transform: scale(.92); filter: brightness(1.25); }
+.d2.touch.flying .d2-fly { display: flex; }
+.d2.touch.flying .d2-foot, .d2.touch.flying .d2-drive { display: none !important; }
+.d2-pedals.fly { grid-template-columns: auto auto auto; grid-template-rows: auto auto; }
+.d2-pedals.fly .d2-pitch:first-child { grid-column: 1; grid-row: 1; } .d2-pedals.fly .d2-exit { grid-column: 2; grid-row: 1; } .d2-pedals.fly .d2-pitch:nth-child(3) { grid-column: 3; grid-row: 1; }
+.d2-pedals.fly .d2-brake { grid-column: 1 / 2; grid-row: 2; width: 70px; height: 70px; font-size: 11px; } .d2-pedals.fly .d2-gas { grid-column: 2 / 4; grid-row: 2; width: auto; height: 70px; }
+.d2-pitch { width: 62px; height: 58px; border-radius: 16px; background: rgba(29, 36, 104, .85) !important; border: 2px solid rgba(139, 109, 255, .8) !important; display: grid !important; place-items: center; font-size: 18px; line-height: 1; }
+.d2-pitch small { font-size: 9px; color: var(--cx-text2); }
+.d2.touch .d2-steer button { width: 70px; height: 70px; border-radius: 50%; background: rgba(10, 13, 43, .55) !important; border: 2px solid rgba(255,255,255,.22) !important; }
+.d2.touch .d2-gas { border-radius: 20px; background: rgba(18, 96, 58, .85) !important; border-width: 2px !important; }
+.d2.touch .d2-brake { border-radius: 18px; background: rgba(127, 29, 45, .85) !important; border-width: 2px !important; }
+.d2.touch .d2-gearb, .d2.touch .d2-exit { background: rgba(10, 13, 43, .7) !important; border-width: 2px !important; }
+.d2.touch .d2-joy { background: rgba(10, 13, 43, .35); border-width: 2px; }
+.d2.touch .d2-act { border-width: 2px !important; background: rgba(108, 76, 245, .9) !important; }
+/* tela cheia (sobre o app) e tela girada (paisagem forçada por CSS quando o aparelho não deixa travar) */
+.d2.fs { position: fixed; inset: 0; z-index: 400; width: 100vw; height: 100dvh; min-height: 0; }
+.d2.fs[data-rot="1"] { inset: auto; left: 0; top: 0; width: 100dvh; height: 100vw; transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
+.d2.fs .d2-mini { top: 60px; bottom: auto; width: 130px; height: 90px; }
+@media (max-width: 900px) { .d2.fs { height: 100dvh; } }

@@ -18,7 +18,7 @@ import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } f
 import { peopleView, housesPublic, housePublic, live } from './living.js';
 import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
-import { driveState, park, infraction } from './drive.js';
+import { driveState, park, infraction, damage, tow, incident } from './drive.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
@@ -462,6 +462,9 @@ router.get('/mundo/status', (req, res) => {
 router.get('/mundo/cidade2d', (req, res) => { const w = world(req.user.id); res.json(driveState(w)); saveWorld(); });
 router.post('/mundo/cidade2d/estacionar', (req, res) => { const w = world(req.user.id); run(res, () => park(w, req.body || {})); });
 router.post('/mundo/cidade2d/infracao', (req, res) => { const ctx = ctxOf(req); run(res, () => infraction(ctx, req.body || {})); });
+router.post('/mundo/cidade2d/dano', (req, res) => { const w = world(req.user.id); run(res, () => damage(w, req.body || {})); });
+router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); run(res, () => tow(ctx, req.body || {})); });
+router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
 router.get('/mundo/veiculos', (req, res) => {
   const w = world(req.user.id); const shop = places(w).find((p) => p.name === 'Oficina Turbo');
   res.json({ main: vehicleOf(w), garage: garage(w), dealer: shop ? { id: shop.id, name: shop.name, address: shop.address, open: isOpen(shop), catalog: (shop.catalog || []).filter((x) => isVehicle(x.key)).map((x) => ({ key: x.key, name: PRODUCTS[x.key].name, price: x.price, stock: x.stock, ...VEHICLES[x.key], art: `/assets/items/${x.key}.png` })) } : null,

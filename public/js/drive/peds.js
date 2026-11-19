@@ -1,65 +1,84 @@
-// PedestrianSystem — moradores reais da cidade (nome e rosto em pixel) andando pelas calçadas.
-// Seguem a calçada de cada rua; no cruzamento escolhem outra rua e, quando precisam atravessar, usam a faixa:
-// com semáforo esperam o vermelho dos carros; sem semáforo esperam não vir carro.
+// PedestrianSystem — moradores reais (nome, profissão, rosto) e passantes andando só pelas calçadas.
+// No cruzamento escolhem outra rua; para atravessar usam a faixa e esperam o sinal (ou a rua livre).
+// Reagem ao que acontece: curiosos se juntam perto de acidentes; atropelados ficam caídos até a ambulância.
 import { along, lightState, at, ROAD, canWalk } from './world.js';
 
-export function createPeds(world, people) {
+// sprite por profissão (folha de NPCs): policiais, saúde, obra; o resto usa civis variados
+export function spriteFor(p, roles, seed) {
+  const job = String(p.job || '').toLowerCase();
+  const of = (role) => roles.filter((r) => r[0] === role).map((r) => r[1]);
+  const pool = /polic|delegad|guarda|investigador/.test(job) ? of('policia') : /m[ée]dic|enfermeir|param[ée]dic|farmac/.test(job) ? of('saude') : /bombeir/.test(job) ? of('bombeiro') : /pedreir|obra|eletricist|encanador|mec[âa]nic|constru|oper[áa]rio/.test(job) ? of('obra') : of('civil');
+  let h = 0; for (const ch of String(p.id || seed)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `npc/${pool[h % pool.length] || 'civil0'}`;
+}
+
+export function createPeds(world, people, roles) {
   const walks = [];
-  // só calçadas de verdade: ao menos 92% do trajeto sobre calçada/faixa (descarta lados fora do mapa ou colados em prédios)
-  const ok = (w) => { let n = 0; let t = 0; for (let s = 0; s < w.len; s += 3) { const q = along(w, s); t++; if (canWalk(at(world, q.x, q.y))) n++; } return t && n / t >= 0.92; };
+  // só calçadas de verdade: ao menos 92% do trajeto sobre calçada/faixa
+  const ok = (w) => { let n = 0; let t = 0; for (let s = 0; s < w.len; s += 4) { const q = along(w, s); t++; if (canWalk(at(world, q.x, q.y))) n++; } return t && n / t >= 0.92; };
   for (const e of world.edges) e.walks.forEach((w, i) => { if (w && w.len > 20 && ok(w)) walks.push({ e, side: i, path: w }); else e.walks[i] = null; });
   const peds = people.map((p, i) => {
     const w = walks[Math.floor(Math.random() * walks.length)];
     const dir = Math.random() < 0.5 ? 1 : -1;
-    return { id: p.id, name: p.name, avatar: p.avatar, color: p.color || '#8b7bff', walk: w, dir, s: Math.random() * w.path.len, v: 7 + Math.random() * 4, x: 0, y: 0, a: 0, state: 'walk', cross: null, pause: 0, W: 5, L: 5, i };
+    return { id: p.id, name: p.name, real: Boolean(p.real), avatar: p.avatar, job: p.job, spr: p.spr || spriteFor(p, roles, i), walk: w, dir, s: Math.random() * w.path.len, v: 7 + Math.random() * 4, x: 0, y: 0, a: 0, face: 1, state: 'walk', cross: null, pause: 0, W: 5, L: 5, i, phase: Math.random() * 6 };
   });
   for (const p of peds) place(p);
   return { peds, walks };
 }
-function place(p) { const q = along(p.walk.path, p.s); p.x = q.x; p.y = q.y; p.a = q.a + (p.dir < 0 ? Math.PI : 0); }
+function place(p) { const q = along(p.walk.path, p.s); p.x = q.x; p.y = q.y; p.a = q.a + (p.dir < 0 ? Math.PI : 0); p.face = Math.cos(p.a) < -0.2 ? -1 : Math.cos(p.a) > 0.2 ? 1 : p.face; }
 
-// a calçada termina no nó n: escolhe a próxima (outra rua) e, se for do outro lado, atravessa
-function nextWalk(world, P, p, n) {
-  const end = [p.x, p.y];
-  const cand = [];
-  for (const e of n.edges) e.walks.forEach((w, i) => {
+// espalha passantes perto de um ponto (mantém a cidade viva onde o jogador está)
+export function respawnNear(P, p, view) {
+  for (let k = 0; k < 30; k++) {
+    const w = P.walks[Math.floor(Math.random() * P.walks.length)];
+    const s = Math.random() * w.path.len; const q = along(w.path, s);
+    const d = Math.hypot(q.x - view.x, q.y - view.y);
+    if (d < view.r * 0.8 || d > view.r + 700) continue;
+    Object.assign(p, { walk: w, s, state: 'walk', cross: null, pause: 0, far: 0 }); place(p); return;
+  }
+}
+
+function nextWalk(P, p, n) {
+  const end = [p.x, p.y]; const cand = [];
+  for (const e of n.edges) e.walks.forEach((w) => {
     if (!w || w.len < 20) return;
-    const startAtN = e.a === n; // a calçada começa no nó n?
-    const sPt = startAtN ? w.pts[0] : w.pts.at(-1);
+    const startAtN = e.a === n; const sPt = startAtN ? w.pts[0] : w.pts.at(-1);
     cand.push({ walk: P.walks.find((x) => x.path === w), dir: startAtN ? 1 : -1, pt: sPt, d: Math.hypot(sPt[0] - end[0], sPt[1] - end[1]), same: e === p.walk.e });
   });
   const others = cand.filter((c) => c.walk && !(c.same && c.walk === p.walk));
   if (!others.length) return null;
-  // na maioria das vezes segue pela mesma calçada (sem atravessar); às vezes atravessa
   others.sort((a, b) => a.d - b.d);
-  const near = others.filter((c) => c.d < 40);
+  const near = others.filter((c) => c.d < 44);
   return near.length && Math.random() < 0.72 ? near[Math.floor(Math.random() * near.length)] : others[Math.floor(Math.random() * others.length)];
 }
-function crossesRoad(world, a, b) {
-  let n = 0;
-  for (let k = 1; k < 8; k++) { const t = k / 8; if (at(world, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) >= ROAD) n++; }
-  return n >= 2;
-}
+function crossesRoad(world, a, b) { let n = 0; for (let k = 1; k < 8; k++) { const t = k / 8; if (at(world, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) >= ROAD && at(world, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) <= 4) n++; } return n >= 2; }
 
-export function stepPeds(P, world, dt, t, cars) {
+export function stepPeds(P, world, dt, t, cars, view) {
   const crossing = new Set();
   for (const p of P.peds) {
+    if (p.state === 'ferido' || p.state === 'levado') continue;
+    if (p.state === 'olhando') { // curioso: anda até o ponto da calçada mais perto da ocorrência e fica olhando
+      p.look -= dt;
+      if (p.look <= 0) { p.state = 'walk'; continue; }
+      const diff = p.lookS - p.s;
+      if (Math.abs(diff) > 1) { p.s += Math.sign(diff) * Math.min(Math.abs(diff), p.v * 1.3 * dt); place(p); }
+      p.face = p.lookAt[0] < p.x ? -1 : 1;
+      continue;
+    }
     if (p.pause > 0) { p.pause -= dt; continue; }
     if (p.state === 'wait' || p.state === 'cross') {
       const c = p.cross;
       if (p.state === 'wait') {
         let go;
         if (c.node.light) go = lightState(c.node, c.axis, t) === 'red' && lightState(c.node, c.axis, t + 2.5) === 'red';
-        else go = !cars.some((k) => Math.hypot(k.x - c.mid[0], k.y - c.mid[1]) < 55 && k.v > 3);
+        else go = !cars.some((k) => Math.hypot(k.x - c.mid[0], k.y - c.mid[1]) < 60 && k.v > 3);
         c.waited += dt;
-        if (go || c.waited > 25) p.state = 'cross';
-        else continue;
+        if (go || c.waited > 25) p.state = 'cross'; else continue;
       }
       if (c.road) crossing.add(c.node.id);
-      const dx = c.to[0] - p.x; const dy = c.to[1] - p.y; const d = Math.hypot(dx, dy);
-      const step = p.v * 1.25 * dt;
+      const dx = c.to[0] - p.x; const dy = c.to[1] - p.y; const d = Math.hypot(dx, dy); const step = p.v * 1.25 * dt;
       if (d <= step) { p.walk = c.walk; p.dir = c.dir; p.s = c.dir > 0 ? 0 : c.walk.path.len; p.state = 'walk'; p.cross = null; place(p); }
-      else { p.x += (dx / d) * step; p.y += (dy / d) * step; p.a = Math.atan2(dy, dx); }
+      else { p.x += (dx / d) * step; p.y += (dy / d) * step; p.a = Math.atan2(dy, dx); p.face = dx < 0 ? -1 : 1; }
       continue;
     }
     p.s += p.v * dt * p.dir;
@@ -68,11 +87,10 @@ export function stepPeds(P, world, dt, t, cars) {
       p.s = Math.max(0, Math.min(L, p.s)); place(p);
       const n = p.dir > 0 ? p.walk.e.b : p.walk.e.a;
       if (n.kind === 'exit') { p.dir = -p.dir; continue; }
-      const nx = nextWalk(world, P, p, n);
+      const nx = nextWalk(P, p, n);
       if (!nx) { p.dir = -p.dir; continue; }
       const to = nx.pt;
       if (crossesRoad(world, [p.x, p.y], to)) {
-        // atravessa a rua: andando na horizontal cruza uma rua vertical (eixo V), e vice-versa
         const axis = Math.abs(to[0] - p.x) > Math.abs(to[1] - p.y) ? 'V' : 'H';
         p.cross = { node: n, axis, to, walk: nx.walk, dir: nx.dir, mid: [(p.x + to[0]) / 2, (p.y + to[1]) / 2], waited: 0, road: true };
         p.state = 'wait'; p.pause = 0.3 + Math.random();
@@ -80,7 +98,22 @@ export function stepPeds(P, world, dt, t, cars) {
       continue;
     }
     place(p);
-    if (Math.random() < dt * 0.02) p.pause = 1 + Math.random() * 3; // para de vez em quando (olha vitrine, celular...)
+    if (Math.random() < dt * 0.02) p.pause = 1 + Math.random() * 3;
+    // passante longe da câmera reaparece perto (os moradores com nome continuam a rotina onde estiverem)
+    if (!p.real && view) { p.far = Math.hypot(p.x - view.x, p.y - view.y) > view.r + 900 ? (p.far || 0) + dt : 0; if (p.far > 5) respawnNear(P, p, view); }
   }
   return crossing;
+}
+
+// curiosos: quem está perto de uma ocorrência vai para o ponto mais próximo da própria calçada e fica olhando
+export function gather(P, x, y, radius = 160, secs = 22) {
+  let n = 0;
+  for (const p of P.peds) {
+    if (p.state === 'ferido' || p.state === 'levado' || Math.hypot(p.x - x, p.y - y) > radius) continue;
+    let best = p.s; let bd = Infinity;
+    for (let s = 0; s <= p.walk.path.len; s += 6) { const q = along(p.walk.path, s); const d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = s; } }
+    Object.assign(p, { state: 'olhando', look: secs + Math.random() * 8, lookS: Math.max(0, Math.min(p.walk.path.len, best + (Math.random() - 0.5) * 30)), lookAt: [x, y], cross: null });
+    n++;
+  }
+  return n;
 }
