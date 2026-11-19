@@ -289,6 +289,25 @@ export default async function render(el) {
     return IMG[`fx/fumaca${Math.floor(t * 4) % 6}`];
   };
   const puff = (x, y, k = 1) => { if (particles.length < 120) particles.push({ x, y, t: 0, life: 1.6 + Math.random(), vx: (Math.random() - 0.5) * 4, vy: -6 - Math.random() * 4, s: (6 + Math.random() * 4) * k }); };
+  // animação de passo: a partir de cada sprite, dois quadros com uma perna à frente (a de cá sobe, a de lá desce)
+  // e o tronco levemente inclinado; ciclo: passo A → parado → passo B → parado
+  const walkCache = new Map();
+  function walkFrames(key) {
+    let f = walkCache.get(key); if (f) return f;
+    const im = IMG[key]; if (!im) return null;
+    const w = im.width; const h = im.height; const leg = Math.round(h * 0.3); const top = h - leg; const k = Math.max(1, Math.round(h * 0.045)); const half = Math.floor(w / 2);
+    const make = (left) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+      x.drawImage(im, 0, 0, w, top, 0, left ? -1 : 0, w, top); // tronco balança 1 px
+      // perna da frente levanta (encurta), perna de trás estica para baixo
+      const [fx, bx] = left ? [0, half] : [half, 0];
+      x.drawImage(im, fx, top, half, leg, fx, top - k, half, leg);
+      x.drawImage(im, bx, top, w - half, leg - k, bx, top + k * 0.5, w - half, leg - k);
+      return c;
+    };
+    f = [make(true), im, make(false), im]; walkCache.set(key, f); return f;
+  }
+  const frameOf = (key, t, phase, speed = 1) => { const fr = walkFrames(key); return fr ? fr[Math.floor(t * 7 * speed + phase) % 4] : IMG[key]; };
   function drawPed(p, t) {
     if (p.state === 'levado') return;
     if (p.state === 'ferido') { const im = IMG['npc/caido']; if (im) ctx.drawImage(im, p.x - 9, p.y - 4, 18, 7); ctx.fillStyle = 'rgba(200,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 2, 4, 1.6, 0, 0, Math.PI * 2); ctx.fill(); return; }
@@ -297,7 +316,8 @@ export default async function render(el) {
     const moving = p.state === 'walk' || p.state === 'cross';
     const bob = moving && !p.pause ? Math.abs(Math.sin(t * 9 + p.phase)) * 0.9 : 0;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save(); ctx.translate(p.x, p.y - bob); if (p.face < 0) ctx.scale(-1, 1); ctx.drawImage(im, -W / 2, -H, W, H); ctx.restore();
+    const fimg = moving && !p.pause ? frameOf(p.spr, t, p.phase * 3, p.v / 9) : im;
+    ctx.save(); ctx.translate(p.x, p.y - bob * 0.4); if (p.face < 0) ctx.scale(-1, 1); ctx.drawImage(fimg, -W / 2, -H, W, H); ctx.restore();
     if (p.state === 'olhando') { ctx.fillStyle = '#fff'; ctx.font = 'bold 6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.sin(t * 6 + p.phase) > 0 ? '!' : '?', p.x, p.y - H - 1); }
   }
   function drawMe(t) {
@@ -306,7 +326,7 @@ export default async function render(el) {
     ctx.fillStyle = 'rgba(56,214,245,.35)'; ctx.beginPath(); ctx.ellipse(me.x, me.y, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
     if (me.swim) { ctx.save(); ctx.beginPath(); ctx.rect(me.x - 10, me.y - H, 20, H * 0.55); ctx.clip(); }
     const bob = me.moving ? Math.abs(Math.sin(t * 10)) * 1 : 0;
-    if (im) { ctx.save(); ctx.translate(me.x, me.y - bob - (me.swim ? -3 : 0)); if (Math.cos(me.a) < -0.2) ctx.scale(-1, 1); ctx.drawImage(im, -W / 2, -H, W, H); ctx.restore(); }
+    if (im) { const fimg = me.moving && !me.swim ? frameOf(me.spr, t, 0, 1.3) : im; ctx.save(); ctx.translate(me.x, me.y - bob * 0.4 - (me.swim ? -3 : 0)); if (Math.cos(me.a) < -0.2) ctx.scale(-1, 1); ctx.drawImage(fimg, -W / 2, -H, W, H); ctx.restore(); }
     if (me.swim) { ctx.restore(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.ellipse(me.x, me.y - 5, 6 + Math.sin(t * 5) * 1.5, 2, 0, 0, Math.PI * 2); ctx.stroke(); }
     ctx.fillStyle = '#38d6f5'; ctx.beginPath(); ctx.moveTo(me.x, me.y - H - 6); ctx.lineTo(me.x - 3, me.y - H - 10); ctx.lineTo(me.x + 3, me.y - H - 10); ctx.fill();
   }

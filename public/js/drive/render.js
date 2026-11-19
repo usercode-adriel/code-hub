@@ -120,7 +120,19 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
 
   // ---------------------------------------------------------------- construções (telhado + fachada sul em 3/4)
+  const sil = new Map();
+  function silhouette(k, im) { let c = sil.get(k); if (c) return c; c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#0a0e1e'; g.fillRect(0, 0, c.width, c.height); sil.set(k, c); return c; }
   function drawBuilding(x, b, lit) {
+    if (b.kind === 'sprite') {
+      const im = img(`bld/${b.spr}`);
+      if (im) {
+        // sombra suave à direita/abaixo e o sprite ocupando exatamente o lote
+        x.globalAlpha = 0.28; x.drawImage(silhouette(`bld/${b.spr}`, im), b.x + 5, b.y + 4, b.w, b.h); x.globalAlpha = 1;
+        x.drawImage(im, b.x, b.y, b.w, b.h);
+        const L = img(`bld/${b.spr}-lit`); if (L) lit.push({ img: L, x: b.x, y: b.y, w: b.w, h: b.h });
+        return;
+      }
+    }
     const R = rng(b.i * 977 + 13);
     if (b.round) { // tanque
       const cx = b.x + b.w / 2; const cy = b.y + b.h / 2; const r = b.w / 2;
@@ -235,7 +247,13 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     // construções e objetos ordenados pela base (y), como num RPG top-down
     const items = [...bin.b.map((b) => [b.y + b.h, 0, b]), ...bin.p.map((p) => [p.y, 1, p])].sort((a, b) => a[0] - b[0]);
     for (const [, t, o] of items) { if (t === 0) drawBuilding(x, o, lit); else drawProp(x, o); }
-    return { c, lit, used: ++order };
+    // todas as luzes do bloco (janelas, fachadas) numa imagem só: à noite é um desenho por bloco
+    let nl = null;
+    if (lit.length) {
+      nl = document.createElement('canvas'); nl.width = nl.height = CH; const g = nl.getContext('2d'); g.translate(-i * CH, -j * CH);
+      for (const e of lit) { if (e.img) { g.globalAlpha = 0.5; g.drawImage(e.img, e.x, e.y, e.w, e.h); } else { g.globalAlpha = e[5] ?? 1; g.fillStyle = e[4]; g.fillRect(e[0], e[1], e[2], e[3]); } }
+    }
+    return { c, lit: nl ? [{ img: nl, x: i * CH, y: j * CH, w: CH, h: CH }] : [], used: ++order };
   }
   let rendersThisFrame = 0;
   function getChunk(i, j) {
@@ -257,7 +275,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     const col = { pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
     for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m) fillShape(x, g, g.island ? '#56a640' : col[m]);
     x.fillStyle = '#f2c94c'; for (const s of city.segs) if (s.w >= 48) { if (s.v) x.fillRect(s.x - 2, s.y0, 4, s.y1 - s.y0); else x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 4); }
-    for (const b of city.blds) { x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
+    for (const b of city.blds) { if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
     x.fillStyle = '#2f7a2a'; for (const p of city.props) if (p.spr.startsWith('arvore') || p.spr.startsWith('arbusto')) { x.beginPath(); x.ellipse(p.x, p.y - 10, 9, 9, 0, 0, Math.PI * 2); x.fill(); }
   }
 
@@ -307,10 +325,10 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
       // brilho aditivo
       // janelas e fachadas acesas (cor própria) e, por cima, brilho aditivo das luzes
       ctx.save();
-      for (const e of emissive) { ctx.globalAlpha = Math.min(1, night * 1.2) * (e[5] ?? 1); ctx.fillStyle = e[4]; ctx.fillRect(e[0], e[1], e[2], e[3]); }
+      for (const e of emissive) { ctx.globalAlpha = Math.min(1, night * 1.2) * (e.img ? 0.9 : e[5] ?? 1); if (e.img) ctx.drawImage(e.img, e.x, e.y, e.w, e.h); else { ctx.fillStyle = e[4]; ctx.fillRect(e[0], e[1], e[2], e[3]); } }
       ctx.globalCompositeOperation = 'lighter';
       for (const L of lights) {
-        if (!L.color || (mobile && L.lamp)) continue; // no celular os postes só iluminam (sem halo aditivo)
+        if (!L.color || (mobile && (L.lamp || L.r < 12))) continue; // no celular os postes só iluminam (sem halo aditivo)
         ctx.globalAlpha = night * (L.ka ?? 0.35);
         if (L.cone) { ctx.save(); ctx.translate(L.x, L.y); ctx.rotate(L.a); ctx.drawImage(tinted(cone, L.color), 0, -L.r / 2, L.r, L.r); ctx.restore(); }
         else { const r = L.r * (L.halo ?? 0.6); ctx.drawImage(tinted(glow, L.color), L.x - r, L.y - r, r * 2, r * 2); }

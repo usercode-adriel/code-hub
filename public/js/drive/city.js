@@ -2,6 +2,7 @@
 // Produz só dados (sem desenhar): ruas para o grafo de trânsito, chão e construções para a renderização,
 // máscara de colisão (4 unidades por célula), altura das construções (para os aviões), luzes, pontos de interesse,
 // bairros, aeroporto e vagas. Unidade = 1 "pixel de arte"; 1 unidade ≈ 0,2 m.
+import { BLD } from './bldmeta.js';
 import { SOLID, WALK, ROAD, CROSS, LOT, WATER, GRASS, RUNWAY, PLAZA, SAND } from './world.js';
 
 export const W = 4096; export const H = 2816; export const CS = 4;
@@ -33,7 +34,7 @@ const ZONES = [
   ['residencial', 'parque', 'residencial', 'residencial', 'residencial', 'comercial', 'residencial'],
 ];
 const ZONES2 = [['posto', 'galpoes', 'galpoes', 'tanques'], ['galpoes', 'conteineres', 'fabrica', 'galpoes'], ['conteineres', 'galpoes', 'fabrica', 'galpoes']];
-const REGION = { estadio: 'Estádio', residencial: 'Bairro Residencial', empresarial: 'Distrito Empresarial', banco: 'Distrito Empresarial', praia: 'Orla', comercial: 'Centro Comercial', shopping: 'Centro Comercial', praca: 'Praça Central', hospital: 'Centro', policia: 'Centro', terminal: 'Terminal Rodoviário', prefeitura: 'Centro Cívico', estacionamento: 'Centro', concessionaria: 'Centro', escola: 'Vila Escolar', rio: 'Beira-Rio', lago: 'Parque do Lago', parque: 'Parque Sul', posto: 'Área Industrial', galpoes: 'Área Industrial', tanques: 'Área Industrial', conteineres: 'Porto Seco', fabrica: 'Área Industrial' };
+const REGION = { hoteis: 'Distrito Hoteleiro', estadio: 'Estádio', residencial: 'Bairro Residencial', empresarial: 'Distrito Empresarial', banco: 'Distrito Empresarial', praia: 'Orla', comercial: 'Centro Comercial', shopping: 'Centro Comercial', praca: 'Praça Central', hospital: 'Centro', policia: 'Centro', terminal: 'Terminal Rodoviário', prefeitura: 'Centro Cívico', estacionamento: 'Centro', concessionaria: 'Centro', escola: 'Vila Escolar', rio: 'Beira-Rio', lago: 'Parque do Lago', parque: 'Parque Sul', posto: 'Área Industrial', galpoes: 'Área Industrial', tanques: 'Área Industrial', conteineres: 'Porto Seco', fabrica: 'Área Industrial' };
 
 export function generateCity(seed = 20261119) {
   const R = rng(seed);
@@ -111,6 +112,7 @@ export function generateCity(seed = 20261119) {
   // faixa norte (acima da Rua do Norte), sul e entre a praia e a cidade
   blocks.push({ zone: 'bosque', r: [336, 8, 2728, 128] }); blocks.push({ zone: 'bosque', r: [336, 2752, 4088, 2808] });
   blocks.push({ zone: 'aeroporto', r: [2792, 8, 4088, 1216] });
+  blocks.push({ zone: 'hoteis', r: inner(2752, 3984, 1248, 1504), i: 7, j: 3 });
 
   const B = (o) => { const b = { floors: 2, ...o, x: snap(o.x), y: snap(o.y), w: snap(o.w), h: snap(o.h) }; blds.push(b); return b; };
   const P = (spr, x, y, w, h, solid = false, extra = {}) => props.push({ spr, x, y, w, h, solid, ...extra });
@@ -133,70 +135,87 @@ export function generateCity(seed = 20261119) {
   }
   const tree = (x, y, big = true) => { const k = Math.floor(R() * 5); P(big ? `arvore${k}` : `arbusto${k % 2}`, x, y, big ? 20 : 14, big ? 34 : 18, true, { h: 18 }); };
 
+  // ---------------------------------------------------------------- prédios em sprite (folhas de pixel art)
+  // cada prédio ocupa exatamente o retângulo desenhado (largura sai da proporção do sprite)
+  const SP = (spr, x, y, h, extra = {}) => { const [sw, sh] = BLD[spr] || [100, 150]; const w = (h * sw) / sh; return B({ kind: 'sprite', spr, x, y, w, h, floors: Math.max(1, Math.round((sh / sw) * 4)), ...extra }); };
+  const SPw = (spr, x, y, w, extra = {}) => { const [sw, sh] = BLD[spr] || [100, 150]; return B({ kind: 'sprite', spr, x, y, w, h: (w * sh) / sw, floors: Math.max(1, Math.round((sh / sw) * 4)), ...extra }); };
+  const wOfS = (spr, h) => { const [sw, sh] = BLD[spr] || [100, 150]; return (h * sw) / sh; };
+  // fileira de prédios da esquerda para a direita, sorteando entre os sprites que cabem (copiando os mesmos quando precisa)
+  function row(x0, x1, y, h, list, { gap = 6, trees = 0, center = true } = {}) {
+    const items = []; let x = x0;
+    for (;;) {
+      const fit = list.filter((k) => wOfS(k, h) <= x1 - x);
+      if (!fit.length) break;
+      const k = pick(fit); items.push([k, x]); x += wOfS(k, h) + gap;
+      if (trees && R() < trees && x1 - x > 16) { items.push(['@tree', x + 4]); x += 14; }
+    }
+    const used = x - gap - x0; const off = center ? Math.max(0, (x1 - x0 - used) / 2) : 0;
+    const out = [];
+    for (const [k, xx] of items) { if (k === '@tree') tree(xx + off + 4, y + h - 2, R() < 0.6); else out.push(SP(k, xx + off, y, h)); }
+    return out;
+  }
+  const RES = ['house', 'house-blue', 'res-a1', 'res-a2', 'res-a3', 'res-a4', 'house', 'house-blue'];
+  const APT = ['apt-beige', 'apt-green', 'apt-brick', 'res-a1', 'res-a2', 'res-a4'];
+  const SHOPS = ['shop', 'food', 'cafe', 'market', 'burger', 'pizza', 'diner', 'bar', 'store247', 'grocery', 'pharmacy', 'pizza2', 'burger2', 'video', 'fashion', 'autoparts', 'diner2', 'bar2', 'gym'];
+  const TOWERS = ['tower-glass', 'tower-glass2', 'tower-heli', 'tower-beige', 'office', 'office2', 'hotel-tall'];
+  const IND = ['warehouse-blue', 'warehouse-brick', 'loading', 'industrial', 'ind-blue'];
+  // prédio único centralizado no espaço (w×h máximos), mantendo a proporção
+  const fitIn = (spr, x0, y0, w, h, extra) => { const [sw, sh] = BLD[spr]; const k = Math.min(w / sw, h / sh); return B({ kind: 'sprite', spr, x: x0 + (w - sw * k) / 2, y: y0 + (h - sh * k) / 2, w: sw * k, h: sh * k, floors: Math.max(2, Math.round((sh / sw) * 4)), ...extra }); };
+
   for (const bl of blocks) {
     const [x0, y0, x1, y1] = bl.r; const bw = x1 - x0; const bh = y1 - y0; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
     if (bl.zone !== 'bosque' && bl.zone !== 'aeroporto') regions.push({ name: REGION[bl.zone] || 'Nexus City', rect: [x0 - 24, y0 - 24, x1 + 24, y1 + 24] });
     switch (bl.zone) {
       case 'residencial': case 'rio': {
-        let ry0 = y0; let ry1 = y1;
+        const parts = bl.zone === 'rio' ? [[y0, 1960], [2104, y1]] : [[y0, y1]];
         if (bl.zone === 'rio') { G('grass', x0, y0, bw, 1976 - y0, 'rect', { yard: true }); G('grass', x0, 2088, bw, y1 - 2088, 'rect', { yard: true }); }
         else G('grass', x0, y0, bw, bh, 'rect', { yard: true });
-        const parts = bl.zone === 'rio' ? [[y0, 1960], [2104, y1]] : [[ry0, ry1]];
         for (const [a, b] of parts) {
-          perimeterLots([x0, a, x1, b], 64, 64, 84, (x, y, w, h) => {
-            const hw = Math.min(w - 12, 52); const hh = Math.min(h - 14, 44);
-            const house = B({ kind: 'casa', x: x + (w - hw) / 2, y: y + (h - hh) / 2, w: hw, h: hh, floors: 1 + (R() < 0.25), roof: pick(ROOF.casa), wall: pick(['#e8dcc0', '#f2e6d0', '#d8c8a8', '#e0d0e0', '#c8d8e8']) });
-            if (R() < 0.6) tree(x + 6 + R() * (w - 12), y + h - 4, R() < 0.7);
-            void house;
-          });
-          // miolo da quadra: segunda fileira de casas (de costas), quintais com árvores e piscinas
-          for (let yy = a + 92; yy < b - 150; yy += 84) for (let xx = x0 + 92; xx < x1 - 150; xx += 84) {
-            const k = R();
-            if (k < 0.62) B({ kind: 'casa', x: xx, y: yy, w: 48, h: 42, floors: 1 + (R() < 0.3), roof: pick(ROOF.casa), wall: pick(['#e8dcc0', '#f2e6d0', '#d8c8a8', '#e0d0e0', '#c8d8e8']) });
-            else if (k < 0.75) G('pond', xx + 8, yy + 10, 30, 18, 'rect', { pool: true });
-            else tree(xx + 24, yy + 30, true);
-            if (R() < 0.5) tree(xx + 60, yy + 70, R() < 0.6);
-          }
+          // fileiras de casas e prédios baixos, com quintais e árvores entre elas
+          const H = 70; let yy = a + 4;
+          while (yy + H <= b - 4) { row(x0 + 4, x1 - 4, yy, H, R() < 0.3 ? APT : RES, { gap: 10, trees: 0.35 }); yy += H + 22; }
+          if (b - yy > 30) for (let x = x0 + 20; x < x1 - 10; x += 40) if (R() < 0.6) tree(x, b - 8, true);
         }
-        if (bl.zone === 'rio') { for (let x = x0 + 20; x < x1 - 10; x += 46) { tree(x, 1960, true); tree(x + 20, 2110, true); } }
         break;
       }
       case 'praia': {
         G('grass', x0, y0, bw, bh);
-        perimeterLots(bl.r, 70, 70, 92, (x, y, w, h) => { B({ kind: 'casa', x: x + 6, y: y + 8, w: w - 12, h: h - 16, floors: 2 + Math.floor(R() * 3), roof: pick(['#e8e2d0', '#f0c8a0', '#a8d8e8', '#e8a8a8']), wall: '#f4eee0', label: R() < 0.2 ? 'Pousada' : null }); });
-        for (let k = 0; k < 10; k++) tree(x0 + 90 + R() * (bw - 180), y0 + 90 + R() * (bh - 180), true);
+        let yy = y0 + 4; const H = 118;
+        while (yy + H <= y1 - 4) { row(x0 + 4, x1 - 4, yy, H, ['apt-beige', 'hotel-tall', 'tower-beige', 'apt-green', 'res-a1', 'hotel'], { gap: 14, trees: 0.5 }); yy += H + 24; }
         break;
       }
-      case 'comercial': case 'shopping': {
-        G('lot', x0, y0, bw, bh, 'rect', { stalls: false });
-        if (bl.zone === 'shopping') {
-          const m = B({ kind: 'loja', x: x0 + 20, y: y0 + 20, w: bw - 40, h: bh * 0.5, floors: 3, roof: '#7a6aa8', wall: '#d8d0e8', label: 'Shopping Nexus', facade: 'shopping' });
-          poi('shopping', 'Shopping Nexus', m.x + m.w / 2, m.y + m.h + 10, '#/mercado', 'bag');
-          G('lot', x0 + 8, y0 + bh * 0.5 + 32, bw - 16, bh * 0.5 - 40, 'rect', { stalls: true });
-          for (let k = 0; k < 14; k++) spots.push([x0 + 30 + k * ((bw - 60) / 13), y0 + bh * 0.5 + 60, -Math.PI / 2]);
-          break;
-        }
-        perimeterLots(bl.r, 76, 52, 84, (x, y, w, h, side) => {
-          const b = B({ kind: 'loja', x, y, w, h, floors: 2 + Math.floor(R() * 4), roof: pick(ROOF.loja), wall: pick(['#d8c8a8', '#c8b8a8', '#b8c0c8', '#e0c8b0', '#c8d0b8']), facade: side === 's' ? pick(facadeSprites) : null, awning: side === 's' && R() < 0.7 ? pick(awnings) : null });
-          if (R() < 0.12) b.billboard = pick(['outdoor-sale', 'outdoor-burger', 'outdoor-drink']);
-        });
-        // miolo da quadra: prédio maior e pátio
-        if (bw > 240 && bh > 240) B({ kind: 'torre', x: x0 + 100, y: y0 + 100, w: bw - 200, h: bh - 200, floors: 5 + Math.floor(R() * 6), roof: pick(ROOF.torre), wall: '#9fb0c8' });
+      case 'comercial': {
+        G('plaza', x0, y0, bw, bh);
+        const H = 82;
+        row(x0 + 2, x1 - 2, y0 + 2, H, SHOPS, { gap: 3 });
+        const mid = bh - 2 * H - 20;
+        // miolo da quadra: prédios de escritório/apartamento (cópias dos sprites), com árvores entre eles
+        if (mid >= 56) row(x0 + 8, x1 - 8, y0 + H + 10, Math.min(150, mid), mid >= 110 ? [...TOWERS, ...APT, 'cinema', 'supermarket', 'hotel'] : [...APT, 'res-a1', 'res-a3', 'gym'], { gap: 12, trees: 0.5 });
+        row(x0 + 2, x1 - 2, y1 - H - 2, H, SHOPS, { gap: 3 });
         if (bl.i === 1 && bl.j === 1) poi('lojas', 'Lojas do centro', cx, y1 + 20, '#/mercado', 'bag');
         if (bl.i === 2 && bl.j === 1) poi('empregos', 'Agência de Empregos', cx, y1 + 20, '#/empregos', 'briefcase');
         if (bl.i === 4 && bl.j === 2) poi('imobiliaria', 'Imobiliária Horizonte', cx, y1 + 20, '#/propriedades', 'building');
         if (bl.i === 5 && bl.j === 5) poi('mercado2', 'Supermercado', cx, y1 + 20, '#/mercado', 'cart');
         break;
       }
+      case 'shopping': {
+        G('lot', x0, y0, bw, bh, 'rect', { stalls: true });
+        const m = fitIn('mall2', x0 + 6, y0 + 4, bw - 12, bh * 0.52, { label: 'Shopping Nexus' });
+        poi('shopping', 'Shopping Nexus', m.x + m.w / 2, m.y + m.h + 10, '#/mercado', 'bag');
+        row(x0 + 4, x1 - 4, y1 - 86, 82, ['supermarket', 'mall', 'cinema'], { gap: 8 });
+        for (let k = 0; k < 10; k++) spots.push([x0 + 30 + k * ((bw - 60) / 9), y0 + bh * 0.52 + 30, -Math.PI / 2]);
+        break;
+      }
       case 'empresarial': case 'banco': {
         G('plaza', x0, y0, bw, bh);
-        const n = bw > 300 ? 2 : 1; const gap = 32;
-        for (let k = 0; k < n; k++) {
-          const w = (bw - gap * (n + 1)) / n;
-          B({ kind: 'torre', x: x0 + gap + k * (w + gap), y: y0 + gap, w, h: bh - gap * 2 - 24, floors: 10 + Math.floor(R() * 16), roof: pick(ROOF.torre), wall: pick(['#8fb0d8', '#a0b8d0', '#7f98c0']), helipad: R() < 0.4, label: bl.zone === 'banco' && k === 0 ? 'Banco Nexus' : null });
+        const H = Math.min(200, (bh - 20) / (bh > 380 ? 2 : 1.2));
+        let yy = y0 + 6; let first = true;
+        while (yy + H <= y1 - 4) {
+          const list = bl.zone === 'banco' && first ? ['bank', 'bank2'] : TOWERS;
+          const bs = row(x0 + 4, x1 - 4, yy, H, list, { gap: 10, trees: 0.4 });
+          if (bl.zone === 'banco' && first && bs[0]) { bs[0].label = 'Banco Nexus'; poi('banco', 'Banco Nexus', bs[0].x + bs[0].w / 2, yy + H + 14, '#/banco', 'wallet'); }
+          first = false; yy += H + 18;
         }
-        for (let x = x0 + 16; x < x1 - 10; x += 60) tree(x, y1 - 10, false);
-        if (bl.zone === 'banco') poi('banco', 'Banco Nexus', x0 + bw / 4, y1 + 20, '#/banco', 'wallet');
         break;
       }
       case 'praca': case 'lago': case 'parque': {
@@ -213,31 +232,33 @@ export function generateCity(seed = 20261119) {
       }
       case 'hospital': {
         G('plaza', x0, y0, bw, bh);
-        const b = B({ kind: 'hospital', x: x0 + 20, y: y0 + 20, w: bw - 40, h: bh - 90, floors: 6, roof: '#e8eef2', wall: '#f4f6f8', label: 'Hospital Nexus', helipad: true });
+        const b = fitIn('hospital2', x0 + 6, y0 + 4, bw * 0.62, bh - 10, { label: 'Hospital Nexus' });
+        fitIn('hospital', b.x + b.w + 8, y0 + bh * 0.3, x1 - b.x - b.w - 14, bh * 0.65);
         poi('hospital', 'Hospital Nexus', b.x + b.w / 2, y1 + 20, '#/hospital', 'hospital');
         break;
       }
       case 'policia': {
         G('plaza', x0, y0, bw, bh);
-        const w2 = bw / 2 - 30;
-        B({ kind: 'policia', x: x0 + 16, y: y0 + 20, w: w2, h: bh - 80, floors: 4, roof: '#3f5f9f', wall: '#c8d4e8', label: 'Delegacia' });
-        B({ kind: 'bombeiros', x: x0 + bw / 2 + 14, y: y0 + 20, w: w2, h: bh - 80, floors: 3, roof: '#b83a3a', wall: '#e8d0c8', label: 'Bombeiros' });
-        poi('policia', 'Delegacia', x0 + 16 + w2 / 2, y1 + 20, '#/policia', 'shield');
-        poi('bombeiros', 'Corpo de Bombeiros', x0 + bw / 2 + 14 + w2 / 2, y1 + 20, '#/acontecimentos', 'flame');
+        const p1 = fitIn('police2', x0 + 4, y0 + 6, bw / 2 - 8, bh - 12, { label: 'Delegacia' });
+        const f1 = fitIn('fire2', x0 + bw / 2 + 4, y0 + 6, bw / 2 - 8, bh - 12, { label: 'Bombeiros' });
+        poi('policia', 'Delegacia', p1.x + p1.w / 2, y1 + 20, '#/policia', 'shield');
+        poi('bombeiros', 'Corpo de Bombeiros', f1.x + f1.w / 2, y1 + 20, '#/acontecimentos', 'flame');
         break;
       }
       case 'terminal': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: false, bus: true });
-        const b = B({ kind: 'terminal', x: x0 + 24, y: y0 + 16, w: bw - 48, h: 90, floors: 2, roof: '#5f8fa8', wall: '#d8e4ec', label: 'Terminal Rodoviário' });
-        for (let k = 0; k < 5; k++) P('ponto', b.x + 30 + k * ((b.w - 60) / 4), b.y + b.h + 18, 30, 14, false);
-        poi('terminal', 'Terminal Rodoviário', b.x + b.w / 2, y1 + 20, '#/acontecimentos', 'bus');
+        const bs = row(x0 + 4, x1 - 4, y0 + 4, 104, ['busterminal'], { gap: 4 });
+        for (let k = 0; k < 5; k++) P('ponto', x0 + 30 + k * ((bw - 60) / 4), y0 + 130, 30, 14, false);
+        poi('terminal', 'Terminal Rodoviário', cx, y1 + 20, '#/acontecimentos', 'bus');
+        if (bs[0]) bs[0].label = 'Terminal Rodoviário';
         break;
       }
       case 'prefeitura': {
         G('plaza', x0, y0, bw, bh);
-        const b = B({ kind: 'civico', x: x0 + 40, y: y0 + 30, w: bw - 80, h: bh - 110, floors: 4, roof: '#d8d0b8', wall: '#f0e8d8', label: 'Prefeitura e Fórum' });
-        for (let x = x0 + 20; x < x1; x += 40) tree(x, y1 - 12, false);
-        poi('prefeitura', 'Prefeitura', b.x + b.w / 3, y1 + 20, '#/governo', 'flag'); poi('forum', 'Fórum', b.x + (2 * b.w) / 3, y1 + 20, '#/justica', 'scale');
+        const c1 = fitIn('cityhall', x0 + 4, y0 + 4, bw * 0.56, bh - 40, { label: 'Prefeitura' });
+        const c2 = fitIn('courthouse', c1.x + c1.w + 8, y0 + 4, x1 - c1.x - c1.w - 12, bh - 40, { label: 'Fórum' });
+        for (let x = x0 + 20; x < x1; x += 40) tree(x, y1 - 10, false);
+        poi('prefeitura', 'Prefeitura', c1.x + c1.w / 2, y1 + 20, '#/governo', 'flag'); poi('forum', 'Fórum', c2.x + c2.w / 2, y1 + 20, '#/justica', 'scale');
         break;
       }
       case 'estacionamento': {
@@ -248,46 +269,57 @@ export function generateCity(seed = 20261119) {
       }
       case 'concessionaria': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: true });
-        const b = B({ kind: 'loja', x: x0 + 20, y: y0 + 20, w: bw - 40, h: 100, floors: 2, roof: '#3f6fd0', wall: '#e8eef8', label: 'Concessionária Turbo', facade: 'vitrine' });
-        poi('concessionaria', 'Concessionária Turbo', b.x + b.w / 2, y1 + 20, '#/veiculos', 'car');
+        const bs = row(x0 + 4, x1 - 4, y0 + 4, 104, ['garage', 'autoparts', 'garage'], { gap: 6 });
+        if (bs[0]) bs[0].label = 'Concessionária Turbo';
+        poi('concessionaria', 'Concessionária Turbo', cx, y1 + 20, '#/veiculos', 'car');
         for (let k = 0; k < 6; k++) spots.push([x0 + 40 + k * ((bw - 80) / 5), y0 + 190, -Math.PI / 2]);
         break;
       }
       case 'escola': {
         G('grass', x0, y0, bw, bh);
-        const b = B({ kind: 'escola', x: x0 + 30, y: y0 + 24, w: bw - 60, h: 110, floors: 3, roof: '#d4a24a', wall: '#f0e0c0', label: 'Escola Nexus' });
-        G('plaza', x0 + 40, y0 + 170, bw - 80, 90, 'rect', { court: true });
+        const b = fitIn('school', x0 + 10, y0 + 6, bw - 20, bh * 0.6, { label: 'Escola Nexus' });
+        G('plaza', x0 + 40, b.y + b.h + 16, bw - 80, Math.max(40, y1 - b.y - b.h - 30), 'rect', { court: true });
         poi('escola', 'Escola e Universidade', b.x + b.w / 2, y1 + 20, '#/empresas/carreira', 'school');
         break;
       }
       case 'estadio': {
-        G('grass', x0, y0, bw, bh);
-        const b = B({ kind: 'estadio', x: x0 + 20, y: y0 + 20, w: bw - 40, h: bh - 60, floors: 4, roof: '#c8ccd8', wall: '#9098a8', label: 'Estádio Nexus' });
+        // estádio maior que os demais: ocupa a quadra inteira
+        G('lot', x0, y0, bw, bh, 'rect', { stalls: true });
+        const b = SPw('stadium', x0, y0, bw, { label: 'Estádio Nexus' });
+        for (let k = 0; k < 8; k++) spots.push([x0 + 24 + k * ((bw - 48) / 7), b.y + b.h + 40, -Math.PI / 2]);
+        for (let x = x0 + 14; x < x1 - 8; x += 34) tree(x, y1 - 6, false);
         poi('estadio', 'Estádio Nexus', b.x + b.w / 2, y1 + 20, '#/diversao', 'trophy');
         break;
       }
       case 'posto': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: false });
-        const c = B({ kind: 'posto', x: x0 + bw / 2 - 70, y: y0 + 40, w: 140, h: 70, floors: 1, roof: '#d83a3a', wall: '#f0f0f0', canopy: true, label: 'Posto Rota' });
-        B({ kind: 'loja', x: x1 - 110, y: y1 - 90, w: 90, h: 60, floors: 1, roof: '#e8b84a', wall: '#f0e8d8', label: 'Conveniência', facade: 'fachada-24' });
-        poi(`posto${bl.i}`, 'Posto de combustível', c.x + c.w / 2, y1 + 20, '#/veiculos', 'fuel');
+        const g = SP('gas', x0 + 20, y0 + 30, 110, { label: 'Posto Rota' });
+        SP('store247', x1 - wOfS('store247', 90) - 16, y1 - 96, 90, { label: 'Conveniência' });
+        row(x0 + 6, x1 - wOfS('store247', 90) - 26, y1 - 100, 96, ['garage', 'autoparts', 'diner2', 'burger2'], { gap: 8, center: false });
+        poi(`posto${bl.i}`, 'Posto de combustível', g.x + g.w / 2, y1 + 20, '#/veiculos', 'fuel');
         break;
       }
       case 'galpoes': case 'fabrica': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: false, industrial: true });
-        const n = 2;
-        for (let k = 0; k < n; k++) {
-          const w = (bw - 60) / n;
-          const b = B({ kind: 'galpao', x: x0 + 20 + k * (w + 20), y: y0 + 24, w, h: bh * 0.55, floors: 3, roof: pick(ROOF.galpao), wall: '#a8b0b8' });
-          if (bl.zone === 'fabrica' && k === 0) { b.chimney = true; b.floors = 5; }
-        }
-        for (let k = 0; k < 6; k++) P(`caixa${k % 3}`, x0 + 30 + R() * (bw - 60), y0 + bh * 0.7 + R() * (bh * 0.25), 14, 12, true, { h: 6 });
+        const H = Math.min(150, (bh - 30) / 2);
+        row(x0 + 4, x1 - 4, y0 + 6, H, bl.zone === 'fabrica' ? ['factory', 'industrial', 'cooling'] : IND, { gap: 10 });
+        row(x0 + 4, x1 - 4, y0 + H + 22, H, bl.zone === 'fabrica' ? ['factory', 'ind-blue', 'industrial'] : IND, { gap: 10 });
         if (bl.i === 8 && bl.j === 4) poi('industria', 'Distrito Industrial', cx, y1 + 20, '#/empresas', 'briefcase');
         break;
       }
       case 'tanques': {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: false, industrial: true });
-        for (let k = 0; k < 4; k++) B({ kind: 'tanque', x: x0 + 30 + (k % 2) * (bw / 2), y: y0 + 30 + Math.floor(k / 2) * (bh / 2), w: Math.min(bw, bh) / 2 - 50, h: Math.min(bw, bh) / 2 - 50, floors: 4, roof: '#c8ccd0', wall: '#a8b0b8', round: true });
+        const H = Math.min(150, (bh - 30) / 2);
+        row(x0 + 4, x1 - 4, y0 + 6, H, ['silos'], { gap: 8 }); row(x0 + 4, x1 - 4, y0 + H + 22, H, ['silos', 'cooling'], { gap: 8 });
+        break;
+      }
+      case 'hoteis': {
+        // faixa entre o aeroporto e a Av. Brasil: hotéis, cassino, escritórios e cinema
+        G('plaza', x0, y0, bw, bh);
+        const H = Math.min(190, bh - 16);
+        const bs = row(x0 + 4, x1 - 4, y0 + 6, H, ['hotel', 'hotel-tall', 'casino', 'office', 'office2', 'cinema', 'tower-glass2'], { gap: 14, trees: 0.6 });
+        const cs = bs.find((b) => b.spr === 'casino'); if (cs) { cs.label = 'Cassino Royal'; poi('cassino', 'Cassino Royal', cs.x + cs.w / 2, y1 + 18, '#/diversao', 'trophy'); }
+        const ht = bs.find((b) => b.spr.startsWith('hotel')); if (ht) poi('hotel', 'Hotel Aeroporto', ht.x + ht.w / 2, y1 + 18, '#/acontecimentos', 'building');
         break;
       }
       case 'conteineres': {
@@ -312,9 +344,8 @@ export function generateCity(seed = 20261119) {
   G('runway', ...airport.runway, 'rect', { kind: 'runway' }); G('runway', ...airport.taxi, 'rect', { kind: 'taxi' });
   G('runway', 2930, 464, 40, 360, 'rect', { kind: 'taxi' }); G('runway', 3440, 464, 40, 360, 'rect', { kind: 'taxi' }); G('runway', 3960, 464, 40, 200, 'rect', { kind: 'taxi' });
   G('runway', ...airport.apron, 'rect', { kind: 'apron' }); G('lot', ...airport.gate, 'rect', { stalls: false });
-  B({ kind: 'hangar', x: 3904, y: 820, w: 150, h: 120, floors: 3, roof: '#8a98a8', wall: '#b8c0c8', label: 'Hangar Nexus Aviação' });
-  B({ kind: 'hangar', x: 3904, y: 960, w: 150, h: 120, floors: 3, roof: '#7a8898', wall: '#b8c0c8' });
-  B({ kind: 'terminal', x: 3020, y: 1132, w: 820, h: 76, floors: 3, roof: '#5f8fa8', wall: '#d8e4ec', label: 'Aeroporto Internacional Nexus' });
+  SPw('warehouse-blue', 3900, 820, 160, { label: 'Hangar Nexus Aviação' }); SPw('warehouse-blue', 3900, 968, 160);
+  { let x = 3010; for (let k = 0; k < 5; k++) { const b = SP('airport', x, 1124, 88, k === 2 ? { label: 'Aeroporto Internacional Nexus' } : {}); x += b.w + 2; } }
   B({ kind: 'torre', x: 2820, y: 720, w: 40, h: 40, floors: 16, roof: '#e8eef2', wall: '#c8d4e0', label: 'Torre de controle', tower: true });
   poi('aeroporto', 'Aeroporto Nexus', 3430, 1236, '#/veiculos', 'rocket');
   poi('hangar', 'Hangar · Aeronaves', 3980, 1100, '#/veiculos', 'rocket');
