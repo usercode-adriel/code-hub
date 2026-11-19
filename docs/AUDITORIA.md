@@ -60,6 +60,19 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Hub pessoal só pelo perfil (a barra lateral troca para "Meu hub" nas telas pessoais)
 - [x] Nenhuma funcionalidade antiga perdida: todas as rotas listadas acima abrem na moldura nova; testes antigos continuam passando
 
+### Cidade 2D dirigível (novo Mapa)
+- [x] Mapa novo a partir dos dois assets (cidade completa + peças), em camadas: imagem, semáforos/radares, pedestres, carros, rótulos
+- [x] Colisões: máscara gerada de `public/assets/drive/roads.json` (prédios, árvores e água sólidos; ruas, calçadas, faixas, estacionamento e ponte livres); a pé só calçada e faixa
+- [x] Trânsito automático (`public/js/drive/traffic.js`): mão direita, semáforos em 17 cruzamentos, rotatórias no sentido anti-horário, curvas mais lentas, distância segura, espera de pedestres, viatura patrulhando
+- [x] Pedestres (`public/js/drive/peds.js`): moradores reais com nome e rosto em pixel, só nas calçadas, atravessando na faixa com o sinal
+- [x] Garagem integrada: carros comprados aparecem estacionados (marcador verde "SEU"), entrar/sair, estacionamento salvo no servidor
+- [x] Direção (`public/js/drive/player.js`): aceleração progressiva, inércia, freio, freio de mão, ré, marcha D/N/R, colisão com prédios e carros
+- [x] Controles: teclado (W/A/S/D, espaço, E, roda, arrastar) e celular (joystick, volante, acelerador, freio, marcha, entrar/sair, pinça)
+- [x] Câmera com zoom limitado, seguindo o carro com antecipação; minimapa; região, hora da cidade, velocidade, marcha, veículo; entrada nos estabelecimentos
+- [x] Fiscalização: avanço de sinal, 4 radares, estacionamento irregular (guincho) — multas reais no banco, com limite por tipo e por dia
+- [x] Desempenho: só o trecho visível é desenhado; 58 fps no celular com CPU 4× mais lenta, 60 fps no PC; sem vazamento de memória
+- O mapa de bairros antigo continua em `#/mapa?classico=1` e nos links de lugares (`#/mapa/<id>`), com rotas e deslocamento
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

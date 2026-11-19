@@ -19,7 +19,7 @@ export default async function render(el) {
         { href: '#vhGaragem', icon: 'car', label: 'Minha garagem', color: '#60a5fa', badge: d.garage.length || '' },
         { href: d.dealer ? `#/mercado/${d.dealer.id}` : '#/mercado', icon: 'cart', label: 'Comprar na concessionária', color: '#fb923c' },
         { id: 'falar', icon: 'chat', label: 'Falar com o vendedor', color: '#38d6f5' },
-        { href: '#/mapa?rota=1', icon: 'map', label: 'Dirigir pelo mapa', color: '#2fd27a' },
+        { href: '#/mapa', icon: 'map', label: 'Dirigir pela cidade', color: '#2fd27a' },
       ],
       chat: d.dealer ? { url: `/mundo/lugar/${d.dealer.id}/conversar`, placeholder: 'Pergunte sobre os carros...', greeting: a ? `E aí! Sou ${a.name.split(' ')[0]}. Bora escolher seu carro?` : 'Oficina Turbo.' } : null,
       live: d.dealer ? { scope: `place:${d.dealer.id}`, title: 'Ao vivo na concessionária', art: '/assets/pixel/scene-porto.png', empty: 'Visitas e vendas da concessionária aparecem aqui.' } : null,

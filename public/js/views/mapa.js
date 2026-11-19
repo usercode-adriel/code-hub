@@ -12,6 +12,8 @@ const FEED_ICON = { entrada: '●', saida: '●', compra: '🛒', promo: '', not
 const hhmm = (d) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
 export default async function render(el, parts, params = new URLSearchParams()) {
+  // o Mapa agora é a cidade 2D dirigível; o mapa de bairros continua para rotas, lugares (#/mapa/<id>) e casas
+  if (!parts?.[0] && !['classico', 'casa', 'bairro', 'rota'].some((k) => params.has(k))) return (await import('./cidade2d.js')).default(el);
   const body = shell(el, 'mapa');
   bindEntities(body);
   body.innerHTML = '<div class="skeleton" style="height:100%;min-height:70vh"></div>';
@@ -21,7 +23,7 @@ export default async function render(el, parts, params = new URLSearchParams()) 
   const quick = QUICK.filter(([k]) => kinds.includes(k));
   body.innerHTML = `<div class="lv">
     <div class="lv-stage" id="lvStage"></div>
-    <div class="lv-hud lv-clock"><div class="lv-t"><b id="lvCk">--:--</b><small id="lvDy"></small></div><div class="lv-wx" id="lvWx"></div>
+    <a class="lv-hud lv-to2d" href="#/mapa" title="Voltar para a cidade 2D (dirigir)">🚗 Cidade 2D</a><div class="lv-hud lv-clock"><div class="lv-t"><b id="lvCk">--:--</b><small id="lvDy"></small></div><div class="lv-wx" id="lvWx"></div>
       <div class="lv-spd" title="O tempo na cidade passa 36× mais rápido: um dia dura 40 minutos"><i class="on">⏱ 1 dia = 40 min</i></div></div>
     <div class="lv-top">
       <label class="gm-search">${icon('search', 15)}<input id="gmQ" placeholder="Buscar lugar, loja, rua…" autocomplete="off" aria-label="Buscar no mapa"><div class="gm-results" id="gmRes" hidden></div></label>

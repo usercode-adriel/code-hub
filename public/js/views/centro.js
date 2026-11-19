@@ -8,7 +8,7 @@ import { livePanel } from '../world/live.js';
 import { cityNow, setCityClock } from '../chrome.js';
 
 const QUICK = [
-  ['#/empregos', 'briefcase', 'Trabalhar', '#fb923c'], ['#/mercado', 'cart', 'Comprar', '#a78bfa'], ['#/mapa?rota=1', 'car', 'Dirigir', '#60a5fa'],
+  ['#/empregos', 'briefcase', 'Trabalhar', '#fb923c'], ['#/mercado', 'cart', 'Comprar', '#a78bfa'], ['#/mapa', 'car', 'Dirigir', '#60a5fa'],
   ['#/empresas/bolsa', 'trending', 'Investir', '#4ade80'], ['#/banco/pendencias', 'file', 'Pagar contas', '#38bdf8'], ['#/empresas/empresa', 'bag', 'Abrir loja', '#f472b6'],
 ];
 const NEWS_ART = { politica: 'scene-cidade', economia: 'scene-comercio', tecnologia: 'scene-aeroporto', entretenimento: 'scene-estadio', esportes: 'scene-estadio', seguranca: 'scene-bairro', ciencia: 'scene-aeroporto', celebridades: 'scene-praia', sociedade: 'scene-parque', local: 'scene-bairro', pessoal: 'scene-parque' };
