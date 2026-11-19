@@ -50,11 +50,15 @@ export function stepCar(car, input, world, dt, others) {
   const na = car.a + turn * dt;
   const nx = car.x + Math.cos(na) * v * dt; const ny = car.y + Math.sin(na) * v * dt;
   car.hit = null;
-  const other = hitCar(nx, ny, na, car.L, others);
+  // já encostado em outro carro: deixa se afastar (sem isso o carro ficaria preso)
+  const stuckNow = hitCar(car.x, car.y, car.a, car.L, others);
+  const other = stuckNow ? null : hitCar(nx, ny, na, car.L, others);
   if (fits(world, nx, ny, na, car.L, car.W) && !other) { car.x = nx; car.y = ny; car.a = na; car.v = v; return; }
   // desliza junto da parede (tenta só um dos eixos) e perde velocidade
-  if (!other && fits(world, nx, car.y, na, car.L, car.W)) { car.x = nx; car.a = na; car.v = v * 0.6; car.hit = 'raspou'; return; }
-  if (!other && fits(world, car.x, ny, na, car.L, car.W)) { car.y = ny; car.a = na; car.v = v * 0.6; car.hit = 'raspou'; return; }
+  // só desliza na parede se o movimento é quase paralelo a ela; de frente é batida
+  const stepX = Math.abs(nx - car.x); const stepY = Math.abs(ny - car.y); const step = Math.hypot(stepX, stepY) || 1;
+  if (!other && stepX / step > 0.5 && fits(world, nx, car.y, na, car.L, car.W)) { car.x = nx; car.a = na; car.v = v * (0.6 + 0.35 * (stepX / step)); car.hit = 'raspou'; car.impact = Math.abs(v) * (1 - stepX / step); return; }
+  if (!other && stepY / step > 0.5 && fits(world, car.x, ny, na, car.L, car.W)) { car.y = ny; car.a = na; car.v = v * (0.6 + 0.35 * (stepY / step)); car.hit = 'raspou'; car.impact = Math.abs(v) * (1 - stepY / step); return; }
   if (fits(world, car.x, car.y, na, car.L, car.W) && !hitCar(car.x, car.y, na, car.L, others)) car.a = na;
   car.hit = other ? 'carro' : 'parede'; car.impact = Math.abs(v); car.hitWith = other || null; car.v = -v * 0.2;
 }

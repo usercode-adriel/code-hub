@@ -73,6 +73,17 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Desempenho: só o trecho visível é desenhado; 58 fps no celular com CPU 4× mais lenta, 60 fps no PC; sem vazamento de memória
 - O mapa de bairros antigo continua em `#/mapa?classico=1` e nos links de lugares (`#/mapa/<id>`), com rotas e deslocamento
 
+### Mapa jogável v3 (cidade maior, aviões, emergência)
+- [x] Cidade gerada (`public/js/drive/city.js`) com 4096×2816 unidades (~7× o mapa anterior): centro comercial, bairros, distrito empresarial, área industrial, porto seco, parques, lago, rio com pontes, terminal, postos, estacionamentos, aeroporto completo
+- [x] Assets das folhas enviadas em `public/assets/rpg` (carros, danificados, aviões, NPCs por profissão, efeitos, mobiliário); script em `tools/drive/build.py`
+- [x] Renderização em blocos em cache, só o visível (`public/js/drive/render.js`); noite com fontes de luz individuais
+- [x] Jogador a pé anda por rua, calçada, grama e água; NPCs só nas calçadas
+- [x] Portas animadas, motorista visível; dano e inutilização; reboque e reparo cobrados (`server/world/drive.js`)
+- [x] Ocorrências (`public/js/drive/incidents.js`): curiosos, ambulância leva feridos, viatura, bombeiros, perseguição policial; viram notícia e afetam o morador
+- [x] Voo (`public/js/drive/plane.js`): empuxo, sustentação, gravidade, estol, pouso, colisão pela altura dos prédios; Hangar vende aeronaves
+- [x] Celular: controles de voo, botões suaves, tela cheia e tela girada
+- [x] Compra direta liberada em todas as lojas
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

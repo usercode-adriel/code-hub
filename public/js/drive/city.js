@@ -89,7 +89,8 @@ export function generateCity(seed = 20261119) {
   for (const [id, [x, y, k]] of Object.entries(nodes)) {
     const [wv, wh] = wOf(x, y);
     if (k === 'round') { G('road', x - 46, y - 46, 92, 92, 'ellipse', { round: true }); G('plaza', x - 18, y - 18, 36, 36, 'ellipse', { island: true }); continue; }
-    if (k === 'exit' || k === 'corner') continue;
+    if (k === 'corner') { const m = Math.max(wv, wh); G('walk', x - m / 2 - 16, y - m / 2 - 16, m + 32, m + 32); G('road', x - m / 2, y - m / 2, m, m); continue; }
+    if (k === 'exit') continue;
     // faixas de pedestre nos quatro braços
     const cw = 8;
     if (wh) { G('cross', x - wv / 2 - 4 - cw, y - wh / 2, cw, wh, 'rect', { dir: 'v' }); G('cross', x + wv / 2 + 4, y - wh / 2, cw, wh, 'rect', { dir: 'v' }); }
