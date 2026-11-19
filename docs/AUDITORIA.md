@@ -90,6 +90,13 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Mapa em formato de continente original com ilhas (`public/js/drive/terreno.js`): costa recortada, ilha-barreira com laguna, ilhotas, arquipélago, península, lagos; praia, água rasa e espuma; outros formatos continuam no seletor
 - [x] Botão Reforma no mapa (`public/js/drive/editor.js`): mover, colocar com prévia, apagar qualquer item, pintar piso com pincel 1×1 a 8×8, girar, tamanho de 30% a 400%, busca na paleta, desfazer, salvamento automático
 
+### Aviação
+- [x] 14 aeronaves novas no Hangar (8 aviões e 6 helicópteros), cada uma com sprite inteiro e danificado (`tools/drive/aviao.py`)
+- [x] Física (`public/js/drive/plane.js`): motor com giro progressivo, tração na pista (atrito de rolagem, freio, aderência lateral), sustentação e arrasto induzido, estol; decola acelerando na pista e abaixando a alavanca após a velocidade de rotação; helicóptero com coletivo e pouso vertical
+- [x] Dano: raspões, pouso duro e colisão no solo tiram saúde (sprite danificado, fumaça animada, fogo quando grave, motor falhando); saúde zero ou batida forte = queda
+- [x] Controles no celular: alavanca vertical, Acelerar/Reduzir, setas; no PC: W/S, A/D, Espaço/Shift
+- [x] Tráfego aéreo em horários marcados (`public/js/drive/sky.js`): pousos e decolagens, sobrevoos, patrulha de helicóptero, esquadrilha com fumaça; aeronaves estacionadas no pátio
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

@@ -94,3 +94,29 @@ test('Construtora e Reforma: catálogo livre, reforma salva e a cidade muda (con
   assert.equal(at(-1000, 1000), 6, 'ilha-barreira a oeste');
   assert.equal(at(-500, 1000), 5, 'mar entre a orla e a ilha');
 });
+
+test('aviação: aeronaves novas no hangar e física de decolagem, helicóptero, dano e queda', async () => {
+  const V = await import('../server/world/vehicles.js');
+  const { createPlane, stepPlane, vRotate } = await import('../public/js/drive/plane.js');
+  assert.ok(Object.keys(V.AIRCRAFT).length >= 17 && V.AIRCRAFT['aero-airliner'] && V.AIRCRAFT['aero-heli-policia'].heli);
+  // mundo de teste: tudo pista (código 7), sem prédios, um "prédio" de 60 de altura em x > 3000
+  const world = { W: 4000, H: 1000, cs: 4, mw: 1000, mask: new Uint8Array(1000 * 250).fill(7), heights: new Uint8Array(1000 * 250), bounds: { x0: 0, y0: 0, x1: 4000, y1: 1000 } };
+  for (let j = 0; j < 250; j++) for (let i = 750; i < 1000; i++) world.heights[j * 1000 + i] = 60;
+  const p = createPlane({ name: 'teste', air: V.AIRCRAFT['aero-mono-azul'].air }, 50, 500, 0);
+  const inp = { up: true, lever: 0 };
+  let t = 0; while (p.ground && t < 40) { inp.lever = p.v > vRotate(p) ? 1 : 0; const ev = stepPlane(p, inp, world, 1 / 30); t += 1 / 30; if (ev?.takeoff) break; }
+  assert.equal(p.ground, false, 'decola ao passar da velocidade de rotação e puxar a alavanca');
+  assert.ok(p.eng < 1, 'o motor acelera aos poucos');
+  for (let k = 0; k < 60; k++) stepPlane(p, { up: true, lever: 1 }, world, 1 / 30);
+  assert.ok(p.h > 5, 'sobe');
+  // batida forte num prédio alto: cai
+  p.x = 2990; p.h = 10; let ev = null; for (let k = 0; k < 60 && !ev?.crash; k++) ev = stepPlane(p, { up: true, lever: 0 }, world, 1 / 30);
+  assert.equal(ev.crash, 'predio');
+  // helicóptero: sobe na vertical, paira e pousa suave
+  const h = createPlane({ name: 'heli', heli: true, air: V.AIRCRAFT['aero-heli-azul'].air }, 500, 500, 0);
+  h.eng = 0.6; stepPlane(h, { lever: 1 }, world, 1 / 30); assert.equal(h.ground, false);
+  for (let k = 0; k < 90; k++) stepPlane(h, { lever: 1 }, world, 1 / 30);
+  assert.ok(h.h > 30 && h.v < 5, 'sobe parado no ar');
+  let land = null; for (let k = 0; k < 900 && !land; k++) { const e = stepPlane(h, { lever: -0.35 }, world, 1 / 30); if (e?.landed || e?.damage || e?.crash) land = e; }
+  assert.deepEqual(land, { landed: true });
+});

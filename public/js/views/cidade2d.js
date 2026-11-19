@@ -13,7 +13,8 @@ import { loadAssets, extrasOf } from '../drive/assets.js';
 import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
 import { createPeds, stepPeds, gather } from '../drive/peds.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
-import { createPlane, stepPlane, knots, feet } from '../drive/plane.js';
+import { createPlane, stepPlane, knots, feet, vRotate } from '../drive/plane.js';
+import { createSky } from '../drive/sky.js';
 import { createIncidents } from '../drive/incidents.js';
 import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
@@ -30,16 +31,17 @@ export default async function render(el, params = new URLSearchParams()) {
     <div class="d2-load" id="d2Load"><div class="skeleton" style="width:220px;height:14px;border-radius:7px"></div><small>Montando Nexus City…</small></div>
     <div class="d2-top"><div class="d2-where"><b id="d2Reg">Nexus City</b><small id="d2Time">--:--</small></div>
       <div class="d2-tools"><button data-z="in" aria-label="Aproximar">${icon('plus', 16)}</button><button data-z="out" aria-label="Afastar">${icon('minus', 16)}</button><button data-z="me" aria-label="Centralizar em mim">${icon('target', 16)}</button><button data-z="edit" class="d2-editb" title="Modo Reforma: posicionar prédios, canteiros e ruas">🔨<span>Reforma</span></button><button data-z="rot" class="d2-only-touch" aria-label="Girar tela / tela cheia">⟳</button><a href="#/mapa?classico=1" title="Mapa de bairros (rotas, lugares e casas)">${icon('map', 16)}</a></div></div>
-    <div class="d2-wanted" id="d2Want" hidden></div>
+    <div class="d2-wanted" id="d2Want" hidden></div><div class="d2-sky" id="d2Sky" hidden></div>
     <canvas class="d2-mini" id="d2Mini" width="192" height="132" aria-label="Minimapa"></canvas>
     <div class="d2-dash" id="d2Dash" hidden></div>
     <div class="d2-prompt" id="d2Prompt" hidden></div>
-    <div class="d2-help" id="d2Help"><b>W A S D</b> andar/dirigir · <b>Espaço</b> freio de mão · <b>E</b> entrar/sair · <b>roda</b> zoom · <b>arrastar</b> explorar · no avião: <b>W/S</b> potência, <b>Espaço</b> sobe, <b>Shift</b> desce</div>
+    <div class="d2-help" id="d2Help"><b>W A S D</b> andar/dirigir · <b>Espaço</b> freio de mão · <b>E</b> entrar/sair · <b>roda</b> zoom · <b>arrastar</b> explorar · no avião: <b>W/S</b> acelerar/reduzir, <b>A/D</b> virar, <b>Espaço</b> puxa a alavanca (sobe), <b>Shift</b> empurra (desce)</div>
     <div class="d2-ctl d2-foot"><div class="d2-joy" data-ctl="joy"><i></i></div><button class="d2-act" data-ctl="enter" id="d2EnterF">Entrar</button></div>
     <div class="d2-ctl d2-drive"><div class="d2-steer"><button data-ctl="left" aria-label="Esquerda">${icon('chevLeft', 28)}</button><button data-ctl="right" aria-label="Direita">${icon('chevRight', 28)}</button></div>
       <div class="d2-pedals"><button class="d2-gearb" data-ctl="gear" id="d2GearB"><span>D</span><small>marcha</small></button><button class="d2-exit" data-ctl="enter">Sair</button><button class="d2-brake" data-ctl="brake">Freio</button><button class="d2-gas" data-ctl="gas">Acelerar</button></div></div>
     <div class="d2-ctl d2-fly"><div class="d2-steer"><button data-ctl="left" aria-label="Esquerda">${icon('chevLeft', 28)}</button><button data-ctl="right" aria-label="Direita">${icon('chevRight', 28)}</button></div>
-      <div class="d2-pedals fly"><button class="d2-pitch" data-ctl="pup">▲<small>subir</small></button><button class="d2-exit" data-ctl="enter">Sair</button><button class="d2-pitch" data-ctl="pdown">▼<small>descer</small></button><button class="d2-brake" data-ctl="brake">− potência</button><button class="d2-gas" data-ctl="gas">+ potência</button></div></div>
+      <div class="d2-lever" data-ctl="lever" aria-label="Alavanca: abaixe para subir"><small>▲ descer</small><div class="d2-lev-track"><i></i></div><small>▼ subir</small></div>
+      <div class="d2-pedals fly"><button class="d2-exit" data-ctl="enter">Sair</button><button class="d2-brake" data-ctl="brake">Reduzir</button><button class="d2-gas" data-ctl="gas">Acelerar</button></div></div>
   </div>`;
   const stage = el.querySelector('#d2'); const cv = stage.querySelector('.d2-cv'); const ctx = cv.getContext('2d', { alpha: false });
   const touch = matchMedia('(pointer: coarse)').matches || innerWidth < 900;
@@ -76,7 +78,7 @@ export default async function render(el, params = new URLSearchParams()) {
     if (c.repairUntil && new Date(c.repairUntil).getTime() > now0) continue;
     if (c.type === 'aeronave') {
       const sp = c.parked || city.planeSpots[1 + (pi++ % (city.planeSpots.length - 1))];
-      const p = createPlane({ ...c, own: true, sprite: c.sprite, L: c.key.includes('jato') ? 52 : 42, W: c.key.includes('jato') ? 46 : 54 }, sp.x ?? sp[0], sp.y ?? sp[1], sp.a ?? sp[2]);
+      const p = createPlane({ ...c, own: true, sprite: c.sprite, L: c.L || (c.key.includes('jato') ? 52 : 42), W: c.L || (c.key.includes('jato') ? 46 : 54) }, sp.x ?? sp[0], sp.y ?? sp[1], sp.a ?? sp[2]);
       p.id = c.id; p.health = c.health ?? 100; own.push(p); continue;
     }
     const sp = c.parked ? [c.parked.x, c.parked.y, c.parked.a] : city.spots[(si++ * 3) % city.spots.length];
@@ -93,6 +95,7 @@ export default async function render(el, params = new URLSearchParams()) {
   const particles = [];
   const notify = (t, m, k = 'info') => toast(t, m, k);
   const report = (body) => api.post('/mundo/cidade2d/ocorrencia', { ...body, regiao: regionAt(me.car || me.plane || me) }).catch(() => {});
+  const SKY = createSky(world);
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
 
   // ---------------- entrada
@@ -139,7 +142,14 @@ export default async function render(el, params = new URLSearchParams()) {
       return;
     }
     const o = n[0];
-    if (o.kind === 'aviao') { if (n[1] > 46) return; me.mode = 'plane'; me.plane = o; cam.follow = true; toast(o.school ? 'Avião-escola' : o.name, touch ? 'Use "+ potência", acelere na pista e toque em ▲ para decolar.' : 'W aumenta a potência; na pista, segure Espaço para decolar.', 'info'); return; }
+    if (o.kind === 'aviao') {
+      if (n[1] > 46) return;
+      if ((o.health ?? 100) <= 0) { toast(`${o.name} está inutilizado`, 'Chame o resgate para levar ao hangar.', 'warning'); return; }
+      me.mode = 'plane'; me.plane = o; cam.follow = true; input.resetLever(0); o.lever = 0;
+      const how = o.heli ? (touch ? 'Toque em Acelerar para ligar o rotor e abaixe a alavanca para subir. Setas viram, Acelerar vai para a frente.' : 'W acelera, Espaço sobe, Shift desce, A/D viram. Decola e pousa em qualquer lugar livre.')
+        : (touch ? `Acelere até o fim da pista e, passando de ${knots(vRotate(o))} nós, abaixe a alavanca para decolar. Setas viram.` : `Segure W até passar de ${knots(vRotate(o))} nós na pista e puxe com Espaço para decolar. A/D viram.`);
+      toast(o.school ? 'Avião-escola' : o.name, how, 'info'); return;
+    }
     if ((o.health ?? 100) <= 0) { toast(`${o.name} está inutilizado`, 'Chame o reboque para levar à oficina.', 'warning'); return; }
     if (n[1] > 34) return;
     me.anim = { kind: 'enter', t: 0, car: o, from: [me.x, me.y] };
@@ -347,16 +357,28 @@ export default async function render(el, params = new URLSearchParams()) {
   const planeVariant = (key, kind) => {
     const k = `${key}|${kind}`; let c = planeCache.get(k); if (c) return c;
     const im = IMG[key]; c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d');
-    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = kind === 'shadow' ? '#000' : 'rgba(20,10,5,.55)'; x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = kind === 'shadow' ? '#000' : kind === 'worn' ? 'rgba(40,22,10,.32)' : 'rgba(20,10,5,.55)'; x.fillRect(0, 0, c.width, c.height);
     planeCache.set(k, c); return c;
   };
+  // sprite conforme o estado: inteiro, danificado (saúde < 60%) ou queimado; helicóptero com rotor girando;
+  // avariado solta fumaça (e fogo quando grave) com animação leve
   function drawPlane(p) {
-    const key = `air/${p.sprite}`; const im = IMG[key]; if (!im) return;
-    const [w, h] = meta(key); const sc = 1 + Math.min(1.2, p.h / 260); const L = p.L * sc; const W = (L * w) / h;
+    const base = `air/${p.sprite}`; const im = IMG[base]; if (!im) return;
+    const hp = p.health ?? 100; const dk = `${base}-dmg`;
+    const pic = p.crashed ? (IMG[dk] ? planeVariant(dk, 'burnt') : planeVariant(base, 'burnt')) : hp < 60 ? (IMG[dk] || planeVariant(base, 'worn')) : im;
+    const [w, h] = meta(base); const sc = 1 + Math.min(1.2, p.h / 260); const L = p.L * sc; const W = (L * w) / h;
     if (p.h > 0.5 || !p.ground) {
-      const off = p.h * 0.45; ctx.save(); ctx.translate(p.x + off, p.y + off * 0.7); ctx.rotate(p.a + Math.PI / 2); ctx.globalAlpha = 0.28; ctx.drawImage(planeVariant(key, 'shadow'), -(p.L * w) / h / 2, -p.L / 2, (p.L * w) / h, p.L); ctx.restore();
+      const off = p.h * 0.45; ctx.save(); ctx.translate(p.x + off, p.y + off * 0.7); ctx.rotate(p.a + Math.PI / 2); ctx.globalAlpha = 0.28; ctx.drawImage(planeVariant(base, 'shadow'), -(p.L * w) / h / 2, -p.L / 2, (p.L * w) / h, p.L); ctx.restore();
     }
-    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a + Math.PI / 2); ctx.drawImage(p.crashed ? planeVariant(key, 'burnt') : im, -W / 2, -L / 2, W, L); ctx.restore();
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a + Math.PI / 2); ctx.drawImage(pic, -W / 2, -L / 2, W, L);
+    if (p.heli && !p.crashed && (p.eng > 0.05 || !p.ground)) {
+      // rotor: disco translúcido girando por cima das pás desenhadas
+      const r = W * 0.5; const ang = performance.now() / 40; ctx.globalAlpha = 0.22; ctx.fillStyle = '#e8eef8'; ctx.beginPath(); ctx.arc(0, -L * 0.1, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.55; ctx.strokeStyle = '#1d2333'; ctx.lineWidth = 1.6; for (let k = 0; k < 2; k++) { const a2 = ang + (k * Math.PI) / 2; ctx.beginPath(); ctx.moveTo(Math.cos(a2) * r, -L * 0.1 + Math.sin(a2) * r); ctx.lineTo(-Math.cos(a2) * r, -L * 0.1 - Math.sin(a2) * r); ctx.stroke(); }
+    }
+    ctx.restore();
+    if (!p.crashed && hp < 60 && Math.random() < (hp < 30 ? 0.35 : 0.14)) puff(p.x - Math.cos(p.a) * p.L * 0.2 + (Math.random() - 0.5) * 6, p.y - Math.sin(p.a) * p.L * 0.2 - 2, hp < 30 ? 1.3 : 0.9);
+    if (!p.crashed && hp < 30) { const f = fxFrame('fogo', performance.now() / 1000 + p.L, 1); if (f) ctx.drawImage(f, p.x - 5, p.y - 10 * sc, 10 * sc, 12 * sc); }
   }
   function draw(t, night) {
     const z = cam.z; const vw = cam.vw; const vh = cam.vh;
@@ -387,6 +409,8 @@ export default async function render(el, params = new URLSearchParams()) {
     for (const p of P.peds) if (inV(p, 20)) items.push([p.y, 0, p]);
     for (const c of T.cars) if (inV(c)) items.push([c.y, 1, c]);
     for (const o of own) if (inV(o, 70) && !(o.kind === 'aviao' && !o.ground)) items.push([o.y, o.kind === 'aviao' ? 3 : 2, o]);
+    for (const o of SKY.parked) if (inV(o, 90)) items.push([o.y, 3, o]);
+    for (const o of SKY.flights) if (o.ground && inV(o, 90)) items.push([o.y, 3, o]);
     items.push([me.y, 4, me]);
     items.sort((a, b) => a[0] - b[0]);
     for (const [, kind, o] of items) {
@@ -410,6 +434,7 @@ export default async function render(el, params = new URLSearchParams()) {
     }
     // aviões em voo por cima de tudo (com sombra no chão)
     for (const o of own) if (o.kind === 'aviao' && !o.ground && inV(o, 200)) { drawPlane(o); if (night > 0.05) addPlaneLights(lights, o, t); }
+    for (const o of SKY.flights) { if (!inV(o, 260)) continue; if (!o.ground) drawPlane(o); if (night > 0.05) addPlaneLights(lights, o, t); if (o.smoke && Math.random() < 0.5) particles.push({ x: o.x - Math.cos(o.a) * o.L * 0.5, y: o.y - Math.sin(o.a) * o.L * 0.5, vx: 0, vy: 0, t: 0, life: 2.2, s: 7 }); }
     if (me.plane && me.plane.ground && night > 0.05) addPlaneLights(lights, me.plane, t);
     // efeitos: explosões, fogo, fumaça
     for (const f of INC.fx) { const im = fxFrame(f.kind, f.t, f.secs); if (!im) continue; const s = (f.kind === 'explosao' ? 46 : 24) * f.scale; ctx.drawImage(im, f.x - s / 2, f.y - s * (f.kind === 'fogo' ? 1 : 0.6), s, s); if (f.kind !== 'fumaca') lights.push({ x: f.x, y: f.y - 8, r: f.kind === 'explosao' ? 120 : 60, color: '#ff8a3a', ka: 0.6, halo: 0.6 }); if (f.kind === 'fogo' && Math.random() < 0.2) puff(f.x, f.y - 16, 1.6); }
@@ -473,8 +498,17 @@ export default async function render(el, params = new URLSearchParams()) {
     stage.classList.toggle('driving', me.mode === 'car'); stage.classList.toggle('flying', me.mode === 'plane');
     let dash = '';
     if (me.car) { const c = me.car; const hp = Math.round(c.health ?? 100); dash = `<div class="d2-spd"><b>${Math.round(toKmh(c.v))}</b><small>km/h</small></div><div class="d2-gearv g-${c.gear}">${c.gear}</div><div class="d2-car"><small>Dirigindo</small><b>${esc(c.name)}</b><i class="d2-hp"><i style="width:${hp}%;background:${hp > 60 ? '#2fd27a' : hp > 25 ? '#f7c948' : '#ff4d5e'}"></i></i></div>`; $('#d2GearB span').textContent = c.gear; }
-    else if (me.plane) { const pl = me.plane; dash = `<div class="d2-spd"><b>${knots(pl.v)}</b><small>nós</small></div><div class="d2-spd"><b>${feet(pl.h)}</b><small>pés</small></div><div class="d2-car"><small>${pl.ground ? 'No solo' : pl.vz > 3 ? 'Subindo' : pl.vz < -3 ? 'Descendo' : 'Nivelado'} · potência ${Math.round(pl.throttle * 100)}%</small><b>${esc(pl.name)}</b><i class="d2-hp"><i style="width:${Math.round(pl.throttle * 100)}%;background:#38d6f5"></i></i></div>${pl.stall ? '<div class="d2-stall">ESTOL</div>' : ''}`; }
+    else if (me.plane) {
+      const pl = me.plane; const hp = Math.round(pl.health ?? 100); const vr = knots(vRotate(pl));
+      const st = pl.ground ? (pl.heli ? (pl.lever > 0.2 ? 'Decolando' : 'No solo · abaixe a alavanca para subir') : knots(pl.v) >= vr ? 'Velocidade de decolagem! Abaixe a alavanca' : `No solo · decola a ${vr} nós`) : pl.vz > 3 ? 'Subindo' : pl.vz < -3 ? 'Descendo' : 'Nivelado';
+      dash = `<div class="d2-spd"><b>${knots(pl.v)}</b><small>nós</small></div><div class="d2-spd"><b>${feet(pl.h)}</b><small>pés</small></div><div class="d2-car"><small>${st}</small><b>${esc(pl.name)}</b>
+        <span class="d2-gauge"><em>motor</em><i class="d2-hp"><i style="width:${Math.round((pl.eng ?? pl.throttle) * 100)}%;background:#38d6f5"></i></i></span>
+        <span class="d2-gauge"><em>alavanca</em><i class="d2-hp"><i style="width:${Math.round(Math.max(0, pl.lever) * 100)}%;background:#a78bfa"></i></i></span>
+        <span class="d2-gauge"><em>saúde</em><i class="d2-hp"><i style="width:${hp}%;background:${hp > 60 ? '#2fd27a' : hp > 30 ? '#f7c948' : '#ff4d5e'}"></i></i></span></div>${pl.stall ? '<div class="d2-stall">ESTOL</div>' : ''}`;
+    }
     if (dash !== lastDash) { lastDash = dash; const d = $('#d2Dash'); d.hidden = !dash; d.innerHTML = dash; }
+    const sb = $('#d2Sky'); const ban = SKY.banner && SKY.banner.until > performance.now() ? SKY.banner.text : '';
+    if (sb.dataset.t !== ban) { sb.dataset.t = ban; sb.hidden = !ban; sb.textContent = ban ? `✈ ${ban}` : ''; }
     const ch = INC.chase; const wv = $('#d2Want');
     wv.hidden = !ch.on; if (ch.on) wv.innerHTML = `<b>🚨 PERSEGUIÇÃO</b><span>${'★'.repeat(ch.level)}${'☆'.repeat(Math.max(0, 3 - ch.level))}</span><small>${ch.lost > 0 ? `despistando… ${Math.ceil(10 - ch.lost)} s` : 'a viatura está atrás de você'}</small>`;
     // interações
@@ -508,20 +542,21 @@ export default async function render(el, params = new URLSearchParams()) {
     if (ED.on) { if (inp.mx || inp.my) cam.pan(-inp.mx * 700 * dt, -inp.my * 700 * dt); } else if (me.mode === 'car' && !me.anim) {
       const c = me.car; if (inp.gearTap) { inp.gearTap = false; }
       const v0 = c.v;
-      stepCar(c, inp, world, dt, [...T.cars, ...own.filter((o) => o !== c && (o.kind === 'carro' || o.ground))]);
+      stepCar(c, inp, world, dt, [...T.cars, ...own.filter((o) => o !== c && (o.kind === 'carro' || o.ground)), ...SKY.parked]);
       afterCrash(c, v0); hitPeds(c); enforce(t);
     } else if (me.mode === 'plane') {
       const pl = me.plane; const ev = stepPlane(pl, inp.plane, world, dt);
+      if (ev?.damage) { pl.health = Math.max(0, (pl.health ?? 100) - ev.damage); flash = 0.6; saveDamage(pl); if (pl.health <= 0) { pl.crashed = true; planeCrash(pl, 'dano'); } else toast(`⚠ ${pl.name} danificado`, `${ev.why[0].toUpperCase()}${ev.why.slice(1)}: saúde ${Math.round(pl.health)}%. ${pl.health < 40 ? 'Pouse logo: o motor está falhando.' : 'Dá para continuar voando.'}`, 'warning'); }
       if (ev?.crash) planeCrash(pl, ev.crash);
       else if (ev?.landed) toast('Pouso perfeito ✈', 'Bem-vindo(a) ao Aeroporto Nexus.', 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim) stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground)]);
+    } else if (me.mode === 'foot' && !me.anim) stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]);
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
-    INC.step(dt, me);
+    INC.step(dt, me); SKY.step(dt, cityNow().hour);
     for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     for (let i = particles.length - 1; i >= 0; i--) if (particles[i].t > particles[i].life) particles.splice(i, 1);
     const tgtV = me.car || me.plane;
@@ -539,7 +574,7 @@ export default async function render(el, params = new URLSearchParams()) {
     towIllegal(nowMs);
   }
   raf = requestAnimationFrame(frame);
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   return () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };

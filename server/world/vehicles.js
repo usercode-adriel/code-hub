@@ -26,10 +26,25 @@ export const AIRCRAFT = {
   'air-mono-vermelho': { name: 'Monomotor Falcão', base: 145000, seats: 2, tier: 'monomotor', sprite: 'mono-vermelho', air: { thrust: 46, vmax: 230, vstall: 96, turn: 0.95 } },
   'air-mono-azul': { name: 'Monomotor Azulão', base: 158000, seats: 4, tier: 'monomotor', sprite: 'mono-azul', air: { thrust: 48, vmax: 240, vstall: 98, turn: 0.9 } },
   'air-jato-branco': { name: 'Jato Executivo Nexus', base: 690000, seats: 8, tier: 'jato', sprite: 'jato-branco', air: { thrust: 80, vmax: 420, vstall: 140, turn: 0.7 } },
+  // folha "Aviação — variações & danificados" (cada uma tem sprite inteiro e danificado)
+  'aero-biplano': { name: 'Biplano Clássico Sol', base: 98000, seats: 2, tier: 'biplano', sprite: 'av-biplano', L: 40, air: { thrust: 40, vmax: 190, vstall: 78, turn: 1.15 } },
+  'aero-mono-branco': { name: 'Monomotor Gaivota', base: 138000, seats: 2, tier: 'monomotor', sprite: 'av-mono-branco', L: 40, air: { thrust: 47, vmax: 235, vstall: 92, turn: 1 } },
+  'aero-mono-azul': { name: 'Monomotor Turbo Anil', base: 172000, seats: 4, tier: 'monomotor', sprite: 'av-mono-azul', L: 42, air: { thrust: 52, vmax: 255, vstall: 96, turn: 0.95 } },
+  'aero-jato-vermelho': { name: 'Jato Acrobático Rubi', base: 540000, seats: 2, tier: 'jato', sprite: 'av-jato-vermelho', L: 46, air: { thrust: 88, vmax: 430, vstall: 128, turn: 1.05 } },
+  'aero-executivo': { name: 'Jato Executivo Aurora', base: 820000, seats: 10, tier: 'jato', sprite: 'av-executivo', L: 60, air: { thrust: 84, vmax: 440, vstall: 138, turn: 0.72 } },
+  'aero-caca-cinza': { name: 'Jato Supersônico Granito', base: 2300000, seats: 1, tier: 'jato supersônico', sprite: 'av-caca-cinza', L: 54, air: { thrust: 130, vmax: 560, vstall: 150, turn: 1.1 } },
+  'aero-caca-verde': { name: 'Jato Supersônico Selva', base: 2150000, seats: 1, tier: 'jato supersônico', sprite: 'av-caca-verde', L: 54, air: { thrust: 124, vmax: 540, vstall: 148, turn: 1.12 } },
+  'aero-airliner': { name: 'Avião Comercial Nexus 320', base: 9800000, seats: 180, tier: 'comercial', sprite: 'av-airliner', L: 96, air: { thrust: 96, vmax: 470, vstall: 165, turn: 0.45 } },
+  'aero-heli-azul': { name: 'Helicóptero Céu Azul', base: 420000, seats: 4, tier: 'helicóptero', sprite: 'av-heli-azul', L: 46, heli: true, air: { thrust: 34, vmax: 170, climb: 46, turn: 1.6 } },
+  'aero-heli-amarelo': { name: 'Helicóptero Táxi Aéreo', base: 460000, seats: 6, tier: 'helicóptero', sprite: 'av-heli-amarelo', L: 46, heli: true, air: { thrust: 34, vmax: 175, climb: 44, turn: 1.55 } },
+  'aero-heli-verde': { name: 'Helicóptero Mata Atlântica', base: 510000, seats: 6, tier: 'helicóptero', sprite: 'av-heli-verde', L: 48, heli: true, air: { thrust: 36, vmax: 185, climb: 44, turn: 1.5 } },
+  'aero-heli-preto': { name: 'Helicóptero Executivo Ônix', base: 690000, seats: 6, tier: 'helicóptero', sprite: 'av-heli-preto', L: 48, heli: true, air: { thrust: 40, vmax: 200, climb: 50, turn: 1.5 } },
+  'aero-heli-resgate': { name: 'Helicóptero de Resgate', base: 640000, seats: 5, tier: 'helicóptero', sprite: 'av-heli-resgate', L: 46, heli: true, air: { thrust: 36, vmax: 180, climb: 48, turn: 1.55 } },
+  'aero-heli-policia': { name: 'Helicóptero Águia (ex-polícia)', base: 600000, seats: 5, tier: 'helicóptero', sprite: 'av-heli-policia', L: 48, heli: true, air: { thrust: 36, vmax: 180, climb: 48, turn: 1.55 } },
 };
 export const isAircraft = (key) => Boolean(AIRCRAFT[key]);
 for (const [key, v] of Object.entries(AIRCRAFT)) {
-  PRODUCTS[key] = { name: v.name, cat: 'veiculos', base: v.base, type: 'aeronave', desc: `${v.seats} lugares · ${v.tier}. Fica no hangar do Aeroporto Nexus: decole, voe e pouse no mapa da cidade.`, actions: ['vender', 'transferir', 'descartar'], stock: [1, 2] };
+  PRODUCTS[key] = { name: v.name, cat: 'veiculos', base: v.base, type: 'aeronave', desc: `${v.seats} lugares · ${v.tier}. Fica no pátio do Aeroporto Nexus: ${v.heli ? 'decola e pousa na vertical, em qualquer lugar livre' : 'acelere na pista e puxe a alavanca para decolar'}.`, actions: ['vender', 'transferir', 'descartar'], stock: [1, 2] };
 }
 export const isVehicle = (key) => Boolean(VEHICLES[key]);
 for (const [key, v] of Object.entries(VEHICLES)) {
@@ -82,4 +97,11 @@ onUpgrade(16, (ctx) => {
   w.city.places.push({ id: uid(), name: 'Hangar Nexus Aviação', kind: 'aviacao', sub: 'Aeronaves e escola de voo', districtId: districtOfNode(w, node) || 'tech', node, x, y, address: address(w, node), hours: [6, 22],
     companyId: null, status: 'aberto', hidden: false, security: 0.6, reputation: 4.4, ratings: [], banned: [], ledger: [], createdAt: ctx.at.toISOString(),
     catalog: Object.keys(AIRCRAFT).map((k) => ({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) })) });
+});
+// aeronaves novas (folha de aviação) chegam ao hangar que já existe
+onUpgrade(17, (ctx) => {
+  const w = ctx.w; if (!w.city) return;
+  const shop = places(w).find((p) => p.name === 'Hangar Nexus Aviação'); if (!shop) return;
+  shop.catalog ??= [];
+  for (const k of Object.keys(AIRCRAFT)) if (!shop.catalog.some((x) => x.key === k)) shop.catalog.push({ key: k, price: Math.round(AIRCRAFT[k].base * (0.96 + Math.random() * 0.08)), stock: 1 + Math.floor(Math.random() * 2) });
 });

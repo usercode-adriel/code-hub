@@ -23,12 +23,22 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
   const held = new Map();
   const pad = { steer: 0, gas: 0, brake: 0, hand: 0, pup: 0, pdown: 0 };
   const joy = { id: null, cx: 0, cy: 0, x: 0, y: 0 };
+  // alavanca de voo (celular): fica onde for deixada; para baixo = puxar (nariz para cima / subir)
+  const lev = { id: null, v: 0, used: false };
+  const levMove = (e) => {
+    if (e.pointerId !== lev.id) return;
+    const tr = stage.querySelector('.d2-lev-track'); if (!tr) return; const r = tr.getBoundingClientRect();
+    const rotd = rot(); const t = rotd ? (r.right - e.clientX) / r.width : (e.clientY - r.top) / r.height; // 0 topo, 1 base
+    lev.v = Math.max(-1, Math.min(1, (t - 0.5) * 2)); if (Math.abs(lev.v) < 0.08) lev.v = 0; lev.used = true; paintLever();
+  };
+  const paintLever = () => { const k = stage.querySelector('.d2-lev-track i'); if (k) k.style.top = `${((lev.v + 1) / 2) * 100}%`; };
   const knob = () => stage.querySelector('.d2-joy i');
   const buzz = () => { try { navigator.vibrate?.(8); } catch { /* sem vibração */ } };
   const btnDown = (e) => {
     const b = e.target.closest('[data-ctl]'); if (!b) return;
     e.preventDefault(); b.setPointerCapture?.(e.pointerId);
     const c = b.dataset.ctl;
+    if (c === 'lever') { lev.id = e.pointerId; levMove(e); return; }
     if (c === 'joy') { const r = b.getBoundingClientRect(); [joy.cx, joy.cy] = local(r.left + r.width / 2, r.top + r.height / 2); joy.id = e.pointerId; joyMove(e); return; }
     buzz();
     if (c === 'enter') { onEnter?.(); b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 150); return; }
@@ -36,6 +46,7 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
     held.set(e.pointerId, c); b.classList.add('on'); sync();
   };
   const joyMove = (e) => {
+    if (e.pointerId === lev.id) { levMove(e); return; }
     if (e.pointerId !== joy.id) return;
     const [lx, ly] = local(e.clientX, e.clientY);
     let dx = lx - joy.cx; let dy = ly - joy.cy; const m = Math.hypot(dx, dy); const R = 46;
@@ -44,6 +55,7 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
     const k = knob(); if (k) k.style.transform = `translate(${dx}px, ${dy}px)`;
   };
   const btnUp = (e) => {
+    if (e.pointerId === lev.id) { lev.id = null; return; }
     if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; const k = knob(); if (k) k.style.transform = ''; return; }
     const c = held.get(e.pointerId); if (!c) return;
     held.delete(e.pointerId); for (const el of stage.querySelectorAll(`[data-ctl="${c}"]`)) el.classList.remove('on'); sync();
@@ -90,8 +102,12 @@ export function createInput(stage, { onEnter, onZoom, onPan, onTap, onHover, pai
     // avião: W/S potência, A/D curva, Espaço/↑ sobe, Shift/↓ desce (no celular: botões próprios)
     st.plane = { up: K('w') || pad.gas, down: K('s') || pad.brake, left: K('a', 'arrowleft') || pad.steer < 0, right: K('d', 'arrowright') || pad.steer > 0, pitchUp: K(' ', 'arrowup') || pad.pup, pitchDown: K('shift', 'arrowdown') || pad.pdown, brake: K('s') || pad.brake };
     st.autoGear = !st.touchUI;
+    if (st.touchUI && lev.used && !(K(' ', 'arrowup', 'shift', 'arrowdown'))) st.plane.lever = lev.v; // alavanca do celular
+    else st.plane.lever = undefined;
     return st;
   };
+  // volta a alavanca ao centro (ao entrar numa aeronave)
+  st.resetLever = (v = 0) => { lev.v = v; lev.used = false; paintLever(); };
   st.destroy = () => { removeEventListener('keydown', kd); removeEventListener('keyup', ku); removeEventListener('blur', blur); removeEventListener('pointermove', joyMove); removeEventListener('pointerup', btnUp); removeEventListener('pointercancel', btnUp); };
   return st;
 }
