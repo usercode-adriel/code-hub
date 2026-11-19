@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17181c">
+  <meta name="theme-color" content="#0a0d2b">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Codeniac</title>
@@ -21,21 +21,21 @@
   <link rel="stylesheet" href="/css/rede.css">
   <link rel="stylesheet" href="/css/world.css">
   <link rel="stylesheet" href="/css/society.css">
+  <link rel="stylesheet" href="/css/cx.css">
   <link rel="stylesheet" href="/custom.css">
   <script type="module">
     import { applyTheme } from '/js/theme.js';
     try { const l = JSON.parse(localStorage.getItem('codeniac.look') || 'null'); if (l) applyTheme(l); } catch (e) {}
   </script>
 </head>
-<body>
-  <div class="app">
-    <aside class="rail-left" id="sidebar" aria-label="Menu"></aside>
-    <main class="main">
-      <header class="topbar" id="topbar"></header>
-      <div class="content"><div id="view"></div></div>
-    </main>
-    <aside class="rail-right" id="rail" aria-label="Atalhos"></aside>
+<body class="cx-on">
+  <div class="cx" id="cx">
+    <aside class="cx-side" id="cxSide" aria-label="Menu"></aside>
+    <header class="cx-top" id="cxTop"></header>
+    <main class="cx-main content" id="cxMain"><div id="view"></div></main>
+    <aside class="cx-dev" id="cxDev" aria-label="Dispositivos"></aside>
   </div>
+  <div class="cx-scrim" id="cxScrim"></div>
   <aside class="assistant" id="assistant" aria-label="Assistente"></aside>
   <nav class="bottom-nav" id="bottomNav" aria-label="Navegação"></nav>
   <div class="overlay"></div>

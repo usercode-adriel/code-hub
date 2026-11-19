@@ -14,6 +14,7 @@ import { emit } from './notify.js';
 import { single, removeUpload } from './routes/uploads.js';
 import { assistantMode, isCloud, geminiJSON, aiWrite, deliverMessage, createConversation, listConversations } from './assistant.js';
 import { searchWeb, fetchPageText } from './webtools.js';
+import { assignPixelFaces, pixelPrompt, isPixel } from './pixelfaces.js';
 
 // ---------------------------------------------------------------- utilidades
 const rnd = (n) => Math.floor(Math.random() * n);
@@ -248,6 +249,7 @@ function addPersona(userId, s, p) {
       for (const fn of personaRemovedHooks) { try { fn(userById(userId), worldOf(userId), x); } catch (e) { console.error('[rede] saída:', e.message); } }
     }
   }
+  faceUp(s);
   if (s.cfg.photos) queueAvatar(userId, p);
   emit(userId, 'social', { type: 'persona', persona: publicPersona(s, p) });
   return p;
@@ -279,10 +281,9 @@ function syncBots(user, s) {
       if (b.traits) { p.story = str(b.traits, 600); p.bio = str(b.traits, 150); }
       p.handle = handleOf(b.name, new Set(s.personas.map((x) => x.handle)));
       s.personas.push(p);
-      if (s.cfg.photos && !p.avatar) queueAvatar(user.id, p);
     }
     p.friend = true; p.botId = b.id; p.name = b.name;
-    if (b.avatar && p.avatar !== b.avatar) p.avatar = b.avatar;
+    if (b.avatar && p.avatar !== b.avatar && !isPixel(b.avatar)) p.avatar = b.avatar;
     if (b.personaId !== p.id) b.personaId = p.id;
   }
   // personagem apagado do chat continua vivendo na rede, mas deixa de ser amigo
@@ -420,27 +421,26 @@ async function pumpImages() {
   } finally { imageBusy = false; }
 }
 
+// rosto em pixel: retratos prontos primeiro; quando acabam, o gerador de imagens cria um rosto novo no mesmo estilo
+function faceUp(s) {
+  return assignPixelFaces(s.personas, { bots: db().bots, onOld: (old) => { if (!isPixel(old) && !db().bots.some((b) => b.avatar === old)) removeUpload(old); } });
+}
 function queueAvatar(userId, p) {
-  if ((p.avatar && !p.restyle) || p.avatarTried) return;
-  p.avatarTried = true;
-  const look = p.looks || `${p.age} year old ${p.gender === 'f' ? 'woman' : 'man'} from ${p.country === 'Brasil' ? 'Brazil' : p.country}`;
+  if (!p.pxShared || p.avatarTried === 'gen') return;
+  p.avatarTried = 'gen';
   queueImage({
-    prompt: `stylized 3D video game character portrait of a ${look}, ${p.job}, ${pick(['confident smile', 'serious look', 'laughing', 'shy smile', 'cool expression'])}, open-world game art, cinematic lighting, neon city background, high detail, head and shoulders`,
-    w: 384, h: 384,
+    prompt: pixelPrompt(p),
+    w: 256, h: 256,
     run: (url) => {
       const s = net(userId);
       const cur = s.personas.find((x) => x.id === p.id);
       if (!cur) { removeUpload(url); return; }
-      const old = cur.avatar;
-      cur.avatar = url; cur.restyle = false; cur.avatarStyle = '3d';
-      const bot = cur.botId && db().bots.find((b) => b.id === cur.botId);
-      if (bot && (!bot.avatar || bot.avatar === old)) bot.avatar = url;
-      if (old && old !== url && !db().bots.some((b) => b.avatar === old)) removeUpload(old);
+      cur.avatar = url; cur.pxShared = false; cur.avatarStyle = 'pixel-ai';
       save();
       emit(userId, 'social', { type: 'persona', persona: publicPersona(s, cur) });
     },
-    fail: () => { p.avatarTried = false; p.avatarFailAt = now(); },
-  }) || (p.avatarTried = false);
+    fail: () => { p.avatarTried = true; p.avatarFailAt = now(); },
+  }) || (p.avatarTried = true);
 }
 
 function queuePostImage(userId, post, prompt) {
@@ -480,7 +480,8 @@ async function tickUser(user, { forceAi = false } = {}) {
   if (s.lastTick && ago(s.lastTick) > 20 * MIN) catchUp(user, s, ago(s.lastTick));
   s.lastTick = now();
 
-  if (imagesOn(s) && imageQueue.length < 4) for (const p of s.personas.filter((x) => (!x.avatar || x.restyle) && !x.avatarTried && (!x.avatarFailAt || ago(x.avatarFailAt) > 6 * HOUR)).slice(0, 3)) queueAvatar(user.id, p);
+  faceUp(s);
+  if (imagesOn(s) && imageQueue.length < 4) for (const p of s.personas.filter((x) => x.pxShared && x.avatarTried !== 'gen' && (!x.avatarFailAt || ago(x.avatarFailAt) > 6 * HOUR)).slice(0, 2)) queueAvatar(user.id, p);
 
   // população: a rede nunca fica vazia e sempre aparece gente nova
   if (s.personas.length < LIMITS.minPersonas) {
@@ -1026,11 +1027,10 @@ export function requestImage(uid, prompt, w, h, run) {
   if (!imagesOn(net(uid))) return false;
   return queueImage({ prompt, w, h, run, fail: () => {} });
 }
-// troca os rostos atuais pelo estilo 3D de jogo (aos poucos, respeitando a fila do gerador)
+// troca os rostos atuais pelo estilo pixel art (retratos prontos, sem custo)
 export function restyleFaces(uid) {
   const s = net(uid);
-  let n = 0;
-  for (const p of s.personas) if (p.avatarStyle !== '3d') { p.restyle = true; p.avatarTried = false; n++; }
+  const n = faceUp(s);
   save();
   return n;
 }

@@ -7,6 +7,8 @@ import { $, $$, esc, avatar, chatMd, toast, timeAgo, notifIcon, modal, brl, toda
 import { openProjectModal } from './components.js';
 import { animateView } from './fx.js';
 import { TOOL_LABEL, botAvatar, bindDictation, COMMANDS, MODE_LABEL } from './chatui.js';
+import { renderSide, renderTop, renderDevices, renderBottom, refreshStatus, paintBadges, HUB_ROUTES, CITY_NAV, CITY_PLACES, HUB_NAV } from './chrome.js';
+import { bindDevices } from './devices.js';
 
 if (!auth.token) location.replace('/login');
 
@@ -33,6 +35,8 @@ const VIEWS = {
   inventario: () => import('./views/inventario.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'),
   organizacoes: () => import('./views/organizacoes.js'), acontecimentos: () => import('./views/acontecimentos.js'), cidade: () => import('./views/cidade.js'),
 };
+// atalhos da barra lateral que abrem telas existentes
+const ALIAS = { empregos: '#/empresas/carreira', propriedades: '#/empresas/imoveis', veiculos: '#/mapa?rota=1', vida: '#/profile', hospital: '#/mapa?busca=hospital', loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
 const WORLD = new Set(['centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
@@ -40,7 +44,7 @@ const FULL_PAGE = new Set(['assistente', 'diario']);
 const NAV_OF = { empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
-const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'dashboard';
+const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'centro';
 const navLabel = (k, l) => store.menu?.labels?.[k] || l;
 const visibleNav = () => NAV.map(([g, items]) => [g, items.filter(([k]) => k === 'settings' || !(store.menu?.hidden || []).includes(k))]);
 function greeting() {
@@ -49,43 +53,12 @@ function greeting() {
 }
 
 function renderSidebar() {
-  const cur = NAV_OF[currentRoute()] || currentRoute();
-  const btn = ([k, l, ic]) => `<a class="rail-btn ${cur === k ? 'active' : ''}" href="#/${k}" data-tip="${esc(navLabel(k, l))}" aria-label="${esc(navLabel(k, l))}">${icon(ic, 19)}${(k === 'notifications' && store.unread) || (k === 'assistente' && store.chatUnread) ? '<i class="rail-dot"></i>' : ''}</a>`;
-  const [main, sys] = visibleNav();
-  $('#sidebar').innerHTML = `<a class="rail-logo" href="#/dashboard" aria-label="${esc(store.appName)}"><img src="${esc(store.images.logoIcon || '/assets/icon.png')}" alt=""></a>
-    <nav class="rail-nav">${main[1].map(btn).join('')}<span class="rail-sep"></span>${sys[1].map(btn).join('')}
-      <button class="rail-btn rail-only-mid" id="railProjects" data-tip="Projetos" aria-label="Projetos">${icon('folder', 19)}</button></nav>
-    <button class="rail-btn rail-out" id="railOut" data-tip="Sair da conta" aria-label="Sair da conta">${icon('logout', 18)}</button>
-    <button class="rail-add" id="railAdd" data-tip="Capturar (Alt+N)" aria-label="Captura rápida">${icon('plus', 18)}</button>`;
-  $('#railAdd').onclick = () => openCapture();
-  $('#railOut').onclick = logout;
-  $('#railProjects').onclick = () => openSheet();
-  renderRightRail();
-  renderBottomNav();
+  const cur = currentRoute();
+  renderSide(cur);
+  renderBottom(cur);
+  const m = $('#bnMenu'); if (m) m.onclick = () => openSheet();
 }
-
-function renderRightRail() {
-  const slug = location.hash.startsWith('#/project/') ? location.hash.split('/')[2] : null;
-  const fresh = (p) => Date.now() - new Date(p.updatedAt || 0).getTime() < 3 * 86400000;
-  $('#rail').innerHTML = `<div class="rail-card"><a class="rail-me" href="#/profile" data-tip="Meu perfil" aria-label="Meu perfil">${avatar(store.user, '', 44)}</a></div>
-    <div class="rail-card rail-projects">${store.projects.map((p) => `<a class="rail-proj ${slug === p.slug ? 'on' : ''}" href="#/project/${esc(p.slug)}" data-tip="${esc(p.name)}" aria-label="${esc(p.name)}" style="--c:${esc(p.color)}">
-        <span class="rp-ico">${p.cover ? `<img src="${esc(p.cover)}" alt="">` : icon(p.icon, 17)}</span>${fresh(p) ? '<i class="rp-st"></i>' : ''}${slug === p.slug ? '<em>aberto</em>' : ''}</a>`).join('')}
-      <button class="rail-proj add" id="railNewProj" data-tip="Novo projeto" aria-label="Novo projeto"><span class="rp-ico">${icon('plus', 16)}</span></button></div>
-    <div class="rail-card"><button class="rail-proj" id="railBot" data-tip="${esc(store.settings.assistantName || 'Assistente')}" aria-label="Abrir assistente">${botAvatar(40)}</button>
-      <a class="rail-proj" href="#/settings" data-tip="Configurações" aria-label="Configurações"><span class="rp-ico plain">${icon('settings', 17)}</span></a></div>`;
-  $('#railNewProj').onclick = () => openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; });
-  $('#railBot').onclick = toggleAssistant;
-}
-
-function renderBottomNav() {
-  const cur = NAV_OF[currentRoute()] || currentRoute();
-  const b = (k, l, ic) => `<a class="bn-btn ${cur === k ? 'on' : ''}" href="#/${k}">${icon(ic, 20)}<span>${esc(navLabel(k, l))}</span></a>`;
-  $('#bottomNav').innerHTML = `<button class="bn-btn" id="bnMenu">${icon('menu', 20)}<span>Menu</span></button>${b('dashboard', 'Hub', 'dashboard')}
-    <button class="bn-main" id="bnAdd" aria-label="Captura rápida">${icon('plus', 24)}</button>
-    ${b('centro', 'Cidade', 'globe')}<a class="bn-btn ${cur === 'assistente' ? 'on' : ''}" href="#/assistente" style="position:relative">${icon('chat', 20)}<span>Chat</span>${store.chatUnread ? '<i class="rail-dot" style="top:4px;right:14px"></i>' : ''}</a>`;
-  $('#bnAdd').onclick = () => openCapture();
-  $('#bnMenu').onclick = () => openSheet();
-}
+function renderRightRail() { renderDevices(); }
 
 // Sair da conta (também cancela as notificações deste aparelho).
 export async function logout() {
@@ -106,13 +79,13 @@ export async function logout() {
 function openSheet() {
   closeSheet();
   const sheet = document.createElement('div');
-  sheet.className = 'sheet-back';
-  const [main, sys] = visibleNav();
+  sheet.className = 'sheet-back cx-sheet';
+  const it = ([k, l, ic, c]) => `<a class="sheet-item" href="#/${k}"><span style="--ic:${c}">${icon(ic, 20)}</span>${esc(l)}</a>`;
   sheet.innerHTML = `<div class="sheet" role="dialog" aria-label="Menu"><div class="sheet-grip"></div>
-    <div class="sheet-grid">${[...main[1], ...sys[1]].map(([k, l, ic]) => `<a class="sheet-item" href="#/${k}"><span>${icon(ic, 20)}</span>${esc(navLabel(k, l))}</a>`).join('')}
+    <h6>Cidade</h6><div class="sheet-grid">${CITY_NAV.map(it).join('')}</div>
+    <h6>Lugares da cidade</h6><div class="sheet-grid">${CITY_PLACES.map(it).join('')}</div>
+    <h6>Meu hub (pessoal)</h6><div class="sheet-grid">${HUB_NAV.map(it).join('')}
       <button class="sheet-item" data-act="bot"><span>${botAvatar(30)}</span>${esc(store.settings.assistantName || 'Assistente')}</button></div>
-    <h6>Projetos</h6><div class="sheet-grid">${store.projects.map((p) => `<a class="sheet-item" href="#/project/${esc(p.slug)}"><span style="background:${esc(p.color)};color:#fff">${icon(p.icon, 18)}</span>${esc(p.name)}</a>`).join('')}
-      <button class="sheet-item" data-act="proj"><span>${icon('plus', 18)}</span>Novo projeto</button></div>
     <div class="sheet-foot"><a class="btn sm outline" href="#/profile">${icon('user', 13)} Perfil</a><button class="btn sm outline" data-act="logout">${icon('logout', 13)} Sair</button></div></div>`;
   document.body.append(sheet);
   requestAnimationFrame(() => sheet.classList.add('open'));
@@ -120,7 +93,6 @@ function openSheet() {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (e.target === sheet || e.target.closest('a')) closeSheet();
     if (act === 'bot') { closeSheet(); toggleAssistant(); }
-    if (act === 'proj') { closeSheet(); openProjectModal().then((p) => { if (p) location.hash = `#/project/${p.slug}`; }); }
     if (act === 'logout') logout();
   });
 }
@@ -132,15 +104,7 @@ function toggleAssistant() {
 }
 
 function renderTopbar() {
-  const first = (store.user.name || '').split(' ')[0];
-  $('#topbar').innerHTML = `<div class="greet"><span>${greeting()},</span> <b>${esc(first)}</b></div>
-    <div class="search" id="search">${icon('search', 15)}<input id="q" placeholder="Buscar..." autocomplete="off" aria-label="Buscar"><span class="kbd">Ctrl K</span><div class="search-results" id="results"></div></div>
-    <button class="round-btn" id="asToggle" title="Assistente" aria-label="Assistente">${icon('bot', 17)}</button>
-    <div class="rel"><button class="round-btn" id="bell" aria-label="Notificações">${icon('bell', 17)}<span class="dot" id="bellDot" ${store.unread ? '' : 'hidden'}>${store.unread}</span></button><div class="dropdown" id="notifDrop"></div></div>
-    <a class="top-avatar" href="#/profile" title="Perfil">${avatar(store.user, '', 38)}</a>`;
-  $('#asToggle').onclick = toggleAssistant;
-  $('#bell').onclick = toggleNotifDrop;
-  bindSearch();
+  renderTop({ onBell: toggleNotifDrop, onSearch: bindSearch });
 }
 
 // ---------- Busca ----------
@@ -459,14 +423,16 @@ async function route() {
   // a 2.0 abre na cidade (Command Center); quem escolheu "Hoje" continua abrindo nele
   let name = parts[0] || (store.settings.homePage === 'hoje' ? 'hoje' : 'centro');
   if (name === 'economia') { location.replace(`#/${parts[1] === 'banco' ? 'banco' : ['empresas', ...parts.slice(1)].join('/')}`); return; }
-  if (!VIEWS[name]) name = 'dashboard';
+  if (ALIAS[name] && !VIEWS[name]) { location.replace(ALIAS[name]); return; }
+  if (!VIEWS[name]) name = 'centro';
   if (name === 'estudos' && parts[1] === 'livros') { location.replace('#/livros'); return; }
   if (parts[0] === 'capturar') { location.replace('#/dashboard'); setTimeout(() => openCapture(), 300); return; }
-  if (store.menu?.hidden?.includes(name) && !['settings', 'profile', 'project'].includes(name)) name = 'dashboard';
-  document.body.classList.remove('sidebar-open', 'assistant-open');
+  if (store.menu?.hidden?.includes(name) && !['settings', 'profile', 'project', 'centro'].includes(name)) name = 'centro';
+  document.body.classList.remove('sidebar-open', 'assistant-open', 'cx-side-open');
   closeSheet();
   document.body.classList.toggle('on-full-page', FULL_PAGE.has(name));
   document.body.classList.toggle('world-mode', WORLD.has(name));
+  document.body.classList.toggle('hub-mode', HUB_ROUTES.has(name));
   document.body.dataset.route = name;
   if (name === 'assistente') { store.chatUnread = 0; document.querySelectorAll('.chat-head').forEach((h) => h.remove()); }
   if (typeof cleanup === 'function') { try { cleanup(); } catch { /* ignore */ } }
@@ -488,6 +454,7 @@ async function route() {
   $('#view').scrollTop = 0;
   $('.content').scrollTop = 0;
   renderSidebar();
+  refreshStatus();
 }
 
 // ---------- Início ----------
@@ -549,8 +516,12 @@ async function boot() {
   try { store.aiMode = (await api.get('/assistant/status')).mode; } catch { /* ok */ }
   await Promise.all([refreshProjects(), refreshUnread()]);
   try { store.chatUnread = (await api.get('/assistant/conversations')).reduce((a, c) => a + (c.unread || 0), 0); } catch { /* ok */ }
-  renderSidebar(); renderTopbar();
+  renderSidebar(); renderTopbar(); renderDevices();
   renderAssistantPanel();
+  bindDevices();
+  refreshStatus(true);
+  setInterval(() => refreshStatus(), 15000);
+  $('#cxScrim').onclick = () => document.body.classList.remove('cx-side-open');
   on('projects', renderSidebar);
   on('user', () => { renderSidebar(); renderTopbar(); });
   on('unread', (n) => { const d = $('#bellDot'); if (d) { d.hidden = !n; d.textContent = n; } renderSidebar(); });
@@ -561,6 +532,7 @@ async function boot() {
     if (e.altKey && e.key.toLowerCase() === 'n') { e.preventDefault(); openCapture(); }
   });
   $('.overlay').onclick = () => document.body.classList.remove('sidebar-open', 'assistant-open');
+  on('world-changed', () => { refreshStatus(true); paintBadges(true); });
   setInterval(() => { const g = $('.greet span'); if (g) g.textContent = `${greeting()},`; }, 600000);
   bindVocab();
   connectStream();

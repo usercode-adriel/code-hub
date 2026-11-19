@@ -9,6 +9,7 @@ import { companies, companyById } from './economy.js';
 import { PRODUCTS, places } from './commerce.js';
 import { genderize, userPost } from '../social.js';
 import { media } from './media.js';
+import { equipPhone, unequipIfGone, isPhone, PHONES, TIERS } from './devices.js';
 import { pick, chance, clamp, uid, nowIso, DAY, round2, cap, str } from './util.js';
 
 export const tplOf = (key) => PRODUCTS[key];
@@ -32,7 +33,9 @@ export function publicItem(it) {
   const tpl = tplOf(it.key) || {};
   let actions = (tpl.actions || []).slice();
   if (['instalado', 'ativo'].includes(it.state)) actions = actions.filter((a) => !['instalar', 'ativar', 'usar'].includes(a));
-  return { ...it, actions, icon: ICON[tpl.cat] || 'bag', compatibility: tpl.target === 'campanha' ? 'Sua empresa ou seu perfil' : 'Uso pessoal' };
+  if (it.state === 'equipado') actions = actions.filter((a) => a !== 'equipar');
+  const phone = PHONES[it.key] ? { tier: PHONES[it.key].tier, tierLabel: TIERS[PHONES[it.key].tier].label, camera: PHONES[it.key].camera, storage: PHONES[it.key].storage, apps: PHONES[it.key].apps.length } : null;
+  return { ...it, actions, phone, icon: ICON[tpl.cat] || 'bag', compatibility: tpl.target === 'campanha' ? 'Sua empresa ou seu perfil' : 'Uso pessoal' };
 }
 
 export function itemAction(ctx, itemId, action, body = {}) {
@@ -53,6 +56,12 @@ export function itemAction(ctx, itemId, action, body = {}) {
     }
     it.state = 'instalado'; log('Instalado no seu perfil.'); addXp(w, 10);
     return { ok: true, text: { 'central-comando': 'Central de Comando instalada: ela aparece no seu Command Center com seus projetos e tarefas.', 'mapa-inteligente': 'Mapa Inteligente ativo: agora o mapa mostra onde as pessoas estão e os imóveis.', memoria: `Seus amigos agora guardam até ${u.memCap} lembranças e recuperam memórias antigas.` }[it.key] };
+  }
+  if (action === 'equipar') {
+    if (!isPhone(it.key)) throw new BankError('Só celulares podem ser equipados');
+    for (const x of inv(w)) if (x.state === 'equipado' && isPhone(x.key)) { x.state = 'guardado'; x.history.push({ at: ctx.at.toISOString(), text: 'Guardado (trocou de celular).' }); }
+    it.state = 'equipado'; log('Equipado como celular principal.'); addXp(w, 3);
+    return { ok: true, text: equipPhone(w, it) };
   }
   if (action === 'ativar') {
     if (it.key === 'smartphone') u.installed.phone = true;
@@ -99,6 +108,7 @@ export function itemAction(ctx, itemId, action, body = {}) {
     p.mood = { emotion: 'grata', intensity: 0.7, reason: `ganhou ${it.name}` };
     if (p.friend && p.botId) dm(ctx, p, genderize(p, pick([`Aaah, ${it.name}?! Você não existe 😭 obrigada(o)!`, 'Que presente lindo! Obrigada(o) de verdade.'])), 'presente');
     record(ctx, { type: 'presente', cat: 'pessoal', title: `Você deu ${it.name} para ${p.name}`, actors: ['me', p.id], importance: 1 });
+    unequipIfGone(w);
     return { ok: true, text: `${p.name} recebeu o presente.` };
   }
   if (action === 'vender') {
@@ -113,9 +123,10 @@ export function itemAction(ctx, itemId, action, body = {}) {
     if (it.key === 'smartphone' && !inv(w).some((x) => x.key === 'smartphone')) u.installed.phone = false;
     if (it.key === 'camera' && !inv(w).some((x) => x.key === 'camera')) u.installed.camera = false;
     credit(w, value, `Venda de ${it.name} para ${buyer.name}`, ctx.at, 'venda');
+    unequipIfGone(w);
     return { ok: true, text: `${buyer.name} comprou por ${value.toLocaleString('pt-BR')} NXC.` };
   }
-  if (action === 'descartar') { drop(); return { ok: true, text: 'Item descartado.' }; }
+  if (action === 'descartar') { drop(); unequipIfGone(w); return { ok: true, text: 'Item descartado.' }; }
   throw new BankError('Ação inválida');
 }
 

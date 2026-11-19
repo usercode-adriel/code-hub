@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { esc, timeAgo, toast, modal, initials, confirmDialog } from '../ui.js';
 import { store } from '../store.js';
+import { myAvatar } from '../chrome.js';
 // fecha o menu "Mais" ao tocar fora (um único ouvinte para o app todo)
 document.addEventListener('click', (e) => { for (const d of document.querySelectorAll('.wx-more[open]')) if (!d.contains(e.target)) d.open = false; }, true);
 
@@ -31,44 +32,11 @@ export const SIDE_GROUPS = [
   ['Sistema', [['arquivo', 'Arquivo', 'book'], ['controle', 'Controle', 'cpu'], ['diversao', 'Diversão', 'play'], ['settings', 'Configurações', 'settings'], ['dashboard', 'Meu hub', 'dashboard']]],
 ];
 
-// moldura de cada ambiente: barra lateral + topo + conteúdo (estilo dashboard de jogo roxo)
+// conteúdo de cada ambiente: a moldura (barra lateral, topo, dispositivos) agora é global (public/js/chrome.js)
 export function shell(el, env, { title = '', sub = '' } = {}) {
-  const cur = ENV_OF[env] || env;
-  const user = store.user || {};
-  const item = ([k, l, ic]) => `<a href="#/${k}" class="wg-item ${k === cur ? 'on' : ''}">${icon(ic, 17)}<span>${l}</span><i class="wx-badge" data-badge="${k}"></i></a>`;
-  el.innerHTML = `<div class="wg w-env" data-env="${env}">
-    <aside class="wg-side" id="wgSide">
-      <a class="wg-logo" href="#/centro" aria-label="Codeniac Digital Society"><span class="wg-logo-ic">${icon('globe', 20)}</span><span class="wg-logo-tx"><b>CODENIAC</b><small>Digital Society</small></span></a>
-      <nav class="wg-nav" aria-label="Navegação">${SIDE_GROUPS.map(([g, items]) => `<div class="wg-grp"><span class="wg-grp-t">${esc(g)}</span>${items.map(item).join('')}</div>`).join('')}</nav>
-    </aside>
-    <div class="wg-scrim" id="wgScrim"></div>
-    <div class="wg-col">
-      <header class="wg-top">
-        <button class="wg-burger" id="wgBurger" aria-label="Menu">${icon('menu', 20)}</button>
-        <form class="wg-search" id="wgSearch"><span>${icon('search', 16)}</span><input placeholder="Buscar em Nexus City…" aria-label="Buscar"></form>
-        <div class="wg-top-r">
-          <a class="wg-coins" href="#/banco" title="Seu saldo"><span class="wg-coin">${icon('wallet', 14)}</span><b id="wgBal">—</b></a>
-          <a class="wg-ic" href="#/notifications" aria-label="Notificações"><i class="wg-ic-dot" data-badge="centro"></i>${icon('bell', 18)}</a>
-          <span class="wg-online"><i></i>Online</span>
-          <a class="wg-me" href="#/profile" aria-label="Meu perfil">${user.avatar ? `<img src="${esc(user.avatar)}" alt="">` : `<span>${esc(initials(user.name || 'Eu'))}</span>`}</a>
-        </div>
-      </header>
-      <main class="wg-main">
-        ${title ? `<header class="w-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
-        <div class="w-body" id="wBody"></div>
-      </main>
-    </div></div>`;
-  // menu móvel
-  const side = el.querySelector('#wgSide'); const scrim = el.querySelector('#wgScrim');
-  const closeSide = () => { side.classList.remove('open'); scrim.classList.remove('on'); };
-  el.querySelector('#wgBurger').onclick = () => { side.classList.toggle('open'); scrim.classList.toggle('on'); };
-  scrim.onclick = closeSide;
-  el.querySelectorAll('.wg-item').forEach((a) => a.addEventListener('click', closeSide));
-  // busca -> internet
-  el.querySelector('#wgSearch').onsubmit = (e) => { e.preventDefault(); const q = e.target.querySelector('input').value.trim(); if (q) location.hash = `#/internet?q=${encodeURIComponent(q)}`; };
-  el.querySelector('.wg-item.on')?.scrollIntoView({ block: 'nearest' });
-  paintBadges(el);
-  paintBalance(el);
+  el.innerHTML = `<div class="w-env cx-page" data-env="${env}">
+    ${title ? `<header class="w-head cx-head"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div><div class="w-head-acts" id="wActs"></div></header>` : ''}
+    <div class="w-body" id="wBody"></div></div>`;
   return el.querySelector('#wBody');
 }
 // saldo no topo (cache curto)
@@ -79,7 +47,7 @@ async function paintBalance(root) {
     const b = root.querySelector('#wgBal'); if (b) b.textContent = num(balCache);
   } catch { /* sem saldo */ }
 }
-export const refreshBalance = () => { balCache = null; };
+export const refreshBalance = () => { balCache = null; import('../chrome.js').then((m) => m.refreshStatus(true)); };
 // badges do menu: sempre há um marcador em cada aba (número quando há pendências, ponto quando não).
 let badgeCache = null; let badgeAt = 0;
 async function paintBadges(root) {
@@ -93,7 +61,7 @@ async function paintBadges(root) {
     }
   } catch { /* sem badges */ }
 }
-export const refreshBadges = () => { badgeCache = null; };
+export const refreshBadges = () => { badgeCache = null; import('../chrome.js').then((m) => m.paintBadges(true)); };
 // identificador único de operação: o servidor nunca processa a mesma operação duas vezes
 export const opId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 // senha bancária de 4 dígitos com teclado numérico (a senha só vai ao servidor, nunca fica salva no navegador)
@@ -143,7 +111,7 @@ export function nascendo(body, retry) {
 
 export function face(p, size = 36, cls = '') {
   if (!p) return '';
-  if (p.me || p.id === 'me') return `<span class="w-face me ${cls}" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.36)}px">EU</span>`;
+  if (p.me || p.id === 'me') return `<img class="w-face me ${cls}" src="${esc(myAvatar())}" alt="Você" style="width:${size}px;height:${size}px">`;
   const st = `width:${size}px;height:${size}px;--c:${esc(p.color || '#7c3aed')}`;
   return p.avatar ? `<img class="w-face ${cls}" src="${esc(p.avatar)}" alt="" style="${st}" loading="lazy">` : `<span class="w-face ini ${cls}" style="${st};font-size:${Math.round(size * 0.38)}px">${esc(initials(p.name || '?'))}</span>`;
 }

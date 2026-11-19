@@ -4,18 +4,20 @@
 import { icon } from '../icons.js';
 import { esc } from '../ui.js';
 
-const ROAD = { rua: ['#4a5059', 3.2], avenida: ['#7c838d', 5.5], acesso: ['#7c838d', 4], rodovia: ['#c9ced6', 8] };
+// paleta 16-bit (estilo dos tilesets de cidade em pixel art): grama, asfalto cinza, água azul, telhados coloridos
+const ROAD = { rua: ['#6b7180', 4.2], avenida: ['#555b6b', 7], acesso: ['#555b6b', 5], rodovia: ['#474c5a', 10] };
+const PX = { sea: '#2f6fd0', sea2: '#2558b8', sand: '#e8c97a', land: '#58a03f', park: '#3e8a35', yard: '#6cb64f', tree: '#2c7a2e', tree2: '#3f9a3a', water: '#3a86e0', pier: '#8a6a45', curb: '#c9c4b5', lane: '#f2d24b' };
 
 // estilo dos quarteirões por tipo de bairro: quantos lotes, altura aparente e cores dos telhados
 const BSTYLE = {
-  centro: { n: [2, 2], gap: 0.14, h: [7, 13], roof: ['#3a4560', '#44506e', '#2f3a52'] },
-  tecnologia: { n: [2, 2], gap: 0.14, h: [9, 17], roof: ['#1f4d5a', '#2a6577', '#1b3f4a'] },
-  residencial: { n: [3, 3], gap: 0.2, h: [2, 3.5], roof: ['#6b4a3a', '#7a4f3d', '#5b4132'] },
-  nobre: { n: [2, 2], gap: 0.3, h: [3, 5], roof: ['#4f3f6e', '#5c4a7c', '#433560'], yard: '#1d3326' },
-  educacao: { n: [2, 1], gap: 0.22, h: [4, 6], roof: ['#6b5a2e', '#7b6a38', '#5a4c28'], yard: '#1f3a27' },
-  comercio: { n: [3, 2], gap: 0.16, h: [3, 5], roof: ['#7a3b1d', '#8a4a24', '#6a3318'] },
-  popular: { n: [3, 3], gap: 0.16, h: [2, 3], roof: ['#5b3a3a', '#4a3f2f', '#6a4538'] },
-  noturno: { n: [2, 2], gap: 0.16, h: [5, 9], roof: ['#5b2a63', '#7a2a56', '#3f2a6a'] },
+  centro: { n: [2, 2], gap: 0.14, h: [7, 13], roof: ['#5b7fc4', '#7a8fb0', '#4a68b0'], yard: '#9aa0a8' },
+  tecnologia: { n: [2, 2], gap: 0.14, h: [9, 17], roof: ['#3f6fd0', '#58a6e0', '#3558a8'], yard: '#9aa0a8' },
+  residencial: { n: [3, 3], gap: 0.2, h: [2, 3.5], roof: ['#c4553d', '#d0703f', '#a9473a'], yard: '#6cb64f' },
+  nobre: { n: [2, 2], gap: 0.3, h: [3, 5], roof: ['#d9d3c7', '#8f5fc4', '#c4553d'], yard: '#6cb64f' },
+  educacao: { n: [2, 1], gap: 0.22, h: [4, 6], roof: ['#d4a24a', '#c98f3a', '#b9b2a2'], yard: '#6cb64f' },
+  comercio: { n: [3, 2], gap: 0.16, h: [3, 5], roof: ['#e08a3a', '#c9c2b2', '#d0603f'], yard: '#a9a597' },
+  popular: { n: [3, 3], gap: 0.16, h: [2, 3], roof: ['#b0573f', '#c98a5a', '#9a6a4a'], yard: '#6cb64f' },
+  noturno: { n: [2, 2], gap: 0.16, h: [5, 9], roof: ['#8a4fc4', '#c44f9a', '#5b5fc4'], yard: '#8a8f9a' },
 };
 const HOUSE_COLOR = { casa: '#f59e0b', mansao: '#a855f7', apartamento: '#38bdf8', 'casa-simples': '#f87171' };
 
@@ -26,7 +28,7 @@ function inPoly(pt, poly) { let c = false; for (let i = 0, j = poly.length - 1; 
 // prédios, casas, quintais e árvores: tudo agrupado em poucos <path> para o mapa continuar leve
 function buildings(geo) {
   const blocks = geo.blocks || []; if (!blocks.length) return '';
-  const yard = []; const walls = {}; const roofs = {}; const trees = []; const win = [];
+  const yard = []; const yardBy = {}; const walls = {}; const roofs = {}; const trees = []; const win = [];
   const poly = (pts, dx = 0, dy = 0) => `M${pts.map((p) => `${(p[0] + dx).toFixed(1)},${(p[1] + dy).toFixed(1)}`).join('L')}Z`;
   for (const bl of blocks) {
     const kind = geo.districts[bl[0]]?.kind || 'residencial'; const st = BSTYLE[kind] || BSTYLE.residencial;
@@ -34,7 +36,7 @@ function buildings(geo) {
     const at = (u, v) => [A[0] * (1 - u) * (1 - v) + B[0] * u * (1 - v) + C[0] * u * v + D[0] * (1 - u) * v, A[1] * (1 - u) * (1 - v) + B[1] * u * (1 - v) + C[1] * u * v + D[1] * (1 - u) * v];
     const m = 0.17; const ctr = at(0.5, 0.5);
     if ((geo.parks || []).some((pk) => inPoly(ctr, pk))) continue; // praças e parques ficam livres
-    if (st.yard) yard.push(poly([at(m, m), at(1 - m, m), at(1 - m, 1 - m), at(m, 1 - m)]));
+    if (st.yard) (yardBy[st.yard] ??= []).push(poly([at(m * 0.6, m * 0.6), at(1 - m * 0.6, m * 0.6), at(1 - m * 0.6, 1 - m * 0.6), at(m * 0.6, 1 - m * 0.6)]));
     // cada quarteirão tem um desenho próprio: um prédio grande, dois lotes desiguais ou a grade do bairro
     const tall = ['centro', 'tecnologia', 'noturno'].includes(kind); const pick = hash(bl[1], bl[2], 11);
     let cellsList = [];
@@ -55,38 +57,69 @@ function buildings(geo) {
         const key = `${kind}|${ci}`;
         (walls[key] ??= []).push(poly(quad, h * 0.4, h * 0.75)); (roofs[key] ??= []).push(poly(quad));
         if (tall) win.push(poly(quad));
-        if (['residencial', 'nobre', 'popular'].includes(kind) && r1 > 0.55) { const t = at(u0 - 0.03, v1 + 0.02); trees.push(`M${t[0].toFixed(1)},${t[1].toFixed(1)}m-2.2,0a2.2,2.2 0 1,0 4.4,0a2.2,2.2 0 1,0-4.4,0`); }
+        if (r1 > (['residencial', 'nobre', 'popular', 'educacao'].includes(kind) ? 0.35 : 0.75)) { const t = at(u0 - 0.04, v1 + 0.03); trees.push(`M${t[0].toFixed(1)},${t[1].toFixed(1)}m-3,0a3,3 0 1,0 6,0a3,3 0 1,0-6,0`); }
       }
     }
   }
-  let out = yard.length ? `<path d="${yard.join('')}" fill="${'#1d3326'}" opacity=".9"/>` : '';
+  let out = Object.entries(yardBy).map(([c, l]) => `<path d="${l.join('')}" fill="${c}"/>`).join('');
   for (const [key, list] of Object.entries(walls)) { const [kind, ci] = key.split('|'); out += `<path d="${list.join('')}" fill="${shade(BSTYLE[kind].roof[+ci], 0.42)}"/>`; }
   for (const [key, list] of Object.entries(roofs)) { const [kind, ci] = key.split('|'); out += `<path d="${list.join('')}" fill="${BSTYLE[kind].roof[+ci]}" stroke="${shade(BSTYLE[kind].roof[+ci], 1.35)}" stroke-width=".6" stroke-opacity=".55"/>`; }
-  if (win.length) out += `<defs><pattern id="cmWin" width="6" height="6" patternUnits="userSpaceOnUse"><rect x="1.2" y="1.2" width="2.2" height="2.2" fill="#ffe9a8"/></pattern></defs><path d="${win.join('')}" fill="url(#cmWin)" opacity=".5"/>`;
-  if (trees.length) out += `<path d="${trees.join('')}" fill="#2f6b3e" opacity=".85"/>`;
+  if (win.length) out += `<defs><pattern id="cmWin" width="6" height="6" patternUnits="userSpaceOnUse"><rect x="1.2" y="1.2" width="2.4" height="2.4" fill="#cfe6ff"/></pattern></defs><path d="${win.join('')}" fill="url(#cmWin)" opacity=".55"/>`;
+  if (trees.length) out += `<path d="${trees.join('')}" fill="#1f5e22" transform="translate(.8 1.2)"/><path d="${trees.join('')}" fill="#2f8a30"/>`;
   return `<g class="cm-bld">${out}</g>`;
+}
+
+// camada fixa da cidade (água, areia, grama, parques, ruas, prédios). É desenhada uma vez e vira uma única imagem
+// em pixel art: leve para arrastar e dar zoom, e com o visual 16-bit.
+function baseLayer(geo, path) {
+  const pts = (p) => p.map((q) => q.join(',')).join(' ');
+  return `<rect width="${geo.w}" height="${geo.h}" fill="${PX.sea}"/>
+    <path d="${geo.land}" fill="${PX.sand}" stroke="${PX.sand}" stroke-width="26" stroke-linejoin="round"/>
+    <path d="${geo.land}" fill="${PX.land}" stroke="#4d8f37" stroke-width="4"/>
+    ${geo.parks.map((p) => `<polygon points="${pts(p)}" fill="${PX.park}" stroke="#2f7a2a" stroke-width="3"/>`).join('')}
+    <path d="${geo.river}" fill="none" stroke="${PX.sand}" stroke-width="58" stroke-linecap="round"/><path d="${geo.river}" fill="none" stroke="${PX.water}" stroke-width="46" stroke-linecap="round"/>
+    <ellipse cx="${geo.lake.cx}" cy="${geo.lake.cy}" rx="${geo.lake.rx + 6}" ry="${geo.lake.ry + 6}" fill="${PX.sand}"/><ellipse cx="${geo.lake.cx}" cy="${geo.lake.cy}" rx="${geo.lake.rx}" ry="${geo.lake.ry}" fill="${PX.water}"/>
+    ${geo.piers.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${PX.pier}"/>`).join('')}
+    <path d="${path([...geo.edges.avenida, ...geo.edges.acesso])}" stroke="${PX.curb}" stroke-width="${ROAD.avenida[1] + 3}" stroke-linecap="round" fill="none"/>
+    <path d="${path(geo.edges.rua)}" stroke="${PX.curb}" stroke-width="${ROAD.rua[1] + 2}" stroke-linecap="round" fill="none"/>
+    ${buildings(geo)}
+    <path d="${path(geo.edges.rua)}" stroke="${ROAD.rua[0]}" stroke-width="${ROAD.rua[1]}" stroke-linecap="round" fill="none"/>
+    <path d="${path([...geo.edges.avenida, ...geo.edges.acesso])}" stroke="${ROAD.avenida[0]}" stroke-width="${ROAD.avenida[1]}" stroke-linecap="round" fill="none"/>
+    <path d="${path(geo.edges.avenida)}" stroke="${PX.lane}" stroke-width="1" stroke-dasharray="6 6" fill="none"/>
+    <g>${geo.hw.map((h) => `<polyline points="${pts(h.pts)}" fill="none" stroke="${PX.curb}" stroke-width="${ROAD.rodovia[1] + 4}" stroke-linejoin="round"/><polyline points="${pts(h.pts)}" fill="none" stroke="${ROAD.rodovia[0]}" stroke-width="${ROAD.rodovia[1]}" stroke-linejoin="round"/><polyline points="${pts(h.pts)}" fill="none" stroke="${PX.lane}" stroke-width="1.2" stroke-dasharray="8 7" stroke-linejoin="round"/>`).join('')}</g>`;
+}
+const pxCache = new Map();
+async function rasterize(svg, geo) {
+  const base = svg.querySelector('.cm-base'); if (!base || !window.Image) return;
+  const key = `${geo.w}x${geo.h}:${geo.nodes.length}:${(geo.blocks || []).length}:${geo.land.length}`;
+  let url = pxCache.get(key);
+  if (!url) {
+    const scale = 0.5; // 1 pixel da imagem = 2 unidades do mapa (zoom aproximado mostra os "pixels")
+    const src = `<svg xmlns="http://www.w3.org/2000/svg" width="${geo.w * scale}" height="${geo.h * scale}" viewBox="0 0 ${geo.w} ${geo.h}" shape-rendering="crispEdges">${base.innerHTML}</svg>`;
+    const blob = URL.createObjectURL(new Blob([src], { type: 'image/svg+xml' }));
+    try {
+      const img = new Image(); img.decoding = 'async';
+      await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = blob; });
+      const cv = document.createElement('canvas'); cv.width = geo.w * scale; cv.height = geo.h * scale;
+      const cx = cv.getContext('2d'); cx.imageSmoothingEnabled = false; cx.drawImage(img, 0, 0, cv.width, cv.height);
+      url = await new Promise((ok) => cv.toBlob((b) => ok(URL.createObjectURL(b)), 'image/png'));
+      pxCache.set(key, url);
+    } catch { return; } finally { URL.revokeObjectURL(blob); }
+  }
+  if (!svg.isConnected && !base.isConnected) return;
+  base.innerHTML = `<image href="${url}" x="0" y="0" width="${geo.w}" height="${geo.h}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
 }
 
 export function cityMap(host, geo, { mini = false, onPick = null, onView = null } = {}) {
   const path = (pairs) => pairs.map(([a, b]) => `M${geo.nodes[a][0]},${geo.nodes[a][1]}L${geo.nodes[b][0]},${geo.nodes[b][1]}`).join('');
-  host.innerHTML = `<div class="cm ${mini ? 'mini' : ''}"><svg class="cm-svg" viewBox="0 0 ${geo.w} ${geo.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa de Nexus City">
-    <defs><linearGradient id="cmSea" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28485c"/><stop offset="1" stop-color="#162a37"/></linearGradient>
-      <filter id="cmGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <rect width="${geo.w}" height="${geo.h}" fill="url(#cmSea)"/>
-    <path d="${geo.land}" fill="#1b1e23" stroke="#2f4555" stroke-width="6"/>
+  host.innerHTML = `<div class="cm px ${mini ? 'mini' : ''}"><svg class="cm-svg" viewBox="0 0 ${geo.w} ${geo.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa de Nexus City">
+    <defs><filter id="cmGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <g class="cm-base">${baseLayer(geo, path)}</g>
     ${geo.districts.map((d) => `<polygon class="cm-dist ${d.locked ? 'locked' : ''}" data-district="${esc(d.id)}" points="${d.poly.map((p) => p.join(',')).join(' ')}"/>`).join('')}
-    ${geo.parks.map((p) => `<polygon points="${p.map((q) => q.join(',')).join(' ')}" fill="#1f3a27" stroke="#2b5236" stroke-width="2"/>`).join('')}
-    <path d="${geo.river}" fill="none" stroke="#2b5068" stroke-width="46" stroke-linecap="round"/>
-    <ellipse cx="${geo.lake.cx}" cy="${geo.lake.cy}" rx="${geo.lake.rx}" ry="${geo.lake.ry}" fill="#2b5068"/>
-    ${geo.piers.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#2a2e35"/>`).join('')}
-    ${buildings(geo)}
-    <path d="${path(geo.edges.rua)}" stroke="${ROAD.rua[0]}" stroke-width="${ROAD.rua[1]}" stroke-linecap="round" fill="none"/>
-    <path d="${path([...geo.edges.avenida, ...geo.edges.acesso])}" stroke="${ROAD.avenida[0]}" stroke-width="${ROAD.avenida[1]}" stroke-linecap="round" fill="none"/>
-    <g>${geo.hw.map((h) => `<polyline points="${h.pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#0d0f12" stroke-width="13" stroke-linejoin="round"/><polyline points="${h.pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="${ROAD.rodovia[0]}" stroke-width="${ROAD.rodovia[1]}" stroke-linejoin="round"/>`).join('')}</g>
     ${mini ? '' : geo.labels.map((l) => `<text class="cm-label" x="${l.at[0]}" y="${l.at[1]}" text-anchor="middle">${esc(l.name.toUpperCase())}${l.locked ? ' · EM OBRAS' : ''}</text>`).join('')}
     <g class="cm-route"></g><g class="cm-layer"></g><g class="cm-walkers"></g></svg>
     ${mini ? '' : `<div class="cm-tools"><button class="cm-btn" data-z="in" aria-label="Aproximar">${icon('plus', 15)}</button><button class="cm-btn" data-z="out" aria-label="Afastar">${icon('minus', 15)}</button><button class="cm-btn" data-z="me" aria-label="Minha localização">${icon('target', 15)}</button><button class="cm-btn" data-z="all" aria-label="Ver a cidade toda">${icon('refresh', 14)}</button></div>`}</div>`;
-  const svg = host.querySelector('svg'); const layer = host.querySelector('.cm-layer'); const routeG = host.querySelector('.cm-route'); const wl = host.querySelector('.cm-walkers');
+  const svg = host.querySelector('svg'); rasterize(svg, geo); const layer = host.querySelector('.cm-layer'); const routeG = host.querySelector('.cm-route'); const wl = host.querySelector('.cm-walkers');
   let vb = [0, 0, geo.w, geo.h]; let data = { places: [], events: [], alerts: [], houses: [], properties: [], me: null };
   let filter = null; let selected = null; let near = false;
   const px = () => vb[2] / Math.max(1, svg.clientWidth || 600); // unidades do mapa por pixel na tela

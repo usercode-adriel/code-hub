@@ -14,6 +14,7 @@ import { justice, publicCase, testify, settleCase, payFine, report, DEFAULT_PENA
 import { hasAuthority, society, professionsFor } from './society.js';
 import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } from './orgs.js';
 import { peopleView, housesPublic, housePublic, live } from './living.js';
+import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
@@ -79,6 +80,36 @@ router.get('/mundo/mapa/ao-vivo', (req, res) => {
   const items = (live(w).items || []).filter((x) => x.at > since).map((x) => ({ id: x.id, at: x.at, kind: x.kind, personaId: x.personaId || null, name: x.name || null, placeId: x.placeId || null, placeName: x.placeName || null, text: x.text }));
   const news = (w.events || []).filter((e) => e.at > since && e.type !== 'genese' && (e.cat === 'seguranca' || e.importance >= 3)).map((e) => ({ id: e.id, at: e.at, kind: e.cat === 'seguranca' ? 'alerta' : 'noticia', text: e.title }));
   res.json([...items, ...news].sort((a, b) => b.at.localeCompare(a.at)).slice(0, n));
+});
+// LIVE reutilizável: cidade inteira, um lugar (place:<id>) ou um tema (banco, policia, saude, comercio).
+// Só eventos reais (feed de chegadas/saídas/compras + acontecimentos do mundo); "watching" = quem está lá agora.
+const LIVE_SCOPES = {
+  banco: { kinds: ['banco', 'emprestimo', 'pix', 'deposito', 'saque', 'investimento', 'pagamento'], cats: [], types: /banco|emprest|divida|cartao|pix|investi|bolsa/ , placeKinds: ['banco'] },
+  policia: { kinds: ['alerta', 'prisao', 'ocorrencia', 'denuncia', 'fianca'], cats: ['seguranca'], placeKinds: ['delegacia', 'tribunal'] },
+  saude: { kinds: ['atendimento'], cats: [], types: /saude|hospital|doen|clinica/, placeKinds: ['hospital', 'clinica', 'farmacia'] },
+  comercio: { kinds: ['compra', 'promo', 'devolucao', 'reposicao'], cats: [], placeKinds: null },
+};
+router.get('/mundo/ao-vivo', (req, res) => {
+  const w = world(req.user.id); const n = Math.min(40, Number(req.query.n) || 16);
+  const scope = String(req.query.scope || 'cidade'); const since = new Date(Date.now() - 6 * HOUR).toISOString();
+  const placeId = scope.startsWith('place:') ? scope.slice(6) : null; const sc = LIVE_SCOPES[scope] || null;
+  const placeKind = (id) => placeById(w, id)?.kind;
+  const face = (id) => { const p = id && personById(w, id); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : null; };
+  let items = (live(w).items || []).filter((x) => x.at > since);
+  if (placeId) items = items.filter((x) => x.placeId === placeId);
+  else if (sc) items = items.filter((x) => sc.kinds.includes(x.kind) || (sc.placeKinds && x.placeId && sc.placeKinds.includes(placeKind(x.placeId))));
+  let evs = (w.events || []).filter((e) => e.at > since && e.type !== 'genese');
+  if (placeId) evs = evs.filter((e) => e.refs?.some((r) => r.id === placeId));
+  else if (sc) evs = evs.filter((e) => sc.cats.includes(e.cat) || (sc.types && sc.types.test(e.type || '')));
+  else evs = evs.filter((e) => e.cat === 'seguranca' || e.importance >= 2);
+  const out = [
+    ...items.map((x) => ({ id: x.id, at: x.at, kind: x.kind, text: x.text, placeId: x.placeId || null, placeName: x.placeName || null, who: face(x.personaId) || (x.name ? { name: x.name } : null), amount: x.amount ?? null })),
+    ...evs.map((e) => ({ id: e.id, at: e.at, kind: e.cat === 'seguranca' ? 'alerta' : 'noticia', cat: e.cat, text: e.title, who: face((e.actors || []).find((a) => a && a !== 'me')) || ((e.actors || []).includes('me') ? { id: 'me', name: 'Você', me: true } : null) })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, n);
+  let watching = 0;
+  if (placeId || sc?.placeKinds) { const pv = peopleView(w, { limit: 9999, horizon: 0 }); const names = new Set(places(w).filter((pl) => (placeId ? pl.id === placeId : sc.placeKinds.includes(pl.kind))).map((pl) => pl.name)); watching = pv.filter((p) => names.has(p.place)).length; }
+  else watching = peopleView(w, { limit: 9999, horizon: 0 }).filter((p) => p.place !== 'em casa').length;
+  res.json({ scope, watching, items: out });
 });
 router.get('/mundo/mapa/casa/:id', (req, res) => { const h = housePublic(world(req.user.id), req.params.id); if (!h) return res.status(404).json({ error: 'Casa não encontrada' }); res.json(h); });
 router.get('/mundo/mapa/local/:id', (req, res) => {
@@ -300,6 +331,27 @@ router.delete('/mundo/capa', (req, res) => {
   if (u.heroImage?.startsWith('/uploads/')) removeUpload(u.heroImage);
   u.heroImage = null; saveWorld();
   res.json({ image: w.city?.heroImage || null });
+});
+
+// moldura do app (topo, barra lateral e dispositivos): dados leves, atualizados a cada poucos segundos
+router.get('/mundo/status', (req, res) => {
+  const w = world(req.user.id);
+  if (!w.core?.genesisAt) return res.json({ born: false, me: { name: req.user.name, avatar: req.user.avatar || null } });
+  const u = account(w); const b = bankOf(w);
+  const res0 = residents(w); const t = Date.now();
+  let out = 0; let moving = 0;
+  for (const p of peopleView(w, { limit: 9999, horizon: 0 })) { if (p.place !== 'em casa') out++; if (p.moving) moving++; }
+  res.json({
+    born: true, now: new Date(t).toISOString(), city: w.city.name || 'Nexus City', population: res0.length, online: out, moving,
+    me: { name: req.user.name, avatar: req.user.avatar || null, level: u.level || 1, xp: u.xp || 0, nextXp: 40 * (u.level || 1) ** 2, balance: b.balance, wallet: b.wallet || 0, reputation: u.reputation, fame: u.fame || 0, underworld: u.underworld || 0, job: u.job?.role || null },
+    devices: devicesOf(w),
+  });
+});
+
+router.get('/mundo/dispositivos', (req, res) => {
+  const w = world(req.user.id);
+  if (!w.core?.genesisAt) return res.json({ born: false });
+  res.json({ born: true, phone: phoneOf(w), wallet: walletOf(w), clock: clockOf(w), models: Object.entries(PHONES).map(([key, p]) => ({ key, name: p.name, tier: p.tier, tierLabel: TIERS[p.tier].label, color: TIERS[p.tier].color, base: p.base, camera: p.camera, storage: p.storage, apps: p.apps.length, desc: p.desc })), appCount: Object.keys(APPS).length });
 });
 
 export default router;
