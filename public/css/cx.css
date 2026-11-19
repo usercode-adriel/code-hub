@@ -607,3 +607,30 @@ body.cx-on .bq-grid .w-panel, body.cx-on .bq-setup { background: var(--cx-panel)
 @media (max-width: 640px) { .cx-look { flex-direction: column; align-items: flex-start; } .cx-look img { width: 100%; } }
 .cx-search { min-width: 0; } .cx-search input { width: 100%; }
 @media (max-width: 900px) { .cx-search { flex: 1 1 0; margin: 0; } .cx-top-r { gap: 6px; } }
+
+/* ---------------- rolagem (PC com barra visível, celular com toque) ---------------- */
+body.cx-on .cx-main.content, body.cx-on.world-mode .cx-main.content {
+  overflow-y: auto !important; overflow-x: hidden !important; height: auto !important;
+  -webkit-overflow-scrolling: touch; touch-action: pan-y pinch-zoom; overscroll-behavior-y: contain;
+}
+body.cx-on[data-route="mapa"] .cx-main.content, body.cx-on[data-route="assistente"] .cx-main.content { overflow: hidden !important; }
+@media (pointer: fine) {
+  body.cx-on .cx-main.content { scrollbar-width: auto; scrollbar-color: #4b44b8 #0d1136; scrollbar-gutter: stable; }
+  body.cx-on ::-webkit-scrollbar { width: 12px; height: 12px; }
+  body.cx-on ::-webkit-scrollbar-track { background: #0d1136; }
+  body.cx-on ::-webkit-scrollbar-thumb { background: #3a3aa8; border-radius: 8px; border: 3px solid #0d1136; }
+  body.cx-on ::-webkit-scrollbar-thumb:hover { background: #6c4cf5; }
+  body.cx-on .cx-nav { scrollbar-width: thin; scrollbar-color: #3a3aa8 transparent; }
+}
+/* mapas embutidos (Início, Desenvolvimento): no celular o dedo na vertical rola a página; na horizontal move o mapa */
+@media (pointer: coarse) {
+  body.cx-on:not([data-route="mapa"]) .cm { touch-action: pan-y; }
+}
+/* listas internas também rolam com o dedo */
+.lv2-list, .nb-msgs, .sp-chat, .cx-nav, .cx-devcard, .cx-ph-apps { -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: auto; }
+/* no celular, listas dentro de cartões não prendem o dedo: crescem e a página inteira rola */
+@media (max-width: 900px), (pointer: coarse) {
+  .hx-live, .nb-live, .ins-live, .sp-live, .ac-live, .dp .nb-live { max-height: none !important; }
+  .lv2-list { overflow: visible; max-height: none; }
+  .nb-msgs { max-height: 320px; }
+}
