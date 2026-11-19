@@ -51,3 +51,46 @@ test('celulares: estão nas lojas, vão para o inventário e podem ser equipados
   const wl = D.walletOf(T.w);
   assert.ok(wl.docs.length >= 1 && wl.cards.length >= 1);
 });
+
+test('veículos: concessionária vende carros; carro principal libera deslocamento de carro', async () => {
+  const V = await import('../server/world/vehicles.js');
+  const C = await import('../server/world/commerce.js');
+  const shop = places(T.w).find((p) => p.name === 'Oficina Turbo');
+  assert.ok(shop.catalog.some((x) => V.isVehicle(x.key)), 'Oficina Turbo vende carros');
+  const ctx = T.ctx();
+  const dest = places(T.w).find((p) => !p.hidden && p.id !== shop.id);
+  assert.throws(() => C.travel(ctx, dest.id, 'carro'), /não tem carro/);
+  const car = I.makeItem(ctx, { key: 'car-hatch-cinza', price: 18000 });
+  I.itemAction(ctx, car.id, 'equipar');
+  assert.equal(V.vehicleOf(T.w).name, 'Hatch Urbano');
+  (await import('../server/world/bank.js')).credit(T.w, 500, 'teste', ctx.at);
+  const r = C.travel(ctx, dest.id, 'carro');
+  assert.equal(r.mode, 'carro');
+});
+
+test('saúde: cai com os dias, check-up cobra e recupera', async () => {
+  const H = await import('../server/world/health.js');
+  const B = await import('../server/world/bank.js');
+  const before = H.healthOf(T.w);
+  await T.advance(26);
+  assert.ok(H.healthOf(T.w) < before || before <= 20, 'saúde cai por dia');
+  const ctx = T.ctx();
+  B.setPin(T.w, '7392');
+  B.credit(T.w, 1000, 'teste', ctx.at);
+  const saldo = B.bankOf(T.w).balance;
+  const r = H.checkup(ctx, '7392');
+  assert.equal(r.health, 100);
+  assert.equal(B.bankOf(T.w).balance, saldo - H.CHECKUP_PRICE);
+  assert.throws(() => H.checkup(ctx, '7392'), /já fez um check-up/);
+});
+
+test('submundo: lojas clandestinas escondidas vendem itens que vão para o inventário e podem ser escondidos', async () => {
+  const U = await import('../server/world/underworld.js');
+  const dens = places(T.w).filter((p) => p.kind === 'clandestino');
+  assert.ok(dens.length >= 2 && dens.every((p) => p.hidden), 'existem e estão escondidas');
+  assert.ok(dens.every((p) => p.catalog.every((x) => U.isIllegal(x.key))));
+  const it = I.makeItem(T.ctx(), { key: 'w-pistol', price: 2400 });
+  assert.ok(it.illegal && it.actions.includes('esconder'));
+  I.itemAction(T.ctx(), it.id, 'esconder');
+  assert.equal(account(T.w).inventory.find((x) => x.id === it.id).state, 'escondido');
+});

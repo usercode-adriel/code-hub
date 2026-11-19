@@ -605,3 +605,5 @@ body.cx-on .bq-grid .w-panel, body.cx-on .bq-setup { background: var(--cx-panel)
 .cx-look { display: flex; align-items: center; gap: 16px; overflow: hidden; }
 .cx-look img { width: 220px; height: 82px; object-fit: cover; border-radius: 12px; border: 2px solid var(--cx-line2); flex: none; }
 @media (max-width: 640px) { .cx-look { flex-direction: column; align-items: flex-start; } .cx-look img { width: 100%; } }
+.cx-search { min-width: 0; } .cx-search input { width: 100%; }
+@media (max-width: 900px) { .cx-search { flex: 1 1 0; margin: 0; } .cx-top-r { gap: 6px; } }

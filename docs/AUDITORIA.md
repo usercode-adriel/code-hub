@@ -44,14 +44,22 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 ## 2. Checklist da reconstrução
 
 - [x] Fase 1 — auditoria (este arquivo)
-- [x] Rostos em pixel para todos os personagens de IA (retratos prontos + geração no mesmo estilo quando acabam)
-- [ ] Fase 2 — design system: paleta navy/roxo sólida, tipografia, cartões, botões, chips; moldura nova (barra lateral, topo, trilho de dispositivos, barra inferior no celular) para TODAS as rotas
-- [ ] Fase 3 — Início: mapa em pixel no centro, LIVE da cidade, ações rápidas, notícias, eventos, entretenimento, atividades
-- [ ] Fase 4 — páginas: Loja, Banco Nexus, Delegacia, Hospital, Empregos, Inventário, Propriedades, Economia, Organizações, Veículos, Minha Vida, Configurações, Chat
-- [ ] Fase 5 — dispositivos: celular (SO em pixel com apps reais), carteira, relógio; smartphones compráveis por nível
-- [ ] Fase 6 — painéis LIVE reutilizáveis com eventos reais
-- [ ] Fase 7 — celular: barra inferior, sem rolagem horizontal, mapa por toque
-- [ ] Fase 8 — testes automatizados + capturas
-- [ ] Loja clandestina (itens fictícios → inventário, com risco policial)
-- [ ] Tela de login em pixel
-- [ ] Nenhuma funcionalidade antiga perdida (todas as rotas acima continuam abrindo)
+- [x] Rostos em pixel para todos os personagens de IA (`server/pixelfaces.js`: retratos prontos sem repetir, por gênero e profissão; quando acabam, geração no mesmo estilo)
+- [x] Fase 2 — design system (`public/css/cx.css`): paleta navy/roxo sólida, tipografia, cartões, botões; moldura nova (`public/js/chrome.js`) em TODAS as rotas
+- [x] Fase 3 — Início: mapa em pixel no centro com filtros e pontos clicáveis, LIVE da cidade, ações rápidas, notícias, eventos, entretenimento, atividades, economia, redes sociais
+- [x] Fase 4 — páginas refeitas: Loja (vitrine de cartões, vendedor com avatar e chat, LIVE), Banco Nexus (gerente de IA, ações, chat, LIVE, conta), Delegacia (policial de plantão, ocorrências, inquéritos, multas, equipe, LIVE), Hospital (novo), Empregos (novo), Propriedades (novo), Veículos (novo), Minha Vida (novo), Inventário, Acontecimentos e Desenvolvimento (antes "em construção"), Configurações (visual único)
+- [x] Fase 5 — dispositivos (`public/js/devices.js`, `server/world/devices.js`): celular com SO em pixel e apps reais, carteira, relógio; 7 celulares compráveis por nível
+- [x] Fase 6 — LIVE reutilizável (`public/js/world/live.js` + `GET /mundo/ao-vivo`) só com eventos reais (chegadas/saídas, compras, banco, polícia, saúde)
+- [x] Fase 7 — celular: barra inferior com botão do celular, menu lateral em gaveta, sem rolagem horizontal (verificado em 21 rotas a 390 px)
+- [x] Fase 8 — testes (`test/cx.test.js`) + capturas
+- [x] Loja clandestina (`server/world/underworld.js`): escondida até ser descoberta, só dinheiro vivo, itens fictícios no inventário, abordagem policial com apreensão e multa
+- [x] Veículos (`server/world/vehicles.js`): concessionária, garagem, carro principal, deslocamento de carro
+- [x] Saúde (`server/world/health.js`): saúde cai por dia, check-up pago, atendimentos de moradores no LIVE
+- [x] Tela de login em pixel
+- [x] Mapa em pixel (camada fixa rasterizada numa imagem só; marcadores, rostos e rotas continuam interativos)
+- [x] Hub pessoal só pelo perfil (a barra lateral troca para "Meu hub" nas telas pessoais)
+- [x] Nenhuma funcionalidade antiga perdida: todas as rotas listadas acima abrem na moldura nova; testes antigos continuam passando
+
+### Próximos refinamentos
+- Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
+- Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.
