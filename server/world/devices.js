@@ -85,6 +85,7 @@ export function equipPhone(w, it) {
 // quando o item sai do inventário (venda, presente, descarte), o celular é desequipado
 export function unequipIfGone(w) {
   const u = account(w);
+  if (u.devices?.vehicle && !(u.inventory || []).some((x) => x.id === u.devices.vehicle)) u.devices.vehicle = null;
   if (u.devices?.phone && !(u.inventory || []).some((x) => x.id === u.devices.phone)) {
     u.devices.phone = null;
     u.installed.phone = (u.inventory || []).some((x) => isPhone(x.key));

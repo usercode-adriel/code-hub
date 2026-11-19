@@ -10,6 +10,7 @@ import { PRODUCTS, places } from './commerce.js';
 import { genderize, userPost } from '../social.js';
 import { media } from './media.js';
 import { equipPhone, unequipIfGone, isPhone, PHONES, TIERS } from './devices.js';
+import { isVehicle, equipVehicle } from './vehicles.js';
 import { pick, chance, clamp, uid, nowIso, DAY, round2, cap, str } from './util.js';
 
 export const tplOf = (key) => PRODUCTS[key];
@@ -63,7 +64,8 @@ export function itemAction(ctx, itemId, action, body = {}) {
     return { ok: true, text: it.state === 'escondido' ? 'Escondido em casa: o risco numa abordagem cai bastante.' : 'O item voltou a andar com você.' };
   }
   if (action === 'equipar') {
-    if (!isPhone(it.key)) throw new BankError('Só celulares podem ser equipados');
+    if (isVehicle(it.key)) { it.state = 'equipado'; log('Virou o carro principal.'); return { ok: true, text: equipVehicle(w, it) }; }
+    if (!isPhone(it.key)) throw new BankError('Só celulares e veículos podem ser equipados');
     for (const x of inv(w)) if (x.state === 'equipado' && isPhone(x.key)) { x.state = 'guardado'; x.history.push({ at: ctx.at.toISOString(), text: 'Guardado (trocou de celular).' }); }
     it.state = 'equipado'; log('Equipado como celular principal.'); addXp(w, 3);
     return { ok: true, text: equipPhone(w, it) };

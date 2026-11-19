@@ -16,6 +16,8 @@ import { justice, publicCase, testify, settleCase, payFine, report, DEFAULT_PENA
 import { hasAuthority, society, professionsFor } from './society.js';
 import { orgsCenter, publicOrg, orgById, requestJoin, acceptInvite, leaveOrg } from './orgs.js';
 import { peopleView, housesPublic, housePublic, live } from './living.js';
+import { hospitalView, checkup, doctorChat } from './health.js';
+import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
 import { loans, askFriendLoan, acceptFriendLoan, repayFriendLoan, createVaquinha, VAQUINHA_MOTIVOS, gigs, doGig } from './finance.js';
 import { listConversations } from '../assistant.js';
@@ -125,7 +127,7 @@ router.get('/mundo/mapa/local/:id', (req, res) => {
   res.json({ id: pl.id, name: pl.name, kind: pl.kind, kindLabel: cat.label || pl.kind, icon: cat.icon, color: cat.color, sub: pl.sub, address: pl.address, hours: pl.hours, open: isOpen(pl), status: pl.status, rating: pl.reputation ? round2(pl.reputation) : null, reviews: (pl.ratings || []).length,
     owner: owner ? { id: owner.id, name: owner.name, avatar: owner.avatar, color: owner.color } : null, company: c ? { id: c.id, name: c.name, status: c.status } : null,
     staff: staff.map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, role: p.agent?.role })), products: (pl.catalog || []).slice(0, 6).map((it) => ({ name: PRODUCTS[it.key].name, stock: it.stock })),
-    shop: Boolean(pl.catalog), app: cat.app || null, here: account(w).location?.placeId === pl.id,
+    shop: Boolean(pl.catalog), app: cat.app || null, desk: pl.sellerId && personById(w, pl.sellerId) ? { id: pl.sellerId, name: personById(w, pl.sellerId).name, avatar: personById(w, pl.sellerId).avatar, gender: personById(w, pl.sellerId).gender } : null, here: account(w).location?.placeId === pl.id,
     history: (w.events || []).filter((e) => e.refs?.some((r) => r.id === pl.id || (c && r.id === c.id))).slice(-5).reverse().map((e) => ({ at: e.at, title: e.title })) });
 });
 router.get('/mundo/rota', (req, res) => {
@@ -133,7 +135,8 @@ router.get('/mundo/rota', (req, res) => {
   const node = (v) => (v === 'eu' ? u.location?.node : placeById(w, v)?.node);
   const r = route(w, node(String(req.query.de || 'eu')), node(String(req.query.para || '')));
   if (!r) return res.status(404).json({ error: 'Sem rota entre esses pontos' });
-  res.json({ ...r, fares: Object.fromEntries(Object.entries(TRANSPORT).map(([k, t]) => [k, { label: t.label, fee: t.fee(r.meters), minutes: r.minutes[k] }])) });
+  const hasCar = (u.inventory || []).some((x) => x.id === u.devices?.vehicle);
+  res.json({ ...r, fares: Object.fromEntries(Object.entries(TRANSPORT).filter(([k, t]) => !t.needs || hasCar).map(([k, t]) => [k, { label: t.label, fee: t.fee(r.meters), minutes: r.minutes[k] }])) });
 });
 router.post('/mundo/ir', (req, res) => { const ctx = ctxOf(req); run(res, () => travel(ctx, req.body?.placeId, req.body?.modo)); });
 
@@ -317,6 +320,10 @@ router.get('/mundo/policia', (req, res) => {
     alerts: (w.events || []).filter((e) => e.cat === 'seguranca').slice(-10).reverse().map((e) => publicEvent(e, w)),
     mine: J.cases.filter((c) => mine(c) && c.kind === 'criminal').slice().reverse().map((c) => publicCase(w, c)),
     profession: professionsFor(w).find((x) => x.key === 'policia'),
+    // equipe é pública (nomes e postos); o que eles investigam é sigiloso
+    team: J.officers.map((o) => { const p = personById(w, o.personaId); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color, rank: o.rank, gender: p.gender, onDuty: isWorking ? Boolean(isWorking(w, p)) : false } : null; }).filter(Boolean),
+    fines: (bankOf(w).debts || []).filter((d) => ['multa', 'judicial', 'fianca'].includes(d.kind) && d.status !== 'paga').map((d) => ({ id: d.id, kind: d.kind, desc: d.desc, amount: d.amount, due: d.due, status: d.status, creditor: d.creditor })),
+    publicStats: { arrests: (w.events || []).filter((e) => e.at > since && /prisao|preso|apreensao/.test(e.type || '')).length, alerts: (w.events || []).filter((e) => e.at > since && e.cat === 'seguranca').length, open: J.cases.filter((c) => ['aberto', 'investigacao', 'intimado', 'decisao'].includes(c.status)).length },
   };
   if (!authorized) { res.json({ ...base, restricted: true }); return; }
   // acesso interno (autoridade policial): painel completo e sigiloso
@@ -329,7 +336,46 @@ router.get('/mundo/policia', (req, res) => {
     debtors: people(w).filter((p) => (p.agent?.debtToUser || 0) > 0).map((p) => ({ id: p.id, name: p.name, amount: p.agent.debtToUser })),
   });
 });
-router.post('/mundo/policia/denuncia', (req, res) => { const ctx = ctxOf(req); run(res, () => publicCase(ctx.w, report(ctx, req.body?.personaId, req.body?.tipo, req.body?.relato))); });
+// atendimento no balcão da delegacia: o(a) policial de plantão conversa sabendo dos SEUS casos e multas (nada sigiloso)
+router.post('/mundo/policia/atendimento', (req, res) => {
+  const ctx = ctxOf(req);
+  run(res, async () => {
+    const w = ctx.w; const J = justice(w); const st = places(w).find((p) => p.kind === 'delegacia');
+    const msg = str(req.body?.mensagem, 400); if (!msg) throw new BankError('Escreva uma mensagem');
+    const offs = J.officers.map((o) => ({ o, p: personById(w, o.personaId) })).filter((x) => x.p);
+    const duty = offs.find((x) => isWorking(w, x.p)) || offs[0];
+    const mineC = J.cases.filter((c) => mine(c)).slice(-5);
+    const fines = (bankOf(w).debts || []).filter((d) => ['multa', 'judicial', 'fianca'].includes(d.kind) && d.status !== 'paga');
+    st.deskChat ??= []; st.deskChat.push({ who: 'me', text: msg, at: nowIso() });
+    const facts = `casos do cidadão: ${mineC.map((c) => `nº ${c.n} (${c.type}, ${c.status})`).join('; ') || 'nenhum'}; multas/fianças em aberto: ${fines.map((d) => `${d.desc} ${round2(d.amount)} NXC`).join('; ') || 'nenhuma'}`;
+    let text = null;
+    if (duty && aiTake(ctx)) {
+      try {
+        const out = await geminiJSON(`Você é ${duty.p.name}, ${duty.o.rank} da Polícia de Nexus City (cidade simulada), atendendo no balcão da delegacia. Seja educado(a), firme e objetivo(a). Fatos do atendimento: ${facts}.
+Nunca revele investigações sigilosas de outras pessoas. Oriente sobre: registrar ocorrência (botão "Registrar ocorrência"), acompanhar os próprios inquéritos, pagar multa ou fiança (no Banco, em Pendências) e direitos no depoimento. Responda em 1 a 3 frases. Mensagem: "${msg}". JSON: {"resposta":""}`, 500, 0.6);
+        text = str(out?.resposta, 500) || null;
+      } catch (err) { console.error('[polícia] atendimento:', err.message); }
+    }
+    if (!text) {
+      const f = msg.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      text = /ocorr|denunc|roub|furt|golpe|calote/.test(f) ? 'Para registrar, use o botão "Registrar ocorrência" e conte o que aconteceu. Sem provas, o caso pode ser arquivado.'
+        : /multa|fianca|pagar/.test(f) ? (fines.length ? `Você tem ${fines.length} pendência(s) com a justiça, somando ${round2(fines.reduce((a, d) => a + d.amount, 0)).toLocaleString('pt-BR')} NXC. O pagamento é feito no Banco Nexus, em Pendências.` : 'Não há multa nem fiança em aberto no seu nome.')
+        : /caso|inquerit|processo|investiga/.test(f) ? (mineC.length ? `Você tem ${mineC.length} caso(s) registrado(s). Acompanhe em "Meus inquéritos".` : 'Não há nenhum inquérito envolvendo você.')
+        : 'Delegacia de Nexus City, em que posso ajudar? Posso orientar sobre ocorrências, seus inquéritos, multas e fianças.';
+    }
+    st.deskChat.push({ who: 'policial', text, at: nowIso() }); cap(st.deskChat, 40);
+    return { text, officer: duty ? { id: duty.p.id, name: duty.p.name, avatar: duty.p.avatar, rank: duty.o.rank } : null };
+  });
+});
+router.post('/mundo/policia/denuncia', (req, res) => {
+  const ctx = ctxOf(req);
+  run(res, () => {
+    const c = report(ctx, req.body?.personaId, req.body?.tipo, req.body?.relato);
+    const st = places(ctx.w).find((p) => p.kind === 'delegacia');
+    live(ctx.w).items.push({ id: crypto.randomUUID(), at: nowIso(), kind: 'denuncia', personaId: 'me', name: 'Você', text: `Você registrou a ocorrência nº ${c.n}`, placeId: st?.id || null, placeName: st?.name || null });
+    return publicCase(ctx.w, c);
+  });
+});
 router.get('/mundo/justica', (req, res) => {
   const w = world(req.user.id); const J = justice(w); const b = bankOf(w);
   const court = places(w).find((p) => p.kind === 'tribunal');
@@ -410,6 +456,42 @@ router.get('/mundo/status', (req, res) => {
   });
 });
 
+router.get('/mundo/veiculos', (req, res) => {
+  const w = world(req.user.id); const shop = places(w).find((p) => p.name === 'Oficina Turbo');
+  res.json({ main: vehicleOf(w), garage: garage(w), dealer: shop ? { id: shop.id, name: shop.name, address: shop.address, open: isOpen(shop), catalog: (shop.catalog || []).filter((x) => isVehicle(x.key)).map((x) => ({ key: x.key, name: PRODUCTS[x.key].name, price: x.price, stock: x.stock, ...VEHICLES[x.key], art: `/assets/items/${x.key}.png` })) } : null,
+    stations: places(w).filter((p) => p.kind === 'posto').map((p) => ({ id: p.id, name: p.name, address: p.address, open: isOpen(p) })),
+    modes: Object.entries(TRANSPORT).map(([k, t]) => ({ key: k, label: t.label, sample: t.fee(2000), needs: t.needs || null })) });
+});
+// balcão de qualquer instituição com atendente (imobiliária, agência de empregos, concessionária...)
+const DESK = { imobiliaria: 'corretor(a) de imóveis', empregos: 'recrutador(a) da agência de empregos', oficina: 'vendedor(a) de veículos e mecânico(a)', banco: 'gerente do banco' };
+router.post('/mundo/lugar/:id/conversar', (req, res) => {
+  const ctx = ctxOf(req);
+  run(res, async () => {
+    const w = ctx.w; const pl = placeById(w, req.params.id); if (!pl || !visible(w, pl)) throw new BankError('Local não encontrado');
+    const msg = str(req.body?.mensagem, 400); if (!msg) throw new BankError('Escreva uma mensagem');
+    const p = pl.sellerId ? personById(w, pl.sellerId) : null; const u = account(w);
+    const role = DESK[pl.kind] || 'atendente';
+    const facts = pl.kind === 'imobiliaria' ? `imóveis à venda: ${(w.properties || []).filter((x) => !x.ownerId || x.forSale).length}; imóveis do cliente: ${(u.properties || []).length}`
+      : pl.kind === 'empregos' ? `emprego atual do cliente: ${u.job ? `${u.job.role} na ${companyById(w, u.job.companyId)?.name || 'empresa'}` : 'desempregado(a)'}; diplomas: ${(u.diplomas || []).join(', ') || 'nenhum'}; vagas abertas na cidade: ${companies(w).reduce((n, c) => n + (c.openings || []).length, 0)}`
+      : pl.kind === 'oficina' ? `carros à venda: ${(pl.catalog || []).filter((x) => isVehicle(x.key) && x.stock).map((x) => `${PRODUCTS[x.key].name} ${x.price} NXC`).join('; ')}; carro do cliente: ${vehicleOf(w)?.name || 'nenhum'}` : '';
+    pl.deskChat ??= []; pl.deskChat.push({ who: 'me', text: msg, at: nowIso() });
+    let text = null;
+    if (p && aiTake(ctx)) {
+      try { text = str((await geminiJSON(`Você é ${p.name}, ${role} em "${pl.name}", Nexus City (cidade simulada de um jogo, moeda NXC). Jeito de falar: ${p.voice || 'cordial'}. Fatos reais: ${facts}. Responda em 1 a 3 frases úteis, sem inventar números. Mensagem do cliente ${userName(ctx)}: "${msg}". JSON: {"resposta":""}`, 500, 0.7))?.resposta, 500) || null; } catch (err) { console.error('[balcão]', err.message); }
+    }
+    if (!text) text = pl.kind === 'imobiliaria' ? `Temos ${(w.properties || []).filter((x) => !x.ownerId || x.forSale).length} imóveis disponíveis. Veja a lista ao lado e me diga qual te interessa.`
+      : pl.kind === 'empregos' ? (u.job ? `Você já trabalha como ${u.job.role}. Se quiser mudar, veja as vagas abertas ao lado.` : 'Vamos te colocar no mercado! Veja as vagas abertas e candidate-se; cursos aumentam suas chances.')
+      : pl.kind === 'oficina' ? 'Dá uma olhada nos carros da vitrine. Com carro próprio você paga só o combustível nos deslocamentos.' : 'Em que posso ajudar?';
+    pl.deskChat.push({ who: 'atendente', text, at: nowIso() }); cap(pl.deskChat, 40);
+    return { text, agent: p ? { id: p.id, name: p.name, avatar: p.avatar } : null };
+  });
+});
+router.get('/mundo/hospital', (req, res) => { res.json(hospitalView(world(req.user.id))); });
+router.post('/mundo/hospital/checkup', (req, res) => { const ctx = ctxOf(req); run(res, () => checkup(ctx, req.body?.pin)); });
+router.post('/mundo/hospital/atendimento', (req, res) => {
+  const ctx = ctxOf(req);
+  run(res, () => doctorChat(ctx, req.body?.mensagem, aiTake(ctx) ? async (prompt) => str((await geminiJSON(`${prompt} JSON: {"resposta":""}`, 500, 0.6))?.resposta, 500) || null : null));
+});
 router.get('/mundo/dispositivos', (req, res) => {
   const w = world(req.user.id);
   if (!w.core?.genesisAt) return res.json({ born: false });

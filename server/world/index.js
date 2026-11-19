@@ -18,6 +18,8 @@ import './orgs.js';
 import './living.js';
 import './devices.js';
 import './underworld.js';
+import './health.js';
+import './vehicles.js';
 import { personById, userChatted, relType, REL_LABEL, requests } from './agents.js';
 import { companyById } from './economy.js';
 import { socialStep, worldFactHooks } from '../social.js';

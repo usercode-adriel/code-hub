@@ -1,4 +1,5 @@
 import express from 'express';
+import { pixelTiles } from '../pixelfaces.js';
 import { db, id, now, save, slugify, localDate, USER_COLLECTIONS } from '../db.js';
 import { single, removeUpload } from './uploads.js';
 import {
@@ -160,6 +161,16 @@ router.post('/profile/avatar', single('image'), (req, res) => {
 router.delete('/profile/avatar', (req, res) => {
   removeUpload(req.user.avatar);
   req.user.avatar = null;
+  save();
+  res.json({ user: publicUser(req.user) });
+});
+
+// rosto em pixel art (mesmo estilo dos personagens da cidade)
+router.put('/profile/avatar-pixel', (req, res) => {
+  const t = String(req.body?.tile || '');
+  if (!/^p\d{3}$/.test(t) || !pixelTiles().some((x) => x.id === t)) return bad(res, 'Rosto inválido');
+  removeUpload(req.user.avatar);
+  req.user.avatar = `/assets/px/${t}.png`;
   save();
   res.json({ user: publicUser(req.user) });
 });

@@ -241,7 +241,7 @@ export function route(w, from, to) {
   for (let v = to; v !== -1; v = prev[v]) { path.push(g.nodes[v]); if (via[v]) { length += via[v].len; if (streets.at(-1) !== via[v].name) streets.push(via[v].name); } }
   path.reverse(); streets.reverse();
   const meters = Math.round(length * METERS_PER_UNIT);
-  return { path, meters, streets: streets.filter(Boolean).slice(0, 8), minutes: { pe: Math.max(1, Math.round(meters / 80)), onibus: Math.max(3, Math.round(meters / 330) + 6), taxi: Math.max(2, Math.round(meters / 500) + 2) } };
+  return { path, meters, streets: streets.filter(Boolean).slice(0, 8), minutes: { pe: Math.max(1, Math.round(meters / 80)), onibus: Math.max(3, Math.round(meters / 330) + 6), taxi: Math.max(2, Math.round(meters / 500) + 2), carro: Math.max(2, Math.round(meters / 520) + 1) } };
 }
 
 // ---------------------------------------------------------------- caminhos em massa (cidadãos andando)

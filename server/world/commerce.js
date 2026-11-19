@@ -418,6 +418,7 @@ export function travel(ctx, placeId, mode = 'pe') {
   if (!pl || (pl.hidden && !(u.discovered || []).includes(pl.id))) throw new BankError('Local não encontrado');
   const r = route(w, u.location?.node ?? 0, pl.node);
   const tr = TRANSPORT[mode] || TRANSPORT.pe;
+  if (tr.needs === 'vehicle' && !(u.inventory || []).some((x) => x.id === u.devices?.vehicle)) throw new BankError('Você não tem carro. Compre um na concessionária (Oficina Turbo) e defina como principal em Veículos.');
   const fee = r ? tr.fee(r.meters) : 0;
   if (fee > 0) {
     const b = bankOf(w);

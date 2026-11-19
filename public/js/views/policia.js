@@ -2,39 +2,63 @@
 import { shell, bindEntities, face, nx, evRow, api, esc, icon, toast, confirmDialog } from '../world/wui.js';
 import { formModal } from '../ui.js';
 import { caseCard } from '../world/cases.js';
+import { livePanel } from '../world/live.js';
+import { myAvatar } from '../chrome.js';
+
+const RANK = { delegado: ['Delegado', 'Delegada'], investigador: ['Investigador', 'Investigadora'], agente: ['Agente', 'Agente'], escrivao: ['Escrivão', 'Escrivã'], perito: ['Perito', 'Perita'] };
+const rk = (r, g) => (RANK[r] ? RANK[r][g === 'f' ? 1 : 0] : r ? r[0].toUpperCase() + r.slice(1) : 'Policial');
 
 export default async function render(el) {
   const body = shell(el, 'policia');
   bindEntities(body);
+  let stopLive = null;
   const load = async () => {
     const d = await api.get('/mundo/policia');
-    if (d.restricted) { renderRestricted(d); return; }
-    body.innerHTML = `<div class="pj">
-      <section class="w-panel pj-top"><div><h1>${icon('shield', 22)} Polícia de Nexus City</h1><p class="muted">${d.station ? `${esc(d.station.name)} · ${esc(d.station.address || '')}` : 'Delegacia'} · Investigações seguem provas: sem provas, o caso é arquivado.</p></div>
-        <button class="btn primary" id="pjRep">${icon('flag', 14)} Registrar ocorrência</button></section>
-      <div class="pj-stats">${[['Casos abertos', d.stats.open], ['Resolvidos (30 d)', d.stats.solved], ['Arquivados (30 d)', d.stats.archived], ['Prisões (30 d)', d.stats.arrests]].map(([l, v]) => `<div class="w-panel"><small>${l}</small><b>${v}</b></div>`).join('')}</div>
-      <div class="pj-cols"><div class="pj-main">
-          <h3>Seus casos</h3>${d.mine.map((c) => caseCard(c)).join('') || '<p class="muted">Nenhum caso envolvendo você.</p>'}
-          <h3>Ocorrências recentes na cidade</h3>${d.cases.filter((c) => c.suspect?.id !== 'me').slice(0, 12).map((c) => caseCard(c, { actions: false })).join('') || '<p class="muted">Nada registrado.</p>'}</div>
-        <aside class="pj-side"><section class="w-panel"><h5>Equipe</h5>${d.officers.map((o) => `<button class="gm-person" data-person="${esc(o.id)}">${face(o, 30)}<span>${esc(o.name)}<small>${esc({ delegado: 'Delegado(a)', investigador: 'Investigador(a)', patrulha: 'Policial de patrulha' }[o.rank] || o.rank)}</small></span></button>`).join('') || '<p class="muted">Sem policiais.</p>'}</section>
-          <section class="w-panel"><h5>Alertas</h5>${d.alerts.map((e) => evRow(e, { compact: true })).join('') || '<p class="muted">Cidade tranquila.</p>'}</section></aside></div></div>`;
+    const duty = (d.team || []).find((o) => o.onDuty) || (d.team || [])[0] || null;
+    const mineOpen = d.mine.filter((c) => !['arquivado', 'multa', 'condenado', 'preso', 'absolvido', 'encerrado'].includes(c.status));
+    body.innerHTML = `<div class="dp">
+      <section class="dp-hero cx-card">
+        <div class="nb-scene dp-scene"><img class="nb-bg" src="/assets/pixel/scene-bairro.png" alt=""><img class="nb-bld" src="/assets/pixel/b-predio.png" alt="">
+          <div class="nb-logo dp-logo"><b>POLICIA</b><small>NEXUS CITY</small></div>
+          <div class="nb-mgr">${duty ? `<img src="${esc(duty.avatar || '')}" alt="${esc(duty.name)}"><span class="nb-mgr-tag">${esc(duty.name)} · ${esc(rk(duty.rank, duty.gender))}</span>` : ''}</div>
+          <div class="nb-bubble" id="dpBubble"><b>Delegacia de Nexus City</b><p>${duty ? `${esc(duty.name.split(' ')[0])} está ${duty.onDuty ? 'de plantão' : 'no balcão'}. ` : ''}Registre ocorrências, acompanhe seus inquéritos e regularize multas e fianças.</p></div></div>
+        <div class="nb-acts">
+          <button class="nb-act" id="pjRep"><span style="--c:#fb923c">${icon('flag', 20)}</span>Registrar ocorrência</button>
+          <a class="nb-act" href="#dpMine"><span style="--c:#60a5fa">${icon('file', 20)}</span>Meus inquéritos${mineOpen.length ? `<em>${mineOpen.length}</em>` : ''}</a>
+          <a class="nb-act" href="#/banco/pendencias"><span style="--c:#f7c948">${icon('scale', 20)}</span>Pagar multa ou fiança${d.fines?.length ? `<em>${d.fines.length}</em>` : ''}</a>
+          <button class="nb-act" data-a="falar"><span style="--c:#38d6f5">${icon('chat', 20)}</span>Falar com policial</button>
+          <a class="nb-act" href="#/justica"><span style="--c:#c084fc">${icon('book', 20)}</span>Processos (Fórum)</a>
+          <a class="nb-act" href="#/acontecimentos"><span style="--c:#ff4d5e">${icon('lock', 20)}</span>Prisões e alertas</a>
+        </div>
+      </section>
+      <section class="nb-chat cx-card dp-chat"><div class="nb-msgs" id="dpMsgs"><div class="nb-m">${duty ? `<img src="${esc(duty.avatar || '')}" alt="">` : '<span></span>'}<p>Delegacia de Nexus City, boa ${new Date().getHours() < 12 ? 'manhã' : new Date().getHours() < 18 ? 'tarde' : 'noite'}. Em que posso ajudar?</p></div></div>
+        <form class="nb-send" id="dpSend"><input name="m" placeholder="Fale com a polícia..." autocomplete="off" maxlength="400"><button class="cx-btn" aria-label="Enviar">${icon('send', 16)}</button></form></section>
+      <aside class="nb-live cx-card" id="dpLive"></aside>
+      <section class="dp-stats">${[['Ocorrências em aberto', d.publicStats?.open ?? d.stats?.open ?? 0, 'flag', '#fb923c'], ['Prisões e apreensões (30 d)', d.publicStats?.arrests ?? d.stats?.arrests ?? 0, 'lock', '#ff4d5e'], ['Alertas de segurança (30 d)', d.publicStats?.alerts ?? 0, 'shield', '#60a5fa'], ['Policiais na cidade', (d.team || []).length, 'users', '#2fd27a']].map(([l, v, ic, c]) => `<div class="cx-card dp-stat"><span class="cx-h-ic" style="--c:${c}">${icon(ic, 16)}</span><div><b>${v}</b><small>${l}</small></div></div>`).join('')}</section>
+      <section class="cx-card dp-occ"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#ff4d5e">${icon('news', 15)}</span><h3>Ocorrências noticiadas</h3></header>${d.alerts.map((e) => evRow(e, { compact: true })).join('') || '<p class="cx-mut">Cidade tranquila nas últimas horas.</p>'}</section>
+      <section class="cx-card dp-mine" id="dpMine"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#60a5fa">${icon('file', 15)}</span><h3>Meus inquéritos</h3></header>${d.mine.map((c) => caseCard(c)).join('') || '<p class="cx-mut">Nenhum caso envolvendo você. Ótimo sinal.</p>'}</section>
+      <section class="cx-card dp-fines"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#f7c948">${icon('scale', 15)}</span><h3>Multas e fianças</h3><a class="cx-more-l" href="#/banco/pendencias">Pagar</a></header>
+        ${(d.fines || []).map((f) => `<div class="dp-fine ${f.status === 'atrasada' ? 'late' : ''}"><div><b>${esc(f.desc)}</b><small>${esc(f.creditor || '')} · vence ${new Date(f.due).toLocaleDateString('pt-BR')}</small></div><em>${nx(f.amount)}</em></div>`).join('') || '<p class="cx-mut">Nada em aberto no seu nome.</p>'}</section>
+      <section class="cx-card dp-team"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#2fd27a">${icon('shield', 15)}</span><h3>Policiais de IA</h3></header>
+        <div class="dp-officers">${(d.team || []).map((o) => `<button data-person="${esc(o.id)}"><img src="${esc(o.avatar || '')}" alt=""><b>${esc(o.name.split(' ')[0])}</b><small>${esc(rk(o.rank, o.gender))}</small>${o.onDuty ? '<i class="dp-duty">plantão</i>' : ''}</button>`).join('') || '<p class="cx-mut">A delegacia ainda está montando a equipe.</p>'}</div></section>
+      ${d.restricted ? `<section class="cx-card dp-auth">${icon('lock', 18)}<div><b>Painel interno restrito às autoridades</b><p class="cx-mut">${d.profession?.eligible ? `Você já tem o diploma (${esc((d.profession.needs || []).join(', '))}). Habilite-se pela ${esc(d.profession.via || 'carreira pública')}.` : `Para virar autoridade policial, forme-se em ${esc((d.profession?.needs || ['Direito']).join(' e '))}.`}</p></div><a class="cx-btn sm ghost" href="#/empresas/carreira">Carreira</a></section>`
+        : `<section class="cx-card dp-int"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#c084fc">${icon('eye', 15)}</span><h3>Painel interno · casos da cidade</h3></header>${d.cases.filter((c) => c.suspect?.id !== 'me').slice(0, 12).map((c) => caseCard(c, { actions: false })).join('') || '<p class="cx-mut">Nada registrado.</p>'}</section>`}
+    </div>`;
+    stopLive?.(); stopLive = livePanel(body.querySelector('#dpLive'), { scope: 'policia', title: 'Live da Delegacia', art: '/assets/pixel/scene-bairro.png', n: 10, empty: 'Ocorrências, prisões e alertas da cidade aparecem aqui.' });
     body.querySelector('#pjRep').onclick = () => reportForm(d);
-    bindCaseActions(body, load);
-  };
-  // visão de cidadão comum: a delegacia é sigilosa. Você só vê o que virou notícia e os seus próprios casos.
-  const renderRestricted = (d) => {
-    const pr = d.profession || {};
-    body.innerHTML = `<div class="pj">
-      <section class="w-panel pj-locked"><div class="pj-lock-ic">${icon('shield', 30)}</div>
-        <div><h1>Delegacia de Nexus City</h1><p class="muted">${d.station ? `${esc(d.station.name)} · ${esc(d.station.address || '')}` : ''}</p>
-        <p>O painel da polícia é <b>restrito às autoridades</b>. Os crimes — inclusive os cibernéticos — acontecem a todo momento e a polícia trabalha em sigilo. Como cidadão, você acompanha apenas o que é <b>noticiado</b> e os <b>seus próprios casos</b>.</p>
-        ${pr.eligible ? `<p class="pj-elig">${icon('check', 13)} Você tem o diploma necessário (${esc((pr.needs || []).join(', '))}). Habilite-se pela ${esc(pr.via || 'carreira pública')} em Carreira.</p><a class="btn primary" href="#/empresas/carreira">${icon('briefcase', 13)} Ir para Carreira</a>`
-          : `<p class="muted">Para virar autoridade policial, forme-se em <b>${esc((pr.needs || ['Direito']).join(' e '))}</b> na Universidade.</p><a class="btn outline" href="#/empresas/carreira">${icon('school', 13)} Ver cursos</a>`}</div>
-        <button class="btn outline pj-rep-sm" id="pjRep">${icon('flag', 13)} Registrar ocorrência</button></section>
-      <div class="pj-cols"><div class="pj-main">
-          <h3>Seus casos</h3>${d.mine.map((c) => caseCard(c)).join('') || '<p class="muted">Você não tem nenhum caso em aberto. Ótimo sinal.</p>'}</div>
-        <aside class="pj-side"><section class="w-panel"><h5>${icon('news', 12)} Segurança no noticiário</h5>${d.alerts.length ? d.alerts.map((e) => evRow(e, { compact: true })).join('') : '<p class="muted">Nada publicado nas últimas horas.</p>'}<a class="w-morelink" href="#/midia">Ver no portal da cidade →</a></section></aside></div></div>`;
-    body.querySelector('#pjRep').onclick = () => reportForm(d);
+    const msgs = body.querySelector('#dpMsgs'); const f = body.querySelector('#dpSend');
+    body.querySelector('[data-a="falar"]').onclick = () => f.m.focus();
+    f.onsubmit = async (e) => {
+      e.preventDefault(); const t = f.m.value.trim(); if (!t) return; f.m.value = '';
+      msgs.insertAdjacentHTML('beforeend', `<div class="nb-m me"><p>${esc(t)}</p><img src="${esc(myAvatar())}" alt=""></div><div class="nb-typing"><i></i><i></i><i></i></div>`); msgs.scrollTop = msgs.scrollHeight;
+      try {
+        const r = await api.post('/mundo/policia/atendimento', { mensagem: t });
+        msgs.querySelector('.nb-typing')?.remove();
+        msgs.insertAdjacentHTML('beforeend', `<div class="nb-m"><img src="${esc(r.officer?.avatar || '')}" alt=""><p>${esc(r.text)}</p></div>`);
+        body.querySelector('#dpBubble').innerHTML = `<b>${esc(r.officer?.name?.split(' ')[0] || 'Policial')}</b><p>${esc(r.text)}</p>`;
+      } catch (err) { msgs.querySelector('.nb-typing')?.remove(); toast('Não deu', err.message, 'error'); }
+      msgs.scrollTop = msgs.scrollHeight;
+    };
     bindCaseActions(body, load);
   };
   const reportForm = async (d) => {
@@ -47,6 +71,7 @@ export default async function render(el) {
       onSubmit: async (v) => { const c = await api.post('/mundo/policia/denuncia', v); toast('Ocorrência registrada', `Caso nº ${c.n} · ${c.statusLabel}`, 'success'); await load(); } });
   };
   try { await load(); } catch (err) { body.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b></div>`; }
+  return () => stopLive?.();
 }
 
 export function bindCaseActions(root, reload) {

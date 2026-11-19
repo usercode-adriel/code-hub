@@ -62,7 +62,7 @@ async function empresa(box, reload) {
   box.querySelectorAll('[data-fire]').forEach((b) => { b.onclick = () => act({ demitir: b.dataset.fire }); });
 }
 
-async function carreira(box, reload) {
+export async function carreira(box, reload) {
   const d = await api.get('/mundo/carreira');
   const j = d.job;
   box.innerHTML = `${j ? `<div class="w-panel e-job"><div class="w-ph"><div><small class="muted">Seu emprego</small><h2>${esc(j.role)} na <a class="w-link" data-company="${esc(j.company?.id)}">${esc(j.company?.name)}</a></h2><small class="muted">${nx(j.salary, 0)} por dia trabalhado · desde ${new Date(j.since).toLocaleDateString('pt-BR')} · ${j.days || 0} dia(s) de trabalho</small></div><button class="btn sm ghost" id="quit">Pedir demissão</button></div>
@@ -105,7 +105,7 @@ function apostila(st) {
       <p>${esc(l.text)}</p>${l.read ? '' : `<button class="btn sm outline" data-lesson="${l.day}">${icon('check', 12)} Marcar como lida</button>`}</div>`).join('')}</div></div>`;
 }
 
-async function imoveis(box, reload) {
+export async function imoveis(box, reload) {
   const [list, eco] = await Promise.all([api.get('/mundo/imoveis'), api.get('/mundo/economia')]);
   let filter = 'todos';
   const paint = () => {
