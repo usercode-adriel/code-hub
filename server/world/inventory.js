@@ -14,7 +14,7 @@ import { pick, chance, clamp, uid, nowIso, DAY, round2, cap, str } from './util.
 
 export const tplOf = (key) => PRODUCTS[key];
 export const inv = (w) => account(w).inventory;
-const ICON = { tecnologia: 'cpu', social: 'star', geral: 'bag' };
+const ICON = { tecnologia: 'cpu', social: 'star', geral: 'bag', submundo: 'eye' };
 
 export function makeItem(ctx, { key, price, place, seller }) {
   const w = ctx.w;
@@ -35,7 +35,7 @@ export function publicItem(it) {
   if (['instalado', 'ativo'].includes(it.state)) actions = actions.filter((a) => !['instalar', 'ativar', 'usar'].includes(a));
   if (it.state === 'equipado') actions = actions.filter((a) => a !== 'equipar');
   const phone = PHONES[it.key] ? { tier: PHONES[it.key].tier, tierLabel: TIERS[PHONES[it.key].tier].label, camera: PHONES[it.key].camera, storage: PHONES[it.key].storage, apps: PHONES[it.key].apps.length } : null;
-  return { ...it, actions, phone, icon: ICON[tpl.cat] || 'bag', compatibility: tpl.target === 'campanha' ? 'Sua empresa ou seu perfil' : 'Uso pessoal' };
+  return { ...it, actions, phone, art: `/assets/items/${it.key}.png`, illegal: Boolean(tpl.illegal), icon: ICON[tpl.cat] || 'bag', compatibility: tpl.target === 'campanha' ? 'Sua empresa ou seu perfil' : 'Uso pessoal' };
 }
 
 export function itemAction(ctx, itemId, action, body = {}) {
@@ -57,6 +57,11 @@ export function itemAction(ctx, itemId, action, body = {}) {
     it.state = 'instalado'; log('Instalado no seu perfil.'); addXp(w, 10);
     return { ok: true, text: { 'central-comando': 'Central de Comando instalada: ela aparece no seu Command Center com seus projetos e tarefas.', 'mapa-inteligente': 'Mapa Inteligente ativo: agora o mapa mostra onde as pessoas estão e os imóveis.', memoria: `Seus amigos agora guardam até ${u.memCap} lembranças e recuperam memórias antigas.` }[it.key] };
   }
+  if (action === 'esconder') {
+    it.state = it.state === 'escondido' ? 'guardado' : 'escondido';
+    log(it.state === 'escondido' ? 'Escondido em casa.' : 'Tirado do esconderijo.');
+    return { ok: true, text: it.state === 'escondido' ? 'Escondido em casa: o risco numa abordagem cai bastante.' : 'O item voltou a andar com você.' };
+  }
   if (action === 'equipar') {
     if (!isPhone(it.key)) throw new BankError('Só celulares podem ser equipados');
     for (const x of inv(w)) if (x.state === 'equipado' && isPhone(x.key)) { x.state = 'guardado'; x.history.push({ at: ctx.at.toISOString(), text: 'Guardado (trocou de celular).' }); }
@@ -73,6 +78,7 @@ export function itemAction(ctx, itemId, action, body = {}) {
   }
   if (action === 'usar') {
     if (it.key === 'cafe') { drop(); addXp(w, 2); return { ok: true, text: 'Café tomado. Energia para mais um dia em Nexus City ☕' }; }
+    if (it.key === 'medkit') { drop(); addXp(w, 2); return { ok: true, text: 'Curativo feito. Você está bem.' }; }
     if (it.key === 'campanha') {
       if (body.alvo === 'empresa') {
         const c = companies(w).find((x) => x.founderId === 'me' && x.status !== 'falida');

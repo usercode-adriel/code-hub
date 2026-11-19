@@ -2,34 +2,17 @@
 // com estilo próprio, que negocia e lembra de você. Para comprar é preciso estar na loja (vá pelo mapa).
 import { shell, face, nx, bindEntities, api, esc, icon, toast, withPin, opId, timeAgo } from '../world/wui.js';
 import { formModal } from '../ui.js';
+import { livePanel } from '../world/live.js';
 
 const stars = (r) => { const n = Math.round(r || 0); return `<span class="mk-stars" aria-label="${(r || 0).toFixed(1)} de 5">${'★'.repeat(n)}${'☆'.repeat(5 - n)}</span>`; };
 const hrs = (h) => (h ? `${String(h[0]).padStart(2, '0')}h–${String(h[1] % 24).padStart(2, '0')}h` : '24 h');
 const CATIC = { tecnologia: 'cpu', social: 'star', geral: 'bag' };
 const CATCOL = { tecnologia: '#22d3ee', social: '#ec4899', geral: '#f59e0b' };
 
-// menu circular (roleta) de itens: tokens ao redor, item selecionado no centro com os botões de compra
-function wheelHtml(s, sel) {
-  const cat = s.catalog || [];
-  const it = cat[sel] || null;
-  const n = cat.length;
-  const tokens = cat.map((p, i) => {
-    const ang = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
-    const x = 50 + 40 * Math.cos(ang); const y = 50 + 40 * Math.sin(ang);
-    const col = CATCOL[p.cat] || '#a855f7';
-    return `<button class="mk-token ${i === sel ? 'on' : ''} ${p.stock ? '' : 'out'}" data-sel="${i}" style="left:${x}%;top:${y}%;--c:${col}" title="${esc(p.name)}">${icon(CATIC[p.cat] || 'bag', 20)}${p.promo ? '<i class="mk-token-promo">%</i>' : ''}</button>`;
-  }).join('');
-  const buyable = it && s.here && s.open && it.stock && !s.banned;
-  return `<div class="mk-wheel-head"><h3>${icon('bag', 16)} Vitrine</h3><small class="muted">Gire e escolha o item</small></div>
-    <div class="mk-wheel"><div class="mk-wheel-ring">${tokens}
-      <div class="mk-wheel-center">${it ? `<span class="mk-wc-ic" style="--c:${CATCOL[it.cat] || '#a855f7'}">${icon(CATIC[it.cat] || 'bag', 30)}</span>
-        <b class="mk-wc-nm">${esc(it.name)}</b>
-        <div class="mk-wc-price">${it.promo ? `<s>${nx(it.listPrice, 0)}</s>` : ''}<em>${nx(it.price, 0)}</em></div>
-        <small class="mk-wc-stock ${it.stock ? '' : 'down'}">${it.stock ? `${it.stock} em estoque` : 'Esgotado'}</small>` : '<b>Sem itens</b>'}</div></div></div>
-    ${it ? `<div class="mk-wc-desc"><p class="muted">${esc(it.desc || '')}</p>
-      <div class="mk-wc-acts"><button class="btn primary" data-buy="${esc(it.key)}" ${buyable ? '' : 'disabled'}>${icon('bag', 14)} Comprar</button><button class="btn outline" data-neg="${esc(it.key)}" ${s.open && it.stock ? '' : 'disabled'}>Negociar</button></div>
-      ${!s.here ? '<small class="muted mk-wc-hint">Vá até a loja pelo mapa para comprar.</small>' : !s.open ? '<small class="muted mk-wc-hint">A loja está fechada agora.</small>' : ''}</div>` : ''}`;
-}
+const art = (key) => `/assets/items/${key}.png`;
+const CATNAME = { tecnologia: 'Tecnologia', social: 'Social', geral: 'Geral', submundo: 'Submundo' };
+const STORE_ART = { 'loja-tec': 'b-loja', shopping: 'b-loja', mercado: 'b-loja', clandestino: 'b-casa', banco: 'b-banco', farmacia: 'b-hospital', clube: 'b-torre', publicidade: 'b-predio', 'loja-social': 'b-predio', cafe: 'b-loja', padaria: 'b-loja' };
+const storeArt = (kind) => `/assets/pixel/${STORE_ART[kind] || 'b-predio'}.png`;
 
 export default async function render(el, parts) {
   const body = shell(el, 'mercado');
@@ -40,19 +23,20 @@ export default async function render(el, parts) {
   try { d = await api.get('/mundo/lojas'); } catch (err) { body.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b></div>`; return; }
   const kinds = [...new Set(d.stores.map((s) => s.kind))];
   let filter = ''; let q = '';
-  body.innerHTML = `<div class="mk">
-    <header class="mk-head w-panel"><div><h1>${icon('bag', 22)} Mercado de Nexus City</h1><p class="muted">Lojas de verdade, com estoque, horário e vendedores que negociam. Para comprar, vá até a loja pelo mapa.</p></div>
-      <label class="gm-search mk-search">${icon('search', 15)}<input id="mkQ" placeholder="Buscar loja ou produto" aria-label="Buscar"></label></header>
-    <div class="gm-chips mk-chips"><button data-k="" class="on">Todas</button>${kinds.map((k) => `<button data-k="${esc(k)}" style="--c:${esc(d.cats[k]?.color || '#64748b')}">${icon(d.cats[k]?.icon || 'bag', 12)} ${esc(d.cats[k]?.label || k)}</button>`).join('')}</div>
-    <div class="mk-grid" id="mkGrid"></div></div>`;
+  body.innerHTML = `<div class="sh">
+    <header class="sh-head cx-card"><img src="/assets/pixel/scene-comercio.png" alt=""><div><h1>Lojas de Nexus City</h1><p>Estoque real, horário, preço e vendedores de IA que negociam e lembram de você. Para comprar, vá até a loja pelo mapa.</p></div>
+      <label class="cx-search sh-q">${icon('search', 15)}<input id="mkQ" placeholder="Buscar loja ou produto" aria-label="Buscar"></label></header>
+    <div class="sh-chips mk-chips"><button data-k="" class="on">Todas</button>${kinds.map((k) => `<button data-k="${esc(k)}" style="--c:${esc(d.cats[k]?.color || '#64748b')}">${icon(d.cats[k]?.icon || 'bag', 12)} ${esc(d.cats[k]?.label || k)}</button>`).join('')}</div>
+    <div class="sh-grid" id="mkGrid"></div></div>`;
   const grid = body.querySelector('#mkGrid');
   const paint = () => {
     const list = d.stores.filter((s) => (!filter || s.kind === filter) && (!q || `${s.name} ${s.kindLabel} ${s.sub || ''} ${(s.products || []).join(' ')}`.toLowerCase().includes(q)));
-    grid.innerHTML = list.map((s) => `<a class="mk-store w-panel ${s.open ? '' : 'closed'}" href="#/mercado/${esc(s.id)}" style="--c:${esc(d.cats[s.kind]?.color || '#64748b')}">
-      <div class="mk-st-top"><span class="mk-ic">${icon(d.cats[s.kind]?.icon || 'bag', 20)}</span><div><b>${esc(s.name)}</b><small>${esc(s.kindLabel || '')}${s.sub ? ` · ${esc(s.sub)}` : ''}</small></div>${d.here === s.id ? '<span class="w-chip ok">Você está aqui</span>' : ''}</div>
-      <div class="mk-st-meta">${stars(s.rating)} <small>(${s.reviews})</small><span class="${s.open ? 'up' : 'down'}">${s.open ? 'Aberta' : 'Fechada'} · ${hrs(s.hours)}</span></div>
-      <small class="muted">${icon('pin', 11)} ${esc(s.address || '')}</small>
-      <div class="mk-st-foot"><span>${s.inStock}/${s.items} produtos em estoque</span>${s.promo && s.promo.until > new Date().toISOString() ? `<span class="mk-promo">-${s.promo.pct}%</span>` : ''}</div></a>`).join('') || '<p class="muted">Nenhuma loja encontrada.</p>';
+    grid.innerHTML = list.map((s) => `<a class="sh-store ${s.open ? '' : 'closed'} ${s.hidden ? 'shady' : ''}" href="#/mercado/${esc(s.id)}" style="--c:${esc(d.cats[s.kind]?.color || '#64748b')}">
+      <div class="sh-st-art"><img src="${storeArt(s.kind)}" alt=""><span class="sh-st-open ${s.open ? 'up' : 'down'}">${s.open ? 'Aberta' : 'Fechada'} · ${hrs(s.hours)}</span>${s.promo && s.promo.until > new Date().toISOString() ? `<span class="sh-st-promo">-${s.promo.pct}%</span>` : ''}${d.here === s.id ? '<span class="sh-st-here">Você está aqui</span>' : ''}</div>
+      <div class="sh-st-b"><div class="sh-st-t">${s.seller ? `<img class="sh-st-sl" src="${esc(s.seller.avatar || '')}" alt="">` : ''}<div><b>${esc(s.name)}</b><small>${esc(s.kindLabel || '')}${s.sub ? ` · ${esc(s.sub)}` : ''}</small></div></div>
+        <div class="sh-st-items">${(s.keys || []).map((k) => `<img src="${art(k)}" alt="">`).join('')}</div>
+        <div class="sh-st-meta">${stars(s.rating)} <small>(${s.reviews})</small><span>${s.inStock}/${s.items} em estoque</span></div>
+        <small class="cx-mut">${icon('pin', 11)} ${esc(s.address || '')}</small></div></a>`).join('') || '<p class="cx-mut">Nenhuma loja encontrada.</p>';
   };
   body.querySelectorAll('.mk-chips button').forEach((b) => { b.onclick = () => { filter = b.dataset.k; body.querySelectorAll('.mk-chips button').forEach((x) => x.classList.toggle('on', x === b)); paint(); }; });
   body.querySelector('#mkQ').oninput = (e) => { q = e.target.value.trim().toLowerCase(); paint(); };
@@ -65,28 +49,47 @@ async function storePage(body, id) {
   let sel = 0;
   const load = async () => { s = await api.get(`/mundo/lojas/${encodeURIComponent(id)}`); if (sel >= s.catalog.length) sel = 0; paint(); };
   const chatLog = [];
+  let catF = ''; let stopLive = null;
   function paint() {
     const promoOn = s.promo && s.promo.until > new Date().toISOString();
-    body.innerHTML = `<div class="mk-page">
-      <a class="mk-back" href="#/mercado">${icon('chevRight', 13)} Voltar ao Mercado</a>
-      <header class="mk-hero w-panel"><div class="mk-hero-l"><h1>${esc(s.name)}</h1><small>${esc(s.kindLabel || '')}${s.sub ? ` · ${esc(s.sub)}` : ''}${s.company ? ` · <a data-company="${esc(s.company.id)}">${esc(s.company.name)}</a>` : ''}</small>
-          <div class="mk-st-meta">${stars(s.reputation)} <small>${(s.reputation || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} · ${s.ratings.length} avaliação(ões) recentes</small></div>
-          <div class="mk-hero-kv"><span>${icon('pin', 12)} ${esc(s.address || '')}</span><span>${icon('clock', 12)} ${hrs(s.hours)} · <b class="${s.open ? 'up' : 'down'}">${s.open ? 'Aberta' : 'Fechada'}</b></span>${s.owner ? `<span>${icon('user', 12)} Dono(a): <a data-person="${esc(s.owner.id)}">${esc(s.owner.name)}</a></span>` : ''}</div></div>
-        <div class="mk-hero-r">${s.here ? `<span class="w-chip ok">${icon('target', 11)} Você está na loja</span>` : `<a class="btn primary" href="#/mapa/${esc(s.id)}">${icon('pin', 14)} Ir até a loja</a><small class="muted">Você precisa estar aqui para comprar</small>`}
-          ${s.banned ? '<span class="w-chip warn">O vendedor se recusa a te atender</span>' : ''}</div></header>
-      ${promoOn ? `<div class="mk-banner">${icon('zap', 14)} Promoção: ${s.promo.pct}% de desconto em ${esc(s.catalog.find((c) => c.key === s.promo.key)?.name || 'um produto')} até ${new Date(s.promo.until).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</div>` : ''}
-      <div class="mk-cols">
-        <section class="mk-showcase w-panel">${wheelHtml(s, sel)}</section>
-        <aside class="mk-side">
-          ${s.seller ? `<section class="w-panel mk-seller"><div class="mk-sl-h"><span data-person="${esc(s.seller.id)}">${face(s.seller, 48)}</span><div><b>${esc(s.seller.name)}</b><small>Vendedor(a) · estilo ${esc(s.seller.styleLabel)}</small>${s.seller.customer?.purchases ? `<small>Você já comprou ${s.seller.customer.purchases}× aqui</small>` : ''}</div></div>
-            ${s.greeting ? `<p class="mk-bubble">“${esc(s.greeting)}”</p>` : ''}
-            ${s.pitch ? `<div class="mk-pitch"><p>“${esc(s.pitch.text)}”</p><button class="btn sm primary" data-pitch>Aceitar oferta · ${nx(s.pitch.offer.price, 0)}</button><small class="muted">Vale por 10 min</small></div>` : ''}
-            <div class="mk-chat" id="mkChat">${chatLog.map((m) => `<p class="${m.me ? 'me' : ''}">${esc(m.text)}</p>`).join('')}</div>
-            <form class="mk-chat-f" id="mkChatF"><input name="m" placeholder="Pergunte algo ao vendedor" maxlength="400" ${s.open ? '' : 'disabled'} aria-label="Mensagem"><button class="btn sm primary" ${s.open ? '' : 'disabled'}>${icon('send', 13)}</button></form></section>` : ''}
-          ${s.staff.length ? `<section class="w-panel"><h5>Equipe</h5><div class="gm-staff">${s.staff.map((p) => `<button data-person="${esc(p.id)}" title="${esc(p.name)}">${face(p, 30)}</button>`).join('')}</div></section>` : ''}
-          <section class="w-panel"><div class="w-ph"><h5>Avaliações</h5><button class="btn sm ghost" data-rate>${icon('star', 12)} Avaliar</button></div>${s.ratings.map((r) => `<div class="mk-rv">${stars(r.stars)} <b>${esc(r.by?.name || 'Cliente')}</b>${r.text ? `<p>${esc(r.text)}</p>` : ''}<small class="muted">${esc(timeAgo(r.at))}</small></div>`).join('') || '<p class="muted">Sem avaliações ainda.</p>'}</section>
-          ${s.history.length ? `<section class="w-panel"><h5>Histórico da loja</h5><ul class="gm-hist">${s.history.map((h) => `<li>${esc(h.title)}</li>`).join('')}</ul></section>` : ''}
+    const cats = [...new Set(s.catalog.map((it) => it.cat))];
+    const feat = (promoOn && s.catalog.find((c) => c.key === s.promo.key)) || (s.pitch && s.catalog.find((c) => c.key === s.pitch.offer.key)) || s.catalog.slice().sort((a, b) => b.price - a.price)[0];
+    const buyable = (it) => s.here && s.open && it.stock && !s.banned;
+    const card = (it) => `<article class="sp-card ${it.stock ? '' : 'out'}" style="--c:${CATCOL[it.cat] || '#a855f7'}">
+        <div class="sp-art"><img src="${art(it.key)}" alt="">${it.promo ? `<span class="sp-promo">-${it.promo}%</span>` : ''}<span class="sp-stock ${it.stock ? (it.stock <= 2 ? 'low' : '') : 'zero'}">${it.stock ? `${it.stock} em estoque` : 'Esgotado'}</span></div>
+        <b class="sp-nm">${esc(it.name)}</b><small class="sp-cat">${esc(CATNAME[it.cat] || it.cat || '')}</small>
+        <div class="sp-price">${it.promo ? `<s>${nx(it.listPrice, 0)}</s>` : ''}<em>${nx(it.price, 0)}</em></div>
+        <div class="sp-acts"><button class="cx-btn sm" data-buy="${esc(it.key)}" ${buyable(it) ? '' : 'disabled'}>${icon('cart', 13)} Comprar</button><button class="cx-btn sm ghost" data-neg="${esc(it.key)}" ${s.open && it.stock ? '' : 'disabled'}>Negociar</button></div>
+        <button class="sp-info" data-info="${esc(it.key)}" aria-label="Detalhes">${icon('eye', 13)}</button></article>`;
+    body.innerHTML = `<div class="sp ${s.kind === 'clandestino' ? 'shady' : ''}">
+      <a class="mk-back" href="#/mercado">${icon('chevLeft', 13)} Lojas</a>
+      <header class="sp-hero cx-card"><img class="sp-hero-art" src="${storeArt(s.kind)}" alt="">
+        <div class="sp-hero-tx"><h1>${esc(s.name)}</h1><small>${esc(s.kindLabel || '')}${s.sub ? ` · ${esc(s.sub)}` : ''}${s.company ? ` · <a data-company="${esc(s.company.id)}">${esc(s.company.name)}</a>` : ''}</small>
+          <div class="sp-kv">${stars(s.reputation)} <span>${(s.reputation || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} · ${s.ratings.length} avaliações</span><span>${icon('clock', 12)} ${hrs(s.hours)} · <b class="${s.open ? 'up' : 'down'}">${s.open ? 'Aberta' : 'Fechada'}</b></span><span>${icon('pin', 12)} ${esc(s.address || '')}</span>${s.owner ? `<span>Dono(a): <a data-person="${esc(s.owner.id)}">${esc(s.owner.name)}</a></span>` : ''}${s.cashOnly ? `<span class="down">${icon('wallet', 12)} Só dinheiro vivo</span>` : ''}</div></div>
+        <div class="sp-hero-r">${s.here ? `<span class="sp-here">${icon('target', 13)} Você está na loja</span>` : `<a class="cx-btn" href="#/mapa/${esc(s.id)}">${icon('pin', 14)} Ir até a loja</a><small class="cx-mut">Você precisa estar aqui para comprar</small>`}
+          ${s.banned ? '<span class="sp-ban">O vendedor se recusa a te atender</span>' : ''}</div></header>
+      ${feat ? `<section class="sp-feat cx-card" style="--c:${CATCOL[feat.cat] || '#a855f7'}"><img src="${art(feat.key)}" alt=""><div><small>${promoOn && feat.key === s.promo.key ? `PROMOÇÃO · ${s.promo.pct}% OFF até ${new Date(s.promo.until).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : s.pitch && feat.key === s.pitch.offer.key ? 'OFERTA DO VENDEDOR' : 'DESTAQUE DA LOJA'}</small><b>${esc(feat.name)}</b><p>${esc(feat.desc || '')}</p></div>
+        <div class="sp-feat-r"><em>${nx(s.pitch && feat.key === s.pitch.offer.key ? s.pitch.offer.price : feat.price, 0)}</em>${s.pitch && feat.key === s.pitch.offer.key ? `<button class="cx-btn" data-pitch ${s.here ? '' : 'disabled'}>Aceitar oferta</button>` : `<button class="cx-btn" data-buy="${esc(feat.key)}" ${buyable(feat) ? '' : 'disabled'}>${icon('cart', 14)} Comprar</button>`}</div></section>` : ''}
+      <div class="sp-cols">
+        <section class="sp-main">
+          <div class="sh-chips sp-cats"><button data-cf="" class="${catF ? '' : 'on'}">Tudo (${s.catalog.length})</button>${cats.map((c) => `<button data-cf="${esc(c)}" class="${catF === c ? 'on' : ''}">${esc(CATNAME[c] || c)}</button>`).join('')}</div>
+          <div class="sp-grid">${s.catalog.filter((it) => !catF || it.cat === catF).map(card).join('') || '<p class="cx-mut">Sem produtos.</p>'}</div>
+          <section class="cx-card sp-rev"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#facc15">${icon('star', 15)}</span><h3>Avaliações</h3><button class="cx-more-l" data-rate>${icon('star', 12)} Avaliar</button></header>
+            ${s.ratings.map((r) => `<div class="mk-rv">${stars(r.stars)} <b>${esc(r.by?.name || 'Cliente')}</b><p>${esc(r.text || '')}</p></div>`).join('') || '<p class="cx-mut">Ainda sem avaliações.</p>'}
+            ${s.history.length ? `<h5>Histórico da loja</h5><ul class="gm-hist">${s.history.map((h) => `<li>${esc(h.title)}</li>`).join('')}</ul>` : ''}</section>
+        </section>
+        <aside class="sp-side">
+          ${s.seller ? `<section class="cx-card sp-seller"><div class="sp-sl-h"><button class="sp-sl-av" data-person="${esc(s.seller.id)}"><img src="${esc(s.seller.avatar || '')}" alt=""></button><div><b>${esc(s.seller.name)}</b><small>Vendedor(a) · ${esc(s.seller.styleLabel || s.seller.style || '')}</small><small class="${s.open ? 'up' : 'down'}">● ${s.open ? 'atendendo' : 'fora do horário'}</small></div></div>
+            ${s.greeting ? `<p class="sp-bubble">${esc(s.greeting)}</p>` : ''}
+            ${s.pitch && !feat ? `<div class="mk-pitch"><p>${esc(s.pitch.text)}</p><button class="cx-btn sm" data-pitch>Aceitar · ${nx(s.pitch.offer.price, 0)}</button></div>` : s.pitch ? `<p class="sp-bubble alt">${esc(s.pitch.text)}</p>` : ''}
+            <div class="sp-chat" id="mkChat">${chatLog.map((m) => `<p class="${m.me ? 'me' : ''}">${esc(m.text)}</p>`).join('')}</div>
+            <form class="nb-send" id="mkChatF"><input name="m" placeholder="Fale com ${esc(s.seller.name.split(' ')[0])}..." maxlength="400" ${s.open ? '' : 'disabled'} aria-label="Mensagem"><button class="cx-btn" ${s.open ? '' : 'disabled'} aria-label="Enviar">${icon('send', 15)}</button></form></section>` : ''}
+          <section class="cx-card sp-live" id="spLive"></section>
+          ${s.staff.length ? `<section class="cx-card"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#38d6f5">${icon('users', 15)}</span><h3>Equipe</h3></header><div class="sp-staff">${s.staff.map((p) => `<button data-person="${esc(p.id)}" title="${esc(p.name)}"><img src="${esc(p.avatar || '')}" alt=""><small>${esc(p.name.split(' ')[0])}</small></button>`).join('')}</div></section>` : ''}
         </aside></div></div>`;
+    stopLive?.(); stopLive = livePanel(body.querySelector('#spLive'), { scope: `place:${s.id}`, title: 'Ao vivo na loja', art: null, n: 10, empty: 'Entradas, saídas, compras e devoluções da loja aparecem aqui.' });
+    body.querySelectorAll('[data-cf]').forEach((b) => { b.onclick = () => { catF = b.dataset.cf; paint(); }; });
+    body.querySelectorAll('[data-info]').forEach((b) => { b.onclick = () => { const it = s.catalog.find((x) => x.key === b.dataset.info); import('../ui.js').then(({ modal }) => modal({ title: it.name, body: `<div class="sp-modal"><img src="${art(it.key)}" alt=""><p>${esc(it.desc || '')}</p><p><b>${nx(it.price, 0)}</b> · ${it.stock} em estoque</p></div>` })); }; });
     bindActions();
   }
   const doBuy = async (key, offerId = null) => {
@@ -115,7 +118,6 @@ async function storePage(body, id) {
     });
   });
   function bindActions() {
-    body.querySelectorAll('[data-sel]').forEach((b) => { b.onclick = () => { sel = Number(b.dataset.sel); paint(); }; });
     body.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => doBuy(b.dataset.buy); });
     body.querySelector('[data-pitch]')?.addEventListener('click', () => doBuy(s.pitch.offer.key, s.pitch.offer.id));
     body.querySelectorAll('[data-neg]').forEach((b) => { b.onclick = () => {
@@ -146,4 +148,5 @@ async function storePage(body, id) {
       onSubmit: async (d) => { await api.post(`/mundo/lojas/${encodeURIComponent(s.id)}/avaliar`, { estrelas: Number(d.estrelas), texto: d.texto }); toast('Obrigado!', 'Sua avaliação conta para a reputação da loja.', 'success'); await load(); } }));
   }
   try { await load(); } catch (err) { body.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b><a class="btn outline" href="#/mercado">Voltar</a></div>`; }
+  return () => stopLive?.();
 }
