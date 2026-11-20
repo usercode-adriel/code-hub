@@ -22,6 +22,7 @@ import { driveState, park, infraction, damage, tow, incident } from './drive.js'
 import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
+import './injuries.js';
 import { protestsView } from './protests.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';

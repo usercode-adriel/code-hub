@@ -123,6 +123,14 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Natureza: grama escura, mata densa com clareiras, cerca de madeira em volta da cidade, lago com píer e barcos, montanhas, costa recortada com coqueiros
 - [x] Mesmos pontos de interesse, aeroporto, vagas, rotas e sistemas; faixas e calçadas verificadas (0 pontos fora da pista/calçada)
 
+### Ferimentos e saúde dos moradores (etapa 1 da expansão urbana)
+- [x] Estado de saúde persistente por morador (`server/world/injuries.js`): saudável, ferido, ferido grave, internado, em recuperação, morto
+- [x] Gravidade pela velocidade do veículo; morte é rara e nunca automática
+- [x] Internação para ferimentos moderados e graves, alta no dia seguinte e volta à rotina depois da recuperação
+- [x] Lista de pacientes no hospital (`/mundo/hospital`, campo `patients`)
+- [x] Atropelamentos (do jogador e do trânsito) enviam a velocidade; ferimentos viram evento e notícia
+- [ ] Ainda não feito nesta etapa: polícia e prisões, combate, diálogos entre NPCs, trânsito novo e persistência das cenas
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

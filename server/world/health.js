@@ -7,6 +7,7 @@ import { places, isOpen } from './commerce.js';
 import { companyById } from './economy.js';
 import { roleOf } from '../pixelfaces.js';
 import { pick, chance, clamp, round2, nowIso, str, cap } from './util.js';
+import { hospitalPatients } from './injuries.js';
 
 const KINDS = ['hospital', 'clinica', 'farmacia'];
 export const CHECKUP_PRICE = 180;
@@ -31,6 +32,7 @@ export function hospitalView(w) {
     doctors: doctors(w).slice(0, 12).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, gender: p.gender })),
     duty: doc ? { id: doc.id, name: doc.name, avatar: doc.avatar, job: doc.job, gender: doc.gender } : null,
     health: healthOf(w), lastCheckup: u.lastCheckup || null, price: CHECKUP_PRICE,
+    patients: hospitalPatients(w),
   };
 }
 

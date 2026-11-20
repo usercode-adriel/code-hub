@@ -63,7 +63,7 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
     const sc = { kind: 'atropelamento', phase: 'impacto', t: 0, car, victim, inc, x: victim.x, y: victim.y, ring: [], driver: null, active: true };
     inc.scene = sc; S.scenes.push(sc);
     if (!culprit) {
-      report({ tipo: 'atropelamento', personaId: victim.real ? victim.id : null, nome: victim.real ? victim.name : 'Pedestre', regiao: regionAt(victim), culpa: false, npc: true });
+      report({ tipo: 'atropelamento', personaId: victim.real ? victim.id : null, nome: victim.real ? victim.name : 'Pedestre', regiao: regionAt(victim), culpa: false, npc: true, kmh: Math.round((car?.v || 0) * 0.72) });
       if (inView(victim, view, 1.4)) notify('🚑 Atropelamento', `${victim.real ? victim.name : 'Um pedestre'} foi atropelado(a) em ${regionAt(victim)}. A ambulância está a caminho.`, 'warning');
     }
     return sc;

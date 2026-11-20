@@ -306,7 +306,7 @@ export default async function render(el, params = new URLSearchParams()) {
       c.v *= 0.6;
       const inc = ACC.pedScene(p, null, viewNow(), { culprit: true }); // vítima no chão, roda de curiosos, ambulância e polícia
       toast('Atropelamento!', `${p.real ? p.name : 'Um pedestre'} ficou ferido(a). A ambulância e a polícia estão a caminho.`, 'error');
-      report({ tipo: 'atropelamento', personaId: p.real ? p.id : null, nome: p.real ? p.name : 'Pedestre', culpa: true, veiculo: c.name });
+      report({ tipo: 'atropelamento', personaId: p.real ? p.id : null, nome: p.real ? p.name : 'Pedestre', culpa: true, veiculo: c.name, kmh: Math.round(toKmh(c.v)) });
       fine('atropelamento'); void inc;
     }
   }

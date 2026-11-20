@@ -9,6 +9,7 @@ import { peopleView } from './living.js';
 import { remember, genderize } from '../social.js';
 import { round2, nowIso, cap } from './util.js';
 import { reformaPublic } from './construtora.js';
+import { injure, treat } from './injuries.js';
 import { photo } from './flights.js';
 import { worldPost } from '../social.js';
 import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
@@ -34,7 +35,7 @@ export function driveState(w) {
   for (const id of Object.keys(u.devices.parked)) if (!all.some((c) => c.id === id)) delete u.devices.parked[id];
   const cars = all.map((c) => { const pk = u.devices.parked[c.id]; return { ...c, parked: pk && pk.map === MAP.v ? pk : null }; });
   const out = new Set(peopleView(w, { limit: 9999, horizon: 0 }).filter((p) => p.place !== 'em casa' && p.doing !== 'dormindo').map((p) => p.id));
-  const people = residents(w).filter((p) => p.agent?.status === 'ativo' && !(p.agent.injuredUntil && p.agent.injuredUntil > nowIso()))
+  const people = residents(w).filter((p) => p.agent?.status === 'ativo' && !(p.agent.injuredUntil && p.agent.injuredUntil > nowIso()) && !(p.agent.health && ['ferido', 'ferido_grave', 'internado', 'em_recuperacao', 'morto'].includes(p.agent.health.state)))
     .sort((a, b) => out.has(b.id) - out.has(a.id)).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, gender: p.gender === 'm' ? 'm' : p.gender === 'f' ? 'f' : null, out: out.has(p.id) }));
   const today = nowIso().slice(0, 10);
   return { map: MAP, reforma: reformaPublic(w), cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance };
@@ -105,7 +106,7 @@ const TITLES = {
   'perseguicao-presa': () => 'Polícia encerra perseguição e aborda motorista',
   'perseguicao-fuga': () => 'Motorista despista a polícia após perseguição',
 };
-export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc, nomes }) {
+export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc, nomes, kmh }) {
   const w = ctx.w; const u = account(w);
   if (!TITLES[tipo]) throw new BankError('Ocorrência desconhecida');
   u.mapIncidents ??= []; const today = nowIso().slice(0, 10);
@@ -114,9 +115,10 @@ export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, n
   const p = personId(w, personaId);
   const reg = String(regiao || '').slice(0, 40);
   if ((tipo === 'atropelamento' || tipo === 'acidente') && p) {
-    p.agent.injuredUntil = new Date(Date.now() + 2 * 3600000).toISOString();
-    p.mood = { emotion: 'assustada', intensity: 0.8, reason: 'foi atropelada(o) e está no hospital' };
-    try { remember(p, genderize(p, tipo === 'acidente' ? `Sofri uma batida de carro${reg ? ` em ${reg}` : ''}. Fui levada(o) ao Hospital Nexus.` : `Fui atropelada(o)${reg ? ` em ${reg}` : ''}${culpa ? ' por um carro dirigido por quem eu conheço da cidade' : ''}. Fui levada(o) ao Hospital Nexus.`)); } catch { /* sem memória */ }
+    // gravidade pela velocidade do veículo (informada pelo mapa); ferimentos persistentes em agent.health
+    const r = injure(ctx, p, { kmh: Number(kmh) || 30, causa: tipo === 'acidente' ? 'acidente' : 'atropelamento', local: reg });
+    if (r?.state === 'morto') p.agent.injuredUntil = null;
+    else if (r) { treat(ctx, p); }
     if (culpa) bumpUser(ctx, p, -12, { trust: -10, note: 'Me atropelou.' });
   }
   const imp = tipo === 'queda-aviao' ? 4 : tipo === 'atropelamento' ? 3 : 2;
