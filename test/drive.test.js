@@ -77,12 +77,12 @@ test('Construtora e Reforma: catálogo livre, reforma salva e a cidade muda (con
   const floor = [{ k: 'piso/rua', x: 2048, y: -96 }, { k: 'x/rua-reta', x: 2080, y: -96, r: 1.57 }];
   assert.throws(() => C.saveReforma(T.w, { floor: [{ k: 'piso/rua', x: 5, y: 7 }] }), /grade/);
   assert.throws(() => C.saveReforma(T.w, { add: [{ id: 'z', k: 'bld/house', x: 99999, y: 0 }] }), /fora do mapa/);
-  const s = C.saveReforma(T.w, { add, floor, del: ['house@768,196'] });
+  const s = C.saveReforma(T.w, { add, floor, del: ['house@648,1604'] });
   assert.deepEqual(s.saved, { add: 3, floor: 2, del: 1 });
   const st = D.driveState(T.w);
   assert.equal(st.reforma.shape, 'continente');
   const base = generateCity(); const city = generateCity(undefined, { reforma: st.reforma });
-  assert.ok(base.blds.some((b) => b.spr === 'house' && b.x === 768 && b.y === 196) && !city.blds.some((b) => b.spr === 'house' && b.x === 768 && b.y === 196), 'demolição vale');
+  assert.ok(base.blds.some((b) => b.spr === 'house' && b.x === 648 && b.y === 1604) && !city.blds.some((b) => b.spr === 'house' && b.x === 648 && b.y === 1604), 'demolição vale');
   assert.equal(city.blds.filter((b) => b.user).length, 2);
   assert.ok(city.props.some((p) => p.user === 'a3' && p.w > 400), 'relevo em escala 3×');
   const at = (x, y) => city.mask[Math.floor((y + city.oy) / city.CS) * city.mw + Math.floor((x + city.ox) / city.CS)];
@@ -92,7 +92,7 @@ test('Construtora e Reforma: catálogo livre, reforma salva e a cidade muda (con
   assert.equal(at(4500, -3500), 5, 'lago no interior do continente');
   assert.equal(at(6000, -1500), 6, 'terra firme no continente');
   assert.equal(at(-1000, 1000), 6, 'ilha-barreira a oeste');
-  assert.equal(at(-500, 1000), 5, 'mar entre a orla e a ilha');
+  assert.equal(at(-700, 1000), 5, 'mar entre a costa e a ilha');
 });
 
 test('aviação: aeronaves novas no hangar e física de decolagem, helicóptero, dano e queda', async () => {

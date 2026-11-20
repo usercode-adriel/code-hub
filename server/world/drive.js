@@ -13,7 +13,7 @@ import { photo } from './flights.js';
 import { worldPost } from '../social.js';
 import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
 
-export const MAP = { v: 'v3', w: 4096, h: 2816 };
+export const MAP = { v: 'v4', w: 4096, h: 2816 }; // v4: cidade refeita (vagas salvas no traçado antigo são descartadas)
 export const FINES = {
   sinal: { label: 'Avanço de sinal vermelho', amount: 293 },
   velocidade: { label: 'Excesso de velocidade', amount: 130 },

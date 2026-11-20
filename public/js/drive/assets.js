@@ -33,9 +33,9 @@ export function loadAssets() {
 export function extrasOf(city) {
   const out = [];
   const take = (s) => { if (s && s.startsWith('x:')) out.push(s.slice(2)); };
-  for (const b of city.blds) if (b.user) take(b.spr);
-  for (const p of city.props) if (p.user) take(p.spr);
-  for (const d of city.decals || []) if (d.user) take(d.spr);
+  for (const b of city.blds) take(b.spr);
+  for (const p of city.props) take(p.spr);
+  for (const d of city.decals || []) take(d.spr);
   for (const g of city.ground) if (g.u) take(g.tex);
   return out;
 }

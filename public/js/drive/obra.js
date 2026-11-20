@@ -89,7 +89,7 @@ export const FLOORS = {
   calcada: { name: 'Calçada', mat: 'walk', price: 15, color: '#bdb8ad' },
   praca: { name: 'Piso de praça', mat: 'plaza', price: 18, color: '#cdbd9c' },
   estacionamento: { name: 'Estacionamento', mat: 'lot', price: 22, color: '#565962' },
-  grama: { name: 'Grama', mat: 'grass', price: 6, color: '#4f9a3a' },
+  grama: { name: 'Grama', mat: 'grass', price: 6, color: '#2f5d27' },
   areia: { name: 'Areia', mat: 'sand', price: 8, color: '#e8cf8a' },
   agua: { name: 'Água (lago)', mat: 'pond', price: 25, color: '#2f6fd0' },
 };

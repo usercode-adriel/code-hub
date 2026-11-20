@@ -19,14 +19,16 @@ function texture(size, base, dots, seed, extra) {
 }
 function makeTextures() {
   const T = {
-    grass: texture(32, '#4f9a3a', [['#5fae44', 120], ['#447f33', 90], ['#69b84c', 30], ['#3d7330', 20]], 1),
-    park: texture(32, '#56a640', [['#66b84a', 110], ['#488f36', 80], ['#78c85a', 20]], 2),
+    grass: texture(32, '#2f5d27', [['#386b2e', 120], ['#275021', 90], ['#40763a', 30], ['#21461c', 24]], 1),
+    park: texture(32, '#33662a', [['#3d7633', 110], ['#2b5824', 80], ['#488340', 20], ['#234a1e', 20]], 2),
     sand: texture(32, '#e8cf8a', [['#f2dca0', 90], ['#d8bb76', 80], ['#c9aa68', 15]], 3),
     water: texture(32, '#2f6fd0', [['#3a80e0', 80], ['#2a62bd', 60]], 4, (x, r) => { x.fillStyle = '#7fb4f2'; for (let i = 0; i < 6; i++) { const px = Math.floor(r() * 28); const py = Math.floor(r() * 32); x.fillRect(px, py, 4, 1); } }),
     road: texture(32, '#4a4d57', [['#555862', 140], ['#41444c', 120], ['#5d606a', 25]], 5),
     lot: texture(32, '#565962', [['#61646d', 120], ['#4d5058', 100]], 6),
     runway: texture(32, '#3c3f47', [['#464951', 120], ['#35383f', 100]], 7),
     walk: texture(16, '#bdb8ad', [['#c9c4b9', 30], ['#aea99e', 30]], 8, (x) => { x.fillStyle = '#a39e93'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 0, 1, 16); x.fillRect(0, 8, 16, 1); x.fillRect(8, 0, 1, 8); x.fillRect(4, 8, 1, 8); x.fillRect(12, 8, 1, 8); }),
+    // calçamento de pedra dos quarteirões (fiadas desencontradas)
+    pave: texture(16, '#8b867c', [['#958f84', 34], ['#7f7a71', 34], ['#9a948a', 10]], 11, (x) => { x.fillStyle = '#726d65'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 8, 16, 1); x.fillRect(0, 0, 1, 8); x.fillRect(8, 8, 1, 8); }),
     plaza: texture(12, '#cdbd9c', [['#d8c9a8', 14], ['#bfae8c', 14]], 9, (x) => { x.fillStyle = '#b3a283'; x.fillRect(0, 0, 12, 1); x.fillRect(0, 0, 1, 6); x.fillRect(6, 6, 1, 6); x.fillRect(0, 6, 12, 1); }),
   };
   return T;
@@ -81,26 +83,54 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
   // sprites das folhas extras ('x:chave') e do pacote de decoração ('d:chave')
   const sprImg = (spr, base) => (spr.startsWith('x:') ? img(`extra/${spr.slice(2)}`) : spr.startsWith('d:') ? img(`deco/${spr.slice(2)}`) : img(`${base}/${spr}`));
-  const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'pond', 'lot', 'front', 'walk', 'access', 'road', 'cross', 'runway'];
+  const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'front', 'walk', 'base', 'curb', 'pave', 'lot', 'bed', 'pond', 'access', 'road', 'cross', 'runway'];
 
+  const polyPath = (x, g) => { x.beginPath(); g.pts.forEach(([px, py], k) => (k ? x.lineTo(px, py) : x.moveTo(px, py))); x.closePath(); };
   function fillShape(x, g, style) {
     x.fillStyle = style;
+    if (g.shape === 'poly') { polyPath(x, g); x.fill(); return; }
     if (g.shape === 'ellipse') { x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(g.x, g.y, g.w, g.h);
   }
+  // elementos desenhados no chão: chafariz, ninfeia, píer de madeira e heliponto
+  function drawFeature(x, d) {
+    const cx = d.x + d.w / 2; const cy = d.y + d.h / 2; const r = d.w / 2;
+    if (d.spr === '@fonte') {
+      x.fillStyle = 'rgba(20,20,30,.25)'; x.beginPath(); x.ellipse(cx + 2, cy + 3, r, r * 0.9, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#9b958a'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#6f6a61'; x.lineWidth = 1.5; x.stroke();
+      x.fillStyle = '#c9c3b6'; x.beginPath(); x.arc(cx, cy, r - 3, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#3b8ad8'; x.beginPath(); x.arc(cx, cy, r - 6, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#6fb8f0'; for (let k = 0; k < 6; k++) { const a = k * 1.05; x.fillRect(cx + Math.cos(a) * (r - 11) - 2, cy + Math.sin(a) * (r - 11), 4, 1); }
+      x.fillStyle = '#b5ae9f'; x.beginPath(); x.arc(cx, cy, r * 0.32, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#7d776c'; x.lineWidth = 1; x.stroke();
+      x.fillStyle = '#9fd8ff'; x.beginPath(); x.arc(cx, cy - 1, r * 0.2, 0, Math.PI * 2); x.fill(); x.fillStyle = '#ffffff'; x.beginPath(); x.arc(cx - 1, cy - 2, r * 0.08 + 0.6, 0, Math.PI * 2); x.fill();
+      return;
+    }
+    if (d.spr === '@ninfeia') { x.fillStyle = '#3f8f3a'; x.beginPath(); x.ellipse(cx, cy, d.w / 2, d.h / 2, 0, 0.35, Math.PI * 2); x.lineTo(cx, cy); x.fill(); x.fillStyle = '#5fb04a'; x.beginPath(); x.ellipse(cx - 1, cy - 1, d.w / 4, d.h / 4, 0, 0, Math.PI * 2); x.fill(); if (d.w > 14) { x.fillStyle = '#f2a6c8'; x.fillRect(cx + 2, cy - 2, 3, 3); } return; }
+    if (d.spr === '@pier') { x.fillStyle = 'rgba(10,30,60,.3)'; x.fillRect(d.x + 2, d.y + 3, d.w, d.h); x.fillStyle = '#8a5a34'; x.fillRect(d.x, d.y, d.w, d.h); x.fillStyle = '#a8743f'; for (let k = d.y + 1; k < d.y + d.h; k += 5) x.fillRect(d.x + 1, k, d.w - 2, 3); x.fillStyle = '#5a3a20'; for (const px of [d.x, d.x + d.w - 3]) for (let k = d.y + 2; k < d.y + d.h; k += 14) x.fillRect(px, k, 3, 3); return; }
+    if (d.spr === '@heli') { x.fillStyle = '#4a4d57'; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#f2c94c'; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, r - 4, 0, Math.PI * 2); x.stroke(); x.fillStyle = '#f0f0ea'; x.fillRect(cx - 9, cy - 11, 4, 22); x.fillRect(cx + 5, cy - 11, 4, 22); x.fillRect(cx - 5, cy - 2, 10, 4); }
+  }
+  function drawCourt(x, g) { x.fillStyle = '#3f8f5a'; x.fillRect(g.x + 10, g.y + 10, g.w - 20, g.h - 20); x.strokeStyle = '#f0f0f0'; x.lineWidth = 1; x.strokeRect(g.x + 14, g.y + 14, g.w - 28, g.h - 28); x.beginPath(); x.moveTo(g.x + g.w / 2, g.y + 14); x.lineTo(g.x + g.w / 2, g.y + g.h - 14); x.stroke(); }
   function drawGround(x, list) {
     const sorted = list.slice().sort((a, b) => (a.u || 0) - (b.u || 0) || MAT_ORDER.indexOf(a.mat) - MAT_ORDER.indexOf(b.mat) || a.i - b.i);
     for (const g of sorted) {
       if (g.island) { fillShape(x, g, pat.park); x.fillStyle = '#e8e4da'; x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.lineWidth = 2; x.strokeStyle = '#e8e4da'; x.stroke(); continue; }
       if (g.pool) { x.fillStyle = '#e8eef2'; x.fillRect(g.x - 2, g.y - 2, g.w + 4, g.h + 4); fillShape(x, g, '#4cb4f0'); x.fillStyle = '#8fd4ff'; x.fillRect(g.x + 2, g.y + 2, g.w - 8, 1); continue; }
+      // distritos: asfalto; quarteirões: calçada com meio-fio, calçamento de pedra e canteiros com borda
+      if (g.mat === 'base') { fillShape(x, g, pat.road); continue; }
+      if (g.mat === 'curb') { fillShape(x, g, pat.walk); polyPath(x, g); x.strokeStyle = '#5f5b54'; x.lineWidth = 2; x.stroke(); x.strokeStyle = 'rgba(255,255,255,.22)'; x.lineWidth = 0.8; x.stroke(); continue; }
+      if (g.mat === 'pave') { fillShape(x, g, pat.pave); if (g.shape === 'poly') { polyPath(x, g); x.strokeStyle = 'rgba(60,55,48,.55)'; x.lineWidth = 1; x.stroke(); } if (g.court) drawCourt(x, g); continue; }
+      if (g.mat === 'bed') { fillShape(x, g, pat.park); if (g.shape === 'poly') { polyPath(x, g); x.strokeStyle = '#2a4a1f'; x.lineWidth = 3; x.stroke(); x.strokeStyle = '#8a7a5c'; x.lineWidth = 1; x.stroke(); } continue; }
+      if (g.mat === 'cross' && g.shape === 'poly') { fillShape(x, g, pat.road); continue; }
       if (g.tex) { const im = sprImg(g.tex); if (im) { if (g.rot) { x.save(); x.translate(g.x + g.w / 2, g.y + g.h / 2); x.rotate(g.rot); x.drawImage(im, -g.w / 2, -g.h / 2, g.w, g.h); x.restore(); } else x.drawImage(im, g.x, g.y, g.w, g.h); continue; } }
       if (g.mat === 'access') { x.fillStyle = pat.road; x.fillRect(g.x, g.y, g.w, g.h); x.fillStyle = '#8f8a80'; x.fillRect(g.x, g.y, g.w, 1); x.fillRect(g.x, g.y + g.h - 1, g.w, 1); x.fillStyle = 'rgba(236,235,230,.7)'; for (let k = g.x + 6; k < g.x + g.w - 6; k += 12) x.fillRect(k, g.y + g.h / 2 - 0.5, 6, 1); continue; }
       if (g.mat === 'front') { if (frontImg) { for (let k = g.x; k < g.x + g.w; k += 16) { const w = Math.min(16, g.x + g.w - k); x.drawImage(frontImg, 0, 0, w, 11, k, g.y, w, g.h); } } else fillShape(x, g, pat.walk); continue; }
       const style = g.mat === 'grass' ? (g.park ? pat.park : pat.grass) : g.mat === 'cross' ? pat.road : g.mat === 'pond' ? pat.water : pat[g.mat] || pat.grass;
       fillShape(x, g, style);
+      if (g.mat === 'pond' && g.shape === 'poly') { polyPath(x, g); x.strokeStyle = 'rgba(160,215,250,.55)'; x.lineWidth = 6; x.stroke(); x.strokeStyle = '#d8c48a'; x.lineWidth = 3; x.stroke(); }
       if (g.mat === 'pond' && g.shape === 'ellipse') { x.strokeStyle = '#e8cf8a'; x.lineWidth = 3; x.beginPath(); x.ellipse(g.x + g.w / 2, g.y + g.h / 2, g.w / 2, g.h / 2, 0, 0, Math.PI * 2); x.stroke(); }
       if (g.mat === 'lot' && g.stalls) { x.fillStyle = '#e8e4da'; for (let k = g.x + 12; k < g.x + g.w - 8; k += 22) { x.fillRect(k, g.y + 20, 1, 30); x.fillRect(k, g.y + g.h - 50, 1, 30); } }
       if (g.mat === 'lot' && g.industrial) { x.fillStyle = 'rgba(247,201,72,.5)'; for (let k = g.x; k < g.x + g.w; k += 40) x.fillRect(k, g.y + g.h - 4, 20, 2); }
-      if (g.mat === 'plaza' && g.court) { x.fillStyle = '#3f8f5a'; x.fillRect(g.x + 10, g.y + 10, g.w - 20, g.h - 20); x.strokeStyle = '#f0f0f0'; x.lineWidth = 1; x.strokeRect(g.x + 14, g.y + 14, g.w - 28, g.h - 28); x.beginPath(); x.moveTo(g.x + g.w / 2, g.y + 14); x.lineTo(g.x + g.w / 2, g.y + g.h - 14); x.stroke(); }
+      if (g.court) drawCourt(x, g);
       if (g.mat === 'cross') { x.fillStyle = '#ecebe6'; if (g.dir === 'v') for (let k = g.y + 2; k < g.y + g.h - 1; k += 5) x.fillRect(g.x, k, g.w, 3); else for (let k = g.x + 2; k < g.x + g.w - 1; k += 5) x.fillRect(k, g.y, 3, g.h); }
       if (g.mat === 'runway') runwayMarks(x, g);
     }
@@ -117,35 +147,55 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     else if (g.kind === 'apron') { x.fillStyle = '#f2c94c'; for (const [sx, sy] of city.planeSpots) { x.fillRect(sx - 30, sy + 26, 60, 1); x.fillRect(sx - 0.5, sy - 30, 1, 56); } }
   }
   // marcações das ruas e acabamento dos cruzamentos
+  // marcações das faixas ao longo de qualquer traçado (retas, diagonais e curvas), cortadas antes dos cruzamentos
+  const offPts = (pts, o) => pts.map((p, i) => { const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [p[0] - ((b[1] - a[1]) / l) * o, p[1] + ((b[0] - a[0]) / l) * o]; });
+  const trimPts = (pts, a, b) => {
+    const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const L = cum.at(-1); if (L - a - b < 8) return null;
+    const pt = (s) => { let i = 1; while (i < cum.length - 1 && cum[i] < s) i++; const t = (s - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t]; };
+    const out = [pt(a)]; for (let i = 1; i < pts.length - 1; i++) if (cum[i] > a && cum[i] < L - b) out.push(pts[i]); out.push(pt(L - b)); return { pts: out, len: L - a - b, pt: (s) => pt(a + s), raw: pts, a };
+  };
+  const MARKS = (city.lines || []).map((L) => { const t = trimPts(L.pts, L.ca, L.cb); if (!t) return null; const bb = [Infinity, Infinity, -Infinity, -Infinity]; for (const [px, py] of L.pts) { bb[0] = Math.min(bb[0], px); bb[1] = Math.min(bb[1], py); bb[2] = Math.max(bb[2], px); bb[3] = Math.max(bb[3], py); } return { ...L, t, bb }; }).filter(Boolean);
+  const strokePts = (x, pts) => { x.beginPath(); pts.forEach(([px, py], k) => (k ? x.lineTo(px, py) : x.moveTo(px, py))); x.stroke(); };
   function roadMarks(x, rect) {
     const [rx0, ry0, rx1, ry1] = rect;
-    for (const s of city.segs) {
-      const hw = s.w / 2;
-      if (s.v) { if (s.x + hw + 20 < rx0 || s.x - hw - 20 > rx1) continue; } else if (s.y + hw + 20 < ry0 || s.y - hw - 20 > ry1) continue;
-      // meio-fio
-      x.fillStyle = '#8f8a80';
-      if (s.v) { x.fillRect(s.x - hw - 1, s.y0, 1, s.y1 - s.y0); x.fillRect(s.x + hw, s.y0, 1, s.y1 - s.y0); } else { x.fillRect(s.x0, s.y - hw - 1, s.x1 - s.x0, 1); x.fillRect(s.x0, s.y + hw, s.x1 - s.x0, 1); }
-      // faixas: avenida = dupla amarela contínua; rua = amarela tracejada; bordas brancas
-      x.fillStyle = '#f2c94c';
-      if (s.w >= 48) { if (s.v) { x.fillRect(s.x - 2, s.y0, 1, s.y1 - s.y0); x.fillRect(s.x + 1, s.y0, 1, s.y1 - s.y0); } else { x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 1); x.fillRect(s.x0, s.y + 1, s.x1 - s.x0, 1); } }
-      else if (s.v) for (let k = s.y0; k < s.y1; k += 14) x.fillRect(s.x - 0.5, k, 1, 7); else for (let k = s.x0; k < s.x1; k += 14) x.fillRect(k, s.y - 0.5, 7, 1);
-      x.fillStyle = 'rgba(236,235,230,.75)';
-      if (s.v) { x.fillRect(s.x - hw + 2, s.y0, 1, s.y1 - s.y0); x.fillRect(s.x + hw - 3, s.y0, 1, s.y1 - s.y0); } else { x.fillRect(s.x0, s.y - hw + 2, s.x1 - s.x0, 1); x.fillRect(s.x0, s.y + hw - 3, s.x1 - s.x0, 1); }
+    x.save(); x.lineCap = 'butt';
+    for (const M of MARKS) {
+      if (M.bb[2] + 40 < rx0 || M.bb[0] - 40 > rx1 || M.bb[3] + 40 < ry0 || M.bb[1] - 40 > ry1) continue;
+      const hw = M.w / 2; const P = M.t.pts;
+      // bordas brancas (vias largas) e eixo: avenida = dupla amarela contínua; anel/diagonal = amarela tracejada longa; rua = tracejada
+      x.strokeStyle = 'rgba(236,235,230,.72)'; x.lineWidth = 1; x.setLineDash([]);
+      if (M.w >= 40) { strokePts(x, offPts(P, hw - 3)); strokePts(x, offPts(P, -(hw - 3))); }
+      x.strokeStyle = '#f2c94c';
+      if (M.w >= 48) { strokePts(x, offPts(P, 1.6)); strokePts(x, offPts(P, -1.6)); }
+      else { x.setLineDash(M.w >= 40 ? [12, 8] : [7, 7]); strokePts(x, P); x.setLineDash([]); }
+      // setas no asfalto antes dos cruzamentos (uma por sentido)
+      if (M.t.len > 120 && !M.ext) {
+        for (const dir of [1, -1]) {
+          const s = dir > 0 ? M.t.len - 30 : 30; const p = M.t.pt(s); const q = M.t.pt(s - dir * 4); const ang = Math.atan2(p[1] - q[1], p[0] - q[0]);
+          const o = M.w * 0.24; const ax = p[0] - Math.sin(ang) * o; const ay = p[1] + Math.cos(ang) * o;
+          x.save(); x.translate(ax, ay); x.rotate(ang); x.fillStyle = 'rgba(240,240,236,.85)'; x.fillRect(-10, -0.8, 8, 1.6); x.beginPath(); x.moveTo(2, 0); x.lineTo(-3, -3.2); x.lineTo(-3, 3.2); x.closePath(); x.fill(); x.restore();
+          // linha de parada
+          const sp = M.t.pt(dir > 0 ? M.t.len - 2 : 2); x.save(); x.translate(sp[0], sp[1]); x.rotate(ang); x.fillStyle = 'rgba(240,240,236,.8)'; x.fillRect(-1, 1, 2, hw - 2); x.restore();
+        }
+      }
     }
-    // cruzamentos: asfalto limpo por cima das marcações + faixas de pedestre + linhas de parada
-    for (const [, [nx, ny, k]] of Object.entries(city.R.nodes)) {
-      if (nx < rx0 - 80 || nx > rx1 + 80 || ny < ry0 - 80 || ny > ry1 + 80 || k === 'exit') continue;
-      let wv = 0; let wh = 0; for (const s of city.segs) { if (s.v && s.x === nx && ny >= s.y0 && ny <= s.y1) wv = Math.max(wv, s.w); if (!s.v && s.y === ny && nx >= s.x0 && nx <= s.x1) wh = Math.max(wh, s.w); }
-      if (k === 'round') { x.fillStyle = pat.road; x.beginPath(); x.ellipse(nx, ny, 46, 46, 0, 0, Math.PI * 2); x.fill(); x.strokeStyle = 'rgba(236,235,230,.8)'; x.lineWidth = 1; x.beginPath(); x.ellipse(nx, ny, 40, 40, 0, 0, Math.PI * 2); x.stroke(); x.fillStyle = pat.park; x.beginPath(); x.ellipse(nx, ny, 18, 18, 0, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#e8e4da'; x.lineWidth = 2; x.stroke(); continue; }
-      x.fillStyle = pat.road; x.fillRect(nx - wv / 2, ny - wh / 2, wv, wh);
-      if (k === 'corner') { x.fillStyle = pat.walk; continue; }
+    // rotatórias: anel branco e ilha central ajardinada
+    for (const n of Object.values(city.nodeInfo || {})) {
+      if (n.kind !== 'round' || n.x < rx0 - 80 || n.x > rx1 + 80 || n.y < ry0 - 80 || n.y > ry1 + 80) continue;
+      x.fillStyle = pat.road; x.beginPath(); x.arc(n.x, n.y, 46, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = 'rgba(236,235,230,.8)'; x.lineWidth = 1; x.setLineDash([6, 5]); x.beginPath(); x.arc(n.x, n.y, 31, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+      x.fillStyle = pat.walk; x.beginPath(); x.arc(n.x, n.y, 20, 0, Math.PI * 2); x.fill(); x.fillStyle = pat.park; x.beginPath(); x.arc(n.x, n.y, 16, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#5f5b54'; x.lineWidth = 1.5; x.beginPath(); x.arc(n.x, n.y, 20, 0, Math.PI * 2); x.stroke();
     }
-    // faixas de pedestre e linhas de parada por cima do asfalto limpo
+    // faixas de pedestre (giradas conforme a rua)
     for (const g of city.ground) {
       if (g.mat !== 'cross' || g.x > rx1 + 10 || g.x + g.w < rx0 - 10 || g.y > ry1 + 10 || g.y + g.h < ry0 - 10) continue;
       x.fillStyle = '#ecebe6';
-      if (g.dir === 'v') for (let k = g.y + 2; k < g.y + g.h - 1; k += 5) x.fillRect(g.x, k, g.w, 3); else for (let k = g.x + 2; k < g.x + g.w - 1; k += 5) x.fillRect(k, g.y, 3, g.h);
+      if (g.shape === 'poly') { x.save(); x.translate(g.cx, g.cy); x.rotate(g.ang); for (let k = -g.cw / 2 + 2; k < g.cw / 2 - 2; k += 5) x.fillRect(-5, k, 10, 3); x.restore(); }
+      else if (g.dir === 'v') for (let k = g.y + 2; k < g.y + g.h - 1; k += 5) x.fillRect(g.x, k, g.w, 3); else for (let k = g.x + 2; k < g.x + g.w - 1; k += 5) x.fillRect(k, g.y, 3, g.h);
     }
+    x.restore();
     // pontes: guarda-corpo de pedra e sombra na água
     for (const b of city.bridges) {
       if (b.x > rx1 || b.x + b.w < rx0 || b.y > ry1 || b.y + b.h < ry0) continue;
@@ -265,6 +315,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   }
 
   function drawProp(x, p) {
+    if (p.hidden) return; // obstáculo invisível (bacia do chafariz desenhado no chão)
     if (p.spr.startsWith('d:') || p.spr.startsWith('x:')) {
       const im = sprImg(p.spr); if (!im) return;
       if (p.rot) { x.save(); x.translate(p.x, p.y - p.h / 2); x.rotate(p.rot); x.drawImage(im, -p.w / 2, -p.h / 2, p.w, p.h); x.restore(); return; }
@@ -289,10 +340,8 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     if (rect[0] < 0 || rect[1] < 0 || rect[2] > core.w || rect[3] > core.h) { drawCoast(x, rect); x.fillStyle = pat.grass; const ax = Math.max(0, rect[0]); const ay = Math.max(0, rect[1]); const bx = Math.min(core.w, rect[2]); const by = Math.min(core.h, rect[3]); if (bx > ax && by > ay) x.fillRect(ax, ay, bx - ax, by - ay); }
     else { x.fillStyle = pat.grass; x.fillRect(rect[0], rect[1], CH, CH); }
     drawGround(x, bin.g);
-    // espuma e água rasa na praia da orla oeste (mesmo acabamento da costa nova)
-    if (city.coast && rect[0] < 240 && rect[2] > 150 && rect[3] > 0 && rect[1] < (city.core?.h || city.H)) { const y0 = Math.max(0, rect[1]); const hh = Math.min(city.core?.h || city.H, rect[3]) - y0; x.fillStyle = 'rgba(120,190,245,.55)'; x.fillRect(206, y0, 26, hh); x.fillStyle = 'rgba(160,215,250,.6)'; x.fillRect(214, y0, 14, hh); x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(226, y0, 3, hh); x.fillStyle = 'rgba(255,255,255,.75)'; for (let k = y0 - (y0 % 17); k < y0 + hh; k += 17) x.fillRect(217, k, 2, 10); }
     roadMarks(x, rect);
-    for (const d of bin.d) { const im = sprImg(d.spr, 'deco'); if (!im) continue; if (d.rot) { x.save(); x.translate(d.x + d.w / 2, d.y + d.h / 2); x.rotate(d.rot); x.drawImage(im, -d.w / 2, -d.h / 2, d.w, d.h); x.restore(); } else x.drawImage(im, d.x, d.y, d.w, d.h); }
+    for (const d of bin.d) { if (d.spr[0] === '@') { drawFeature(x, d); continue; } const im = sprImg(d.spr, 'deco'); if (!im) continue; if (d.rot) { x.save(); x.translate(d.x + d.w / 2, d.y + d.h / 2); x.rotate(d.rot); x.drawImage(im, -d.w / 2, -d.h / 2, d.w, d.h); x.restore(); } else x.drawImage(im, d.x, d.y, d.w, d.h); }
     const lit = [];
     x.imageSmoothingEnabled = true;
     // construções e objetos ordenados pela base (y), como num RPG top-down
@@ -328,14 +377,17 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     x.save(); if (rect) { x.beginPath(); x.rect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]); x.clip(); }
     const hit = (o, m = 0) => !rect || (o.x - m < rect[2] && o.x + (o.w || 0) + m > rect[0] && o.y - m - 60 < rect[3] && o.y + (o.h || 0) + m > rect[1]);
     x.fillStyle = '#2f6fd0'; x.fillRect(bd.x0, bd.y0, bd.x1 - bd.x0, bd.y1 - bd.y0);
-    const C = coastP(); if (C) { x.lineJoin = 'round'; x.strokeStyle = '#7fbff0'; x.lineWidth = BW + 60; x.stroke(C.land); x.fillStyle = '#4f9a3a'; x.fill(C.land); x.strokeStyle = '#e8cf8a'; x.lineWidth = BW; x.stroke(C.land); if (C.hasLakes) { x.fillStyle = '#2f6fd0'; x.fill(C.lakes); x.strokeStyle = '#e8cf8a'; x.stroke(C.lakes); } } else { x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, city.W, city.H); }
-    const core = city.core || { w: city.W, h: city.H }; x.fillStyle = '#4f9a3a'; x.fillRect(0, 0, core.w, core.h);
-    const col = { access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#4f9a3a', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
-    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? '#56a640' : col[m]);
-    for (const g of city.ground) if (g.u && hit(g)) fillShape(x, g, col[g.mat] || '#4f9a3a');
+    const C = coastP(); if (C) { x.lineJoin = 'round'; x.strokeStyle = '#7fbff0'; x.lineWidth = BW + 60; x.stroke(C.land); x.fillStyle = '#2f5d27'; x.fill(C.land); x.strokeStyle = '#e8cf8a'; x.lineWidth = BW; x.stroke(C.land); if (C.hasLakes) { x.fillStyle = '#2f6fd0'; x.fill(C.lakes); x.strokeStyle = '#e8cf8a'; x.stroke(C.lakes); } } else { x.fillStyle = '#2f5d27'; x.fillRect(0, 0, city.W, city.H); }
+    const core = city.core || { w: city.W, h: city.H }; x.fillStyle = '#2f5d27'; x.fillRect(0, 0, core.w, core.h);
+    const col = { base: '#3f424b', curb: '#a9a59b', pave: '#8b867c', bed: '#33662a', access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#2f5d27', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
+    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? '#33662a' : col[m]);
+    for (const g of city.ground) if (g.u && hit(g)) fillShape(x, g, col[g.mat] || '#2f5d27');
     x.fillStyle = '#f2c94c'; for (const s of city.segs) if (s.w >= 48) { if (s.v) x.fillRect(s.x - 2, s.y0, 4, s.y1 - s.y0); else x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 4); }
     for (const b of city.blds) { if (!hit(b)) continue; if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
-    x.fillStyle = '#2f7a2a'; for (const p of city.props) if (hit(p, 20) && (p.spr.startsWith('arvore') || p.spr.startsWith('arbusto'))) { x.beginPath(); x.ellipse(p.x, p.y - 10, 9, 9, 0, 0, Math.PI * 2); x.fill(); }
+    const TRE = /^(arvore|arbusto|d:arvore|d:coqueiro|x:pinheiro|x:arvore-nat)/;
+    for (const p of city.props) { if (!hit(p, 20)) continue;
+      if (p.spr === 'x:montanhas') { const im = img('extra/montanhas'); if (im) x.drawImage(im, p.x - p.w / 2, p.y - p.h, p.w, p.h); continue; }
+      if (TRE.test(p.spr)) { const pn = p.spr.startsWith('x:pinheiro'); x.fillStyle = pn ? '#1f4d22' : '#2b5f22'; x.beginPath(); x.ellipse(p.x, p.y - 10, pn ? 7 : 9, pn ? 9 : 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = 'rgba(120,170,80,.35)'; x.beginPath(); x.ellipse(p.x - 2, p.y - 13, 3, 3, 0, 0, Math.PI * 2); x.fill(); } }
     x.restore();
   }
   drawOverview();

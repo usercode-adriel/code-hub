@@ -22,7 +22,7 @@ const RW = { x0: 2880, x1: 4040, y: 428 }; const PARK = [3640, 870];
 
 function route(kind, b, R) {
   const cx = 2000; const cy = 1400;
-  if (kind === 'chegada') return [[RW.x1 + 3200, RW.y - 260, 300, 190], [RW.x1 + 900, RW.y, 120, 165], [RW.x1 - 40, RW.y, 0, 150], [RW.x0 + 380, RW.y, 0, 34], [RW.x0 + 300, RW.y + 30, 0, 26], [RW.x0 + 300, 640, 0, 26], [PARK[0], 660, 0, 26], [PARK[0], PARK[1], 0, 8]];
+  if (kind === 'chegada') return [[RW.x1 + 3200, RW.y - 260, 300, 190], [RW.x1 + 900, RW.y, 120, 165], [RW.x1 - 40, RW.y, 0, 150], [3460, RW.y, 0, 34], [3460, RW.y + 36, 0, 26], [3460, 660, 0, 26], [PARK[0], 660, 0, 26], [PARK[0], PARK[1], 0, 8]];
   if (kind === 'partida') return [[PARK[0], PARK[1], 0, 10], [PARK[0], 660, 0, 26], [RW.x0 + 60, 660, 0, 26], [RW.x0 + 60, RW.y, 0, 12], [RW.x0 + 640, RW.y, 0, 120], [RW.x1 - 120, RW.y, 0, 170], [RW.x1 + 900, RW.y - 200, 160, 200], [RW.x1 + 4000, RW.y - 1400, 340, 230]];
   const side = R() < 0.5;
   const from = side ? [b.x0 + 100, cy - 900 + R() * 1800] : [cx - 1600 + R() * 3200, b.y0 + 100];

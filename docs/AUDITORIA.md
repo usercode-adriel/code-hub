@@ -117,6 +117,12 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Trânsito: abre passagem para sirenes, contorna acidentes pela outra faixa, espera pedestres; equipes saem de perto quando a base está longe
 - [x] Manifestações (`server/world/protests.js`, `public/js/drive/protest.js`): agenda diária com tema, lugar e horário; multidão com cartazes e palavras de ordem; notícia e posts com foto
 
+### Cidade refeita do zero (traçado compacto)
+- [x] `public/js/drive/city.js` reescrito: 7×4 quarteirões dentro de um anel viário com esquinas curvas, Av. Nexus e Av. Brasil com rotatória, duas diagonais, anexo logístico junto ao aeroporto
+- [x] Quarteirões sem grama: calçada contínua com esquinas arredondadas, calçamento de pedra, prédios alinhados nas bordas, pátios com chafariz, bancos, vasos e postes
+- [x] Natureza: grama escura, mata densa com clareiras, cerca de madeira em volta da cidade, lago com píer e barcos, montanhas, costa recortada com coqueiros
+- [x] Mesmos pontos de interesse, aeroporto, vagas, rotas e sistemas; faixas e calçadas verificadas (0 pontos fora da pista/calçada)
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

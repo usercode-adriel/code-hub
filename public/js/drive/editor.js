@@ -174,7 +174,7 @@ export function createEditor({ stage, cam, city, world, assets, api, toast, rebu
       const g = cv.getContext('2d'); const P = shapePolys(cv.dataset.p); const b = P.bounds; const k = Math.min(120 / (b.x1 - b.x0), 96 / (b.y1 - b.y0));
       g.fillStyle = '#2f6fd0'; g.fillRect(0, 0, 120, 96); g.save(); g.translate((120 - (b.x1 - b.x0) * k) / 2, (96 - (b.y1 - b.y0) * k) / 2); g.scale(k, k); g.translate(-b.x0, -b.y0);
       const path = (polys) => { g.beginPath(); for (const poly of polys) { poly.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); } };
-      g.fillStyle = '#4f9a3a'; path(P.land); g.fill(); g.fillStyle = '#2f6fd0'; path(P.lakes); g.fill();
+      g.fillStyle = '#2f5d27'; path(P.land); g.fill(); g.fillStyle = '#2f6fd0'; path(P.lakes); g.fill();
       g.fillStyle = '#6b6f7a'; g.fillRect(320, 0, (city.core?.w || 4096) - 320, city.core?.h || 2816); g.restore();
     });
     m.querySelectorAll('[data-s]').forEach((b) => { b.onclick = () => { if (S.rf.shape === b.dataset.s) return; snapshot(); S.rf.shape = b.dataset.s; status('Gerando o terreno…', 'warn'); m.hidden = true; setTimeout(() => { changed(null, true); status(`Formato: ${SHAPES[S.rf.shape].label}`, 'ok'); }, 30); }; });
