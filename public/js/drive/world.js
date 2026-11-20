@@ -116,12 +116,14 @@ export function lightState(n, axis, t) {
 // semáforo inteligente (Aurora): sensores contam os carros parados em cada eixo; o verde fica no eixo com fila,
 // muda depois de um verde mínimo quando o outro lado espera, e nunca segura o outro lado mais que o verde máximo
 const SMART = { minGreen: 6, maxGreen: 22, yellow: 2.5, idleSwap: 30 };
-export function stepSmartLights(world, cars, dt, view) {
-  for (const n of world.smartNodes ||= Object.values(world.nodes).filter((q) => q.light?.smart)) {
-    if (view && Math.hypot(n.x - view.x, n.y - view.y) > view.r + 500) continue;
-    const L = n.light; const q = { H: 0, V: 0 };
-    for (const c of cars) if (!c.turn && c.lane?.to === n && c.lane.path.len - c.s < 90 && Math.abs(c.v) < 4) q[c.lane.axis]++;
-    L.wait = q; L.t += dt;
+export function stepSmartLights(world, cars, dt) {
+  // todos os cruzamentos (longe da câmera também: senão a fila do outro eixo esperaria para sempre); a fila de cada
+  // cruzamento é contada numa só passada pelos carros
+  const nodes = world.smartNodes ||= Object.values(world.nodes).filter((q) => q.light?.smart);
+  for (const n of nodes) n.light.q = { H: 0, V: 0 };
+  for (const c of cars) { const n = c.lane?.to; if (!c.turn && n?.light?.smart && c.lane.path.len - c.s < 90 && Math.abs(c.v) < 4) n.light.q[c.lane.axis]++; }
+  for (const n of nodes) {
+    const L = n.light; const q = L.q; L.wait = q; L.t += dt;
     const other = L.axis === 'H' ? 'V' : 'H';
     if (L.phase === 'yellow') { if (L.t >= SMART.yellow) { L.axis = other; L.phase = 'green'; L.t = 0; } continue; }
     const swap = (q[other] > 0 && L.t >= SMART.minGreen && (q[L.axis] === 0 || L.t >= SMART.maxGreen)) || (L.t >= SMART.idleSwap && q[L.axis] === 0);
@@ -226,7 +228,7 @@ export function routeNodes(world, fromId, toId, banEdge = null) {
     if (done.has(id)) continue; done.add(id); if (id === toId) break;
     for (const l of world.nodes[id].out) {
       if (l.narrow || (id === fromId && banEdge && l.edge === banEdge)) continue;
-      const nd = d + l.path.len + 20; const to = l.to.id;
+      const nd = d + l.path.len + 20 + (world.penalty ? world.penalty(l) : 0); const to = l.to.id; // faixa bloqueada (acidente, obra) custa caro: a rota desvia
       if (nd < (dist.get(to) ?? Infinity)) { dist.set(to, nd); prev.set(to, id); q.push([nd, to]); }
     }
   }

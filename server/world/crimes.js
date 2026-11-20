@@ -21,6 +21,7 @@ export const CRIMES = {
   homicidio_culposo: { label: 'Homicídio culposo', sev: 3, type: 'estelionato' },
   homicidio: { label: 'Homicídio', sev: 3, type: 'estelionato' },
   perturbacao: { label: 'Perturbação e vias de fato', sev: 1, type: 'vandalismo' },
+  roubo_veiculo: { label: 'Roubo de veículo', sev: 2, type: 'furto' },
   dirigir_sem_habilitacao: { label: 'Dirigir sem habilitação', sev: 1, type: 'desobediencia' },
 };
 

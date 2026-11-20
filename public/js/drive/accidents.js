@@ -13,6 +13,12 @@ import { along, nearestWalk, canWalk } from './world.js';
 import { respawnNear, gather } from './peds.js';
 import { pickTraffic } from './traffic.js';
 import { obb } from './obst.js';
+import { CITY } from './cityevents.js';
+
+// guinchos: a operação começa TOW.start s depois da batida; cada guincho trabalha ~TOW.work s no carro e só então vem o
+// próximo (fila, um por vez); lead = tempo médio de viagem do guincho até o local. Batidas: abaixo de TOW.leve km/h de
+// diferença de velocidade os carros seguem; a partir de TOW.ferido km/h alguém se fere e vem a ambulância.
+export const TOW = { start: 120, work: 55, lead: 35, next: 30, leve: 18, ferido: 45 }; // next: o 2º guincho chega ~next s depois que o 1º sai
 
 const LINES = {
   batida: [['Você não viu o sinal?!', 'Foi mal, eu me distraí...'], ['Olha o estado do meu carro!', 'Calma, o seguro cobre.'], ['Você estava rápido demais!', 'Eu? Você que freou do nada!'], ['Alguém se machucou?', 'Não, só o susto mesmo.']],
@@ -43,12 +49,15 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
   function driverFor(c, view) { const p = borrow(view); const [x, y] = door(c); const a = actor(p?.spr || chrFor({ id: `mot${Math.random()}` }), x, y, p?.name || null); a.ped = p; a.react = { kind: 'dor', t0: performance.now(), dur: 2.6, face: Math.random() < 0.5 ? 1 : -1 }; return a; }
 
   // ---------------------------------------------------------------- início das cenas
-  function crashScene(cars, view, { police = Math.random() < 0.55, culprit = false, playerCar = null } = {}) {
-    for (const k of cars) { k.wrecked = 9999; k.smoke = 1; k.v = 0; k.reckless = null; k.sceneHold = true; if (k.maxV0) k.maxV = k.maxV0; }
+  function crashScene(cars, view, { police = Math.random() < 0.55, culprit = false, playerCar = null, kmh = 30 } = {}) {
+    const light = kmh < TOW.leve && !playerCar; // batida leve: amassou, mas os carros seguem
+    for (const k of cars) { k.wrecked = 9999; k.smoke = light ? 0 : 1; k.v = 0; k.reckless = null; k.sceneHold = true; if (k.maxV0) k.maxV = k.maxV0; }
     const x = cars.reduce((s, k) => s + k.x, 0) / cars.length; const y = cars.reduce((s, k) => s + k.y, 0) / cars.length;
     INC.addFx('fumaca', x, y - 4, 5, 1.1);
-    const inc = INC.create('acidente', x, y, { units: police ? ['policia'] : [], npc: !culprit, culprit, injured: [] });
-    const sc = { kind: 'batida', phase: 'impacto', t: 0, line: 0, cars, police, playerCar, inc, x, y, drivers: [], trucks: [], officer: null, active: true };
+    const hurt = kmh >= TOW.ferido;
+    const inc = INC.create('acidente', x, y, { units: light ? [] : [...(police ? ['policia'] : []), ...(hurt ? ['ambulancia'] : [])], npc: !culprit, culprit, injured: [] });
+    const sc = { kind: 'batida', phase: 'impacto', t: 0, line: 0, cars, police: police && !light, light, hurt, kmh, playerCar, inc, x, y, drivers: [], trucks: [], queue: cars.filter((k) => k !== playerCar), officer: null, active: true };
+    CITY.emit('acidente', { x, y, cars, grave: !light, feridos: hurt ? 1 : 0, kmh });
     inc.scene = sc; S.scenes.push(sc);
     const reg = regionAt({ x, y });
     if (!culprit) {
@@ -92,8 +101,8 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
   // ---------------------------------------------------------------- andamento das cenas
   function stepCrash(sc, dt, view) {
     sc.t += dt; sc.pt = (sc.pt || 0) + dt;
-    const units = sc.inc.units; const pol = units.find((u) => u.kind === 'policia');
-    if (pol && pol.release === undefined) pol.release = false;
+    const units = sc.inc.units; const pol = units.find((u) => u.kind === 'policia'); const amb = units.find((u) => u.kind === 'ambulancia');
+    for (const u of [pol, amb]) if (u && u.release === undefined) u.release = false;
     const meet = () => {
       // os motoristas param na calçada ao lado do acidente, frente a frente
       const w = nearestWalk(world, sc.x, sc.y, 50, canWalk) || [sc.x, sc.y + 16]; const k = sc.cars[0]; const ca = Math.cos(k.a); const sa = Math.sin(k.a);
@@ -101,8 +110,9 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
     };
     if (sc.phase === 'impacto' && sc.t > 1.4) {
       const spots = meet(); sc.spots = spots;
-      sc.cars.forEach((k, i) => { const d = driverFor(k, view); sc.drivers.push(d); walkTo(d, spots[i % 2]); });
-      if (sc.playerCar) { const d = sc.drivers[0]; d.face = [sc.playerCar.x, sc.playerCar.y]; setTimeout(() => say(d, 'Ei! Você bateu no meu carro!', 3.5), 1500); }
+      sc.cars.forEach((k, i) => { if (k === sc.playerCar) return; const d = driverFor(k, view); d.car = k; sc.drivers.push(d); walkTo(d, spots[i % 2]); });
+      if (sc.hurt && sc.drivers[0]) { const d = sc.drivers[0]; d.react = { kind: 'dor', t0: performance.now(), dur: 99, face: 1 }; d.hurt = true; } // motorista ferido fica curvado de dor
+      if (sc.playerCar && sc.drivers[0]) { const d = sc.drivers[0]; d.face = [sc.playerCar.x, sc.playerCar.y]; setTimeout(() => say(d, 'Ei! Você bateu no meu carro!', 3.5), 1500); }
       sc.phase = 'conversa'; sc.pt = 0;
     }
     if (sc.phase === 'conversa' || sc.phase === 'policia') {
@@ -111,49 +121,61 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
       sc.lt = (sc.lt || 0) - dt;
       if (sc.lt <= 0 && a && (!a.to)) { sc.lt = 2.4; const pair = sc.pair || (sc.pair = pick(LINES.batida)); const who = sc.line % 2 === 0 ? a : b || a; if (sc.phase === 'conversa' && sc.line < 4) say(who, pair[sc.line % 2]); sc.line++; }
     }
-    if (sc.phase === 'conversa') {
-      if (sc.police) {
-        if (pol?.job?.phase === 'atendendo' && !sc.officer) {
-          const [x, y] = door(pol); sc.officer = actor('chr/policial', x, y, 'Policial'); walkTo(sc.officer, sc.spots[2], () => { sc.officer.face = [sc.drivers[0].x, sc.drivers[0].y]; });
-          sc.phase = 'policia'; sc.pt = 0;
-        } else if (!pol && sc.pt > 30) sc.police = false; // viatura não conseguiu sair: segue só com o guincho
-      } else if (sc.pt > 9) towTrucks(sc);
+    // batida leve: discutem um pouco, voltam aos carros e seguem viagem (sem guincho)
+    if (sc.light) {
+      if (sc.pt > 10 && !sc.leaving && sc.phase === 'conversa') { sc.leaving = true; sc.drivers.forEach((d) => walkTo(d, door(d.car, 3), () => { d.gone = true; })); }
+      if ((sc.leaving && sc.drivers.every((d) => d.gone)) || sc.t > 60) { for (const k of sc.cars) { k.sceneHold = false; k.wrecked = 0; k.smoke = 0; } for (const d of sc.drivers) { d.gone = true; giveBack(d.ped, view); } sc.active = false; }
+      return;
     }
-    if (sc.phase === 'policia') {
-      const o = sc.officer;
-      if (!o.to) { sc.ot = (sc.ot || 0) - dt; if (sc.ot <= 0) { sc.ot = 3; const l = LINES.policia[Math.min(LINES.policia.length - 1, sc.oi = (sc.oi || 0) + 1) - 1]; say(o, l, 2.8); for (const d of sc.drivers) d.face = [o.x, o.y]; } }
-      if (sc.pt > 11) towTrucks(sc);
+    // polícia: o policial conversa com os motoristas e registra; fica até o fim da remoção
+    if (sc.police && sc.phase === 'conversa') {
+      if (pol?.job?.phase === 'atendendo' && !sc.officer && sc.spots) {
+        const [x, y] = door(pol); sc.officer = actor('chr/policial', x, y, 'Policial'); walkTo(sc.officer, sc.spots[2], () => { sc.officer.face = [sc.drivers[0]?.x ?? sc.x, sc.drivers[0]?.y ?? sc.y]; });
+        sc.phase = 'policia'; sc.pt = 0;
+      } else if (!pol && sc.pt > 30) sc.police = false; // viatura não conseguiu sair
     }
-    if (sc.phase === 'guincho') {
-      for (const u of sc.trucks) {
-        if (u.towing || u.job?.phase !== 'atendendo') continue;
-        u.hookT = (u.hookT || 0) + dt;
-        if (u.hookT > 3) { const car = u.forCar; car.towedBy = u; car.hookAnim = 0; car.sceneHold = false; u.towing = car; }
+    if (sc.phase === 'policia' && sc.officer && !sc.officer.to) { sc.ot = (sc.ot || 0) - dt; if (sc.ot <= 0 && (sc.oi || 0) < LINES.policia.length) { sc.ot = 3; sc.oi = (sc.oi || 0) + 1; say(sc.officer, LINES.policia[sc.oi - 1], 2.8); for (const d of sc.drivers) d.face = [sc.officer.x, sc.officer.y]; } }
+    // ambulância (batida forte): a enfermeira atende o motorista ferido e leva ao hospital
+    if (sc.hurt && amb?.job?.phase === 'atendendo' && !sc.medic && sc.drivers[0]) {
+      const d = sc.drivers[0]; const [x, y] = door(amb); sc.medic = actor('chr/enfermeira', x, y, 'Enfermeira');
+      walkTo(sc.medic, [d.x + 7, d.y + 2], () => {
+        sc.medic.face = [d.x, d.y]; say(sc.medic, 'Sou da equipe de resgate. Onde está doendo?', 3);
+        setTimeout(() => say(d, 'No braço... e bati a cabeça no volante.', 3), 3200);
+        setTimeout(() => say(sc.medic, 'Vamos te levar para o hospital, fica tranquilo.', 3), 6500);
+        setTimeout(() => { walkTo(sc.medic, door(amb, 3), () => { sc.medic.gone = true; }); d.react = null; walkTo(d, door(amb, 3), () => { d.gone = true; amb.release = true; }); }, 9500);
+      });
+    }
+    // guinchos em fila: o primeiro chega ~TOW.start s após a batida; cada um trabalha ~TOW.work s; o próximo só vem
+    // depois que o anterior saiu com o carro (sem guinchos duplicados nem esperando para sempre)
+    if (!sc.truck && sc.queue.length && sc.t >= (sc.trucks.length ? sc.nextTruckAt : TOW.start - TOW.lead)) {
+      const car = sc.queue.shift();
+      const u = INC.dispatch('guincho', sc.inc, { at: [car.x, car.y], back: 34, near: [300, 420] });
+      if (u) { Object.assign(u, { forCar: car, release: false, workT: 0, eta: sc.trucks.length ? sc.t + TOW.next - 5 : TOW.start, goal: [car.x, car.y] }); sc.truck = u; sc.trucks.push(u); }
+      else car.done = true; // sem caminho para o guincho: o carro sai de cena
+    }
+    const u = sc.truck;
+    // chegada na hora marcada: a velocidade do guincho se ajusta à distância que falta
+    if (u && u.job?.phase === 'indo' && u.goal) { const left = Math.hypot(u.x - u.goal[0], u.y - u.goal[1]) * 1.3; const tl = u.eta + 0.4 - sc.t; u.maxV = tl <= 1 ? 60 : Math.max(16, Math.min(60, (left / tl) * 1.1)); if (left < 110 && tl > 2) u.maxV = Math.max(4, left / tl); }
+    if (u && u.job?.phase === 'atendendo' && !u.released) {
+      u.workT += dt;
+      if (!u.towing && u.workT > TOW.work - 6) { const car = u.forCar; car.towedBy = u; car.hookAnim = 0; car.sceneHold = false; u.towing = car; } // engata e sobe o carro
+      if (u.towing && u.workT > TOW.work) {
+        u.release = true; u.released = true;
+        if (!sc.police) { const d = sc.drivers.find((x) => x.car === u.forCar); if (d && !d.gone && !d.hurt) walkTo(d, door(u, 3), () => { d.gone = true; }); } // sem polícia: o motorista vai no guincho
       }
-      if (sc.trucks.length && sc.trucks.every((u) => u.towing) && !sc.leaving) {
-        sc.leaving = true; sc.pt = 0;
-        if (sc.police && pol) {
-          // motoristas e policial entram na viatura; a polícia vai embora depois deles
-          const ppl = [...sc.drivers, sc.officer].filter(Boolean); let left = ppl.length;
-          for (const d of ppl) walkTo(d, door(pol, 3), () => { d.gone = true; if (--left <= 0) pol.release = true; });
-          for (const u of sc.trucks) u.release = true;
-        } else {
-          sc.drivers.forEach((d, i) => { const u = sc.trucks[i % sc.trucks.length]; walkTo(d, door(u, 3), () => { d.gone = true; u.release = true; }); });
-          if (!sc.drivers.length) for (const u of sc.trucks) u.release = true;
-        }
-      }
-      if (sc.leaving && sc.pt > 25) { for (const d of sc.drivers) d.gone = true; if (sc.officer) sc.officer.gone = true; if (pol) pol.release = true; for (const u of sc.trucks) u.release = true; }
-      if (sc.leaving && sc.trucks.every((u) => u.done || !T.cars.includes(u))) end(sc, view);
     }
-    if (sc.t > 400) end(sc, view);
-  }
-  function towTrucks(sc) {
-    sc.phase = 'guincho';
-    for (const car of sc.cars) {
-      const u = INC.dispatch('guincho', sc.inc, { at: [car.x, car.y], back: 30 });
-      if (u) { u.forCar = car; u.release = false; sc.trucks.push(u); }
-      else { car.done = true; } // sem caminho para o guincho: o carro sai de cena
+    if (u && u.released && !u.goneAt) u.goneAt = sc.t;
+    if (u && u.released && sc.t - u.goneAt > 4) { sc.truck = null; sc.nextTruckAt = sc.t; } // o próximo guincho é chamado logo que o anterior parte
+    // tudo removido: motoristas e policial vão na viatura; a via é liberada (o trânsito recalcula sozinho)
+    if (!sc.queue.length && !sc.truck && sc.trucks.length && !sc.leaving) {
+      sc.leaving = true; sc.pt = 0;
+      const ppl = [...sc.drivers.filter((d) => !d.gone && !d.hurt), sc.officer].filter(Boolean);
+      if (pol && ppl.length) { let left = ppl.length; for (const d of ppl) walkTo(d, door(pol, 3), () => { d.gone = true; if (--left <= 0) pol.release = true; }); }
+      else { for (const d of ppl) d.gone = true; if (pol) pol.release = true; }
     }
+    if (sc.leaving && sc.pt > 25) { for (const d of sc.drivers) d.gone = true; if (sc.officer) sc.officer.gone = true; if (pol) pol.release = true; if (amb) amb.release = true; }
+    if (sc.leaving && sc.trucks.every((x) => x.done || !T.cars.includes(x)) && (!pol || pol.release)) end(sc, view);
+    if (sc.t > TOW.start + sc.cars.length * (TOW.work + 70) + 120) end(sc, view);
   }
   function stepPed(sc, dt, view) {
     sc.t += dt;
@@ -226,7 +248,7 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
       for (const o of T.cars) {
         if (o === c || o.temp || o.towedBy) continue;
         if (Math.abs(o.x - c.x) > 40 || Math.abs(o.y - c.y) > 40) continue;
-        if (obb(c, o, 0.5)) { crashScene([c, o], view); hit = true; break; }
+        if (obb(c, o, 0.5)) { const kmh = Math.abs(c.v - (o.v || 0) * Math.cos(o.a - c.a)) * 0.72; crashScene([c, o], view, { kmh }); hit = true; break; } // intensidade = diferença de velocidade
       }
       if (!hit) for (const p of P.peds) {
         if (p.state !== 'jay' && p.state !== 'cross') continue;

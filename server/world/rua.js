@@ -16,6 +16,7 @@ export const PENAS = {
   sangrando: { crime: 'lesao_grave', dias: 1, fianca: 1500, sev: 'grave', label: 'feriu uma pessoa, que ficou sangrando na calçada' },
   morte: { crime: 'homicidio_culposo', dias: 1, fianca: 4000, sev: 'morte', label: 'derrubou uma pessoa, que morreu no local' },
   policial: { crime: 'agressao_policial', dias: 2, fianca: 2500, label: 'agrediu um policial' },
+  roubo: { crime: 'roubo_veiculo', dias: 1, fianca: 1200, label: 'roubou um carro na rua' },
 };
 export const MULTA_PERTURBACAO = 195;
 const RESULTS = ['inconsciente', 'sangrando', 'morte'];
@@ -66,7 +67,7 @@ export function streetArrest(ctx, { opcao, delegacia }) {
     return { ok: true, resultado: 'fianca', pago: pa.fianca };
   }
   if (opcao !== 'cumprir') throw new BankError('Escolha cumprir a pena ou pagar a fiança');
-  const motivo = { lesao_corporal: 'Lesão corporal', lesao_grave: 'Lesão corporal grave', homicidio_culposo: 'Homicídio culposo', agressao_policial: 'Agressão a policial' }[pa.crime] || 'Crime';
+  const motivo = { roubo_veiculo: 'Roubo de veículo', lesao_corporal: 'Lesão corporal', lesao_grave: 'Lesão corporal grave', homicidio_culposo: 'Homicídio culposo', agressao_policial: 'Agressão a policial' }[pa.crime] || 'Crime';
   u.detention = { at: nowIso(), until: new Date(Date.now() + pa.dias * 24 * HOUR_MS).toISOString(), motivo, local: String(delegacia || 'Delegacia').slice(0, 40), tipo: pa.crime, bail: pa.fianca, dias: pa.dias, caseId: pa.caseId };
   u.pendingArrest = null; sh.prisoes = (sh.prisoes || 0) + 1; sh.situacao = 'preso(a)'; sh.lastPrisao = nowIso();
   u.reputation = Math.max(0, (u.reputation || 50) - (pa.crime === 'homicidio_culposo' ? 15 : 8));
@@ -110,6 +111,26 @@ export function streetComplaint(ctx, { local, presente }) {
   let multa = null;
   if (presente) { const d = addDebt(w, { kind: 'multa', amount: MULTA_PERTURBACAO, desc: `Multa: perturbação e vias de fato ${where(local)}`, dueDays: 5, creditor: 'Polícia', at: ctx.at }); multa = { amount: MULTA_PERTURBACAO, debtId: d.id }; u.reputation = Math.max(0, (u.reputation || 50) - 2); }
   return { ok: true, multa };
+}
+
+// 8) roubo de carro pelo jogador: o motorista (ou testemunhas) denuncia — vira ocorrência com a descrição do carro e
+// do suspeito; a prisão só acontece se a polícia alcançar o jogador (captura → prisão pendente: 1 dia ou fiança)
+export function vehicleTheft(ctx, { veiculo, cor, local, testemunhas, aparencia, direcao }) {
+  const w = ctx.w; const u = account(w);
+  const desc = `Roubo de ${String(veiculo || 'carro').slice(0, 40)}${cor ? ` ${String(cor).slice(0, 20)}` : ''} ${where(local)}.${aparencia ? ` Suspeito: ${String(aparencia).slice(0, 60)}.` : ''}${direcao ? ` Fugiu ${String(direcao).slice(0, 30)}.` : ''}`;
+  const r = registerCrime(ctx, { tipo: 'roubo_veiculo', suspeito: 'me', local: where(local), witnesses: Math.max(1, Math.min(10, Number(testemunhas) || 1)), desc });
+  u.carThefts = [...(u.carThefts || []), { at: nowIso(), veiculo: String(veiculo || '').slice(0, 40), local: where(local) }].slice(-30);
+  return { ok: true, caseId: r?.caseId || null, desc };
+}
+export function theftCaptured(ctx, { local }) {
+  const w = ctx.w; const u = account(w); const P = PENAS.roubo;
+  u.pendingArrest = { resultado: 'roubo', crime: P.crime, dias: P.dias, fianca: P.fianca, local: where(local), at: nowIso(), caseId: null };
+  return { ok: true, dias: P.dias, fianca: P.fianca };
+}
+// roubo de carro entre moradores: notícia (e prisão, se a polícia pegou o ladrão)
+export function npcTheft(ctx, { local, preso }) {
+  record(ctx, { type: 'roubo-veiculo', cat: 'seguranca', title: preso ? `Polícia prende ladrão de carro ${where(local)}` : `Carro roubado ${where(local)}: ladrão fugiu`, text: preso ? 'O motorista chamou a polícia, que perseguiu e prendeu o suspeito.' : 'O motorista chamou a polícia. O suspeito abandonou o carro e fugiu a pé.', actors: [], importance: 2 });
+  return { ok: true };
 }
 
 // 7) crime de rua entre moradores (assassinato): notícia e investigação, suspeito não identificado

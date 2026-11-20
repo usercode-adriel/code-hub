@@ -89,3 +89,13 @@ test('servidor: agressão a policial com fiança; morte; discussão e reclamaç�
   assert.ok(T.w.userSheet.crimes.some((k) => k.tipo === 'perturbacao'));
   void account;
 });
+
+test('servidor: roubo de carro vai para a ficha; a prisão só existe depois da captura (1 dia ou fiança)', () => {
+  const ctx = T.ctx(); const u = account(T.w); u.pendingArrest = null;
+  const r = R.vehicleTheft(ctx, { veiculo: 'Carro', cor: 'azul', local: 'Centro', testemunhas: 2, aparencia: 'barbudo de camisa polo', direcao: 'para o norte' });
+  assert.ok(/Roubo de Carro azul/.test(r.desc)); assert.ok(T.w.userSheet.crimes.some((c) => c.tipo === 'roubo_veiculo'));
+  assert.equal(u.pendingArrest, null, 'denúncia não prende');
+  const c = R.theftCaptured(ctx, { local: 'Centro' }); assert.equal(c.dias, 1); assert.equal(c.fianca, R.PENAS.roubo.fianca);
+  bankOf(T.w).balance = 9000; assert.equal(R.streetArrest(ctx, { opcao: 'fianca' }).resultado, 'fianca');
+  assert.equal(R.npcTheft(ctx, { local: 'Centro', preso: true }).ok, true);
+});

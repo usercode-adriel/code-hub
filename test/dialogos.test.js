@@ -8,7 +8,9 @@ const { residents, agentOf } = await import('../server/world/agents.js');
 const { toneOf } = Dg;
 
 const at = (i) => { const rs = residents(T.w); return rs[i % rs.length]; }; // 44 moradores no mundo de teste
-const pairOf = (i) => [at(i), at(i + 1)];
+const ativo = (p) => p.agent?.resident && p.agent.status === 'ativo';
+// par a partir de i com os dois ativos (o mundo de teste pode ter alguém preso ou internado)
+const pairOf = (i) => { for (let k = i; k < i + 44; k++) if (ativo(at(k)) && ativo(at(k + 1))) return [at(k), at(k + 1)]; return [at(i), at(i + 1)]; };
 
 test('uma conversa tem falas alternadas, conteúdo e efeito nas relações', () => {
   const [a, b] = pairOf(20);

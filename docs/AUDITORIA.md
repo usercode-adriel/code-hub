@@ -172,6 +172,21 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Cela com fiança nas prisões que permitem (a blitz continua sem fiança)
 - [ ] Limitações: só 2 personagens masculinos (barbudo e policial), então todos os moradores homens aparecem com um deles; as folhas não trazem bombeiro, construtor nem médico; o horário das viaturas é ajustado pela distância, mas um engarrafamento grande ainda pode atrasar alguns segundos
 
+### IA de trânsito, acidentes, emergência, guinchos e roubo de veículos (estilo GTA)
+- [x] Colisão: causas corrigidas — carro "fantasma" depois de 9 s parado (atravessava tudo), cone de visão reto que não via carros na curva e falta de controle de cruzamento. Agora: percepção ao longo do trajeto real (faixa + curva + próxima faixa) numa grade espacial; trava final que desfaz qualquer movimento que sobreporia outro veículo ou pessoa
+- [x] Motoristas (`public/js/drive/traffic.js`): modelo IDM (distância mínima + tempo de segurança × velocidade, frenagem gradual), tempo de reação, quatro perfis (cauteloso, comum, apressado, imprudente — o imprudente pode furar o vermelho e não para direito no PARE)
+- [x] Cruzamentos: reserva por movimento (só entra quem não cruza a trajetória de quem está dentro, considerando a carroceria e o trecho que a curva varre), espaço na saída (não bloqueia o cruzamento), parada antes da linha, PARE com parada completa, faixa de pedestre, rotatórias seguras e vez garantida a quem espera demais; semáforos inteligentes atualizados em toda a cidade
+- [x] Faixas: troca segura nas vias de 4 faixas; ultrapassagem pela contramão só com a contramão livre; retorno quando a via está bloqueada; rotas (Dijkstra) e escolhas evitam faixas bloqueadas e ruas cheias
+- [x] Eventos urbanos (`public/js/drive/cityevents.js`): acidente, bloqueio/liberação, roubo, procurado e prisão; o trânsito publica as faixas bloqueadas (acidente, viatura atendendo, bloqueio policial, obra)
+- [x] Acidentes: intensidade pela diferença de velocidade — leve (discutem e seguem), forte (imobilizados, polícia e guinchos), muito forte (motorista ferido, ambulância e enfermeira)
+- [x] Guinchos em fila (`TOW` em accidents.js): o 1º chega 2 min após a batida, trabalha ~1 min e sai com o carro; só então vem o 2º; carro sobe na traseira e sai de cena com o guincho; a via é liberada no fim
+- [x] Emergência: sirene faz quem está à frente no mesmo sentido ir para a faixa da direita ou encostar e reduzir (pela posição, direção e distância); cruzamentos seguram a entrada quando uma sirene chega; viaturas e ambulâncias estacionam junto ao meio-fio; chegada no horário marcado
+- [x] Roubo de veículos (`public/js/drive/carjack.js`): E perto de qualquer carro da cidade → o carro para, o jogador vai à porta, o motorista levanta as mãos, fala (banco de falas sem repetição), corre, e só então o jogador assume o volante; denúncia com modelo, cor, direção e aparência; testemunhas reagem
+- [x] Procurado 1★ a 4★: denúncia; viatura vê o jogador e persegue; fuga longa traz reforço e bloqueio (viaturas atravessadas, faixa fechada); operação intensa; prisão só com captura (abordagem, mensagem, 1 dia ou fiança); despistar derruba o nível
+- [x] Moradores também roubam (raro): ladrão tira o motorista, foge dirigindo como imprudente, o dono liga para a polícia, a viatura persegue; o ladrão é preso ou abandona o carro e foge a pé
+- [x] Testes: `test/traffic.test.js` (simulação da cidade real em Node: zero sobreposições) e roubo em `test/street.test.js`; no navegador: 120 checagens sem sobreposição, acidente com sequência de guinchos, roubo, denúncia, perseguição, captura e roubo entre moradores
+- [ ] Pendências: a rotatória da Praça da Estrela comporta um movimento por vez (fila longa com muitos carros); ainda há "travas" curtas (carro para um instante quando a leitura do trânsito está atrasada); reforços policiais não fazem a abordagem (só a viatura principal); bloqueio policial não desvia o jogador a pé
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

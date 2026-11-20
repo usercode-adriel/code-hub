@@ -482,6 +482,7 @@ const ruaRoute = (path, fn) => router.post(`/mundo/rua/${path}`, (req, res) => {
 ruaRoute('queda', RUA.streetIncident); ruaRoute('acusacao', RUA.streetAccuse); ruaRoute('policial', RUA.assaultOfficer);
 ruaRoute('prisao', RUA.streetArrest); ruaRoute('fianca', RUA.payBail); ruaRoute('discussao', RUA.streetDiscuss);
 ruaRoute('reclamacao', RUA.streetComplaint); ruaRoute('assassinato', RUA.streetMurder);
+ruaRoute('roubo', RUA.vehicleTheft); ruaRoute('captura', RUA.theftCaptured); ruaRoute('roubo-npc', RUA.npcTheft);
 // diálogos entre moradores e com o jogador
 router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });
 router.get('/mundo/dialogo/abrir/:id', (req, res) => { const ctx = ctxOf(req); run(res, () => openTalk(ctx, req.params.id)); });

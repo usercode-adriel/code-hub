@@ -10,10 +10,13 @@ import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, 
 import { createBlitz } from '../drive/blitz.js';
 import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
-import { createStreet } from '../drive/street.js';
+import { createStreet, looksOf } from '../drive/street.js';
+import { createCarjack } from '../drive/carjack.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
+import * as TR from '../drive/traffic.js';
+import { CITY } from '../drive/cityevents.js';
 import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
 import { createPeds, stepPeds, gather, chrRow, CHR_KEYS, spriteFor } from '../drive/peds.js';
 import { CHR } from '../drive/chrmeta.js';
@@ -119,6 +122,10 @@ export default async function render(el, params = new URLSearchParams()) {
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
   ACC = createAccidents({ world, T, P, INC, report, regionAt: (p) => regionAt(p), notify, chrFor: (p) => spriteFor(p, assets.roles, p.id) });
   // ocorrências de rua (esbarrão, queda, crime entre moradores): street.js conduz a cena; o servidor guarda o que é real
+  // roubo de veículos (jogador e moradores) e nível de procurado
+  const CARJ = createCarjack({ T, P, INC, ACC, world, me, own, notify, regionAt: (p) => regionAt(p), looks: () => looksOf(me.spr), chrFor: (c) => spriteFor({ id: c.id }, assets.roles, c.id),
+    post: (path, body) => api.post(`/mundo/rua/${path}`, body).catch(() => null),
+    ui: { enter: (o) => { me.anim = { kind: 'enter', t: 0, car: o, from: [me.x, me.y] }; }, arrest: (x) => arrestPanel(x), exitCar: () => { const c = me.car; if (!c) return; c.v = 0; const sp = nearestWalk(world, ...doorPoint(c), 40, canFoot) || [c.x + 14, c.y]; me.mode = 'foot'; me.car = null; me.anim = null; [me.x, me.y] = sp; } } });
   const STREET = createStreet({ P, INC, ACC, world, me, notify, regionAt: (p) => regionAt(p), post: (path, body) => api.post(`/mundo/rua/${path}`, body).catch((err) => { toast('Ocorrência', err.message, 'error'); return null; }), ui: { discuss: (o) => discussPanel(o), arrest: (x) => arrestPanel(x) } });
 
   // ---------------- entrada
@@ -269,6 +276,7 @@ export default async function render(el, params = new URLSearchParams()) {
       return;
     }
     const n = nearest(own.filter((o) => !o.crashed), me, 46);
+    if ((!n || n[1] > 30) && CARJ.tryJack()) return; // carro da cidade perto: roubo (o motorista sai e o jogador entra)
     if (!n) {
       const c = nearest(cars(), me, 99999);
       toast(c ? `Seu ${c[0].name} está longe` : 'Sem veículo por perto', c ? 'Siga o marcador verde no mapa e no minimapa.' : 'Compre um carro na Concessionária ou use o avião-escola no Aeroporto.', 'info');
@@ -312,11 +320,12 @@ export default async function render(el, params = new URLSearchParams()) {
   }
 
   // ---------------- garagem: estacionar, danos e reboque
-  const savePark = (c) => { if (c.id && c.id !== 'escola') api.post('/mundo/cidade2d/estacionar', { itemId: c.id, x: c.x, y: c.y, a: c.a }).catch(() => {}); };
+  const savePark = (c) => { if (c.id && c.id !== 'escola' && !c.stolen) api.post('/mundo/cidade2d/estacionar', { itemId: c.id, x: c.x, y: c.y, a: c.a }).catch(() => {}); };
   let dmgTimer = null;
-  const saveDamage = (c) => { if (!c.id || c.id === 'escola') return; clearTimeout(dmgTimer); dmgTimer = setTimeout(() => api.post('/mundo/cidade2d/dano', { itemId: c.id, health: c.health }).catch(() => {}), 800); };
+  const saveDamage = (c) => { if (!c.id || c.id === 'escola' || c.stolen) return; clearTimeout(dmgTimer); dmgTimer = setTimeout(() => api.post('/mundo/cidade2d/dano', { itemId: c.id, health: c.health }).catch(() => {}), 800); };
   async function callTow(c) {
     try {
+      if (c.stolen) { toast('Carro roubado', 'A oficina não aceita carro sem documento. Abandone-o.', 'warning'); return; }
       if (c.id !== 'escola') await api.post('/mundo/cidade2d/dano', { itemId: c.id, health: c.health });
       if (c.id === 'escola') { await fine('acidente-aereo'); Object.assign(c, createPlane({ name: c.name, sprite: c.sprite, school: true, L: 42, W: 54, air: c.air }, ...city.planeSpots[0])); c.id = 'escola'; c.health = 100; toast('Avião-escola recolhido', 'A escola de voo cobrou o conserto (Banco → Pendências).', 'warning'); return; }
       const r = await api.post('/mundo/cidade2d/reboque', { itemId: c.id });
@@ -382,7 +391,7 @@ export default async function render(el, params = new URLSearchParams()) {
     // batida em carro de morador: os dois ficam danificados na hora e soltam fumaça; o motorista sai e reclama,
     // a polícia vem e o guincho leva o carro dele (cena programada)
     if (other && T.cars.includes(other) && !other.temp && !other.sceneHold && !other.towedBy && c.impact > 8) {
-      ACC.crashScene([other], viewNow(), { culprit: true, police: true, playerCar: c });
+      ACC.crashScene([other], viewNow(), { culprit: true, police: true, playerCar: c, kmh: c.impact * 0.72 });
       c.smokeT = 8; fine('colisao'); report({ tipo: 'acidente', culpa: true, veiculo: c.name });
       const d2 = Math.max(dmg, 6); c.health = Math.max(0, (c.health ?? 100) - d2); saveDamage(c);
       toast('💥 Batida!', `Você bateu num carro. Lataria: ${Math.round(c.health)}%. A polícia está a caminho.`, 'warning');
@@ -598,7 +607,7 @@ export default async function render(el, params = new URLSearchParams()) {
         if (night > 0.05 && o === me.car) addCarLights(lights, o);
       } else if (kind === 3) drawPlane(o);
       else if (kind === 6 && o.react && (performance.now() - o.react.t0) / 1000 < (o.react.dur || 99)) reactChr(o.spr, o.x, o.y + 0.5, o.react.kind, (performance.now() - o.react.t0) / 1000, o.react.face || 1, 15);
-      else if (kind === 6) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), o.to ? Math.floor(o.t / 3.2) % 4 : 0, 15); }
+      else if (kind === 6) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); if (o.pose === 'maos') drawChr(o.spr, o.x, o.y + 0.5, 6, 1, 15); else if (o.run && o.to) drawChr(o.spr, o.x, o.y + 0.5, Math.cos(o.a) >= 0 ? 4 : 5, Math.floor(o.t / 5) % 4, 15); else drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), o.to ? Math.floor(o.t / 3.2) % 4 : 0, 15); } // mãos para cima (assalto), correndo (fuga)
       else if (kind === 5) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), Math.floor(o.t / 3.2) % 4, 15); }
       else drawMe(t);
     }
@@ -695,14 +704,16 @@ export default async function render(el, params = new URLSearchParams()) {
     if (sb.dataset.t !== ban) { sb.dataset.t = ban; sb.hidden = !ban; sb.textContent = ban ? `✈ ${ban}` : ''; }
     jailHud();
     const ch = INC.chase; const wv = $('#d2Want');
-    wv.hidden = !ch.on; if (ch.on) wv.innerHTML = `<b>🚨 PERSEGUIÇÃO</b><span>${'★'.repeat(ch.level)}${'☆'.repeat(Math.max(0, 3 - ch.level))}</span><small>${ch.lost > 0 ? `despistando… ${Math.ceil(10 - ch.lost)} s` : 'a viatura está atrás de você'}</small>`;
+    const lvl = Math.max(CARJ.level, ch.on ? ch.level : 0); wv.hidden = !lvl;
+    if (lvl) { const html = `<b>🚨 ${ch.on ? 'PERSEGUIÇÃO' : 'PROCURADO'}</b><span>${'★'.repeat(Math.min(4, lvl))}${'☆'.repeat(Math.max(0, 4 - lvl))}</span><small>${ch.on ? (ch.lost > 0 ? `despistando… ${Math.ceil(12 - ch.lost)} s` : 'a viatura está atrás de você') : esc(CARJ.reason || 'evite as viaturas')}</small>`; if (wv.dataset.h !== html) { wv.dataset.h = html; wv.innerHTML = html; } }
     // interações
     let html = '';
     if (me.mode === 'foot' && !me.anim) {
       const n = nearest(own.filter((o) => !o.crashed), me, 46);
       if (n) { const o = n[0]; html = (o.health ?? 100) <= 0 ? `<button data-act="tow">${icon('wrench', 15)} Chamar reboque · ${esc(o.name)}</button>` : `<button data-act="enter">${icon(o.kind === 'aviao' ? 'rocket' : 'car', 15)} <b>E</b> ${o.kind === 'aviao' ? 'Pilotar' : 'Entrar no'} ${esc(o.name)}</button>${(o.health ?? 100) < 100 ? `<button data-act="tow">${icon('wrench', 15)} Reparar (${Math.round(o.health)}%)</button>` : ''}`; }
       const crashed = nearest(own.filter((o) => o.crashed), me, 80); if (crashed) html += `<button data-act="tow">${icon('wrench', 15)} Resgatar ${esc(crashed[0].name)}</button>`;
-      $('#d2EnterF').textContent = n && (n[0].health ?? 100) > 0 ? (n[0].kind === 'aviao' ? 'Pilotar' : 'Entrar') : 'Veículo';
+      const jk = !n && !me.jacking ? CARJ.canJack() : null; if (jk) html += `<button data-act="enter">${icon('car', 15)} <b>E</b> Roubar este carro</button>`;
+      $('#d2EnterF').textContent = n && (n[0].health ?? 100) > 0 ? (n[0].kind === 'aviao' ? 'Pilotar' : 'Entrar') : jk ? 'Roubar' : 'Veículo';
     } else if (me.car && Math.abs(me.car.v) < 4) html = `<button data-act="enter">${icon('logout', 15)} <b>E</b> Sair do carro</button>${me.car.health <= 0 ? `<button data-act="tow">${icon('wrench', 15)} Chamar reboque</button>` : ''}`;
     else if (me.plane && me.plane.ground && me.plane.v < 6) html = `<button data-act="enter">${icon('logout', 15)} <b>E</b> Sair da aeronave</button>`;
     const poi = city.pois.map((q) => [q, Math.hypot(q.at[0] - p.x, q.at[1] - p.y)]).sort((a, b) => a[1] - b[1])[0];
@@ -834,7 +845,7 @@ export default async function render(el, params = new URLSearchParams()) {
       if (ev?.crash) planeCrash(pl, ev.crash);
       else if (ev?.landed) toast('Pouso perfeito ✈', `Bem-vindo(a) ao ${regionAt(pl).includes('Aurora') ? 'Aeroporto Aurora' : 'Aeroporto Nexus'}.`, 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim && !DET) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
+    } else if (me.mode === 'foot' && !me.anim && !DET && !me.jacking) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
       stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked, ...(inp.run ? [] : pedsNear)]);
       // esbarrões: correndo derruba (inconsciente, sentado sangrando ou morte); andando, o morador discute;
       // num policial (morador policial ou policial a pé das cenas) é agressão a policial
@@ -845,7 +856,7 @@ export default async function render(el, params = new URLSearchParams()) {
       me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
-    TALKS.scan(dt, viewC); TALKS.tick(dt); STREET.step(dt, viewC); // ocorrências de rua // conversas entre moradores que se encontram na rua
+    TALKS.scan(dt, viewC); TALKS.tick(dt); STREET.step(dt, viewC); CARJ.step(dt, viewC); // ocorrências de rua, roubos e procurado // conversas entre moradores que se encontram na rua
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5, state: 'me' }] : []), ...P.peds.filter((p) => ['cross', 'ferido', 'jay', 'roda', 'volta', 'caido'].includes(p.state)).map((p) => ({ x: p.x, y: p.y, L: 6, W: 7, state: 'ped' })), ...ACC.S.actors.map((a) => ({ x: a.x, y: a.y, L: 5, W: 6, state: 'ped' }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
@@ -869,7 +880,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, STREET, BLZ, blitzScene, blitzSetup, get DET() { return DET; } };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, STREET, BLZ, TR, CITY, CARJ, blitzScene, blitzSetup, get DET() { return DET; } };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }
