@@ -26,7 +26,7 @@ import { createSky } from '../drive/sky.js';
 import { createIncidents } from '../drive/incidents.js';
 import { createAccidents } from '../drive/accidents.js';
 import { buildObst, obstAt } from '../drive/obst.js';
-import { createWeapons, ARMAS, linhaLivre } from '../drive/weapons.js';
+import { createWeapons, ARMAS, linhaLivre, alvoMaisProximo } from '../drive/weapons.js';
 import { DUR } from '../drive/reactions.js';
 import { FEAR } from '../drive/carjack.js';
 import { createProtests } from '../drive/protest.js';
@@ -195,6 +195,29 @@ export default async function render(el, params = new URLSearchParams()) {
       if (!['walk', 'olhando', 'wait', 'cross'].includes(q.state) || Math.hypot(q.x - me.x, q.y - me.y) > 70) continue;
       if (Math.random() < 0.5 * dt) { fugir(q, [me.x, me.y], 4.5); q.say = { text: pick(['Não atira! Por favor!', 'Calma! Pode levar tudo!', 'Ei! Abaixa isso!']), emo: 'surpresa', until: performance.now() + 2400 }; }
     }
+  }
+  // caixa de mira: com a arma sacada a pé, o alvo é o mesmo da mira automática (o mais próximo com linha livre)
+  const AIM = { ped: null };
+  const miraAlvo = () => {
+    if (!WPN.arma || !WPN.desenhada || me.mode !== 'foot' || me.anim || DET) return null;
+    const cand = P.peds.filter((q) => !['levado', 'cena', 'vitima'].includes(q.state)).map((q) => ({ id: q.id, x: q.x, y: q.y, ref: q }));
+    const best = alvoMaisProximo(world, me, ARMAS[WPN.arma].alcance, cand, (x, y) => at(world, x, y) === SOLID || obstAt(world.obst, x, y, 1));
+    return best?.ref || null;
+  };
+  // roubar (furto pelo motor de ações; só morador com ficha), atirar (mesmo disparo da tecla K) ou intimidar (foge com a fala de medo)
+  async function aimAct(acao, ped) {
+    if (!ped) return;
+    if (acao === 'atirar') return fireNow();
+    const now = performance.now();
+    if (acao === 'roubar') {
+      if (!ped.real) return toast('Sem registro', 'Este morador não tem ficha na cidade, então não dá para roubar.', 'info');
+      const r = await api.post('/mundo/infracao', { tipo: 'furto', vitima: ped.id, valor: 150, testemunhas: testemunhasEm(me.x, me.y, 120, ped), local: regionAt(me) }).catch(() => null);
+      const dinheiro = r?.consequencias?.find((c) => c.tipo === 'dinheiro');
+      if (dinheiro?.ok) toast('Furto', `Você levou ${dinheiro.valor} NXC.`, 'warning');
+      else toast('Nada para levar', `${esc(ped.name || 'Ele')} não tem dinheiro com ele.`, 'info');
+    }
+    fugir(ped, [me.x, me.y], 4);
+    ped.say = { text: pick(FEAR), emo: 'surpresa', until: now + 2400 };
   }
   const keyArmas = (e) => {
     if (!alive || ED.on || DET || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -808,9 +831,12 @@ export default async function render(el, params = new URLSearchParams()) {
     const poi = city.pois.map((q) => [q, Math.hypot(q.at[0] - p.x, q.at[1] - p.y)]).sort((a, b) => a[1] - b[1])[0];
     if (poi && poi[1] < 70 && me.mode !== 'plane') html += `<a href="${esc(poi[0].route)}">${icon('pin', 15)} Entrar: <b>${esc(poi[0].label)}</b></a>`;
     if (WPN.arma && me.mode === 'foot') { const m = WPN.munição(); html += `<span class="d2-ammo">🔫 ${esc(ARMAS[WPN.arma].nome)} ${m.pente}/${m.max}${m.recarregando ? ' · recarregando' : ''}${WPN.desenhada ? '' : ' · guardada'}</span>`; }
+    AIM.ped = miraAlvo();
+    if (AIM.ped) html += `<div class="d2-aim"><span>🎯 ${esc(AIM.ped.name || 'Morador')}</span><button data-aim="roubar"${AIM.ped.real ? '' : ' disabled'}>Roubar</button><button data-aim="atirar">Atirar (K)</button><button data-aim="intimidar">Intimidar</button></div>`;
     if (html !== lastPrompt) {
       lastPrompt = html; const pr = $('#d2Prompt'); pr.hidden = !html; pr.innerHTML = html;
       pr.querySelector('[data-act="enter"]')?.addEventListener('click', act);
+      pr.querySelectorAll('[data-aim]').forEach((b) => { b.onclick = () => aimAct(b.dataset.aim, AIM.ped); });
       pr.querySelector('[data-act="tow"]')?.addEventListener('click', () => { const t = me.car || nearest(own.filter((o) => (o.health ?? 100) < 100 || o.crashed), me, 80)?.[0]; if (t) callTow(t); });
     }
   }
