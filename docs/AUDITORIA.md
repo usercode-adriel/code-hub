@@ -187,6 +187,15 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Testes: `test/traffic.test.js` (simulação da cidade real em Node: zero sobreposições) e roubo em `test/street.test.js`; no navegador: 120 checagens sem sobreposição, acidente com sequência de guinchos, roubo, denúncia, perseguição, captura e roubo entre moradores
 - [ ] Pendências: a rotatória da Praça da Estrela comporta um movimento por vez (fila longa com muitos carros); ainda há "travas" curtas (carro para um instante quando a leitura do trânsito está atrasada); reforços policiais não fazem a abordagem (só a viatura principal); bloqueio policial não desvia o jogador a pé
 
+### Reestruturação em fases (ordem numérica)
+- [x] Fase 1 — motor central de ações (`server/world/acoes.js`): ação iniciada → condições verificadas → evento → reações → consequências. Duplicatas barradas pela chave (com o alvo); quem está detido não age; cada recusa informa a condição que falhou
+- [x] Fase 2 — furto de dinheiro de NPC (`infracoes.js`), vandalismo com integridade e prejuízo em dívida (`patrimonio.js`), invasão por porta trancada; denúncia por testemunha (1 − (1/2)^n); estruturas não são destrutíveis
+- [x] Fase 3 — diálogos com opções contextuais: medo, testemunha de acontecimento, hostilidade, reputação; efeitos próprios (desculpar, acalmar, intimidar, pedir ajuda); respostas fora do contexto são recusadas
+- [x] Fase 4 — armas com projétil e mira automática no alvo mais próximo (`public/js/drive/weapons.js`), mesma mecânica para a viatura da perseguição; disparo registrado no motor de ações (ferimento, homicídio, denúncia)
+- [ ] Fase 4 (restante): caixa "Roubar / Atirar / Intimidar" ao mirar; reações avançadas (levantar as mãos, procurar abrigo, revidar, chamar polícia); loja de armamentos com interior (hoje a compra usa o submundo existente); animações de sacar, guardar e recuar em spritesheet definitiva
+- [ ] Fase 2 (restante): interface de vandalismo e invasão no mapa (o motor existe; falta ligar ao clique em objeto e em porta) e furto de objetos de loja
+- [ ] Fases 5 a 9: fiscalização, carona e sequestro, propriedades e interiores, notícias e TV, testes de cadeias de eventos
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.
