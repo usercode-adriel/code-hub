@@ -7,6 +7,8 @@ import { residents, agentOf } from './agents.js';
 import { remember, genderize } from '../social.js';
 import { chance, pick, nowIso, cap } from './util.js';
 
+const CAUSA = { acidente: 'uma batida de carro', esbarrao: 'uma queda na rua (derrubado(a) por alguém correndo)', agressao: 'uma agressão na rua' };
+const CAUSA_CURTA = { acidente: 'batida de carro', esbarrao: 'queda na rua', agressao: 'agressão' };
 const HOUR = 3600000; const DAY = 24 * HOUR;
 export const STATES = { saudavel: 'Saudável', ferido: 'Ferido', ferido_grave: 'Ferido grave', internado: 'Internado', em_recuperacao: 'Em recuperação', morto: 'Morto' };
 
@@ -18,14 +20,14 @@ export function severityOf(kmh, rnd = Math.random()) {
   return 'leve';
 }
 
-export function injure(ctx, p, { kmh = 30, causa = 'atropelamento', local = '' } = {}) {
+export function injure(ctx, p, { kmh = 30, causa = 'atropelamento', local = '', sev: forced = null } = {}) {
   const a = agentOf(ctx.w, p); if (!a || a.health?.state === 'morto') return null;
-  const sev = severityOf(kmh);
+  const sev = forced || severityOf(kmh); // ocorrências de rua informam a gravidade (inconsciente, sangrando, morte)
   const h = a.health ??= { state: 'saudavel', history: [] };
   const now = ctx.at ?? new Date();
   if (sev === 'morte') {
     h.state = 'morto'; h.since = now.toISOString();
-    record(ctx, { type: 'obito', cat: 'seguranca', title: `${p.name} morreu após ${causa === 'acidente' ? 'uma batida de carro' : 'um atropelamento'}${local ? ` em ${local}` : ''}`, text: 'Atendimento de emergência não foi suficiente.', actors: [p.id], importance: 4 });
+    record(ctx, { type: 'obito', cat: 'seguranca', title: `${p.name} morreu após ${CAUSA[causa] || 'um atropelamento'}${local ? ` em ${local}` : ''}`, text: 'Atendimento de emergência não foi suficiente.', actors: [p.id], importance: 4 });
     services.live?.(ctx.w, { kind: 'ocorrencia', personaId: p.id, name: p.name, text: `${p.name} não resistiu aos ferimentos` });
     return { state: 'morto' };
   }
@@ -34,11 +36,11 @@ export function injure(ctx, p, { kmh = 30, causa = 'atropelamento', local = '' }
   // tempo de recuperação em horas do jogo: leve ~3 h, moderada ~10 h, grave ~ 2 dias (internação a partir de ferido grave)
   h.hospitalUntil = sev === 'leve' ? null : new Date(now.getTime() + (sev === 'grave' ? 3 : 1) * HOUR).toISOString();
   h.recoverUntil = new Date(now.getTime() + (sev === 'leve' ? 3 : sev === 'moderada' ? 10 : 48) * HOUR).toISOString();
-  h.history.push({ at: now.toISOString(), text: `${STATES[state]} (${causa === 'acidente' ? 'batida' : 'atropelamento'}${local ? ` em ${local}` : ''})` }); cap(h.history, 20);
+  h.history.push({ at: now.toISOString(), text: `${STATES[state]} (${CAUSA_CURTA[causa] || 'atropelamento'}${local ? ` em ${local}` : ''})` }); cap(h.history, 20);
   a.injuredUntil = h.recoverUntil; // compatibilidade: quem usa injuredUntil continua afastado
   p.mood = { emotion: 'assustada', intensity: 0.8, reason: 'foi ferida(o) e precisa de atendimento' };
-  try { remember(p, genderize(p, `Fui ferida(o) em ${causa === 'acidente' ? 'uma batida de carro' : 'um atropelamento'}${local ? ` em ${local}` : ''}. ${sev === 'leve' ? 'Foi um susto.' : 'Fui levada(o) ao Hospital Nexus.'}`)); } catch { /* sem memória */ }
-  record(ctx, { type: 'ferimento', cat: 'seguranca', title: `${p.name} ${sev === 'leve' ? 'se machuca levemente' : sev === 'moderada' ? 'fica ferido(a)' : 'sofre ferimentos graves'}${local ? ` em ${local}` : ''}`, text: `Causa: ${causa === 'acidente' ? 'batida de carro' : 'atropelamento'}. Gravidade: ${STATES[state].toLowerCase()}.`, actors: [p.id], importance: sev === 'grave' ? 3 : 2 });
+  try { remember(p, genderize(p, `Fui ferida(o) em ${CAUSA[causa] || 'um atropelamento'}${local ? ` em ${local}` : ''}. ${sev === 'leve' ? 'Foi um susto.' : 'Fui levada(o) ao Hospital Nexus.'}`)); } catch { /* sem memória */ }
+  record(ctx, { type: 'ferimento', cat: 'seguranca', title: `${p.name} ${sev === 'leve' ? 'se machuca levemente' : sev === 'moderada' ? 'fica ferido(a)' : 'sofre ferimentos graves'}${local ? ` em ${local}` : ''}`, text: `Causa: ${CAUSA_CURTA[causa] || 'atropelamento'}. Gravidade: ${STATES[state].toLowerCase()}.`, actors: [p.id], importance: sev === 'grave' ? 3 : 2 });
   return { state, severity: sev };
 }
 

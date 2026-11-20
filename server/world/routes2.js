@@ -20,6 +20,7 @@ import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { driveState, park, infraction, damage, tow, incident } from './drive.js';
 import { blitzAnswer } from './blitz.js';
+import * as RUA from './rua.js';
 import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
@@ -476,6 +477,11 @@ router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); r
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
 // blitz: resposta ao policial (entregar | sem | desacato); a detenção não tem fiança
 router.post('/mundo/blitz/responder', (req, res) => { const ctx = ctxOf(req); run(res, () => blitzAnswer(ctx, { opcao: String(req.body?.opcao || ''), local: req.body?.local, veiculo: req.body?.veiculo })); });
+// ocorrências de rua (esbarrão, queda, discussão, acusação, prisão/fiança, crime entre moradores)
+const ruaRoute = (path, fn) => router.post(`/mundo/rua/${path}`, (req, res) => { const ctx = ctxOf(req); run(res, () => fn(ctx, req.body || {})); });
+ruaRoute('queda', RUA.streetIncident); ruaRoute('acusacao', RUA.streetAccuse); ruaRoute('policial', RUA.assaultOfficer);
+ruaRoute('prisao', RUA.streetArrest); ruaRoute('fianca', RUA.payBail); ruaRoute('discussao', RUA.streetDiscuss);
+ruaRoute('reclamacao', RUA.streetComplaint); ruaRoute('assassinato', RUA.streetMurder);
 // diálogos entre moradores e com o jogador
 router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });
 router.get('/mundo/dialogo/abrir/:id', (req, res) => { const ctx = ctxOf(req); run(res, () => openTalk(ctx, req.params.id)); });

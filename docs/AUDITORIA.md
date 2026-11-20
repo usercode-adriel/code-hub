@@ -164,6 +164,14 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Cone da blitz trocado pelo sprite da folha prisional
 - [ ] Limitações: a caminhada é gerada a partir das vistas paradas (sem braços balançando); nas reações, o corpo é o da folha de referência pintado por faixas (cabelo, rosto, roupa, calça, sapato), então detalhes como óculos, boné e estampa não aparecem; sete personagens não têm vista de costas; não há armas, então "baleado" existe mas ainda não é usado
 
+### Personagens animados de verdade e ocorrências de rua
+- [x] Os personagens do jogo são os 11 das folhas animadas (`tools/drive/chars3.py`): caminhada, corrida e as 10 reações desenhadas de cada um (atropelado, baleado, caído, ferido grave, morto deitado/sentado/de pé, sangramento, dor, quase morte)
+- [x] Atropelamento → sequência "atropelado"; assassinato entre moradores (raro) → "baleado" e "morto"; esbarrão correndo → um de três desfechos: inconsciente ("caído"), sentado sangrando (discute com o jogador) ou morte ("sangramento" e "morto")
+- [x] Cena de rua (`public/js/drive/street.js`): roda de 5 a 20 curiosos comentando; quem se sente ameaçado chama a polícia ou foge correndo; ambulância chega aos 60 s e a polícia aos 80 s (velocidade ajustada para chegar na hora, paradas afastadas); a enfermeira pergunta e a vítima ou as testemunhas respondem; o policial investiga, o culpado é apontado pela roupa e a polícia persegue; a cena dura de 3 a 5 min
+- [x] Penas (`server/world/rua.js`): lesão corporal, lesão grave e homicídio culposo → 1 dia de cela ou fiança; esbarrar num policial → agressão a policial, 2 dias ou fiança; esbarrão andando → discussão (três respostas) e, se o morador chamar a polícia, multa por perturbação; tudo na ficha criminal
+- [x] Cela com fiança nas prisões que permitem (a blitz continua sem fiança)
+- [ ] Limitações: só 2 personagens masculinos (barbudo e policial), então todos os moradores homens aparecem com um deles; as folhas não trazem bombeiro, construtor nem médico; o horário das viaturas é ajustado pela distância, mas um engarrafamento grande ainda pode atrasar alguns segundos
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

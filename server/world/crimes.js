@@ -16,6 +16,11 @@ export const CRIMES = {
   dano: { label: 'Dano ao patrimônio', sev: 1, type: 'vandalismo' },
   atropelamento_doloso: { label: 'Atropelamento criminoso', sev: 3, type: 'estelionato' },
   desacato: { label: 'Desacato à autoridade', sev: 2, type: 'desobediencia' },
+  lesao_corporal: { label: 'Lesão corporal', sev: 2, type: 'furto' },
+  lesao_grave: { label: 'Lesão corporal grave', sev: 3, type: 'furto' },
+  homicidio_culposo: { label: 'Homicídio culposo', sev: 3, type: 'estelionato' },
+  homicidio: { label: 'Homicídio', sev: 3, type: 'estelionato' },
+  perturbacao: { label: 'Perturbação e vias de fato', sev: 1, type: 'vandalismo' },
   dirigir_sem_habilitacao: { label: 'Dirigir sem habilitação', sev: 1, type: 'desobediencia' },
 };
 

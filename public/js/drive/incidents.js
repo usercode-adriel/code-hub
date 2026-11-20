@@ -21,9 +21,11 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
     let start = nearestLane(world, base[0], base[1] - 30, (l) => !l.narrow);
     // base longe (> 900): a equipe vem de onde já estava rodando, a 350–750 do local (chega em ~15–25 s)
     const tx = opts.at?.[0] ?? inc.x; const ty = opts.at?.[1] ?? inc.y;
-    if (Math.hypot(base[0] - tx, base[1] - ty) > 900) {
+    // opts.near: a equipe sai de onde já estava rodando, a essa distância (chegada em hora marcada nas cenas de rua)
+    if (opts.near || Math.hypot(base[0] - tx, base[1] - ty) > 900) {
+      const [n0, n1] = opts.near || [350, 750];
       const lanes = world.lanes.filter((l) => !l.narrow && l.path.len > 40);
-      for (let k = 0; k < 60; k++) { const l = lanes[Math.floor(Math.random() * lanes.length)]; const s0 = Math.random() * l.path.len; const q = along(l.path, s0); const d = Math.hypot(q.x - tx, q.y - ty); if (d > 350 && d < 750) { start = { lane: l, s: s0 }; break; } }
+      for (let k = 0; k < 120; k++) { const l = lanes[Math.floor(Math.random() * lanes.length)]; const s0 = Math.random() * l.path.len; const q = along(l.path, s0); const d = Math.hypot(q.x - tx, q.y - ty); if (d > n0 && d < n1 && routeNodes(world, l.to.id, nearestLane(world, tx, ty, (x) => !x.narrow)?.lane.from.id, l.edge)) { start = { lane: l, s: s0 }; break; } }
     }
     const dest = nearestLane(world, opts.at?.[0] ?? inc.x, opts.at?.[1] ?? inc.y, (l) => !l.narrow);
     if (!start || !dest) return null;
@@ -52,8 +54,10 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
   const addFx = (kind, x, y, secs, scale = 1) => fx.push({ kind, x, y, t: 0, secs, scale });
 
   // ---- perseguição: viatura sai da patrulha (ou da delegacia) e segue o jogador
-  function startChase(level, reason, me) {
-    if (chase.on) { chase.level = Math.max(chase.level, level); return; }
+  // onEnd(resultado): quem abriu a perseguição decide o que acontece quando o jogador é pego (ex.: prisão ou fiança)
+  function startChase(level, reason, me, onEnd = null) {
+    if (chase.on) { chase.level = Math.max(chase.level, level); if (onEnd) chase.onEnd = onEnd; return; }
+    chase.onEnd = onEnd;
     let car = T.cars.filter((c) => c.kind === 'policia' && !c.job && !c.wrecked).sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
     if (!car || Math.hypot(car.x - me.x, car.y - me.y) > 900) {
       const pol = station('policia', me.x, me.y) || POL; const lane = nearestLane(world, me.x + 260, me.y + 260, (l) => !l.narrow) || nearestLane(world, pol[0], pol[1]);
@@ -69,6 +73,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
     const c = chase.car; chase.on = false;
     if (c) { c.mode = null; c.siren = false; c.dest = null; c.route = []; c.target = null; c.maxV = 50; const n = nearestLane(world, c.x, c.y, (l) => !l.narrow); if (n) Object.assign(c, { lane: n.lane, s: n.s, turn: null }); c.temp = true; c.done = Math.hypot(c.x - me.x, c.y - me.y) > 600; }
     report?.({ tipo: result === 'preso' ? 'perseguicao-presa' : 'perseguicao-fuga', motivo: chase.reason, nivel: chase.level });
+    const cb = chase.onEnd; chase.onEnd = null; if (cb) { cb(result); return; }
     if (result === 'preso') notify('🚓 Você foi abordado(a)', 'A polícia aplicou multa por fuga. Pague no Banco → Pendências.', 'error');
     else notify('Você despistou a polícia', 'Mas a ocorrência ficou registrada.', 'warning');
   }

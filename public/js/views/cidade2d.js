@@ -10,6 +10,7 @@ import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, 
 import { createBlitz } from '../drive/blitz.js';
 import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
+import { createStreet } from '../drive/street.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
@@ -99,7 +100,7 @@ export default async function render(el, params = new URLSearchParams()) {
   school.id = 'escola'; school.health = 100; own.push(school);
   const cars = () => own.filter((o) => o.kind === 'carro');
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
-  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'jovem'}`; })(), row: 0, walkT: 0 };
+  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'barbudo'}`; })(), row: 0, walkT: 0 };
   [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
   // detido(a) numa blitz: começa na delegacia (a detenção corre no relógio do servidor)
   let DET = state.detention || null;
@@ -117,6 +118,8 @@ export default async function render(el, params = new URLSearchParams()) {
   let ACC = null; // acidentes entre moradores (criado depois das ocorrências)
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
   ACC = createAccidents({ world, T, P, INC, report, regionAt: (p) => regionAt(p), notify, chrFor: (p) => spriteFor(p, assets.roles, p.id) });
+  // ocorrências de rua (esbarrão, queda, crime entre moradores): street.js conduz a cena; o servidor guarda o que é real
+  const STREET = createStreet({ P, INC, ACC, world, me, notify, regionAt: (p) => regionAt(p), post: (path, body) => api.post(`/mundo/rua/${path}`, body).catch((err) => { toast('Ocorrência', err.message, 'error'); return null; }), ui: { discuss: (o) => discussPanel(o), arrest: (x) => arrestPanel(x) } });
 
   // ---------------- entrada
   const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
@@ -142,6 +145,44 @@ export default async function render(el, params = new URLSearchParams()) {
     ctx.fillStyle = '#141832';
     lines.forEach((l, i) => ctx.fillText(l, x + 5, y + 6 + lh / 2 + i * lh));
     ctx.restore();
+  }
+  // discussão depois de um esbarrão (ou com quem ficou sentado sangrando): três respostas; o servidor decide a reação
+  function discussPanel({ ped, situacao, opening, onResult }) {
+    stage.querySelector('.d2-talk')?.remove();
+    const nm = ped.real ? ped.name : 'Pedestre'; const box = document.createElement('div'); box.className = 'd2-talk d2-disc';
+    box.innerHTML = `<div class="tk-head"><span class="bz-badge" aria-hidden="true">😠</span><div><b>${esc(nm)}</b><small>${situacao === 'sangrando' ? 'caído(a), sangrando · muito irritado(a)' : 'irritado(a) com o esbarrão'}</small></div><button class="tk-x" aria-label="Fechar">×</button></div>
+      <div class="tk-log"><p class="tk-npc">${esc(nm.split(' ')[0])}: ${esc(opening)}</p></div>
+      <div class="tk-opts"><button data-t="educada" class="tk-educada">Pedir desculpas</button><button data-t="neutra" class="tk-neutra">Ignorar</button><button data-t="agressiva" class="tk-agressiva">Provocar</button></div>`;
+    stage.appendChild(box); const log = box.querySelector('.tk-log');
+    const close = (r = null) => { box.remove(); onResult?.(r); onResult = null; };
+    box.querySelector('.tk-x').onclick = () => close(null);
+    box.querySelectorAll('[data-t]').forEach((b) => { b.onclick = async () => {
+      box.querySelectorAll('[data-t]').forEach((x) => { x.disabled = true; });
+      let r = null;
+      if (ped.real) r = await api.post('/mundo/rua/discussao', { id: ped.id, tone: b.dataset.t, situacao }).catch(() => null);
+      if (!r) { const brav = b.dataset.t === 'agressiva' || (b.dataset.t === 'neutra' && Math.random() < 0.5); r = { fala: b.dataset.t === 'educada' ? 'Tá bom... mas presta atenção.' : brav ? 'Vou chamar a polícia!' : 'Que falta de educação.', emo: brav ? 'irritado' : 'neutro', chamaPolicia: situacao !== 'sangrando' && brav, encerra: true }; }
+      log.insertAdjacentHTML('beforeend', `<p class="tk-me">Você: ${esc(b.textContent)}</p><p class="tk-npc">${esc(nm.split(' ')[0])}: ${esc(r.fala)}</p>`);
+      if (r.chamaPolicia) log.insertAdjacentHTML('beforeend', '<p class="tk-npc"><b>📞 Está ligando para a polícia.</b></p>');
+      setTimeout(() => close(r), 1800);
+    }; });
+  }
+  // prisão: cumprir os dias na cela (1 dia = 24 h da cidade) ou pagar a fiança
+  function arrestPanel(x) {
+    stage.querySelector('.d2-talk')?.remove();
+    const ref = me.car || me; const pol = city.pois.filter((q) => q.id === 'policia' || q.id.startsWith('policia-')).sort((a, b) => Math.hypot(a.at[0] - ref.x, a.at[1] - ref.y) - Math.hypot(b.at[0] - ref.x, b.at[1] - ref.y))[0];
+    const deleg = pol?.id.endsWith('aurora') ? 'Delegacia de Aurora' : 'Delegacia de Nexus City';
+    const box = document.createElement('div'); box.className = 'd2-talk d2-blitz';
+    box.innerHTML = `<div class="tk-head"><span class="bz-badge" aria-hidden="true">🚓</span><div><b>Você foi detido(a)</b><small>${esc(x.motivo || 'Crime')} · ${esc(deleg)}</small></div></div>
+      <div class="tk-log"><p class="tk-npc">Policial: Você está sendo levado(a) para a delegacia. Pena: ${x.dias} dia(s) na cela, ou fiança de ${x.fianca} NXC.</p></div>
+      <div class="tk-opts"><button data-o="cumprir" class="tk-neutra">Cumprir ${x.dias} dia(s) na cela</button><button data-o="fianca" class="tk-educada">Pagar fiança · ${x.fianca} NXC</button></div>
+      <div class="tk-foot"><small>1 dia da cidade = 40 min reais. O inquérito continua na Delegacia nos dois casos.</small></div>`;
+    stage.appendChild(box);
+    box.querySelectorAll('[data-o]').forEach((b) => { b.onclick = async () => {
+      try {
+        const r = await api.post('/mundo/rua/prisao', { opcao: b.dataset.o, delegacia: deleg }); box.remove(); refreshStatus(true);
+        if (r.resultado === 'preso') arrest(r.detention, me.car || null); else toast('💸 Fiança paga', `${r.pago} NXC. Você está livre, mas responde ao inquérito.`, 'warning');
+      } catch (err) { toast('Prisão', err.message, 'error'); }
+    }; });
   }
   // conversa com um morador (toque nele): fala contextual, humor, relação e três respostas com consequências
   async function talkPanel(ped) {
@@ -195,7 +236,7 @@ export default async function render(el, params = new URLSearchParams()) {
   function pickLook() {
     let m = stage.querySelector('.d2-look'); if (m) { m.remove(); return; }
     m = document.createElement('div'); m.className = 'd2-look ed-modal';
-    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:400% 400%;aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:400% ${(CHR[k].rows || 4) * 100}%;aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
     stage.appendChild(m);
     m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr2', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
     m.querySelector('[data-x]').onclick = () => m.remove();
@@ -429,7 +470,7 @@ export default async function render(el, params = new URLSearchParams()) {
   // personagem fazendo uma reação da folha de referência (quadros desenhados, com as cores dele)
   function reactChr(key, x, y, kind, t, face, H) {
     ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x, y, H * 0.42, 1.5, 0, 0, Math.PI * 2); ctx.fill();
-    if (!drawReaction(ctx, IMG[`${key}-rx`], kind, t, x, y, H, face)) drawChr(key, x, y, 0, 0, H);
+    if (!drawReaction(ctx, IMG[`${key}-rx`], key, kind, t, x, y, H, face)) drawChr(key, x, y, 0, 0, H);
   }
   function drawPed(p, t) {
     if (p.state === 'levado' || p.state === 'cena') return;
@@ -443,6 +484,10 @@ export default async function render(el, params = new URLSearchParams()) {
       else reactChr(p.spr, p.x, p.y + 0.5, kind, el, p.react.face, 15);
       return;
     }
+    // ocorrências de rua: vítima (reação), fugindo/atacando (corrida), discutindo (braço levantado, virado para o jogador)
+    if (p.state === 'vitima' && p.react) { reactChr(p.spr, p.x, p.y + 0.5, p.react.kind, (performance.now() - p.react.t0) / 1000, p.react.face, 15); return; }
+    if (p.state === 'foge' || p.state === 'ataca') { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(p.spr, p.x, p.y + 0.5, Math.cos(p.a) >= 0 ? 4 : 5, Math.floor(t * 9 + p.phase) % 4, 15); return; }
+    if (p.state === 'discute') { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(p.spr, p.x, p.y + 0.5, 6, Math.floor(t * 1.6) % 2, 15); return; }
     p.react = null;
     const moving = ((p.state === 'walk' || p.state === 'cross' || p.state === 'jay') && !p.pause) || ((p.state === 'roda' || p.state === 'volta') && p.rmove);
     // olhando uma ocorrência: vira para ela; parado: mantém a última direção
@@ -460,14 +505,10 @@ export default async function render(el, params = new URLSearchParams()) {
     ctx.fillStyle = 'rgba(56,214,245,.35)'; ctx.beginPath(); ctx.ellipse(me.x, me.y, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
     if (me.swim) { ctx.save(); ctx.beginPath(); ctx.rect(me.x - 10, me.y - H, 20, H * 0.55); ctx.clip(); }
     if (me.moving) me.row = chrRow(me.a);
-    const m = CHR[me.spr.slice(4)]; const walking = me.moving && !me.swim;
-    if (m?.layout === 'heroi') {
-      // folha do jogador: linhas frente, costas, direita, esquerda (coluna 0 parado, 1–4 caminhada) e corrida
-      // para os lados (linhas 4 e 5, colunas 1–5); correndo para cima/baixo usa a caminhada mais rápida
-      const r = [0, 2, 1, 3][me.row || 0]; const side = r >= 2;
-      const [row, col] = !walking ? [r, 0] : me.run && side ? [r + 2, 1 + (Math.floor(me.walkT) % 5)] : [r, 1 + (Math.floor(me.walkT) % 4)];
-      drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), row, col, me.run && side && walking ? H * 0.94 : H);
-    } else drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), me.row || 0, walking ? Math.floor(me.walkT) % 4 : 0, H);
+    const walking = me.moving && !me.swim; const side = me.row === 1 || me.row === 3;
+    // correndo de lado: quadros de corrida da folha (linhas 4 direita e 5 esquerda); de frente/costas, passos mais rápidos
+    if (walking && me.run && side) drawChr(me.spr, me.x, me.y + 0.5, me.row === 1 ? 4 : 5, Math.floor(me.walkT) % 4, H);
+    else drawChr(me.spr, me.x, me.y + 0.5 + (me.swim ? 3 : 0), me.row || 0, walking ? Math.floor(me.walkT) % 4 : 0, H);
     if (me.run && walking && Math.random() < 0.25) particles.push({ x: me.x - Math.cos(me.a) * 3, y: me.y, vx: 0, vy: -2, t: 0, life: 0.6, s: 3 });
     if (me.swim) { ctx.restore(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.ellipse(me.x, me.y - 5, 6 + Math.sin(t * 5) * 1.5, 2, 0, 0, Math.PI * 2); ctx.stroke(); }
     ctx.fillStyle = '#38d6f5'; ctx.beginPath(); ctx.moveTo(me.x, me.y - H - 4); ctx.lineTo(me.x - 3, me.y - H - 8); ctx.lineTo(me.x + 3, me.y - H - 8); ctx.fill();
@@ -747,12 +788,12 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   // prisão: o carro fica retido no pátio perto da delegacia e o jogador é conduzido(a) à delegacia
   function arrest(det, car) {
-    DET = det; const pol = stationNear('policia', car.x, car.y); if (!pol) return;
-    if (me.car === car) { car.v = 0; car.door = 0; me.car = null; me.mode = 'foot'; me.anim = null; }
+    const ref = car || me.car || me; DET = det; const pol = stationNear('policia', ref.x, ref.y); if (!pol) return;
+    if (car && me.car === car) { car.v = 0; car.door = 0; me.car = null; me.mode = 'foot'; me.anim = null; }
     const spot = city.spots.map((s) => [s, Math.hypot(s[0] - pol[0], s[1] - pol[1])]).sort((a, b) => a[1] - b[1])[0]?.[0];
-    if (spot) { [car.x, car.y, car.a] = spot; car.v = 0; savePark(car); }
+    if (spot && car) { [car.x, car.y, car.a] = spot; car.v = 0; savePark(car); }
     [me.x, me.y] = nearestWalk(world, pol[0], pol[1] - 10, 60) || pol; cam.follow = true; flash = 1;
-    toast('🚓 Conduzido(a) à delegacia', `${det.local}. Seu carro ficou no pátio ao lado.`, 'warning');
+    toast('🚓 Conduzido(a) à delegacia', `${det.local}.${car ? ' Seu carro ficou no pátio ao lado.' : ''}`, 'warning');
   }
   const CELA = createCela();
   const celaMsg = () => { const m = $('#d2Jail .jl-m'); if (m) { const txt = CELA.msgUntil > performance.now() ? CELA.msg : 'Use as setas / WASD para andar pela cela.'; if (m.textContent !== txt) m.textContent = txt; } };
@@ -763,8 +804,9 @@ export default async function render(el, params = new URLSearchParams()) {
     if (left <= 0) { DET = null; el?.remove(); toast('🔓 Liberado(a)', 'Você cumpriu a detenção e saiu da delegacia.', 'success'); return; }
     if (!el) {
       el = document.createElement('div'); el.id = 'd2Jail'; el.className = 'd2-jail';
-      el.innerHTML = `<b>🚔 Cela · ${esc(DET.local)}</b><small>${esc(DET.motivo)} · porta trancada até cumprir o horário</small><span class="jl-t"></span><em class="jl-m"></em>`;
+      el.innerHTML = `<b>🚔 Cela · ${esc(DET.local)}</b><small>${esc(DET.motivo)} · ${DET.dias ? `${DET.dias} dia(s) de pena` : 'porta trancada até cumprir o horário'}</small><span class="jl-t"></span><em class="jl-m"></em>${DET.bail ? `<button class="cx-btn" data-bail>Pagar fiança · ${DET.bail} NXC</button>` : ''}`;
       stage.appendChild(el);
+      el.querySelector('[data-bail]')?.addEventListener('click', async () => { try { await api.post('/mundo/rua/fianca', {}); DET = null; el.remove(); toast('🔓 Fiança paga', 'Você saiu da cela. O inquérito continua.', 'success'); refreshStatus(true); } catch (err) { toast('Fiança', err.message, 'error'); } });
     }
     const s = Math.ceil(left / 1000); el.querySelector('.jl-t').textContent = `Liberação em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} (horário real)`;
   }
@@ -794,11 +836,16 @@ export default async function render(el, params = new URLSearchParams()) {
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
     } else if (me.mode === 'foot' && !me.anim && !DET) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
       stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked, ...(inp.run ? [] : pedsNear)]);
-      // correndo e esbarrando: a pessoa cai no chão (levanta em alguns segundos)
-      if (me.run && me.moving) for (const q of P.peds) if (['walk', 'olhando', 'wait'].includes(q.state) && Math.hypot(q.x - me.x, q.y - me.y) < 5.5) { q.state = 'caido'; q.fall = 3 + Math.random() * 2; q.fallA = me.a; q.say = { text: 'Ai!', until: performance.now() + 1500 }; me.walkT += 1; } me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
+      // esbarrões: correndo derruba (inconsciente, sentado sangrando ou morte); andando, o morador discute;
+      // num policial (morador policial ou policial a pé das cenas) é agressão a policial
+      if (me.moving) {
+        for (const q of P.peds) if (['walk', 'olhando', 'wait', 'cross', 'conversa'].includes(q.state) && Math.hypot(q.x - me.x, q.y - me.y) < (me.run ? 5.5 : 6.6)) { if (me.run) { if (STREET.knock(q)) me.walkT += 1; } else if ((q.x - me.x) * Math.cos(me.a) + (q.y - me.y) * Math.sin(me.a) > 0) STREET.bump(q); }
+        for (const a of ACC.S.actors) if (!a.gone && /policial/.test(a.spr) && Math.hypot(a.x - me.x, a.y - me.y) < 6) STREET.officer(a);
+      }
+      me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
-    TALKS.scan(dt, viewC); TALKS.tick(dt); // conversas entre moradores que se encontram na rua
+    TALKS.scan(dt, viewC); TALKS.tick(dt); STREET.step(dt, viewC); // ocorrências de rua // conversas entre moradores que se encontram na rua
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5, state: 'me' }] : []), ...P.peds.filter((p) => ['cross', 'ferido', 'jay', 'roda', 'volta', 'caido'].includes(p.state)).map((p) => ({ x: p.x, y: p.y, L: 6, W: 7, state: 'ped' })), ...ACC.S.actors.map((a) => ({ x: a.x, y: a.y, L: 5, W: 6, state: 'ped' }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
@@ -822,7 +869,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, BLZ, blitzScene, blitzSetup, get DET() { return DET; } };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, STREET, BLZ, blitzScene, blitzSetup, get DET() { return DET; } };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }
