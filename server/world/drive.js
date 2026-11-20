@@ -116,10 +116,11 @@ export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, n
   if (u.mapIncidents.filter((x) => x.slice(0, 10) === today).length >= 40) return { ok: false, reason: 'limite' };
   u.mapIncidents.push(nowIso()); u.mapIncidents = u.mapIncidents.slice(-40);
   const p = personId(w, personaId);
-  const reg = String(regiao || '').slice(0, 40);
+  const reg = String(regiao || '').slice(0, 40); let estado = null;
   if ((tipo === 'atropelamento' || tipo === 'acidente') && p) {
     // gravidade pela velocidade do veículo (informada pelo mapa); ferimentos persistentes em agent.health
     const r = injure(ctx, p, { kmh: Number(kmh) || 30, causa: tipo === 'acidente' ? 'acidente' : 'atropelamento', local: reg });
+    estado = r?.state || null;
     if (r?.state === 'morto') p.agent.injuredUntil = null;
     else if (r) { treat(ctx, p); }
     if (culpa) bumpUser(ctx, p, -12, { trust: -10, note: 'Me atropelou.' });
@@ -140,6 +141,6 @@ export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, n
   const who = Array.isArray(nomes) ? nomes.map((x) => String(x).slice(0, 40)).slice(0, 2) : [];
   record(ctx, { type: `mapa-${tipo}`, cat: 'seguranca', title: TITLES[tipo](p?.name || nome, reg, culpa), text: [veiculo ? `Veículo envolvido: ${String(veiculo).slice(0, 40)}.` : '', who.length ? `Motoristas: ${who.join(' e ')}.` : ''].filter(Boolean).join(' '), actors: [...(culpa ? ['me'] : []), ...(p ? [p.id] : [])], importance: imp });
   services.live?.(w, { kind: tipo === 'atropelamento' || tipo === 'queda-aviao' ? 'atendimento' : 'ocorrencia', personaId: p?.id || (culpa ? 'me' : null), name: p?.name || (culpa ? 'Você' : null), text: TITLES[tipo](p?.name || nome, reg, false) });
-  return { ok: true };
+  return { ok: true, estado }; // estado do morador atingido (o mapa mostra a reação de morte se for 'morto')
 }
 const personId = (w, id) => (id ? personById(w, id) : null);

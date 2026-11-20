@@ -1,21 +1,28 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pose, lying, REACTIONS } from '../public/js/drive/reactions.js';
+import { frameAt, lying, rxCell, REACTIONS, TIMING } from '../public/js/drive/reactions.js';
+import { RX } from '../public/js/drive/chrmeta.js';
+import { existsSync } from 'node:fs';
 import { CHR } from '../public/js/drive/chrmeta.js';
 import { createCela, ROOM, DOOR } from '../public/js/drive/cela.js';
 
-test('reações da folha de referência: começam de pé e terminam deitado (quem cai)', () => {
-  for (const k of ['atropelado', 'baleado', 'caido', 'ferido', 'sangramento', 'quase-morte']) {
-    assert.ok(Math.abs(pose(k, 0).rot) < 0.4, `${k} começa de pé`);
-    assert.ok(lying(k, 5), `${k} termina deitado`);
+test('reações tocam os quadros da folha de referência, na ordem, e param no último', () => {
+  assert.deepEqual(REACTIONS.sort(), ['atropelado', 'baleado', 'caido', 'dor', 'ferido', 'morto', 'morto-de-pe', 'morto-sentado', 'quase-morte', 'sangramento']);
+  for (const k of REACTIONS) {
+    assert.equal(TIMING[k].length, RX.seq[k].n, `${k}: um tempo por quadro da folha`);
+    assert.equal(frameAt(k, 0).i, 0); assert.equal(frameAt(k, 30).i, RX.seq[k].n - 1, `${k} termina no último quadro`);
   }
-  assert.ok(pose('atropelado', 0.35).dy > 4, 'atropelado é arremessado');
-  assert.ok(pose('atropelado', 3).blood > 0.9 && pose('caido', 3).blood === 0, 'sangue só onde há ferimento');
-  assert.ok(pose('dor', 2).sy < 0.8 && !lying('dor', 2), 'dor: curvado de joelhos, sem deitar');
-  assert.ok(Math.abs(pose('levantando', 1).rot) < 0.01, 'levanta no fim');
-  assert.equal(REACTIONS.length, 9);
-  assert.ok(lying('morto', 0) && lying('levantando', 0), 'morto e levantando já começam deitados');
+  const seen = new Set(); for (let t = 0; t < 2; t += 0.02) seen.add(frameAt('atropelado', t).i);
+  assert.deepEqual([...seen], [0, 1, 2, 3, 4, 5], 'atropelado passa por todos os quadros, em ordem');
+  for (const k of ['atropelado', 'baleado', 'caido', 'ferido', 'sangramento', 'quase-morte']) { assert.ok(!lying(k, 0), `${k} começa de pé`); assert.ok(lying(k, 10), `${k} termina no chão`); }
+  assert.equal(frameAt('levantando', 0).i, RX.seq.caido.n - 1, 'levantar começa deitado'); assert.equal(frameAt('levantando', 9).i, 0, 'e termina de pé');
+  assert.deepEqual(rxCell('dor', 2), { sx: 104, sy: RX.seq.dor.row * 48, w: 52, h: 48 });
 });
+
+test('todo personagem tem a folha de reações', () => {
+  for (const k of Object.keys(CHR)) assert.ok(existsSync(new URL(`../public/assets/rpg/chr/${k}-rx.png`, import.meta.url)), k);
+});
+
 
 test('personagens novos: folhas 4×4 com papéis do jogo (polícia, saúde, bombeiro, obra) e gênero', () => {
   const roles = new Set(Object.values(CHR).map((v) => v.role));

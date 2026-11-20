@@ -157,10 +157,84 @@ def walk(fr, side):
     return [fr, bob(s), fr, bob(stride(fr, 2))]
 
 
+# ---------------------------------------------------------------- reações (folha "reacoes": quadros desenhados)
+# Sequências da folha de referência (índices das figuras em ordem de leitura) e para onde fica a cabeça em cada
+# quadro ('u' em cima, 'l' à esquerda, 'r' à direita) — usado para pintar cabelo, rosto, roupa, calça e sapato.
+RX_SEQ = {
+    'atropelado': [0, 1, 2, 3, 9, 10], 'baleado': [4, 5, 6, 7, 8, 11, 12], 'caido': [13, 14, 15, 21, 22, 23],
+    'ferido': [16, 17, 18, 19, 20, 24, 25], 'morto': [26, 27, 28, 29], 'morto-sentado': [30, 31, 32, 33],
+    'morto-de-pe': [34, 35, 36, 37, 38], 'sangramento': [39, 40, 41, 42, 43, 44], 'dor': [45, 46, 49, 50, 51],
+    'quase-morte': [47, 48, 52, 53, 54, 55, 56],
+}
+RX_HEAD = {3: 'r', 9: 'l', 10: 'l', 11: 'l', 12: 'r', 22: 'r', 23: 'r', 24: 'r', 25: 'r', 26: 'l', 27: 'l', 28: 'l', 29: 'l', 33: 'l', 44: 'l', 55: 'l', 56: 'l'}
+RX_CELL = (52, 48)
+
+
+def rx_frames():
+    """os 57 quadros da folha de reações (fundo branco e rótulos escuros removidos), em ordem de leitura."""
+    a = np.array(Image.open(os.path.join(SRC, 'reacoes.webp')).convert('RGB')).astype(int)
+    mx = a.max(2); mn = a.min(2)
+    bg = (mn > 225) & ((mx - mn) < 20); dark = mx < 60
+    fg = ~bg & ~nd.binary_dilation(dark & (nd.uniform_filter(dark.astype(float), 9) > 0.6), iterations=3)
+    fg = nd.binary_opening(fg, iterations=1)
+    lab, n = nd.label(nd.binary_dilation(fg, iterations=6)); objs = nd.find_objects(lab); out = []
+    for i, s in enumerate(objs):
+        m = (lab[s] == i + 1) & fg[s]
+        if m.sum() < 600 or (a[s].max(2)[m] < 70).mean() > 0.5: continue
+        out.append((s[0].start, s[1].start, a[s], m))
+    out.sort(key=lambda t: (t[0] // 110, t[1]))
+    return [(img, m) for _, _, img, m in out]
+
+
+def palette(front):
+    """cores do personagem (cabelo, pele, camisa, calça, sapato) tiradas da vista de frente."""
+    al = front[..., 3] > 0; ys, xs = np.nonzero(al); top, bot = ys.min(), ys.max(); hh = bot - top + 1; cx = int(xs.mean())
+    def med(y0, y1, half=0.25):
+        w = max(2, int((xs.max() - xs.min()) * half)); reg = front[top + int(hh * y0):top + int(hh * y1) + 1, max(0, cx - w):cx + w + 1]
+        px = reg[reg[..., 3] > 0][:, :3].astype(int); px = px[px.max(1) > 45]
+        return np.median(px, 0) if len(px) else np.array([120, 120, 120])
+    # pele: pixels com tom de pele em qualquer parte da figura (rosto, braços, pernas); sem nenhum, um tom médio
+    px = front[al][:, :3].astype(int); r, g, b = px[:, 0], px[:, 1], px[:, 2]; lum = 0.299 * r + 0.587 * g + 0.114 * b
+    sk = px[(r > g) & (g > b) & (r - b > 35) & (r - b < 140) & (lum > 70) & (lum < 225) & (g - b > 8)]
+    pele = np.median(sk, 0) if len(sk) > 10 else np.array([225, 175, 135])
+    return {'cabelo': med(0.0, 0.06, 0.18), 'pele': pele, 'camisa': med(0.30, 0.45), 'calca': med(0.66, 0.82, 0.2), 'sapato': med(0.95, 1.0, 0.3)}
+
+
+def recolor(img, m, head, pal):
+    """pinta o corpo base da referência com as cores do personagem; sangue e contorno ficam como estão."""
+    rgb = img[..., :3].astype(float); h, w = m.shape; ys, xs = np.nonzero(m)
+    t = np.zeros((h, w))
+    if head == 'u': t = (np.arange(h)[:, None] - ys.min()) / max(1, ys.max() - ys.min()) * np.ones((1, w))
+    elif head == 'l': t = (np.arange(w)[None, :] - xs.min()) / max(1, xs.max() - xs.min()) * np.ones((h, 1))
+    else: t = (xs.max() - np.arange(w)[None, :]) / max(1, xs.max() - xs.min()) * np.ones((h, 1))
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    blood = (r > 120) & (r - g > 70) & (r - b > 60)
+    lum = 0.299 * r + 0.587 * g + 0.114 * b; outline = lum < 70
+    k = np.clip(lum / 205.0, 0.35, 1.25)[..., None]  # sombreado do corpo base (pele média ≈ 205)
+    band = np.select([t < 0.08, t < 0.27, t < 0.58, t < 0.93], [0, 1, 2, 3], 4)  # cabeça grande (~27% da altura)
+    cols = np.stack([pal['cabelo'], pal['pele'], pal['camisa'], pal['calca'], pal['sapato']])
+    new = np.clip(cols[band] * k, 0, 255)
+    out = np.where((blood | outline)[..., None], rgb, new)
+    return np.dstack([out, np.where(m, 255, 0)]).astype(np.uint8)
+
+
+def rx_sheet(front, frames):
+    pal = palette(front); CW, CH = RX_CELL
+    rows = list(RX_SEQ.items()); sheet = np.zeros((CH * len(rows), CW * 7, 4), np.uint8)
+    k = (H - 3) / frames[0][1].shape[0]  # mesma escala do personagem em pé (quadro 0 = de pé)
+    for r, (name, idx) in enumerate(rows):
+        for c, i in enumerate(idx):
+            img, m = frames[i]; f = shrink(recolor(img, m, RX_HEAD.get(i, 'u'), pal), k)
+            fh, fw = f.shape[:2]; fh = min(fh, CH - 1); fw = min(fw, CW); f = f[-fh:, :fw]
+            x0 = (CW - fw) // 2; y0 = CH - 1 - fh
+            sheet[r * CH + y0:r * CH + y0 + fh, c * CW + x0:c * CW + x0 + fw] = f
+    return sheet
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     sheets = {}
-    meta = {}; preview = []
+    meta = {}; preview = []; rxf = None
     for key, name, role, g, sheet, fi, si, bi in CHARS:
         if sheet not in sheets: sheets[sheet] = figures(sheet)
         F = sheets[sheet]
@@ -177,13 +251,16 @@ def main():
             for c, f in enumerate(row): sheet_img[r * H:(r + 1) * H, c * W:(c + 1) * W] = f
         Image.fromarray(sheet_img, 'RGBA').save(os.path.join(OUT, key + '.png'), optimize=True)
         meta[key] = {'name': name, 'role': role, 'g': g, 'w': W, 'h': H, **({} if back is not None else {'noBack': True})}
+        if rxf is None: rxf = rx_frames()
+        Image.fromarray(rx_sheet(fr[0], rxf), 'RGBA').save(os.path.join(OUT, key + '-rx.png'), optimize=True)
         preview.append(sheet_img)
     # remove as folhas antigas que não existem mais
     for f in os.listdir(OUT):
-        if f.endswith('.png') and f[:-4] not in meta: os.remove(os.path.join(OUT, f))
+        if f.endswith('.png') and f[:-4].removesuffix('-rx') not in meta: os.remove(os.path.join(OUT, f))
     json.dump(meta, open(os.path.join(OUT, 'meta.json'), 'w'), ensure_ascii=False)
     js = os.path.join(ROOT, '..', '..', 'public', 'js', 'drive', 'chrmeta.js')
-    open(js, 'w').write('// personagens animados (folhas 4×4: frente, direita, costas, esquerda × 4 passos) — gerado por tools/drive/chars2.py\nexport const CHR = ' + json.dumps(meta, ensure_ascii=False) + ';\n')
+    open(js, 'w').write('// personagens animados (folhas 4×4: frente, direita, costas, esquerda × 4 passos) — gerado por tools/drive/chars2.py\nexport const CHR = ' + json.dumps(meta, ensure_ascii=False) + ';\n'
+                   + '// reações desenhadas (folha <chave>-rx.png): uma linha por sequência, quadros de ' + f'{RX_CELL[0]}×{RX_CELL[1]}' + '\nexport const RX = ' + json.dumps({'cell': RX_CELL, 'seq': {k: {'row': i, 'n': len(v)} for i, (k, v) in enumerate(RX_SEQ.items())}}) + ';\n')
     # prévia (para conferir a direção e os passos)
     Wm = max(p.shape[1] for p in preview); cols = 6; rows = (len(preview) + cols - 1) // cols
     pv = np.zeros((rows * H * 4, cols * Wm, 4), np.uint8)

@@ -8,7 +8,7 @@ import { icon } from '../icons.js';
 import { esc, toast } from '../ui.js';
 import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY } from '../drive/world.js';
 import { createBlitz } from '../drive/blitz.js';
-import { pose, drawPose } from '../drive/reactions.js';
+import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
@@ -371,7 +371,7 @@ export default async function render(el, params = new URLSearchParams()) {
       c.v *= 0.6;
       const inc = ACC.pedScene(p, null, viewNow(), { culprit: true }); // vítima no chão, roda de curiosos, ambulância e polícia
       toast('Atropelamento!', `${p.real ? p.name : 'Um pedestre'} ficou ferido(a). A ambulância e a polícia estão a caminho.`, 'error');
-      report({ tipo: 'atropelamento', personaId: p.real ? p.id : null, nome: p.real ? p.name : 'Pedestre', culpa: true, veiculo: c.name, kmh: Math.round(toKmh(c.v)) });
+      report({ tipo: 'atropelamento', personaId: p.real ? p.id : null, nome: p.real ? p.name : 'Pedestre', culpa: true, veiculo: c.name, kmh: Math.round(toKmh(c.v)) }).then((r) => { if (r?.estado === 'morto') p.dead = true; }); // morte (rara): o servidor decide
       fine('atropelamento'); void inc;
     }
   }
@@ -426,12 +426,10 @@ export default async function render(el, params = new URLSearchParams()) {
     const im = IMG[key]; const m = CHR[key.slice(4)]; if (!im || !m) return false;
     const W = (H * m.w) / m.h; ctx.drawImage(im, frame * m.w, row * m.h, m.w, m.h, x - W / 2, y - H, W, H); return true;
   }
-  // personagem numa pose de reação (de lado, virado para onde cai)
-  function reactChr(key, x, y, ps, face, H) {
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x + face * (ps.rot > 1 ? H * 0.35 : 0), y, ps.rot > 1 ? H * 0.5 : 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save(); ctx.translate(x, y);
-    drawPose(ctx, ps, H, () => drawChr(key, 0, 0, face > 0 ? 1 : 3, 0, H), face, performance.now() / 1000);
-    ctx.restore();
+  // personagem fazendo uma reação da folha de referência (quadros desenhados, com as cores dele)
+  function reactChr(key, x, y, kind, t, face, H) {
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x, y, H * 0.42, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+    if (!drawReaction(ctx, IMG[`${key}-rx`], kind, t, x, y, H, face)) drawChr(key, x, y, 0, 0, H);
   }
   function drawPed(p, t) {
     if (p.state === 'levado' || p.state === 'cena') return;
@@ -440,8 +438,10 @@ export default async function render(el, params = new URLSearchParams()) {
       const kind = p.state === 'caido' ? 'caido' : 'atropelado';
       if (!p.react || p.react.kind !== kind) p.react = { kind, t0: performance.now(), face: Math.cos(p.fallA ?? p.a) < 0 ? -1 : 1 };
       const el = (performance.now() - p.react.t0) / 1000;
-      const ps = p.state === 'caido' && p.fall < 0.6 ? pose('levantando', 0.6 - p.fall) : pose(kind, el);
-      reactChr(p.spr, p.x, p.y + 0.5, ps, p.react.face, 15); return;
+      if (p.state === 'caido' && p.fall < 0.8) reactChr(p.spr, p.x, p.y + 0.5, 'levantando', 0.8 - p.fall, p.react.face, 15); // levanta no fim
+      else if (p.dead && el > 0.9) reactChr(p.spr, p.x, p.y + 0.5, 'morto', el - 0.9, p.react.face, 15); // depois do atropelamento, morto (deitado)
+      else reactChr(p.spr, p.x, p.y + 0.5, kind, el, p.react.face, 15);
+      return;
     }
     p.react = null;
     const moving = ((p.state === 'walk' || p.state === 'cross' || p.state === 'jay') && !p.pause) || ((p.state === 'roda' || p.state === 'volta') && p.rmove);
@@ -556,7 +556,7 @@ export default async function render(el, params = new URLSearchParams()) {
         if (hp <= 0) { const f = fxFrame('fogo', t + o.L, 1); if (f) ctx.drawImage(f, o.x - 6 + Math.cos(o.a) * o.L * 0.3, o.y - 14 + Math.sin(o.a) * o.L * 0.3, 12, 14); }
         if (night > 0.05 && o === me.car) addCarLights(lights, o);
       } else if (kind === 3) drawPlane(o);
-      else if (kind === 6 && o.react && (performance.now() - o.react.t0) / 1000 < (o.react.dur || 99)) reactChr(o.spr, o.x, o.y + 0.5, pose(o.react.kind, (performance.now() - o.react.t0) / 1000), o.react.face || 1, 15);
+      else if (kind === 6 && o.react && (performance.now() - o.react.t0) / 1000 < (o.react.dur || 99)) reactChr(o.spr, o.x, o.y + 0.5, o.react.kind, (performance.now() - o.react.t0) / 1000, o.react.face || 1, 15);
       else if (kind === 6) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), o.to ? Math.floor(o.t / 3.2) % 4 : 0, 15); }
       else if (kind === 5) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), Math.floor(o.t / 3.2) % 4, 15); }
       else drawMe(t);
