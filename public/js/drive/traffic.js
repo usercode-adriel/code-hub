@@ -20,9 +20,9 @@ export const lengthOf = (kind) => LEN[kind] || 22;
 const KMH = 0.72; // unidades/s → km/h (1 unidade ≈ 0,2 m)
 export const toKmh = (v) => Math.abs(v) * KMH;
 const CIVIL = ['azul', 'verde', 'laranja', 'branco', 'preto', 'roxo', 'suv-amarelo', 'esportivo-vermelho', 'branco', 'azul', 'preto', 'city-vermelho', 'city-verde', 'city-roxo', 'city-azul', 'city-suv', 'city-vermelho', 'city-azul'];
-export const SPRITES = { policia: ['policia', 'city-policia'], ambulancia: ['ambulancia', 'city-ambulancia'], taxi: ['taxi', 'city-taxi'], guincho: ['caminhao-vermelho'] };
+export const SPRITES = { policia: ['city-policia'], ambulancia: ['city-ambulancia'], bombeiros: ['city-bombeiros'], taxi: ['taxi', 'city-taxi'], guincho: ['caminhao-vermelho'] };
 export const spriteOf = (kind) => { const l = SPRITES[kind]; return l ? l[Math.floor(Math.random() * l.length)] : kind; };
-const BIG = [['taxi', 'taxi', 0.08], ['city-taxi', 'taxi', 0.07], ['city-van', 'van', 0.05], ['city-picape', 'van', 0.04], ['van-branca', 'van', 0.05], ['picape-azul', 'van', 0.05], ['jipe-verde', 'van', 0.05], ['caminhao-branco', 'caminhao', 0.04], ['caminhao-vermelho', 'caminhao', 0.02], ['caminhao-azul', 'caminhao', 0.02], ['coleta', 'coleta', 0.02], ['betoneira', 'caminhao', 0.015]];
+const BIG = [['city-bombeiros', 'bombeiros', 0.012], ['taxi', 'taxi', 0.08], ['city-taxi', 'taxi', 0.07], ['city-van', 'van', 0.05], ['city-picape', 'van', 0.04], ['van-branca', 'van', 0.05], ['picape-azul', 'van', 0.05], ['jipe-verde', 'van', 0.05], ['caminhao-branco', 'caminhao', 0.04], ['caminhao-vermelho', 'caminhao', 0.02], ['caminhao-azul', 'caminhao', 0.02], ['coleta', 'coleta', 0.02], ['betoneira', 'caminhao', 0.015]];
 export function pickTraffic(i) {
   if (i === 0 || i === 1) return { sprite: spriteOf('policia'), kind: 'policia' }; // duas viaturas patrulhando
   let r = Math.random();

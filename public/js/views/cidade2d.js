@@ -26,6 +26,7 @@ import { createSky } from '../drive/sky.js';
 import { createIncidents } from '../drive/incidents.js';
 import { createAccidents } from '../drive/accidents.js';
 import { buildObst, obstAt } from '../drive/obst.js';
+import { chaveDoCarro, avancaPorta } from '../drive/portas.js';
 import { createWeapons, ARMAS, linhaLivre, alvoMaisProximo } from '../drive/weapons.js';
 import { DUR } from '../drive/reactions.js';
 import { FEAR } from '../drive/carjack.js';
@@ -564,11 +565,6 @@ export default async function render(el, params = new URLSearchParams()) {
     ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.a + Math.PI / 2); ctx.globalAlpha = alpha; ctx.drawImage(im, -W / 2, -L / 2, W, L); ctx.restore();
   };
   const driverHead = (o) => { const ca = Math.cos(o.a); const sa = Math.sin(o.a); const lx = o.L * 0.02; const ly = -o.W * 0.2; const x = o.x + lx * ca - ly * sa; const y = o.y + lx * sa + ly * ca; ctx.fillStyle = '#3a2418'; ctx.beginPath(); ctx.arc(x, y, 2.1, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f0c8a0'; ctx.beginPath(); ctx.arc(x + ca * 0.6, y + sa * 0.6, 1.5, 0, Math.PI * 2); ctx.fill(); };
-  const drawDoor = (c) => {
-    if (!c.door) return; const ca = Math.cos(c.a); const sa = Math.sin(c.a);
-    const hx = c.L * 0.2; const hy = -c.W / 2; const x = c.x + hx * ca - hy * sa; const y = c.y + hx * sa + hy * ca;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(c.a + Math.PI - c.door * 1.05); ctx.fillStyle = c.color || '#999'; ctx.strokeStyle = '#1a1d26'; ctx.lineWidth = 0.6; ctx.fillRect(0, -1, c.L * 0.3, 2); ctx.strokeRect(0, -1, c.L * 0.3, 2); ctx.restore();
-  };
   const fxFrame = (kind, t, secs) => {
     if (kind === 'explosao') { const n = Math.min(9, Math.floor((t / secs) * 10)); return IMG[n < 5 ? `fx/exp${n}` : `fx/expf${n - 5}`]; }
     if (kind === 'fogo') return IMG[`fx/fogo${Math.floor(t * 10) % 7}`];
@@ -699,7 +695,7 @@ export default async function render(el, params = new URLSearchParams()) {
     for (const [, kind, o] of items) {
       if (kind === 0) drawPed(o, t);
       else if (kind === 1) {
-        const dmg = (o.wrecked > 4 || o.smoke) && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
+        const dmg = (o.wrecked > 4 || o.smoke) && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : chaveDoCarro(o.sprite, o.door);
         drawVeh(o, dmg);
         if (o.beacon) { const on = Math.floor(t * 4) % 2; ctx.fillStyle = on ? '#ffb020' : '#6b4a00'; ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, Math.PI * 2); ctx.fill(); if (on) lights.push({ x: o.x, y: o.y, r: 20, color: '#ffb020', ka: 0.6, halo: 0.6 }); }
         if (o.siren) { const on = Math.floor(t * 6) % 2; const c1 = on ? '#ff3a3a' : '#3a7aff'; ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(o.x, o.y, 2.4, 0, Math.PI * 2); ctx.fill(); lights.push({ x: o.x, y: o.y, r: 26, color: c1, ka: 0.7, halo: 0.7 }); }
@@ -707,9 +703,9 @@ export default async function render(el, params = new URLSearchParams()) {
         if (night > 0.05 && !o.wrecked) addCarLights(lights, o);
       } else if (kind === 2) {
         const hp = o.health ?? 100;
-        const key = hp < 35 && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
+        const key = hp < 35 && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : chaveDoCarro(o.sprite, o.door);
         if (o !== me.car) { ctx.strokeStyle = hp <= 0 ? '#ff4d5e' : '#2fd27a'; ctx.lineWidth = 1.1; ctx.setLineDash([2, 1.6]); ctx.beginPath(); ctx.arc(o.x, o.y, 15, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-        drawVeh(o, key); drawDoor(o);
+        drawVeh(o, key);
         if (o.smokeT > 0) { o.smokeT -= 1 / 60; if (Math.random() < 0.12) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, 0.8); }
         if (hp < 45 && Math.random() < (hp <= 0 ? 0.25 : 0.06)) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, hp <= 0 ? 1.4 : 1);
         if (hp <= 0) { const f = fxFrame('fogo', t + o.L, 1); if (f) ctx.drawImage(f, o.x - 6 + Math.cos(o.a) * o.L * 0.3, o.y - 14 + Math.sin(o.a) * o.L * 0.3, 12, 14); }
@@ -945,6 +941,7 @@ export default async function render(el, params = new URLSearchParams()) {
     raf = requestAnimationFrame(frame);
     if (document.hidden) { last = nowMs; return; }
     const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
+    for (const c of T.cars) if (c.job) avancaPorta(c, dt); // porta da unidade de emergência: abre ao atender, fecha ao voltar
     const t = Date.now() / 1000;
     const inp = input.read();
     stage.classList.toggle('jailed', Boolean(DET));
