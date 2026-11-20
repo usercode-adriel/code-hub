@@ -60,54 +60,73 @@ export async function loadWorld() {
 // grafo de ruas (nós, trechos, faixas por sentido e calçadas) a partir da descrição das ruas
 export function buildGraph(R) {
   const nodes = {};
-  for (const [id, [x, y, kind]] of Object.entries(R.nodes)) nodes[id] = { id, x, y, kind: kind || 'cross', edges: [], out: [], inn: [], maxW: 0 };
+  // nó: [x, y, tipo, raio da rotatória (opcional; padrão 46)]
+  for (const [id, [x, y, kind, rr]] of Object.entries(R.nodes)) nodes[id] = { id, x, y, kind: kind || 'cross', r: rr || 46, edges: [], out: [], inn: [], maxW: 0 };
   const edges = [];
   for (const rd of R.roads) {
     const pairs = rd.shape ? [[rd.path[0], rd.path.at(-1), rd.shape]] : rd.path.slice(1).map((b, i) => [rd.path[i], b, null]);
     for (const [a, b, shape] of pairs) {
       const A = nodes[a]; const B = nodes[b];
       const pts = shape ? shape.map((p) => p.slice()) : [rd.via?.[a] || [A.x, A.y], rd.via?.[b] || [B.x, B.y]];
-      const e = { id: `${rd.id}:${a}-${b}`, road: rd.id, a: A, b: B, w: rd.w, narrow: Boolean(rd.narrow), pts };
+      const e = { id: `${rd.id}:${a}-${b}`, road: rd.id, a: A, b: B, w: rd.w, narrow: Boolean(rd.narrow), lanes: rd.lanes || 1, pts };
       edges.push(e); A.edges.push(e); B.edges.push(e);
       A.maxW = Math.max(A.maxW, rd.w); B.maxW = Math.max(B.maxW, rd.w);
     }
   }
-  const clearance = (n) => (n.kind === 'round' ? 44 : n.kind === 'corner' ? 8 : n.kind === 'exit' ? 0 : n.maxW / 2 + 7);
+  const clearance = (n) => (n.kind === 'round' ? n.r - 2 : n.kind === 'corner' ? 8 : n.kind === 'exit' ? 0 : n.maxW / 2 + 7);
   for (const n of Object.values(nodes)) n.clear = clearance(n);
   // faixas (um sentido cada) e calçadas (dois lados de cada rua)
   const lanes = [];
   for (const e of edges) {
-    const o = e.narrow ? e.w * 0.22 : e.w * 0.24;
-    for (const [from, to, raw] of [[e.a, e.b, e.pts], [e.b, e.a, e.pts.slice().reverse()]]) {
+    // uma faixa por sentido, ou duas (avenidas e rodovia de 4 faixas): a da direita e a da esquerda
+    const offs = e.lanes >= 2 ? [e.w * 0.37, e.w * 0.13] : [e.narrow ? e.w * 0.22 : e.w * 0.24];
+    for (const o of offs) for (const [from, to, raw] of [[e.a, e.b, e.pts], [e.b, e.a, e.pts.slice().reverse()]]) {
       let pts = offset(raw, o);
       pts = trim(pts, [from.x, from.y], from.clear, true);
       pts = trim(pts, [to.x, to.y], to.clear, false);
       if (pts.length < 2) continue;
       const path = mkPath(pts);
       const dEnd = norm(sub(pts.at(-1), pts.at(-2))); const dStart = norm(sub(pts[1], pts[0]));
-      const lane = { id: lanes.length, edge: e, from, to, path, dEnd, dStart, axis: Math.abs(dEnd[0]) >= Math.abs(dEnd[1]) ? 'H' : 'V', narrow: e.narrow };
+      const lane = { id: lanes.length, edge: e, from, to, path, dEnd, dStart, axis: Math.abs(dEnd[0]) >= Math.abs(dEnd[1]) ? 'H' : 'V', narrow: e.narrow, inner: o < e.w * 0.2 && e.lanes >= 2 };
       lanes.push(lane); from.out.push(lane); to.inn.push(lane);
     }
     // calçadas: eixo da rua deslocado para fora da pista
     const so = e.w / 2 + 8;
     e.walks = [1, -1].map((side) => {
       let pts = offset(e.pts, so * side);
-      pts = trim(pts, [e.a.x, e.a.y], e.a.kind === 'round' ? 56 : e.a.kind === 'exit' ? 0 : e.a.clear + 6, true);
-      pts = trim(pts, [e.b.x, e.b.y], e.b.kind === 'round' ? 56 : e.b.kind === 'exit' ? 0 : e.b.clear + 6, false);
+      pts = trim(pts, [e.a.x, e.a.y], e.a.kind === 'round' ? e.a.r + 10 : e.a.kind === 'exit' ? 0 : e.a.clear + 6, true);
+      pts = trim(pts, [e.b.x, e.b.y], e.b.kind === 'round' ? e.b.r + 10 : e.b.kind === 'exit' ? 0 : e.b.clear + 6, false);
       return pts.length >= 2 ? mkPath(pts) : null;
     });
   }
-  const lights = new Set(R.lights || []);
-  for (const n of Object.values(nodes)) { n.light = lights.has(n.id) ? { off: (n.x * 7 + n.y * 3) % 22 } : null; }
+  const lights = new Set(R.lights || []); const smart = new Set(R.smartLights || []);
+  for (const n of Object.values(nodes)) { n.light = lights.has(n.id) ? { off: (n.x * 7 + n.y * 3) % 22, ...(smart.has(n.id) ? { smart: true, axis: 'H', phase: 'green', t: 0, wait: { H: 0, V: 0 } } : {}) } : null; }
   return { R, W: R.w, H: R.h, nodes, edges, lanes, mask: null, cs: 1, mw: R.w, turnCache: new Map(), lots: R.lots || [], pois: R.pois || [], radars: R.radars || [], regions: R.regions || [] };
 }
 
 // semáforo: ciclo de 22 s; eixo H (leste-oeste) e V (norte-sul) alternam
 export function lightState(n, axis, t) {
   if (!n.light) return 'green';
+  if (n.light.smart) return axis === n.light.axis ? n.light.phase : 'red';
   const c = ((t + n.light.off) % 22 + 22) % 22;
   if (axis === 'H') return c < 8 ? 'green' : c < 10.5 ? 'yellow' : 'red';
   return c >= 11 && c < 19 ? 'green' : c >= 19 && c < 21.5 ? 'yellow' : 'red';
+}
+
+// semáforo inteligente (Aurora): sensores contam os carros parados em cada eixo; o verde fica no eixo com fila,
+// muda depois de um verde mínimo quando o outro lado espera, e nunca segura o outro lado mais que o verde máximo
+const SMART = { minGreen: 6, maxGreen: 22, yellow: 2.5, idleSwap: 30 };
+export function stepSmartLights(world, cars, dt, view) {
+  for (const n of world.smartNodes ||= Object.values(world.nodes).filter((q) => q.light?.smart)) {
+    if (view && Math.hypot(n.x - view.x, n.y - view.y) > view.r + 500) continue;
+    const L = n.light; const q = { H: 0, V: 0 };
+    for (const c of cars) if (!c.turn && c.lane?.to === n && c.lane.path.len - c.s < 90 && Math.abs(c.v) < 4) q[c.lane.axis]++;
+    L.wait = q; L.t += dt;
+    const other = L.axis === 'H' ? 'V' : 'H';
+    if (L.phase === 'yellow') { if (L.t >= SMART.yellow) { L.axis = other; L.phase = 'green'; L.t = 0; } continue; }
+    const swap = (q[other] > 0 && L.t >= SMART.minGreen && (q[L.axis] === 0 || L.t >= SMART.maxGreen)) || (L.t >= SMART.idleSwap && q[L.axis] === 0);
+    if (swap) { L.phase = 'yellow'; L.t = 0; }
+  }
 }
 
 // curva de uma faixa para a seguinte no cruzamento (Bézier) ou contorno da rotatória (sentido anti-horário)
@@ -117,7 +136,7 @@ export function turnPath(world, L1, L2) {
   const E = L1.path.pts.at(-1); const S = L2.path.pts[0]; const n = L1.to;
   let pts;
   if (n.kind === 'round') {
-    const r = 29; const c = [n.x, n.y];
+    const r = n.r * 0.63; const c = [n.x, n.y];
     let a0 = Math.atan2(E[1] - c[1], E[0] - c[0]); let a1 = Math.atan2(S[1] - c[1], S[0] - c[0]);
     while (a1 > a0 - 0.35) a1 -= Math.PI * 2; // anti-horário na tela = ângulo diminuindo
     pts = [E];

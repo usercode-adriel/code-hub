@@ -13,6 +13,7 @@ import { EXTRA } from './extrameta.js';
 import { SOLID, WALK, ROAD, CROSS, LOT, WATER, GRASS, RUNWAY, PLAZA, SAND } from './world.js';
 import { CATALOG, genKey, placed } from './obra.js';
 import { terrainOf } from './terreno.js';
+import { auroraRoads, auroraBlocks, auroraExtras, auroraLabel } from './city2.js';
 
 export const W = 4096; export const H = 2816; export const CS = 4;
 
@@ -76,11 +77,12 @@ const ANNEX = [['aeroparque', 'galpoes'], ['fabrica', 'conteineres']];
 const REGION = { estadio: 'Estádio', escola: 'Vila Escolar', hoteis: 'Distrito Hoteleiro', banco: 'Distrito Empresarial', prefeitura: 'Centro Cívico', shopping: 'Centro Comercial', concessionaria: 'Centro',
   residencial: 'Bairro Residencial', diagA: 'Largo das Diagonais', diagB: 'Largo das Diagonais', comercial: 'Centro Comercial', praca: 'Praça Central', hospital: 'Centro', terminal: 'Terminal Rodoviário',
   policia: 'Centro', estacionamento: 'Centro', posto: 'Centro', cantoSO: 'Bairro Residencial', cantoSE: 'Bairro Residencial', misto: 'Bairro Residencial', parque: 'Parque Sul', mercado: 'Centro Comercial',
-  aeroparque: 'Aeroporto Nexus', galpoes: 'Área Industrial', fabrica: 'Área Industrial', conteineres: 'Porto Seco' };
+  aeroparque: 'Aeroporto Nexus', galpoes: 'Área Industrial', fabrica: 'Área Industrial', conteineres: 'Porto Seco', torres: 'Centro Financeiro' };
 
 // reforma: { shape, add: [{id,k,x,y,r,s}], del: [chaves de itens gerados], floor: [{k,x,y}] } (modo Reforma)
 export function generateCity(seed = 20261119, { reforma = null } = {}) {
-  const R = rng(seed);
+  // sorteio de Nexus City (R) e da Aurora (RA): a segunda cidade usa o próprio, então Nexus City não muda
+  let R = rng(seed); const RA = rng(seed ^ 0x5a17a);
   const pick = (a) => a[Math.floor(R() * a.length)];
   const RF = reforma || {}; const DEL = new Set(RF.del || []);
   const userAdd = (RF.add || []).map((a) => [a, placed(a)]).filter(([, o]) => o);
@@ -90,18 +92,18 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   // ---------------------------------------------------------------- grafo de ruas
   const nodes = {}; const roads = [];
   const nid = (x, y) => `n${x}_${y}`;
-  const node = (x, y, kind) => { const id = nid(x, y); if (!nodes[id]) nodes[id] = [x, y, kind]; else if (kind) nodes[id][2] = kind; return id; };
+  const node = (x, y, kind, r) => { const id = nid(x, y); if (!nodes[id]) nodes[id] = r ? [x, y, kind, r] : [x, y, kind]; else { if (kind) nodes[id][2] = kind; if (r) nodes[id][3] = r; } return id; };
   const CORNERS = new Set(['440,1248', '440,2528', '2680,2528']);
   for (const x of XL) for (const y of YL) if (!CORNERS.has(`${x},${y}`)) node(x, y);
   for (const [x, y] of [[3140, 1248], [3600, 1248], [2680, 1728], [3140, 1728], [3600, 1728], [3140, 2208], [3600, 2208]]) node(x, y);
-  node(1400, 0, 'exit'); node(1400, H, 'exit'); node(0, 1888, 'exit'); node(W, 2208, 'exit');
+  node(1400, 0, 'exit'); node(1400, H, 'exit'); node(0, 1888, 'exit'); node(W, 2208); // a leste, a estrada segue como Rodovia Aurora
   node(1400, 1888, 'round');
   const road = (id, name, w, pts, extra = {}) => roads.push({ id, name, w, path: pts.map(([x, y]) => nid(x, y)), ...extra });
   for (const x of [760, 1080, 1400, 1720, 2040, 2360]) road(`V${x}`, NAMES.V[x], wV(x), [...(x === 1400 ? [[1400, 0]] : []), ...YL.map((y) => [x, y]), ...(x === 1400 ? [[1400, H]] : [])]);
   road('V440', NAMES.V[440], RING, [[440, 1568], [440, 1888], [440, 2208]]);
   road('V2680', NAMES.V[2680], RING, [[2680, 1248], [2680, 1568], [2680, 1728], [2680, 1888], [2680, 2208]]);
   for (const y of [1568, 1888, 2208]) road(`H${y}`, NAMES.H[y], y === 2208 ? ST : wH(y), [...(y === 1888 ? [[0, 1888]] : []), ...XL.map((x) => [x, y])]);
-  road('H2208L', 'Estrada do Leste', 40, [[2680, 2208], [3140, 2208], [3600, 2208], [W, 2208]]);
+  road('H2208L', 'Estrada do Leste', 40, [[2680, 2208], [3140, 2208], [3600, 2208], [W, 2208]], { noStub: true });
   road('H1248', NAMES.H[1248], RING, XL.slice(1).map((x) => [x, 1248]));
   road('H1248L', 'Av. do Aeroporto', ST, [[2680, 1248], [3140, 1248], [3600, 1248]]);
   road('H2528', NAMES.H[2528], RING, XL.slice(1, 7).map((x) => [x, 2528]));
@@ -116,21 +118,27 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   curve('CNO', 'Anel Viário', [760, 1248], [440, 1568], arc(600, 1408, RC, -Math.PI / 2, -Math.PI));
   curve('CSO', 'Anel Viário', [440, 2208], [760, 2528], arc(600, 2368, RC, Math.PI, Math.PI / 2));
   curve('CSE', 'Anel Viário', [2360, 2528], [2680, 2208], arc(2520, 2368, RC, Math.PI / 2, 0));
+  // Aurora: ruas da segunda cidade, rodovia, estradas e vilas (ver city2.js)
+  const AUN = auroraRoads({ node, road, nid });
   // tipo de cada nó: cruzamento (3+ ligações) ou esquina
   const deg = {}; const maxW = {};
   for (const rd of roads) rd.path.forEach((id, i) => { deg[id] = (deg[id] || 0) + (i > 0) + (i < rd.path.length - 1); maxW[id] = Math.max(maxW[id] || 0, rd.w); });
   for (const [id, n] of Object.entries(nodes)) if (!n[2]) n[2] = deg[id] >= 3 ? undefined : 'corner';
   const lights = [];
-  for (const [id, [, , k]] of Object.entries(nodes)) { if (k) continue; if (maxW[id] >= 40 || deg[id] >= 5 || R() < 0.35) lights.push(id); }
+  for (const [id, [, , k]] of Object.entries(nodes)) { if (k || AUN.has(id)) continue; if (maxW[id] >= 40 || deg[id] >= 5 || R() < 0.35) lights.push(id); }
+  // Aurora: semáforos inteligentes (todos os cruzamentos de avenida e metade das ruas)
+  const smartLights = [];
+  for (const id of AUN) { if (nodes[id][2]) continue; if (maxW[id] >= 40 || deg[id] >= 5 || RA() < 0.5) { lights.push(id); smartLights.push(id); } }
   // linhas (para as marcações das faixas) e trechos retos (para continuar as saídas no terreno)
-  const clearOf = (id) => { const k = nodes[id][2]; return k === 'round' ? 52 : k === 'corner' || k === 'exit' ? 0 : maxW[id] / 2 + 14; };
+  const rOf = (id) => nodes[id][3] || 46; // raio da rotatória
+  const clearOf = (id) => { const k = nodes[id][2]; return k === 'round' ? rOf(id) + 6 : k === 'corner' || k === 'exit' ? 0 : maxW[id] / 2 + 14; };
   const lines = []; const segs = [];
   for (const rd of roads) {
     const pairs = rd.shape ? [[rd.path[0], rd.path.at(-1), rd.shape]] : rd.path.slice(1).map((b, i) => [rd.path[i], b, null]);
-    for (const [a, b, sh] of pairs) lines.push({ pts: sh ? sh.map((p) => p.slice()) : [nodes[a].slice(0, 2), nodes[b].slice(0, 2)], w: rd.w, ca: clearOf(a), cb: clearOf(b), diag: rd.id.startsWith('D'), road: rd.id });
-    if (rd.shape || rd.id.startsWith('D')) continue;
+    for (const [a, b, sh] of pairs) lines.push({ pts: sh ? sh.map((p) => p.slice()) : [nodes[a].slice(0, 2), nodes[b].slice(0, 2)], w: rd.w, ca: clearOf(a), cb: clearOf(b), diag: Boolean(rd.diag) || rd.id.startsWith('D'), road: rd.id, lanes: rd.lanes || 1, out: Boolean(rd.out) });
+    if (rd.shape || rd.diag || rd.id.startsWith('D')) continue;
     const P = rd.path.map((id) => nodes[id]); const v = P[0][0] === P.at(-1)[0];
-    if (v) segs.push({ v: true, x: P[0][0], y0: P[0][1], y1: P.at(-1)[1], w: rd.w, name: rd.name }); else segs.push({ v: false, y: P[0][1], x0: P[0][0], x1: P.at(-1)[0], w: rd.w, name: rd.name });
+    if (v) segs.push({ v: true, x: P[0][0], y0: P[0][1], y1: P.at(-1)[1], w: rd.w, name: rd.name, noStub: rd.noStub }); else segs.push({ v: false, y: P[0][1], x0: P[0][0], x1: P.at(-1)[0], w: rd.w, name: rd.name, noStub: rd.noStub });
   }
 
   // ---------------------------------------------------------------- camadas e auxiliares
@@ -214,6 +222,8 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
     blocks.push({ zone: ANNEX[j][i], part: 'rect', c: 7 + i, r: 4 + j, cell: [x0, y0, x1, y1], curb: roundPoly(insetPoly(V, d), 14), inner: insetPoly(V, d.map((v) => v + 16)), pave: roundPoly(insetPoly(V, d.map((v) => v + 16)), 6) });
   }
 
+  const auroraBl = auroraBlocks({ insetPoly, roundPoly, rectPts });
+
   // ---------------------------------------------------------------- composição de cada quarteirão
   const drive = (bb, side, x) => { // rebaixo de calçada (entrada de carro) até a rua
     const [x0, y0, x1, y1] = bb;
@@ -221,6 +231,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
     else if (side === 'e') G('lot', x1 - 4, x - 20, 22, 40); else G('lot', x0 - 18, x - 20, 22, 40);
   };
   function compose(b) {
+    const pois0 = pois.length;
     const z = b.zone; const bb = bboxOf(b.pave); const [x0, y0, x1, y1] = bb; const bw = x1 - x0; const bh = y1 - y0; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
     const groundMat = ['estacionamento', 'aeroparque', 'galpoes', 'fabrica', 'conteineres', 'posto', 'concessionaria'].includes(z) ? 'lot' : 'pave';
     GP('curb', b.curb); GP(groundMat, b.pave, groundMat === 'lot' ? { stalls: ['estacionamento', 'aeroparque'].includes(z), industrial: ['galpoes', 'fabrica', 'conteineres'].includes(z) } : {});
@@ -411,6 +422,23 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
         if (z === 'fabrica') poi('industria', 'Distrito Industrial', cx, poiY, '#/empresas', 'briefcase');
         break;
       }
+      case 'torres': { // centro financeiro (Aurora): torres de vidro altas e praça com chafariz
+        row(x0 + 2, x1 - 2, y0 + 2, 172, TOWERS, { gap: 8 });
+        courtyard(y0 + 178, y1 - 4);
+        break;
+      }
+      case 'vila': { // vila do interior: casas dos dois lados e quintal arborizado
+        row(x0 + 4, x1 - 4, y0 + 2, 84, RES, { gap: 10 }); row(x0 + 4, x1 - 4, y1 - 86, 84, RES, { gap: 10 });
+        const ya = y0 + 92; const yb = y1 - 92; if (yb - ya > 14) { GP('bed', roundPoly(rectPts(x0 + 10, ya, x1 - 10, yb), 6)); for (let x = x0 + 24; x < x1 - 16; x += 32) tree(x, (ya + yb) / 2 + 10, R() < 0.7); }
+        break;
+      }
+      case 'vilaCentro': case 'vilaPorto': { // centrinho da vila: comércio e pracinha (no porto, bar de pescador e caixotes)
+        row(x0 + 4, x1 - 4, y0 + 2, 96, z === 'vilaPorto' ? ['diner', 'bar', 'food', 'store247', 'bar2'] : ['shop', 'market', 'cafe', 'pharmacy', 'grocery', 'bar'], { gap: 8 });
+        courtyard(y0 + 102, y1 - 4);
+        if (z === 'vilaPorto') for (let x = x0 + 20; x < x1 - 10; x += 42) PX(pick(['caixotes', 'barril', 'pneus']), x, y1 - 10, true);
+        poi(`vila-${b.village?.id || 'x'}`, b.village?.name || 'Vila', cx, poiY, '#/social/eventos', 'sun');
+        break;
+      }
       case 'conteineres': {
         const cols = ['#c84a3a', '#3a7ac8', '#3aa85a', '#e8b84a', '#8a5ac8', '#e87a3a'];
         const nx = Math.floor((bw - 12) / 63); const ny = Math.floor((bh - 12) / 25); const ox = x0 + (bw - (nx * 63 - 3)) / 2; const oy = y0 + (bh - (ny * 25 - 3)) / 2;
@@ -421,6 +449,8 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
       }
       default: break;
     }
+    // Aurora: pontos de interesse com nome e id próprios (não se confundem com os de Nexus City)
+    if (b.city) for (let i = pois0; i < pois.length; i++) { if (!pois[i].id.endsWith('-aurora')) pois[i].id += '-aurora'; pois[i].label = auroraLabel(pois[i].label); }
   }
   for (const b of blocks) { compose(b); const bb = bboxOf(b.curb); regions.push({ name: REGION[b.zone] || 'Nexus City', rect: [bb[0] - 20, bb[1] - 20, bb[2] + 20, bb[3] + 20] }); }
 
@@ -535,25 +565,42 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
     for (const [k, x, y, s] of [['montanhas', 600, -420, 3], ['montanhas', 1700, -500, 3.4], ['montanhas', 2700, -430, 3.2], ['montanhas', 3800, -520, 3], ['montanhas', 4500, 600, 2.6], ['montanhas', 4550, 1900, 2.6], ['montanhas', 2300, 3350, 2.6], ['montanhas', 800, 3280, 2.2]]) if (T0.zone(x, y) === 2 && T0.zone(x, y - 120) === 2) XP(k, x, y, s, true);
   }
 
+  // ---------------------------------------------------------------- AURORA (segunda cidade): quarteirões, chão, aeroporto, natureza
+  let AUX = { blitz: [], area: null }; const AURAD = [];
+  {
+    const saved = R; R = RA; const nb = blds.length;
+    for (const b of auroraBl) {
+      compose(b); const bb = bboxOf(b.curb);
+      const nm = b.village ? b.village.name : `Aurora · ${(REGION[b.zone] || 'Centro').replace('Largo das Diagonais', 'Praça da Estrela').replace('Bairro Residencial', 'Bairro Jardim')}`;
+      regions.push({ name: nm, rect: [bb[0] - 20, bb[1] - 20, bb[2] + 20, bb[3] + 20] });
+    }
+    for (let i = nb; i < blds.length; i++) if (blds[i].label) blds[i].label = auroraLabel(blds[i].label);
+    AUX = auroraExtras({ R, pick, G, GP, B, SP, PX, XP, P, pine, tree, roundPoly, rectPts, roads, nodes, pois, regions, lamps, decals, fence, runwayLights, radars: AURAD, T0, dens, wOfS, drive, spots });
+    R = saved;
+  }
+
   // ---------------------------------------------------------------- máscara de colisão e alturas
-  const mw = W / CS; const mh = H / CS; const mask = new Uint8Array(mw * mh).fill(GRASS); const heights = new Uint8Array(mw * mh);
+  // máscara única do continente inteiro (núcleo de Nexus City, Aurora, vilas e terreno); OX/OY deslocam o índice
+  const BB = T0.bounds; const OX = -BB.x0; const OY = -BB.y0; const mw = T0.mw; const mh = T0.mh;
+  const mask = T0.grid.slice(); const heights = new Uint8Array(mw * mh);
+  for (let j = OY / CS; j < (OY + H) / CS; j++) mask.fill(GRASS, j * mw + OX / CS, j * mw + (OX + W) / CS); // núcleo começa em grama
   const code = { access: LOT, front: WALK, pond: WATER, water: WATER, sand: SAND, grass: GRASS, walk: WALK, road: ROAD, cross: CROSS, lot: LOT, runway: RUNWAY, plaza: PLAZA, base: ROAD, curb: WALK, pave: PLAZA, bed: GRASS };
   const cl = (v, m) => Math.max(0, Math.min(m, v)); // fill de array tipado com índice negativo conta do fim: sempre limitar
-  const fillRect = (c, x, y, w, h) => { const ax = cl(Math.floor(x / CS), mw); const ay = cl(Math.floor(y / CS), mh); const bx = cl(Math.ceil((x + w) / CS), mw); const by = cl(Math.ceil((y + h) / CS), mh); if (bx <= ax) return; for (let j = ay; j < by; j++) mask.fill(c, j * mw + ax, j * mw + bx); };
-  const fillEll = (c, x, y, w, h) => { const cx = x + w / 2; const cy = y + h / 2; const ax = Math.max(0, Math.floor(x / CS)); const ay = Math.max(0, Math.floor(y / CS)); const bx = Math.min(mw, Math.ceil((x + w) / CS)); const by = Math.min(mh, Math.ceil((y + h) / CS)); for (let j = ay; j < by; j++) for (let i = ax; i < bx; i++) { const dx = ((i + 0.5) * CS - cx) / (w / 2); const dy = ((j + 0.5) * CS - cy) / (h / 2); if (dx * dx + dy * dy <= 1) mask[j * mw + i] = c; } };
+  const fillRect = (c, x, y, w, h) => { const ax = cl(Math.floor((x + OX) / CS), mw); const ay = cl(Math.floor((y + OY) / CS), mh); const bx = cl(Math.ceil((x + w + OX) / CS), mw); const by = cl(Math.ceil((y + h + OY) / CS), mh); if (bx <= ax) return; for (let j = ay; j < by; j++) mask.fill(c, j * mw + ax, j * mw + bx); };
+  const fillEll = (c, x, y, w, h) => { const cx = x + w / 2 + OX; const cy = y + h / 2 + OY; const ax = Math.max(0, Math.floor((x + OX) / CS)); const ay = Math.max(0, Math.floor((y + OY) / CS)); const bx = Math.min(mw, Math.ceil((x + w + OX) / CS)); const by = Math.min(mh, Math.ceil((y + h + OY) / CS)); for (let j = ay; j < by; j++) for (let i = ax; i < bx; i++) { const dx = ((i + 0.5) * CS - cx) / (w / 2); const dy = ((j + 0.5) * CS - cy) / (h / 2); if (dx * dx + dy * dy <= 1) mask[j * mw + i] = c; } };
   const fillPoly = (c, pts) => {
     const [, b0, , b1] = bboxOf(pts); const xs = [];
-    for (let j = Math.max(0, Math.floor(b0 / CS)); j <= Math.min(mh - 1, Math.ceil(b1 / CS)); j++) {
-      const y = (j + 0.5) * CS; xs.length = 0;
+    for (let j = Math.max(0, Math.floor((b0 + OY) / CS)); j <= Math.min(mh - 1, Math.ceil((b1 + OY) / CS)); j++) {
+      const y = (j + 0.5) * CS - OY; xs.length = 0;
       for (let i = 0, n = pts.length; i < n; i++) { const [ax, ay] = pts[i]; const [bx, by] = pts[(i + 1) % n]; if ((ay > y) !== (by > y)) xs.push(ax + ((y - ay) / (by - ay)) * (bx - ax)); }
       xs.sort((p, q) => p - q);
-      for (let k = 0; k + 1 < xs.length; k += 2) { const i0 = Math.max(0, Math.ceil(xs[k] / CS - 0.5)); const i1 = Math.min(mw - 1, Math.floor(xs[k + 1] / CS - 0.5)); if (i1 >= i0) mask.fill(c, j * mw + i0, j * mw + i1 + 1); }
+      for (let k = 0; k + 1 < xs.length; k += 2) { const i0 = Math.max(0, Math.ceil((xs[k] + OX) / CS - 0.5)); const i1 = Math.min(mw - 1, Math.floor((xs[k + 1] + OX) / CS - 0.5)); if (i1 >= i0) mask.fill(c, j * mw + i0, j * mw + i1 + 1); }
     }
   };
   // faixas de pedestre nos braços dos cruzamentos (ruas retas), giradas conforme a rua
   for (const [id, [nx, ny, k]] of Object.entries(nodes)) {
     if (k === 'exit' || k === 'corner') continue;
-    const dist = k === 'round' ? 60 : maxW[id] / 2 + 8;
+    const dist = k === 'round' ? rOf(id) + 14 : maxW[id] / 2 + 8;
     for (const L of lines) {
       if (L.diag) continue;
       const ends = [[L.pts[0], L.pts[1]], [L.pts.at(-1), L.pts.at(-2)]];
@@ -577,10 +624,10 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   for (const b of blds) {
     const hgt = Math.min(250, b.floors * 9 + 6);
     if (b.round) fillEll(SOLID, b.x, b.y, b.w, b.h); else fillRect(SOLID, b.x, b.y, b.w, b.h);
-    const ax = Math.floor(b.x / CS); const ay = Math.floor(b.y / CS); const bx2 = Math.ceil((b.x + b.w) / CS); const by2 = Math.ceil((b.y + b.h) / CS);
+    const ax = Math.floor((b.x + OX) / CS); const ay = Math.floor((b.y + OY) / CS); const bx2 = Math.ceil((b.x + b.w + OX) / CS); const by2 = Math.ceil((b.y + b.h + OY) / CS);
     for (let j = ay; j < by2; j++) for (let i = ax; i < bx2; i++) if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], hgt);
   }
-  const maskAt = (x, y) => { const i = Math.floor(x / CS); const j = Math.floor(y / CS); return i < 0 || j < 0 || i >= mw || j >= mh ? -1 : mask[j * mw + i]; };
+  const maskAt = (x, y) => { const i = Math.floor((x + OX) / CS); const j = Math.floor((y + OY) / CS); return i < 0 || j < 0 || i >= mw || j >= mh ? -1 : mask[j * mw + i]; };
   const nearBld = (x, y, m = 8) => blds.some((b) => x > b.x - m && x < b.x + b.w + m && y > b.y - m && y < b.y + b.h + m);
 
   // ---------------------------------------------------------------- calçadas: postes, mobiliário, placas e bueiros
@@ -591,7 +638,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   let fk = 0;
   for (const L of lines) {
     const len = total(L.pts); const hw = L.w / 2; const s0 = L.ca + 26; const s1 = len - L.cb - 26; if (s1 <= s0) continue;
-    const ind = L.pts[0][0] >= 2680 && L.pts.at(-1)[0] >= 2680 && !(L.pts[0][1] === 1248 && L.pts.at(-1)[1] === 1248); const outside = L.road === 'V1400' && (L.pts[0][1] < 1248 || L.pts[0][1] > 2528);
+    const ind = L.pts[0][0] >= 2680 && L.pts.at(-1)[0] >= 2680 && L.pts[0][0] <= W && L.pts.at(-1)[0] <= W && !(L.pts[0][1] === 1248 && L.pts.at(-1)[1] === 1248); const outside = (L.road === 'V1400' && (L.pts[0][1] < 1248 || L.pts[0][1] > 2528)) || (L.out && L.w < 56);
     for (let s = s0; s <= s1; s += 88) {
       const [x, y, a] = at(L.pts, s); const nx = -Math.sin(a); const ny = Math.cos(a);
       for (const side of [-1, 1]) {
@@ -627,6 +674,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   }
   const radars = [{ at: [1400, 1728], limit: 50 }, { at: [1400, 2368], limit: 50 }, { at: [920, 1888], limit: 50 }, { at: [2200, 1888], limit: 50 }, { at: [1880, 1248], limit: 50 }, { at: [3370, 1248], limit: 40 }, { at: [3850, 2208], limit: 60 }, { at: [1880, 2528], limit: 40 }];
   for (const r of radars) PX('placa-50', r.at[0] + 34, r.at[1] - 30);
+  radars.push(...AURAD); // radares da Aurora (placas já postas em city2.js)
   if (DEL.size) {
     for (let i = props.length - 1; i >= 0; i--) { const p = props[i]; if (p.user || !DEL.has(genKey(p))) continue; props.splice(i, 1); if (p.lamp) for (let k = lamps.length - 1; k >= 0; k--) if (Math.abs(lamps[k][0] - p.x) < 4 && Math.abs(lamps[k][1] - p.y) < 10) lamps.splice(k, 1); }
     for (let i = decals.length - 1; i >= 0; i--) if (DEL.has(genKey(decals[i]))) decals.splice(i, 1);
@@ -638,13 +686,13 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   for (const p of props) if (p.solid) {
     const big = p.w > 60 && p.h > 40;
     if (big) { const r = Math.min(p.w * 0.36, p.h * 0.3); fillEll(SOLID, p.x - r, p.y - r * 1.6, r * 2, r * 1.6); } else { const r = p.spr.startsWith('arvore') || p.spr.startsWith('x:') ? 4 : 3; fillRect(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); }
-    const i = Math.floor(p.x / CS); const j = Math.floor(p.y / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.ht || 10);
+    const i = Math.floor((p.x + OX) / CS); const j = Math.floor((p.y + OY) / CS); if (i >= 0 && j >= 0 && i < mw && j < mh) heights[j * mw + i] = Math.max(heights[j * mw + i], p.ht || 10);
   }
   // travessias: o caminho das calçadas (mesma conta do grafo de ruas) cruza o asfalto perto das esquinas e das
   // diagonais; esses pontos viram faixa (pedestre e carro podem passar), sem mudar o desenho
   {
-    const nclear = (id) => { const k = nodes[id][2]; return k === 'round' ? 44 : k === 'corner' ? 8 : k === 'exit' ? 0 : maxW[id] / 2 + 7; };
-    const wtrim = (id) => { const k = nodes[id][2]; return k === 'round' ? 56 : k === 'exit' ? 0 : nclear(id) + 6; };
+    const nclear = (id) => { const k = nodes[id][2]; return k === 'round' ? rOf(id) - 2 : k === 'corner' ? 8 : k === 'exit' ? 0 : maxW[id] / 2 + 7; };
+    const wtrim = (id) => { const k = nodes[id][2]; return k === 'round' ? rOf(id) + 10 : k === 'exit' ? 0 : nclear(id) + 6; };
     for (const rd of roads) {
       const pairs = rd.shape ? [[rd.path[0], rd.path.at(-1), rd.shape]] : rd.path.slice(1).map((b, i) => [rd.path[i], b, null]);
       for (const [a, b, sh] of pairs) {
@@ -656,7 +704,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
           for (let s2 = 0; s2 <= L; s2 += 2) {
             const [x, y] = at(off, s2);
             if (Math.hypot(x - nodes[a][0], y - nodes[a][1]) < t0 || Math.hypot(x - nodes[b][0], y - nodes[b][1]) < t1) continue;
-            for (const [ex, ey] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]]) { const i = Math.floor((x + ex) / CS); const j = Math.floor((y + ey) / CS); if (i >= 0 && j >= 0 && i < mw && j < mh && mask[j * mw + i] === ROAD) mask[j * mw + i] = CROSS; }
+            for (const [ex, ey] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]]) { const i = Math.floor((x + ex + OX) / CS); const j = Math.floor((y + ey + OY) / CS); if (i >= 0 && j >= 0 && i < mw && j < mh && mask[j * mw + i] === ROAD) mask[j * mw + i] = CROSS; }
           }
         }
       }
@@ -668,17 +716,14 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   if (wb) pois.push({ id: 'construtora', label: 'Construtora Nexus', at: [Math.round(wb.x + wb.w / 2), Math.round(wb.y + wb.h + 14)], route: '#/construtora', icon: 'building' });
 
   // ---------------------------------------------------------------- terreno em volta (expansões) e costa
-  const coast = T0; const BB = coast.bounds; const OX = -BB.x0; const OY = -BB.y0;
-  const emw = coast.mw; const emh = coast.mh; const oi = OX / CS; const oj = OY / CS;
-  const emask = coast.grid.slice(); const eh = new Uint8Array(emw * emh);
-  for (let j = 0; j < mh; j++) { emask.set(mask.subarray(j * mw, (j + 1) * mw), (j + oj) * emw + oi); eh.set(heights.subarray(j * mw, (j + 1) * mw), (j + oj) * emw + oi); }
-  const eFill = (c, x, y, w, h) => { const ax = cl(Math.floor((x + OX) / CS), emw); const ay = cl(Math.floor((y + OY) / CS), emh); const bx = cl(Math.ceil((x + w + OX) / CS), emw); const by = cl(Math.ceil((y + h + OY) / CS), emh); if (bx <= ax) return; for (let j = ay; j < by; j++) emask.fill(c, j * emw + ax, j * emw + bx); };
+  const coast = T0; const eFill = fillRect;
   // estradas que saem do núcleo continuam pelo terreno até a praia/borda (com barreira no fim)
   const stubs = [];
   for (const s2 of segs) {
     const ends = s2.v ? [[s2.y0, -1], [s2.y1, 1]] : [[s2.x0, -1], [s2.x1, 1]];
+    if (s2.noStub) continue; // continua como rodovia (Aurora)
     for (const [e, dir] of ends) {
-      if (s2.v ? (e > 0 && e < H) : (e > 0 && e < W)) continue;
+      if (e !== 0 && e !== (s2.v ? H : W)) continue; // só as saídas na borda do núcleo
       let L = 0; while (L < 900) { const px = s2.v ? s2.x : e + dir * (L + 8); const py = s2.v ? e + dir * (L + 8) : s2.y; if (coast.zone(px, py) !== 2) break; L += 8; }
       L -= 24; if (L < 24) continue;
       const half = s2.w / 2;
@@ -692,15 +737,14 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
       for (let k = -1; k <= 1; k++) PX('barreira', s2.v ? ex + k * (s2.w / 3) : ex, (s2.v ? ey : ey + k * (s2.w / 3)) + 5, true);
     }
   }
-  for (const f of userFloor) eFill(code[f.mat], f.x, f.y, f.w, f.h);
-  for (const b of blds) if (b.user) { eFill(SOLID, b.x, b.y, b.w, b.h); const ax = Math.floor((b.x + OX) / CS); const ay = Math.floor((b.y + OY) / CS); const hgt = Math.min(250, b.floors * 9 + 6); for (let j = ay; j < Math.ceil((b.y + b.h + OY) / CS) && j < emh; j++) for (let i = ax; i < Math.ceil((b.x + b.w + OX) / CS) && i < emw; i++) if (i >= 0 && j >= 0) eh[j * emw + i] = Math.max(eh[j * emw + i], hgt); }
-  for (const p of props) if (p.solid && (p.user || p.x < 0 || p.y < 0 || p.x > W || p.y > H)) { const big = p.w > 60 && p.h > 40; const r = big ? Math.min(p.w * 0.36, p.h * 0.3) : p.spr.startsWith('arvore') || p.spr.startsWith('x:') ? 4 : 3; eFill(SOLID, p.x - r, p.y - r * (big ? 1.6 : 1.5), r * 2, r * (big ? 1.6 : 2)); }
+  // (a máscara do continente já recebeu chão, construções e objetos sólidos de todo o mapa)
   // continuação das estradas desenhada por cima da mata (some com as árvores que caíram em cima)
   for (let i = props.length - 1; i >= 0; i--) { const p = props[i]; if (p.user || !(p.x < 0 || p.y < 0 || p.x > W || p.y > H)) continue; if (stubs.some(([a, b2, c2, d2]) => p.x > a - 26 && p.x < a + c2 + 26 && p.y > b2 - 10 && p.y < b2 + d2 + 40)) props.splice(i, 1); }
 
-  const nodeInfo = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { x: n[0], y: n[1], kind: n[2], maxW: maxW[id] || 0 }]));
+  const nodeInfo = Object.fromEntries(Object.entries(nodes).map(([id, n]) => [id, { x: n[0], y: n[1], kind: n[2], maxW: maxW[id] || 0, r: n[3] || 46 }]));
   return {
-    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: OX, oy: OY, bounds: BB, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, rentSpot, planeSpots,
-    R: { w: W, h: H, nodes, roads, lights, lots: [], pois, regions, radars }, segs, lines, nodeInfo,
+    W, H, CS, mw, mh, mask, heights, ox: OX, oy: OY, bounds: BB, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, rentSpot, planeSpots,
+    aurora: { blitz: AUX.blitz, area: AUX.area },
+    R: { w: W, h: H, nodes, roads, lights, smartLights, lots: [], pois, regions, radars }, segs, lines, nodeInfo,
   };
 }

@@ -1,7 +1,7 @@
 // TrafficSystem — carros automáticos: seguem as faixas (mão direita), escolhem o caminho em cada cruzamento
 // (ou seguem uma rota, no caso de viaturas e ambulâncias), param no vermelho, reduzem nas curvas e rotatórias,
 // mantêm distância (cone de visão à frente) e esperam pedestres. Sem física: rotas, pontos e controle de velocidade.
-import { along, turnPath, lightState, routeNodes } from './world.js';
+import { along, turnPath, lightState, routeNodes, stepSmartLights } from './world.js';
 
 const LEN = { carro: 22, taxi: 22, policia: 23, ambulancia: 25, bombeiros: 30, caminhao: 30, van: 25, moto: 12, meu: 22, coleta: 30, guincho: 30 };
 export const lengthOf = (kind) => LEN[kind] || 22;
@@ -67,6 +67,7 @@ function ahead(c, list, maxD, skipStatic = false) {
 const isStatic = (o) => (o.wrecked > 0 && !o.reckless) || o.hold || o.towedBy || o.sceneHold;
 
 export function stepTraffic(T, world, dt, t, ctx) {
+  stepSmartLights(world, T.cars, dt, ctx.view); // semáforos inteligentes (sensores de fila)
   const obstacles = [...T.cars, ...ctx.extra];
   for (const c of T.cars) {
     if (c.mode === 'chase' || c.mode === 'parked' || c.towedBy) continue;

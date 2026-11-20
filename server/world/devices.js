@@ -106,6 +106,7 @@ export function walletOf(w) {
   const u = account(w); const b = bankOf(w);
   const docs = [{ kind: 'rg', title: 'Identidade de Nexus City', sub: `Cidadã(o) desde ${new Date(w.core.genesisAt).toLocaleDateString('pt-BR')}` }];
   if ((u.properties || []).length) docs.push({ kind: 'escritura', title: `Escrituras (${u.properties.length})`, sub: 'Imóveis no seu nome' });
+  if (u.cnh) docs.push({ kind: 'cnh', title: `CNH categoria ${u.cnh.categoria}`, sub: u.cnh.status === 'suspensa' ? 'Suspensa (desacato em blitz)' : `Regular · válida até ${new Date(u.cnh.validade).toLocaleDateString('pt-BR')}` });
   const licenses = [
     ...(u.diplomas || []).map((d) => ({ kind: 'diploma', title: `Diploma: ${d}`, sub: 'Educação de Nexus City' })),
     ...(u.profession ? [{ kind: 'profissao', title: `Registro profissional`, sub: u.profession }] : []),

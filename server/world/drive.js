@@ -14,6 +14,7 @@ import * as C from './crimes.js';
 import { photo } from './flights.js';
 import { worldPost } from '../social.js';
 import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
+import { cnhOf, detentionOf } from './blitz.js';
 
 export const MAP = { v: 'v4', w: 4096, h: 2816 }; // v4: cidade refeita (vagas salvas no traçado antigo são descartadas)
 export const FINES = {
@@ -39,7 +40,8 @@ export function driveState(w) {
   const people = residents(w).filter((p) => p.agent?.status === 'ativo' && !(p.agent.injuredUntil && p.agent.injuredUntil > nowIso()) && !(p.agent.health && ['ferido', 'ferido_grave', 'internado', 'em_recuperacao', 'morto'].includes(p.agent.health.state)))
     .sort((a, b) => out.has(b.id) - out.has(a.id)).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, color: p.color, job: p.job, gender: p.gender === 'm' ? 'm' : p.gender === 'f' ? 'f' : null, out: out.has(p.id) }));
   const today = nowIso().slice(0, 10);
-  return { map: MAP, reforma: reformaPublic(w), cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance };
+  const cnh = cnhOf(w);
+  return { map: MAP, reforma: reformaPublic(w), cars, main: u.devices.vehicle || null, people, fines: (u.trafficFines || []).filter((f) => f.at.slice(0, 10) === today).length, limits: { perDay: PER_DAY }, catalog: FINES, balance: bankOf(w).balance, detention: detentionOf(w), cnh: { status: cnh.status, categoria: cnh.categoria } };
 }
 
 const mine = (w, itemId) => { const it = (account(w).inventory || []).find((x) => x.id === itemId); if (!it || !(VEHICLES[it.key] || AIRCRAFT[it.key])) throw new BankError('Esse veículo não é seu'); return it; };

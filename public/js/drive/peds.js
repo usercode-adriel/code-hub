@@ -147,8 +147,9 @@ export function stepPeds(P, world, dt, t, cars, view) {
     } else p.lat = 0;
     place(p);
     if (Math.random() < dt * 0.02) p.pause = 1 + Math.random() * 3;
-    // passante longe da câmera reaparece perto (os moradores com nome continuam a rotina onde estiverem)
-    if (!p.real && view) { p.far = Math.hypot(p.x - view.x, p.y - view.y) > view.r + 900 ? (p.far || 0) + dt : 0; if (p.far > 5) respawnNear(P, p, view); }
+    // passante longe da câmera reaparece perto (fora da tela). Moradores com nome também, mas só depois de 10 s
+    // longe: assim eles circulam onde o jogador está e se encontram na rua (conversas)
+    if (view) { p.far = Math.hypot(p.x - view.x, p.y - view.y) > view.r + 900 ? (p.far || 0) + dt : 0; if (p.far > (p.real ? 10 : 5)) respawnNear(P, p, view); }
   }
   return crossing;
 }

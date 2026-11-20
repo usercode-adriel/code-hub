@@ -59,3 +59,14 @@ test('no máximo três conversas ao mesmo tempo na tela', async () => {
   for (let k = 0; k < 40; k++) { T.scan(2, { x: 100, y: 100, r: 500 }); await new Promise((r) => setTimeout(r, 0)); clock += 50000; T.tick(0.02); }
   assert.ok(T.active.length <= 3, `conversas ativas: ${T.active.length}`);
 });
+
+test('quem já fez uma pausa (contador levemente negativo) continua podendo conversar', async () => {
+  const P = fakeWorld(2); P.peds[0].pause = -0.013; P.peds[1].pause = -0.2;
+  const T = createTalks({ P, request: async () => ({ lines: [{ who: 'a', text: 'Oi!' }] }), now: () => 0, rand: () => 0 });
+  T.scan(2, { x: 100, y: 100, r: 500 }); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(P.peds[0].state, 'conversa');
+  const Q = fakeWorld(2); Q.peds[0].pause = 1.5; // parado de verdade: não puxa conversa
+  const T2 = createTalks({ P: Q, request: async () => ({ lines: [{ who: 'a', text: 'Oi!' }] }), now: () => 0, rand: () => 0 });
+  T2.scan(2, { x: 100, y: 100, r: 500 }); await new Promise((r) => setTimeout(r, 0));
+  assert.equal(Q.peds[0].state, 'walk');
+});

@@ -169,6 +169,8 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
       x.strokeStyle = '#f2c94c';
       if (M.w >= 48) { strokePts(x, offPts(P, 1.6)); strokePts(x, offPts(P, -1.6)); }
       else { x.setLineDash(M.w >= 40 ? [12, 8] : [7, 7]); strokePts(x, P); x.setLineDash([]); }
+      // vias de 4 faixas: divisória branca tracejada entre as duas faixas de cada sentido
+      if (M.lanes >= 2) { x.strokeStyle = 'rgba(240,240,236,.8)'; x.lineWidth = 1; x.setLineDash([10, 9]); strokePts(x, offPts(P, M.w * 0.25)); strokePts(x, offPts(P, -M.w * 0.25)); x.setLineDash([]); }
       // setas no asfalto antes dos cruzamentos (uma por sentido)
       if (M.t.len > 120 && !M.ext) {
         for (const dir of [1, -1]) {
@@ -182,11 +184,14 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     }
     // rotatórias: anel branco e ilha central ajardinada
     for (const n of Object.values(city.nodeInfo || {})) {
-      if (n.kind !== 'round' || n.x < rx0 - 80 || n.x > rx1 + 80 || n.y < ry0 - 80 || n.y > ry1 + 80) continue;
-      x.fillStyle = pat.road; x.beginPath(); x.arc(n.x, n.y, 46, 0, Math.PI * 2); x.fill();
-      x.strokeStyle = 'rgba(236,235,230,.8)'; x.lineWidth = 1; x.setLineDash([6, 5]); x.beginPath(); x.arc(n.x, n.y, 31, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
-      x.fillStyle = pat.walk; x.beginPath(); x.arc(n.x, n.y, 20, 0, Math.PI * 2); x.fill(); x.fillStyle = pat.park; x.beginPath(); x.arc(n.x, n.y, 16, 0, Math.PI * 2); x.fill();
-      x.strokeStyle = '#5f5b54'; x.lineWidth = 1.5; x.beginPath(); x.arc(n.x, n.y, 20, 0, Math.PI * 2); x.stroke();
+      const R0 = n.r || 46; const k = R0 / 46;
+      if (n.kind !== 'round' || n.x < rx0 - 40 - R0 || n.x > rx1 + 40 + R0 || n.y < ry0 - 40 - R0 || n.y > ry1 + 40 + R0) continue;
+      x.fillStyle = pat.road; x.beginPath(); x.arc(n.x, n.y, R0, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = 'rgba(236,235,230,.8)'; x.lineWidth = 1; x.setLineDash([6, 5]); x.beginPath(); x.arc(n.x, n.y, 31 * k, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+      x.fillStyle = pat.walk; x.beginPath(); x.arc(n.x, n.y, 20 * k, 0, Math.PI * 2); x.fill(); x.fillStyle = pat.park; x.beginPath(); x.arc(n.x, n.y, 16 * k, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#5f5b54'; x.lineWidth = 1.5; x.beginPath(); x.arc(n.x, n.y, 20 * k, 0, Math.PI * 2); x.stroke();
+      // rotatória grande: canteiro com caminhos em cruz e monumento no centro
+      if (R0 >= 70) { x.fillStyle = pat.walk; for (let q = 0; q < 4; q++) { x.save(); x.translate(n.x, n.y); x.rotate((q * Math.PI) / 4); x.fillRect(-16 * k, -2, 32 * k, 4); x.restore(); } x.fillStyle = '#9b958a'; x.beginPath(); x.arc(n.x, n.y, 9, 0, Math.PI * 2); x.fill(); x.fillStyle = '#d8d2c4'; x.beginPath(); x.arc(n.x, n.y, 5, 0, Math.PI * 2); x.fill(); }
     }
     // faixas de pedestre (giradas conforme a rua)
     for (const g of city.ground) {

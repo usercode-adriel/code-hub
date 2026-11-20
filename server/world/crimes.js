@@ -15,6 +15,8 @@ export const CRIMES = {
   resistencia: { label: 'Resistência à prisão', sev: 2, type: 'desobediencia' },
   dano: { label: 'Dano ao patrimônio', sev: 1, type: 'vandalismo' },
   atropelamento_doloso: { label: 'Atropelamento criminoso', sev: 3, type: 'estelionato' },
+  desacato: { label: 'Desacato à autoridade', sev: 2, type: 'desobediencia' },
+  dirigir_sem_habilitacao: { label: 'Dirigir sem habilitação', sev: 1, type: 'desobediencia' },
 };
 
 // ficha criminal: histórico persistente por pessoa (o agente guarda o próprio registro)

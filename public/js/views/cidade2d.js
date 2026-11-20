@@ -6,7 +6,8 @@
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { esc, toast } from '../ui.js';
-import { buildGraph, lightState, nearestWalk, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY } from '../drive/world.js';
+import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY } from '../drive/world.js';
+import { createBlitz } from '../drive/blitz.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
@@ -98,6 +99,10 @@ export default async function render(el, params = new URLSearchParams()) {
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
   const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'heroi'}`; })(), row: 0, walkT: 0 };
   [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
+  // detido(a) numa blitz: começa na delegacia (a detenção corre no relógio do servidor)
+  let DET = state.detention || null;
+  const stationNear = (id, x, y) => city.pois.filter((p) => p.id === id || p.id.startsWith(`${id}-`)).sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - y) - Math.hypot(b.at[0] - x, b.at[1] - y))[0]?.at;
+  if (DET) { const pol = city.pois.find((p) => p.id === 'policia-aurora')?.at || stationNear('policia', me.x, me.y); if (pol) [me.x, me.y] = nearestWalk(world, pol[0], pol[1] - 10, 60) || pol; }
   const cam = createCamera(world); cam.z = touch ? 2.6 : 2.4; cam.x = cam.tx = me.x; cam.y = cam.ty = me.y;
   const particles = [];
   const notify = (t, m, k = 'info') => toast(t, m, k);
@@ -204,6 +209,7 @@ export default async function render(el, params = new URLSearchParams()) {
   // entrar/sair (E ou botão): carro com porta animada, avião no pátio
   function act() {
     if (me.anim) return;
+    if (DET) { toast('Você está detido(a)', 'Espere a liberação ou pague a fiança.', 'warning'); return; }
     if (me.mode === 'car') {
       const c = me.car;
       if (Math.abs(c.v) > 4) { toast('Pare o carro primeiro', 'Freie até parar para poder sair.', 'info'); return; }
@@ -298,7 +304,11 @@ export default async function render(el, params = new URLSearchParams()) {
     const k = tipo.replace(/-.*/, ''); if ((fineQ.get(k) || 0) > performance.now()) return; fineQ.set(k, performance.now() + 15000);
     try { const r = await api.post('/mundo/cidade2d/infracao', { tipo, veiculo: (me.car || me.plane)?.name, ...extra }); if (r.ok) { toast('🚨 Multa', `${r.fine.label}: ${r.fine.amount} NXC (Banco → Pendências)`, 'error'); flash = 1; refreshStatus(true); } } catch { /* offline */ }
   }
-  const policeNear = (p, r) => T.cars.some((c) => c.kind === 'policia' && !c.job && Math.hypot(c.x - p.x, c.y - p.y) < r);
+  const policeNear = (p, r) => T.cars.some((c) => c.kind === 'policia' && (!c.job || c.job.kind === 'blitz') && Math.hypot(c.x - p.x, c.y - p.y) < r);
+  // Aurora (cidade inteligente): câmeras da Central de Monitoramento cobrem a cidade toda
+  const inAurora = (p) => { const a = city.aurora?.area; return Boolean(a) && p.x > a[0] && p.x < a[2] && p.y > a[1] && p.y < a[3]; };
+  let camNote = 0;
+  const centralSaw = (what) => { if (camNote > performance.now()) return; camNote = performance.now() + 20000; toast('📹 Central de Monitoramento', `${what} registrado pelas câmeras de Aurora.`, 'warning'); };
   const lightIn = new Map(); const radarHit = new Map();
   function enforce(t) {
     const c = me.car; if (!c) return; const kmh = toKmh(c.v);
@@ -307,13 +317,17 @@ export default async function render(el, params = new URLSearchParams()) {
       const inside = Math.hypot(c.x - n.x, c.y - n.y) < n.clear - 6; const was = lightIn.get(n.id) || false;
       if (inside && !was && kmh > 8 && c.v > 0) {
         const axis = Math.abs(Math.cos(c.a)) >= Math.abs(Math.sin(c.a)) ? 'H' : 'V';
-        if (lightState(n, axis, t) === 'red') { fine('sinal'); if (policeNear(c, 320)) INC.startChase(1, 'Avanço de sinal vermelho na frente da polícia', c); }
+        if (lightState(n, axis, t) === 'red') { fine('sinal'); if (inAurora(c)) centralSaw('Avanço de sinal vermelho'); if (policeNear(c, 320)) INC.startChase(1, 'Avanço de sinal vermelho na frente da polícia', c); }
       }
       lightIn.set(n.id, inside);
     }
     for (const [i, r] of world.radars.entries()) {
       if (Math.hypot(c.x - r.at[0], c.y - r.at[1]) > 26 || (radarHit.get(i) || 0) > performance.now()) continue;
-      if (kmh > r.limit * 1.07 + 2) { radarHit.set(i, performance.now() + 8000); const ex = kmh / r.limit - 1; fine(ex <= 0.2 ? 'velocidade' : ex <= 0.5 ? 'velocidade-grave' : 'velocidade-gravissima', { kmh: Math.round(kmh), limite: r.limit }); if (ex > 0.5 && policeNear(c, 400)) INC.startChase(1, 'Excesso de velocidade', c); }
+      if (kmh > r.limit * 1.07 + 2) {
+        radarHit.set(i, performance.now() + 8000); const ex = kmh / r.limit - 1; fine(ex <= 0.2 ? 'velocidade' : ex <= 0.5 ? 'velocidade-grave' : 'velocidade-gravissima', { kmh: Math.round(kmh), limite: r.limit });
+        // em Aurora a central manda uma viatura atrás de quem passa muito acima do limite, mesmo sem polícia por perto
+        if (ex > 0.5 && (policeNear(c, 400) || r.aurora)) { if (r.aurora) centralSaw(`Excesso de velocidade (${Math.round(kmh)} km/h)`); INC.startChase(1, r.aurora ? 'Central de Monitoramento: excesso de velocidade' : 'Excesso de velocidade', c); }
+      }
     }
   }
 
@@ -492,6 +506,7 @@ export default async function render(el, params = new URLSearchParams()) {
           lights.push({ x: n.x + dx, y: n.y + dy - 2, r: 7, color: col(s), ka: 0.6, halo: 0.8 });
         }
       }
+      for (const sc of blitzScene.values()) if (sc) for (const [x, y] of sc.cones) { if (!inV({ x, y })) continue; ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 2.4, y - 0.6, 4.8, 1.4); ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(x, y - 6.5); ctx.lineTo(x + 2.6, y); ctx.lineTo(x - 2.6, y); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.5, y - 3.6, 3, 1); }
       for (const r of world.radars) { if (!inV({ x: r.at[0], y: r.at[1] })) continue; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#e11d48'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(r.at[0] + 18, r.at[1] - 18, 4.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#111'; ctx.font = 'bold 4.6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(r.limit), r.at[0] + 18, r.at[1] - 17.7); ctx.fillStyle = '#334155'; ctx.fillRect(r.at[0] + 23, r.at[1] - 20, 4, 3); }
     }
     // objetos com profundidade (ordenados por y): pedestres, carros, aviões no chão, jogador
@@ -558,6 +573,7 @@ export default async function render(el, params = new URLSearchParams()) {
       for (const m of PR.members()) { if (!inV(m, 0)) continue; if (m.sign) { const up = m.state === 'protesta' ? Math.abs(Math.sin(t * 3 + m.phase)) * 3 : 0; const [sx, sy] = S(m.x, m.y - 19 - up); ctx.fillStyle = '#7a5230'; ctx.fillRect(Math.round(sx) - 0.5, Math.round(sy), 1.4, 6 * z / 3); pill(sx, sy, m.sign, '#fdfdf7', '#b4121f', 8); } bub(m, 27); }
     }
     if (z >= 2.2) { let n = 0; for (const p of P.peds) { if (!p.real || p.state === 'levado' || !inV(p, 0) || n++ > 26) continue; const [sx, sy] = S(p.x, p.y - 17); pill(sx, sy, p.name.split(' ')[0], p.state === 'ferido' ? 'rgba(160,20,30,.85)' : 'rgba(10,13,43,.7)', '#fff', 9); } }
+    for (const sc of blitzScene.values()) { if (!sc || !inV(sc.car, 0)) continue; const [sx, sy] = S(sc.car.x, sc.car.y - 22); pill(sx, sy, '🚓 BLITZ', '#b4121f', '#fff', 10); }
     for (const o of own) { if (o === me.car || o === me.plane || !inV(o, 0)) continue; const [sx, sy] = S(o.x, o.y - (o.kind === 'aviao' ? 30 : 19)); pill(sx, sy, `${o.school ? 'ESCOLA' : o.rental ? 'ALUGADO' : 'SEU'} · ${o.name.replace(' (alugado)', '')}${(o.health ?? 100) <= 0 ? ' (inutilizado)' : ''}`, (o.health ?? 100) <= 0 ? '#a3122a' : '#1f9d5a', '#fff', 10); }
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.5})`; ctx.fillRect(0, 0, vw, vh); }
   }
@@ -589,6 +605,7 @@ export default async function render(el, params = new URLSearchParams()) {
     mctx.strokeStyle = 'rgba(255,255,255,.9)'; mctx.lineWidth = 1; mctx.strokeRect(X(cam.x - cam.vw / 2 / cam.z), Y(cam.y - cam.vh / 2 / cam.z), (cam.vw / cam.z) * kx, (cam.vh / cam.z) * ky);
     for (const o of own) { mctx.fillStyle = (o.health ?? 100) <= 0 ? '#ff4d5e' : o.kind === 'aviao' ? '#f7c948' : '#2fd27a'; mctx.fillRect(X(o.x) - 2, Y(o.y) - 2, 4, 4); }
     for (const inc of INC.list) { mctx.fillStyle = '#ff4d5e'; mctx.beginPath(); mctx.arc(X(inc.x), Y(inc.y), 3, 0, Math.PI * 2); mctx.fill(); }
+    for (const sc of blitzScene.values()) if (sc) { mctx.fillStyle = Math.floor(Date.now() / 400) % 2 ? '#ff3a3a' : '#3a7aff'; mctx.fillRect(X(sc.car.x) - 2, Y(sc.car.y) - 2, 4, 4); }
     if (INC.chase.on && INC.chase.car) { mctx.fillStyle = Math.floor(Date.now() / 250) % 2 ? '#3a7aff' : '#ff3a3a'; mctx.fillRect(X(INC.chase.car.x) - 2, Y(INC.chase.car.y) - 2, 4, 4); }
     const p = me.car || me.plane || me; mctx.fillStyle = '#38d6f5'; mctx.beginPath(); mctx.arc(X(p.x), Y(p.y), 3.2, 0, Math.PI * 2); mctx.fill(); mctx.strokeStyle = '#0a0d2b'; mctx.stroke();
   }
@@ -618,6 +635,7 @@ export default async function render(el, params = new URLSearchParams()) {
     if (air.dataset.t !== at) { air.dataset.t = at; air.hidden = !at; air.textContent = at; }
     const sb = $('#d2Sky'); const ban = SKY.banner && SKY.banner.until > performance.now() ? SKY.banner.text : '';
     if (sb.dataset.t !== ban) { sb.dataset.t = ban; sb.hidden = !ban; sb.textContent = ban ? `✈ ${ban}` : ''; }
+    jailHud();
     const ch = INC.chase; const wv = $('#d2Want');
     wv.hidden = !ch.on; if (ch.on) wv.innerHTML = `<b>🚨 PERSEGUIÇÃO</b><span>${'★'.repeat(ch.level)}${'☆'.repeat(Math.max(0, 3 - ch.level))}</span><small>${ch.lost > 0 ? `despistando… ${Math.ceil(10 - ch.lost)} s` : 'a viatura está atrás de você'}</small>`;
     // interações
@@ -636,6 +654,101 @@ export default async function render(el, params = new URLSearchParams()) {
       pr.querySelector('[data-act="enter"]')?.addEventListener('click', act);
       pr.querySelector('[data-act="tow"]')?.addEventListener('click', () => { const t = me.car || nearest(own.filter((o) => (o.health ?? 100) < 100 || o.crashed), me, 80)?.[0]; if (t) callTow(t); });
     }
+  }
+
+  // ---------------- blitz policial (Aurora e Rodovia Aurora): agenda sorteada por dia da cidade; viatura com giroflex
+  // no acostamento, cones e dois policiais. O policial manda parar, vem até a janela e pede a habilitação; o servidor
+  // decide o desfecho (liberado, ou multa + ocorrência + detenção). Arrancar sem responder é fuga (multa e perseguição).
+  const blitzScene = new Map();
+  const BLZ = createBlitz({ spots: city.aurora?.blitz || [], notify, onStop: (b, car) => blitzApproach(b, car), onFlee: (b, car) => blitzFlee(b, car) });
+  function blitzSetup(b) {
+    const ln = nearestLane(world, b.at[0], b.at[1], (l) => !l.narrow && !l.inner); if (!ln) return null;
+    const p = along(ln.lane.path, Math.min(ln.lane.path.len - 12, Math.max(12, ln.s)));
+    const e = ln.lane.edge; const off = e.lanes >= 2 ? e.w * 0.37 : e.w * 0.24; const side = e.w / 2 - off + 7; // acostamento à direita
+    const nx = -Math.sin(p.a); const ny = Math.cos(p.a); const cx = p.x + nx * side; const cy = p.y + ny * side; const ca = Math.cos(p.a); const sa = Math.sin(p.a);
+    const car = { id: `blz-${b.id}`, sprite: 'city-policia', kind: 'policia', L: lengthOf('policia'), W: 12, x: cx, y: cy, a: p.a, v: 0, mode: 'parked', siren: true, job: { kind: 'blitz' }, driver: false };
+    T.cars.push(car);
+    const cones = [0, 1, 2, 3, 4].map((i) => [cx - ca * (24 + i * 11) - nx * (3 + i * 1.6), cy - sa * (24 + i * 11) - ny * (3 + i * 1.6)]);
+    const mk = (x, y, a) => ({ spr: 'chr/policial', x, y, a, to: null, v: 9, face: null, say: null, name: 'Policial', t: 0, gone: false, onArrive: null });
+    const o1 = mk(cx - ca * 16 - nx * 2, cy - sa * 16 - ny * 2, p.a + Math.PI); const o2 = mk(cx + ca * 16 + nx * 9, cy + sa * 16 + ny * 9, p.a + Math.PI / 2);
+    ACC.S.actors.push(o1, o2);
+    return { b, car, cones, o1, o2, home: [o1.x, o1.y] };
+  }
+  function blitzTeardown(sc) { if (!sc) return; const i = T.cars.indexOf(sc.car); if (i >= 0) T.cars.splice(i, 1); sc.o1.gone = true; sc.o2.gone = true; }
+  const blitzReturn = (sc) => { if (!sc) return; sc.o1.v = 9; sc.o1.to = sc.home; sc.o1.onArrive = () => { sc.o1.face = null; }; };
+  let blzT = 0;
+  function blitzTick(dt) {
+    blzT -= dt;
+    if (blzT <= 0) {
+      blzT = 1; const k = cityNow(); const act = BLZ.update(k.day || 0, k.hour);
+      for (const b of act) if (!blitzScene.has(b.id)) blitzScene.set(b.id, blitzSetup(b));
+      for (const [id, sc] of blitzScene) if (!act.some((x) => x.id === id) && BLZ.stage?.blitz.id !== id) { blitzTeardown(sc); blitzScene.delete(id); }
+    }
+    if (DET) return;
+    const st = BLZ.step(me.car && !me.anim ? me.car : null);
+    if (!st) return;
+    const sc = blitzScene.get(st.blitz.id);
+    if (st.phase === 'sinal' && sc && me.car) { sc.o1.face = [me.car.x, me.car.y]; if (!sc.o1.say || sc.o1.say.until < performance.now()) sc.o1.say = { text: 'Encoste o veículo!', emo: 'surpresa', until: performance.now() + 2200 }; }
+    // abordagem em andamento: arrancar com o carro antes de responder é fuga
+    if (st.phase === 'abordagem' && me.car && st.stopAt && Math.hypot(me.car.x - st.stopAt[0], me.car.y - st.stopAt[1]) > 40) blitzFlee(st.blitz, me.car);
+  }
+  function blitzApproach(b, car) {
+    const st = BLZ.stage; st.stopAt = [car.x, car.y];
+    const sc = blitzScene.get(b.id); if (!sc) { BLZ.finish(); return; }
+    const [dx, dy] = doorPoint(car, 8);
+    sc.o1.say = { text: 'Desligue o motor, por favor.', emo: 'neutro', until: performance.now() + 2400 };
+    sc.o1.v = 24; sc.o1.to = [dx, dy]; sc.o1.onArrive = () => { sc.o1.face = [car.x, car.y]; if (BLZ.stage?.phase === 'abordagem') blitzPanel(b, sc, car); };
+  }
+  function blitzFlee(b, car) {
+    stage.querySelector('.d2-blitz')?.remove(); BLZ.cool.set(b.id, performance.now() + 120000); BLZ.stage = null;
+    blitzReturn(blitzScene.get(b.id)); fine('fuga'); INC.startChase(2, `Furou a blitz (${b.name})`, car);
+  }
+  function blitzPanel(b, sc, car) {
+    stage.querySelector('.d2-talk')?.remove();
+    const hr = cityNow().hour; const greet = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
+    const ask = `${greet}. Blitz da Polícia de Aurora. Habilitação e documento do veículo, por favor.`;
+    const box = document.createElement('div'); box.className = 'd2-talk d2-blitz';
+    box.innerHTML = `<div class="tk-head"><span class="bz-badge" aria-hidden="true">🚓</span><div><b>Policial · Blitz</b><small>${esc(b.name)} · ${esc(car.name || 'seu carro')}</small></div></div>
+      <div class="tk-log" id="bzLog"><p class="tk-npc">Policial: ${esc(ask)}</p></div>
+      <div class="tk-opts"><button data-o="entregar" class="tk-educada">Entregar habilitação</button><button data-o="sem" class="tk-neutra">Não tenho habilitação</button><button data-o="desacato" class="tk-agressiva">Desacato à autoridade</button></div>
+      <div class="tk-foot"><small>Responda ao policial. Arrancar com o carro conta como fuga.</small></div>`;
+    stage.appendChild(box);
+    sc.o1.say = { text: ask, emo: 'neutro', until: performance.now() + balloonSecs(ask) * 1000 };
+    const log = box.querySelector('#bzLog');
+    box.querySelectorAll('[data-o]').forEach((btn) => { btn.onclick = async () => {
+      box.querySelectorAll('[data-o]').forEach((x) => { x.disabled = true; });
+      log.insertAdjacentHTML('beforeend', `<p class="tk-me">Você: ${esc(btn.textContent)}</p>`);
+      let r;
+      try { r = await api.post('/mundo/blitz/responder', { opcao: btn.dataset.o, local: b.name, veiculo: car.name }); }
+      catch (err) { toast('Blitz', err.message, 'error'); box.remove(); BLZ.finish(); blitzReturn(sc); return; }
+      log.insertAdjacentHTML('beforeend', `<p class="tk-npc">Policial: ${esc(r.fala)}</p>`); log.scrollTop = log.scrollHeight;
+      sc.o1.say = { text: r.fala, emo: r.resultado === 'preso' ? 'irritado' : 'feliz', until: performance.now() + balloonSecs(r.fala) * 1000 };
+      if (r.resultado === 'liberado') { toast('✅ Liberado(a)', `CNH categoria ${r.cnh?.categoria || 'B'} conferida. Boa viagem!`, 'success'); setTimeout(() => { box.remove(); BLZ.finish(); blitzReturn(sc); }, 1800); return; }
+      toast('🚔 Detido(a) na blitz', `${r.multa.label}: ${r.multa.amount} NXC (Banco → Pendências)`, 'error'); refreshStatus(true);
+      setTimeout(() => { box.remove(); BLZ.finish(); blitzReturn(sc); arrest(r.detention, car); }, 2400);
+    }; });
+  }
+  // prisão: o carro fica retido no pátio perto da delegacia e o jogador é conduzido(a) à delegacia
+  function arrest(det, car) {
+    DET = det; const pol = stationNear('policia', car.x, car.y); if (!pol) return;
+    if (me.car === car) { car.v = 0; car.door = 0; me.car = null; me.mode = 'foot'; me.anim = null; }
+    const spot = city.spots.map((s) => [s, Math.hypot(s[0] - pol[0], s[1] - pol[1])]).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (spot) { [car.x, car.y, car.a] = spot; car.v = 0; savePark(car); }
+    [me.x, me.y] = nearestWalk(world, pol[0], pol[1] - 10, 60) || pol; cam.follow = true; flash = 1;
+    toast('🚓 Conduzido(a) à delegacia', `${det.local}. Seu carro ficou no pátio ao lado.`, 'warning');
+  }
+  function jailHud() {
+    let el = $('#d2Jail');
+    if (!DET) { el?.remove(); return; }
+    const left = new Date(DET.until).getTime() - Date.now();
+    if (left <= 0) { DET = null; el?.remove(); toast('🔓 Liberado(a)', 'Você cumpriu a detenção e saiu da delegacia.', 'success'); return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'd2Jail'; el.className = 'd2-jail';
+      el.innerHTML = `<b>🚔 Detido(a) · ${esc(DET.local)}</b><small>${esc(DET.motivo)}</small><span class="jl-t"></span><button class="cx-btn" data-bail>Pagar fiança · ${DET.bail} NXC</button>`;
+      stage.appendChild(el);
+      el.querySelector('[data-bail]').onclick = async () => { try { await api.post('/mundo/blitz/fianca', {}); DET = null; el.remove(); toast('🔓 Fiança paga', 'Você foi liberado(a).', 'success'); refreshStatus(true); } catch (err) { toast('Fiança', err.message, 'error'); } };
+    }
+    const s = Math.ceil(left / 1000); el.querySelector('.jl-t').textContent = `Liberação em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} (horário real)`;
   }
 
   // ---------------- laço principal (delta time; pausa em segundo plano)
@@ -657,9 +770,9 @@ export default async function render(el, params = new URLSearchParams()) {
       const pl = me.plane; const ev = stepPlane(pl, inp.plane, world, dt);
       if (ev?.damage) { pl.health = Math.max(0, (pl.health ?? 100) - ev.damage); flash = 0.6; saveDamage(pl); if (pl.health <= 0) { pl.crashed = true; planeCrash(pl, 'dano'); } else toast(`⚠ ${pl.name} danificado`, `${ev.why[0].toUpperCase()}${ev.why.slice(1)}: saúde ${Math.round(pl.health)}%. ${pl.health < 40 ? 'Pouse logo: o motor está falhando.' : 'Dá para continuar voando.'}`, 'warning'); }
       if (ev?.crash) planeCrash(pl, ev.crash);
-      else if (ev?.landed) toast('Pouso perfeito ✈', 'Bem-vindo(a) ao Aeroporto Nexus.', 'success');
+      else if (ev?.landed) toast('Pouso perfeito ✈', `Bem-vindo(a) ao ${regionAt(pl).includes('Aurora') ? 'Aeroporto Aurora' : 'Aeroporto Nexus'}.`, 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
+    } else if (me.mode === 'foot' && !me.anim && !DET) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
       stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked, ...(inp.run ? [] : pedsNear)]);
       // correndo e esbarrando: a pessoa cai no chão (levanta em alguns segundos)
       if (me.run && me.moving) for (const q of P.peds) if (['walk', 'olhando', 'wait'].includes(q.state) && Math.hypot(q.x - me.x, q.y - me.y) < 5.5) { q.state = 'caido'; q.fall = 3 + Math.random() * 2; q.fallA = me.a; q.say = { text: 'Ai!', until: performance.now() + 1500 }; me.walkT += 1; } me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
@@ -669,6 +782,7 @@ export default async function render(el, params = new URLSearchParams()) {
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5, state: 'me' }] : []), ...P.peds.filter((p) => ['cross', 'ferido', 'jay', 'roda', 'volta', 'caido'].includes(p.state)).map((p) => ({ x: p.x, y: p.y, L: 6, W: 7, state: 'ped' })), ...ACC.S.actors.map((a) => ({ x: a.x, y: a.y, L: 5, W: 6, state: 'ped' }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
+    blitzTick(dt);
     INC.step(dt, me); SKY.step(dt, cityNow().hour); ACC.step(dt, viewC); PR.step(dt, viewC, cityNow().hour); if (PR.banner && PR.banner.until > performance.now() && (!SKY.banner || SKY.banner.until < performance.now())) SKY.banner = PR.banner;
     for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     for (let i = particles.length - 1; i >= 0; i--) if (particles[i].t > particles[i].life) particles.splice(i, 1);
@@ -688,7 +802,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, BLZ, blitzScene, blitzSetup, get DET() { return DET; } };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }

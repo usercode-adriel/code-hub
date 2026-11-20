@@ -887,3 +887,13 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .tk-foot { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--cx-text2); }
 .tk-card { color: #c4b5fd; font-weight: 600; }
 .d2.touch .d2-talk { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-width: none; max-height: 52%; overflow-y: auto; }
+
+/* blitz: painel do policial (mesmo cartão das conversas) e aviso de detenção */
+.d2-blitz .tk-head { border-bottom-color: rgba(225, 29, 72, .35); }
+.d2-blitz .bz-badge { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: linear-gradient(135deg, #1e3a8a, #b4121f); }
+.d2-jail { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 18px; border-radius: 14px; background: rgba(10, 13, 43, .92); border: 1px solid rgba(225, 29, 72, .55); color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); text-align: center; min-width: 240px; }
+.d2-jail b { font-size: 15px; }
+.d2-jail small { color: #cbd5e1; }
+.d2-jail .jl-t { font-variant-numeric: tabular-nums; font-weight: 700; color: #fca5a5; }
+.d2-jail .cx-btn { margin-top: 4px; }
+.touch .d2-jail { top: 70px; min-width: 0; width: calc(100% - 32px); }

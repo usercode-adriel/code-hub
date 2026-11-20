@@ -3,7 +3,7 @@
 // o desfecho e as relações. Aqui só há o agendamento e a reprodução. Sem DOM: dá para testar em Node.
 const MAX_TALKS = 3; // conversas simultâneas na tela (desempenho)
 const SCAN_EVERY = 1.2; // segundos entre buscas de pares
-const RANGE = 22; // distância máxima (unidades do mapa) para dois moradores conversarem
+const RANGE = 44; // distância máxima (unidades do mapa) para dois moradores conversarem
 const PAIR_COOL_MS = 45000; // tempo real antes de um mesmo par voltar a conversar
 
 // quebra o texto em linhas de no máximo `max` caracteres (balão com quebra automática de linha)
@@ -24,7 +24,7 @@ export const EMO_ICON = { feliz: '🙂', irritado: '😠', triste: '😢', surpr
 
 export function createTalks({ P, request, now = () => performance.now(), rand = Math.random }) {
   const S = { active: [], pending: 0, cool: new Map(), scanT: 0 };
-  const canTalk = (p) => p.real && !p.talk && (p.state === 'walk' || p.state === 'olhando') && !p.pause;
+  const canTalk = (p) => p.real && !p.talk && (p.state === 'walk' || p.state === 'olhando') && !(p.pause > 0); // pause fica levemente negativo depois de uma parada
   const keyOf = (a, b) => [a.id, b.id].sort().join('|');
   const face = (p, q) => { p.a = Math.atan2(q.y - p.y, q.x - p.x); p.face = q.x < p.x ? -1 : 1; };
 
@@ -43,12 +43,12 @@ export function createTalks({ P, request, now = () => performance.now(), rand = 
   S.scan = (dt, view) => {
     S.scanT -= dt; if (S.scanT > 0) return; S.scanT = SCAN_EVERY;
     if (S.active.length >= MAX_TALKS || S.pending >= 1) return;
-    const list = P.peds.filter((p) => canTalk(p) && Math.hypot(p.x - view.x, p.y - view.y) < view.r);
+    const list = P.peds.filter((p) => canTalk(p) && Math.hypot(p.x - view.x, p.y - view.y) < view.r + 120); // inclui a borda da tela: a conversa entra na cena
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i]; const b = list[j];
       if (Math.hypot(a.x - b.x, a.y - b.y) > RANGE) continue;
       const cool = S.cool.get(keyOf(a, b)); if (cool != null && now() - cool < PAIR_COOL_MS) continue;
-      if (rand() > 0.35) continue; // nem todo encontro vira conversa
+      if (rand() > 0.55) continue; // nem todo encontro vira conversa
       S.pending++;
       Promise.resolve(request(a.id, b.id)).then((data) => {
         S.pending--;

@@ -139,6 +139,22 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Testes: `test/dialogos.test.js` e `test/talk.test.js`; `npm test` com 71 testes passando
 - [ ] Limitações: moradores sem nome (figurantes) não conversam; briga só registra evento e hostilidade, sem combate; polícia não intervém na conversa; sem perseguição, prisão na rua e trânsito com guincho coordenado pela polícia
 
+### Segunda cidade: Aurora (cidade inteligente) e blitz policial
+- [x] `public/js/drive/city2.js`: Aurora no leste do continente (8×6 quarteirões, maior que Nexus City), ligada pela Rodovia Aurora (4 faixas) que continua a Estrada do Leste
+- [x] Av. Central de 4 faixas (2 por sentido, divisória tracejada), Boulevard Aurora, Av. das Palmeiras, anel viário com esquinas curvas
+- [x] Quatro diagonais em estrela que se encontram na Praça da Estrela (rotatória grande, quarteirões recortados em círculo); rotatórias na Av. das Palmeiras, no trevo da rodovia e na orla
+- [x] Em volta, sem ficar quadrado: Av. Beira-Mar pela orla com coqueiros, estradas para três vilas do interior (Vila Serena, Vila Esperança, Porto Aurora), campos e mata
+- [x] Aeroporto Internacional Aurora (pista, taxiway, pátio, terminal, torre, hangar, heliponto); o avião do jogador pousa e decola lá
+- [x] Serviços próprios (delegacia, hospital, bombeiros, prefeitura, banco, shopping, estádio, terminal); as equipes de emergência saem da base mais próxima
+- [x] Sinalização inteligente: semáforos com sensores de fila (verde mínimo 6 s, máximo 22 s, amarelo 2,5 s) em todos os cruzamentos de avenida
+- [x] Radares (60 na Av. Central, 80 na rodovia, 50 nas ruas) e Central de Monitoramento: excesso gravíssimo em Aurora gera perseguição mesmo sem viatura por perto
+- [x] Blitz (`public/js/drive/blitz.js`, `server/world/blitz.js`): 3 pontos e horários sorteados por dia da cidade; viatura com giroflex, cones e policiais; o policial manda parar, vem à janela e pede a habilitação
+- [x] Respostas: entregar habilitação (liberado), não tenho habilitação (multa de 880 + ficha + 2 h detido), desacato (multa de 1.467 + ficha + CNH suspensa + 3 h detido); furar a blitz é fuga (multa e perseguição)
+- [x] Detenção persistente na Delegacia de Aurora com contagem e fiança; CNH na carteira; ficha criminal do jogador atualizada
+- [x] Nexus City inalterada: mesmas construções, objetos e máscara de colisão no núcleo (conferido contra a versão anterior); a máscara de colisão agora cobre o continente inteiro
+- [x] Testes: `test/aurora.test.js` (7) e `test/blitz.test.js` (8); `npm test` com 87 testes passando
+- [ ] Limitações: voos programados continuam só no Aeroporto Nexus; a blitz só acontece em Aurora e na rodovia; a geração do mapa passou de ~0,15 s para ~0,4 s
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

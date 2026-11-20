@@ -8,14 +8,15 @@ import { lengthOf, spriteOf } from './traffic.js';
 
 export function createIncidents({ world, T, P, pois, notify, report }) {
   const list = []; const fx = [];
-  const station = (id) => pois.find((p) => p.id === id)?.at;
-  const H = station('hospital'); const POL = station('policia'); const FIRE = station('bombeiros');
+  // base mais próxima do local (cada cidade tem hospital, delegacia e bombeiros: 'hospital', 'hospital-aurora'…)
+  const station = (id, x = null, y = null) => { const l = pois.filter((p) => p.id === id || p.id.startsWith(`${id}-`)); if (x == null) return l[0]?.at; return l.sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - y) - Math.hypot(b.at[0] - x, b.at[1] - y))[0]?.at; };
+  const POL = station('policia');
   const chase = { on: false, car: null, level: 0, lost: 0, caught: 0, reason: '', t: 0 };
 
   // viatura/ambulância/caminhão saindo da base com destino ao local
-  const GAR = station('concessionaria') || station('estacionamento'); // oficina/guincho
   function dispatch(kind, inc, opts = {}) {
-    const base = opts.base || (kind === 'ambulancia' ? H : kind === 'bombeiros' ? FIRE : kind === 'guincho' ? GAR : POL);
+    const bx = opts.at?.[0] ?? inc.x; const by = opts.at?.[1] ?? inc.y;
+    const base = opts.base || (kind === 'ambulancia' ? station('hospital', bx, by) : kind === 'bombeiros' ? station('bombeiros', bx, by) : kind === 'guincho' ? (station('concessionaria', bx, by) || station('estacionamento', bx, by)) : station('policia', bx, by));
     if (!base) return null;
     let start = nearestLane(world, base[0], base[1] - 30, (l) => !l.narrow);
     // base longe (> 900): a equipe vem de onde já estava rodando, a 350–750 do local (chega em ~15–25 s)
@@ -55,7 +56,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
     if (chase.on) { chase.level = Math.max(chase.level, level); return; }
     let car = T.cars.filter((c) => c.kind === 'policia' && !c.job && !c.wrecked).sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
     if (!car || Math.hypot(car.x - me.x, car.y - me.y) > 900) {
-      const lane = nearestLane(world, me.x + 260, me.y + 260, (l) => !l.narrow) || nearestLane(world, POL[0], POL[1]);
+      const pol = station('policia', me.x, me.y) || POL; const lane = nearestLane(world, me.x + 260, me.y + 260, (l) => !l.narrow) || nearestLane(world, pol[0], pol[1]);
       const p = along(lane.lane.path, lane.s);
       car = { id: `pol${Date.now()}`, sprite: 'policia', kind: 'policia', L: lengthOf('policia'), W: 12, maxV: 60, temp: true, driver: true, lane: lane.lane, s: lane.s, x: p.x, y: p.y, a: p.a, v: 0 };
       T.cars.push(car);
@@ -114,7 +115,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
         if (arrived || (j.phase === 'indo' && Math.hypot(u.x - inc.x, u.y - inc.y) < 70 && u.v < 1)) { j.phase = 'atendendo'; j.t = 0; u.target = null; u.v = 0; u.wrecked = 0.01; u.hold = true; }
         if (j.phase === 'atendendo') {
           u.wrecked = 0.2; j.t += dt;
-          if (j.kind === 'ambulancia' && j.t > 6 && inc.injured.length) { inc.taken = true; for (const p of inc.injured) { p.state = 'levado'; p.x = -999; } notify('🚑 Ambulância', `${inc.injured.map((p) => p.name).join(', ')} ${inc.injured.length > 1 ? 'foram levados' : 'foi levado(a)'} ao Hospital Nexus.`, 'info'); inc.injured = []; }
+          if (j.kind === 'ambulancia' && j.t > 6 && inc.injured.length) { inc.taken = true; for (const p of inc.injured) { p.state = 'levado'; p.x = -999; } const aur = pois.find((q) => q.id === 'hospital-aurora' && q.at[0] === j.base[0] && q.at[1] === j.base[1]); notify('🚑 Ambulância', `${inc.injured.map((p) => p.name).join(', ')} ${inc.injured.length > 1 ? 'foram levados' : 'foi levado(a)'} ao ${aur ? 'Hospital Aurora' : 'Hospital Nexus'}.`, 'info'); inc.injured = []; }
           if (j.kind === 'bombeiros' && j.t > 8) inc.fire = 0;
           // cena programada: a equipe só vai embora quando a cena libera (u.release); senão, regra padrão
           const done = u.release !== undefined ? u.release && j.t > 1 : j.kind === 'ambulancia' ? !inc.injured.length && j.t > 7 : j.kind === 'bombeiros' ? !inc.fire && j.t > 9 : j.t > 14;
