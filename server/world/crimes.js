@@ -23,6 +23,8 @@ export const CRIMES = {
   perturbacao: { label: 'Perturbação e vias de fato', sev: 1, type: 'vandalismo' },
   roubo_veiculo: { label: 'Roubo de veículo', sev: 2, type: 'furto' },
   furto: { label: 'Furto', sev: 2, type: 'furto' },
+  homicidio: { label: 'Homicídio', sev: 3, type: 'estelionato' },
+  disparo: { label: 'Disparo de arma de fogo em via pública', sev: 3, type: 'desobediencia' },
   invasao: { label: 'Invasão de propriedade', sev: 2, type: 'invasao' },
   vandalismo: { label: 'Vandalismo', sev: 1, type: 'vandalismo' },
   dirigir_sem_habilitacao: { label: 'Dirigir sem habilitação', sev: 1, type: 'desobediencia' },

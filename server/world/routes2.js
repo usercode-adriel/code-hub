@@ -22,6 +22,7 @@ import { driveState, park, infraction, damage, tow, incident } from './drive.js'
 import { blitzAnswer } from './blitz.js';
 import * as RUA from './rua.js';
 import * as INF from './infracoes.js';
+import * as ARM from './armas.js';
 import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
@@ -484,6 +485,8 @@ ruaRoute('queda', RUA.streetIncident); ruaRoute('acusacao', RUA.streetAccuse); r
 ruaRoute('prisao', RUA.streetArrest); ruaRoute('fianca', RUA.payBail); ruaRoute('discussao', RUA.streetDiscuss);
 ruaRoute('reclamacao', RUA.streetComplaint); ruaRoute('assassinato', RUA.streetMurder);
 // infrações (motor de ações, fase 2): furto, vandalismo e invasão
+// armas: um disparo (acertou ou não); a mira automática fica no cliente, o servidor confere posse, alvo e efeitos
+router.post('/mundo/arma/tiro', (req, res) => { const ctx = ctxOf(req); run(res, () => ARM.disparar(ctx, req.body || {})); });
 router.post('/mundo/infracao', (req, res) => { const ctx = ctxOf(req); run(res, () => INF.infracao(ctx, req.body || {})); });
 ruaRoute('roubo', RUA.vehicleTheft); ruaRoute('captura', RUA.theftCaptured); ruaRoute('roubo-npc', RUA.npcTheft);
 // diálogos entre moradores e com o jogador

@@ -7,8 +7,8 @@ import { residents, agentOf } from './agents.js';
 import { remember, genderize } from '../social.js';
 import { chance, pick, nowIso, cap } from './util.js';
 
-const CAUSA = { acidente: 'uma batida de carro', esbarrao: 'uma queda na rua (derrubado(a) por alguém correndo)', agressao: 'uma agressão na rua' };
-const CAUSA_CURTA = { acidente: 'batida de carro', esbarrao: 'queda na rua', agressao: 'agressão' };
+const CAUSA = { acidente: 'uma batida de carro', esbarrao: 'uma queda na rua (derrubado(a) por alguém correndo)', agressao: 'uma agressão na rua', tiro: 'um disparo de arma de fogo' };
+const CAUSA_CURTA = { acidente: 'batida de carro', esbarrao: 'queda na rua', agressao: 'agressão', tiro: 'disparo' };
 const HOUR = 3600000; const DAY = 24 * HOUR;
 export const STATES = { saudavel: 'Saudável', ferido: 'Ferido', ferido_grave: 'Ferido grave', internado: 'Internado', em_recuperacao: 'Em recuperação', morto: 'Morto' };
 

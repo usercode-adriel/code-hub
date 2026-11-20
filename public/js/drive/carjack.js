@@ -220,5 +220,6 @@ export function createCarjack(D) {
     S.extra = S.extra.filter((u) => !u.done);
   };
   S.clear = clearWanted;
+  S.capturar = capture; // o jogador foi derrubado por um tiro da polícia: abordagem e pena (mesmo caminho da perseguição)
   return S;
 }

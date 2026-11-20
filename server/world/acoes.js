@@ -27,8 +27,9 @@ export function executar(ctx, acao) {
   const w = ctx.w; w.acoesRecentes ??= {};
   const agora = ctx.at.getTime();
   // 1) impedir eventos duplicados
+  // cada tiro é um evento próprio (repetivel): só ações de natureza única (furto, invasão…) são deduplicadas
   const k = chave(acao); const ultima = w.acoesRecentes[k];
-  if (ultima != null && agora - ultima < DEDUPE_MS) return { ok: false, motivo: 'duplicada', condicoes: [] };
+  if (!acao.repetivel && ultima != null && agora - ultima < DEDUPE_MS) return { ok: false, motivo: 'duplicada', condicoes: [] };
   for (const [kk, t] of Object.entries(w.acoesRecentes)) if (agora - t > DEDUPE_MS * 3) delete w.acoesRecentes[kk];
   // 2) condições (todas precisam ser verdadeiras; as verificadas ficam no retorno para auditoria)
   const verificadas = [];
