@@ -21,6 +21,7 @@ import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { driveState, park, infraction, damage, tow, incident } from './drive.js';
 import { blitzAnswer } from './blitz.js';
 import * as RUA from './rua.js';
+import * as INF from './infracoes.js';
 import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
@@ -482,6 +483,8 @@ const ruaRoute = (path, fn) => router.post(`/mundo/rua/${path}`, (req, res) => {
 ruaRoute('queda', RUA.streetIncident); ruaRoute('acusacao', RUA.streetAccuse); ruaRoute('policial', RUA.assaultOfficer);
 ruaRoute('prisao', RUA.streetArrest); ruaRoute('fianca', RUA.payBail); ruaRoute('discussao', RUA.streetDiscuss);
 ruaRoute('reclamacao', RUA.streetComplaint); ruaRoute('assassinato', RUA.streetMurder);
+// infrações (motor de ações, fase 2): furto, vandalismo e invasão
+router.post('/mundo/infracao', (req, res) => { const ctx = ctxOf(req); run(res, () => INF.infracao(ctx, req.body || {})); });
 ruaRoute('roubo', RUA.vehicleTheft); ruaRoute('captura', RUA.theftCaptured); ruaRoute('roubo-npc', RUA.npcTheft);
 // diálogos entre moradores e com o jogador
 router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });

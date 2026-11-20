@@ -16,6 +16,7 @@ export const DEFAULT_PENALTIES = {
   estelionato: { label: 'Estelionato', kind: 'criminal', sev: 3, fine: 2500 },
   furto: { label: 'Furto', kind: 'criminal', sev: 2, fine: 800 },
   vandalismo: { label: 'Vandalismo', kind: 'criminal', sev: 1, fine: 500 },
+  invasao: { label: 'Invasão de propriedade', kind: 'criminal', sev: 2, fine: 900 },
   golpe: { label: 'Golpe digital', kind: 'criminal', sev: 2, fine: 1500 },
   desobediencia: { label: 'Desobediência', kind: 'criminal', sev: 1, fine: 400 },
   calote: { label: 'Cobrança de dívida entre pessoas', kind: 'civil', sev: 1, fine: 0 },
