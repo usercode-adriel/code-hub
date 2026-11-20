@@ -20,6 +20,8 @@ export const VEHICLES = {
   'car-conversivel-vermelho': { name: 'Esportivo Turbo Listrado', base: 86000, seats: 2, speed: 1.4, tier: 'esportivo', sprite: 'esportivo-vermelho' },
   'car-tunado-rosa': { name: 'Cupê Laranja', base: 64000, seats: 2, speed: 1.3, tier: 'esportivo', sprite: 'laranja' },
   'car-sorvete': { name: 'Caminhão Baú', base: 47000, seats: 2, speed: 0.8, tier: 'trabalho', sprite: 'caminhao-branco' },
+  // só para aluguel (Locadora Nexus Rent): não aparece na concessionária e não pode ser vendido
+  'rent-rosso': { name: 'Rosso GT (alugado)', base: 92000, seats: 2, speed: 1.4, tier: 'esportivo', sprite: 'aluguel-vermelho', rental: true },
 };
 // aeronaves: pilotáveis no aeroporto do mapa jogável
 export const AIRCRAFT = {
@@ -49,7 +51,7 @@ for (const [key, v] of Object.entries(AIRCRAFT)) {
 }
 export const isVehicle = (key) => Boolean(VEHICLES[key]);
 for (const [key, v] of Object.entries(VEHICLES)) {
-  PRODUCTS[key] = { name: v.name, cat: 'veiculos', base: v.base, type: 'veiculo', desc: `${v.seats} lugares · categoria ${v.tier}. Vira seu meio de transporte: você paga só o combustível.`, actions: ['equipar', 'vender', 'transferir', 'descartar'], stock: [1, 3] };
+  PRODUCTS[key] = { name: v.name, cat: 'veiculos', base: v.base, type: 'veiculo', desc: `${v.seats} lugares · categoria ${v.tier}. Vira seu meio de transporte: você paga só o combustível.`, actions: v.rental ? ['equipar'] : ['equipar', 'vender', 'transferir', 'descartar'], stock: [1, 3] };
 }
 // carro próprio: combustível por metro (bem mais barato que táxi)
 TRANSPORT.carro = { label: 'Carro próprio', fee: (m) => round2(1 + m * 0.0009), needs: 'vehicle' };
@@ -61,7 +63,7 @@ onUpgrade(15, (ctx) => {
   shop.sub = 'Concessionária e oficina';
   shop.catalog ??= [];
   for (const key of Object.keys(VEHICLES)) {
-    if (shop.catalog.some((x) => x.key === key)) continue;
+    if (VEHICLES[key].rental || shop.catalog.some((x) => x.key === key)) continue;
     shop.catalog.push({ key, price: Math.round(VEHICLES[key].base * (0.95 + Math.random() * 0.1)), stock: 1 + Math.floor(Math.random() * 2) });
   }
 });

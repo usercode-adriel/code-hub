@@ -18,6 +18,8 @@ import { createPlane, stepPlane, knots, feet, vRotate } from '../drive/plane.js'
 import { createSky } from '../drive/sky.js';
 import { createIncidents } from '../drive/incidents.js';
 import { createAccidents } from '../drive/accidents.js';
+import { buildObst } from '../drive/obst.js';
+import { createProtests } from '../drive/protest.js';
 import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
 import { cityNow, refreshStatus } from '../chrome.js';
@@ -59,7 +61,7 @@ export default async function render(el, params = new URLSearchParams()) {
   let reforma = state.reforma || null;
   const city = generateCity(undefined, { reforma });
   const world = buildGraph(city.R);
-  const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars });
+  const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars, obst: buildObst(city.props) });
   syncWorld();
   await assets.ensure(extrasOf(city));
   const R = createRenderer(city, assets, { mobile: touch });
@@ -83,8 +85,8 @@ export default async function render(el, params = new URLSearchParams()) {
       const p = createPlane({ ...c, own: true, sprite: c.sprite, L: c.L || (c.key.includes('jato') ? 52 : 42), W: c.L || (c.key.includes('jato') ? 46 : 54) }, sp.x ?? sp[0], sp.y ?? sp[1], sp.a ?? sp[2]);
       p.id = c.id; p.health = c.health ?? 100; own.push(p); continue;
     }
-    const sp = c.parked ? [c.parked.x, c.parked.y, c.parked.a] : city.spots[(si++ * 3) % city.spots.length];
-    own.push({ own: true, kind: 'carro', id: c.id, key: c.key, name: c.name, sprite: c.sprite || 'branco', speed: c.speed || 1, x: sp[0], y: sp[1], a: sp[2], v: 0, steer: 0, gear: 'D', L: lengthOf(c.key === 'car-van-bege' || c.key === 'car-sorvete' ? 'van' : 'carro'), W: 12, health: c.health ?? 100, door: 0, color: sampleColor(`cars/${c.sprite || 'branco'}`) });
+    const sp = c.parked ? [c.parked.x, c.parked.y, c.parked.a] : c.rental && city.rentSpot ? city.rentSpot : city.spots[(si++ * 3) % city.spots.length];
+    own.push({ own: true, rental: Boolean(c.rental), kind: 'carro', id: c.id, key: c.key, name: c.name, sprite: c.sprite || 'branco', speed: c.speed || 1, x: sp[0], y: sp[1], a: sp[2], v: 0, steer: 0, gear: 'D', L: lengthOf(c.key === 'car-van-bege' || c.key === 'car-sorvete' ? 'van' : 'carro'), W: 12, health: c.health ?? 100, door: 0, color: sampleColor(`cars/${c.sprite || 'branco'}`) });
   }
   // avião-escola da escola de voo (sempre disponível para treinar)
   const school = createPlane({ name: 'Avião-escola Paulistinha', sprite: 'mono-amarelo', school: true, L: 42, W: 54, air: { thrust: 44, vmax: 220, vstall: 92, turn: 1 } }, ...city.planeSpots[0]);
@@ -99,11 +101,12 @@ export default async function render(el, params = new URLSearchParams()) {
   const report = (body) => api.post('/mundo/cidade2d/ocorrencia', { regiao: regionAt(me.car || me.plane || me), ...body }).catch(() => {});
   const SKY = createSky(world, { chrFor: (p) => spriteFor(p, assets.roles, p.id) });
   // agenda de voos do servidor (painel, nomes dos passageiros); atualiza a cada 30 s
-  const loadBoard = () => api.get('/mundo/voos').then((b) => { SKY.board = b; }).catch(() => {});
+  const PR = createProtests({ world, pois: city.pois, chrFor: (p) => spriteFor(p, assets.roles, p.id), mobile: touch });
+  const loadBoard = () => Promise.all([api.get('/mundo/voos').then((b) => { SKY.board = b; }), api.get('/mundo/manifestacoes').then((m) => PR.set(m))]).catch(() => {});
   loadBoard(); const boardTimer = setInterval(loadBoard, 30000);
   let ACC = null; // acidentes entre moradores (criado depois das ocorrências)
   const INC = createIncidents({ world, T, P, pois: city.pois, notify, report });
-  ACC = createAccidents({ T, P, INC, report, regionAt: (p) => regionAt(p), notify });
+  ACC = createAccidents({ world, T, P, INC, report, regionAt: (p) => regionAt(p), notify, chrFor: (p) => spriteFor(p, assets.roles, p.id) });
 
   // ---------------- entrada
   const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
@@ -270,7 +273,16 @@ export default async function render(el, params = new URLSearchParams()) {
     if (!c.hit || !c.impact) return;
     const dmg = crashDamage(c.impact);
     const other = c.hitWith;
-    if (other && !other.own && other.kind !== undefined) { other.wrecked = Math.max(other.wrecked || 0, dmg > 15 ? 25 : 4); other.v = 0; if (dmg > 15) other.smoke = 1; }
+    // batida em carro de morador: os dois ficam danificados na hora e soltam fumaça; o motorista sai e reclama,
+    // a polícia vem e o guincho leva o carro dele (cena programada)
+    if (other && T.cars.includes(other) && !other.temp && !other.sceneHold && !other.towedBy && c.impact > 8) {
+      ACC.crashScene([other], viewNow(), { culprit: true, police: true, playerCar: c });
+      c.smokeT = 8; fine('colisao'); report({ tipo: 'acidente', culpa: true, veiculo: c.name });
+      const d2 = Math.max(dmg, 6); c.health = Math.max(0, (c.health ?? 100) - d2); saveDamage(c);
+      toast('💥 Batida!', `Você bateu num carro. Lataria: ${Math.round(c.health)}%. A polícia está a caminho.`, 'warning');
+      return;
+    }
+    if (other && !other.own && other.kind !== undefined) { other.wrecked = Math.max(other.wrecked || 0, dmg > 15 ? 25 : 4); other.v = 0; other.smoke = 1; }
     if (dmg <= 0) return;
     c.health = Math.max(0, (c.health ?? 100) - dmg); saveDamage(c);
     if (navigator.vibrate) try { navigator.vibrate(dmg > 30 ? [40, 30, 60] : 25); } catch { /* ok */ }
@@ -282,16 +294,17 @@ export default async function render(el, params = new URLSearchParams()) {
       void inc; void wasV;
     }
   }
+  const viewNow = () => ({ x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 });
   function hitPeds(c) {
     if (Math.abs(c.v) < 3) return;
     const ca = Math.cos(c.a); const sa = Math.sin(c.a);
     for (const p of P.peds) {
-      if (p.state === 'ferido' || p.state === 'levado' || Math.abs(p.x - c.x) > 20 || Math.abs(p.y - c.y) > 20) continue;
+      if (p.state === 'ferido' || p.state === 'levado' || p.state === 'cena' || Math.abs(p.x - c.x) > 20 || Math.abs(p.y - c.y) > 20) continue;
       const dx = p.x - c.x; const dy = p.y - c.y; const lx = dx * ca + dy * sa; const ly = -dx * sa + dy * ca;
       if (Math.abs(lx) > c.L / 2 + 2 || Math.abs(ly) > c.W / 2 + 2) continue;
       if (toKmh(c.v) < 9) { p.s += p.dir * 8; continue; }
-      p.state = 'ferido'; c.v *= 0.6;
-      const inc = INC.create('atropelamento', p.x, p.y, { culprit: true, injured: [p] });
+      c.v *= 0.6;
+      const inc = ACC.pedScene(p, null, viewNow(), { culprit: true }); // vítima no chão, roda de curiosos, ambulância e polícia
       toast('Atropelamento!', `${p.real ? p.name : 'Um pedestre'} ficou ferido(a). A ambulância e a polícia estão a caminho.`, 'error');
       report({ tipo: 'atropelamento', personaId: p.real ? p.id : null, nome: p.real ? p.name : 'Pedestre', culpa: true, veiculo: c.name });
       fine('atropelamento'); void inc;
@@ -349,9 +362,10 @@ export default async function render(el, params = new URLSearchParams()) {
     const W = (H * m.w) / m.h; ctx.drawImage(im, frame * m.w, row * m.h, m.w, m.h, x - W / 2, y - H, W, H); return true;
   }
   function drawPed(p, t) {
-    if (p.state === 'levado') return;
+    if (p.state === 'levado' || p.state === 'cena') return;
+    if (p.state === 'caido') { const im = IMG['npc/caido']; if (im) { ctx.save(); ctx.translate(p.x, p.y); if (Math.cos(p.fallA || 0) < 0) ctx.scale(-1, 1); ctx.drawImage(im, -9, -4, 18, 7); ctx.restore(); } return; }
     if (p.state === 'ferido') { const im = IMG['npc/caido']; if (im) ctx.drawImage(im, p.x - 9, p.y - 4, 18, 7); ctx.fillStyle = 'rgba(200,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 2, 4, 1.6, 0, 0, Math.PI * 2); ctx.fill(); return; }
-    const moving = (p.state === 'walk' || p.state === 'cross') && !p.pause;
+    const moving = ((p.state === 'walk' || p.state === 'cross' || p.state === 'jay') && !p.pause) || ((p.state === 'roda' || p.state === 'volta') && p.rmove);
     // olhando uma ocorrência: vira para ela; parado: mantém a última direção
     const ang = p.state === 'olhando' && p.lookAt ? Math.atan2(p.lookAt[1] - p.y, p.lookAt[0] - p.x) : p.a;
     if (moving || p.state === 'olhando' || p.row == null) p.row = chrRow(ang);
@@ -438,6 +452,8 @@ export default async function render(el, params = new URLSearchParams()) {
     for (const o of own) if (inV(o, 70) && !(o.kind === 'aviao' && !o.ground)) items.push([o.y, o.kind === 'aviao' ? 3 : 2, o]);
     for (const o of SKY.parked) if (inV(o, 90)) items.push([o.y, 3, o]);
     for (const w of SKY.walkers) if (w.delay <= 0 && inV(w, 20)) items.push([w.y, 5, w]);
+    for (const a of ACC.S.actors) if (inV(a, 20)) items.push([a.y, 6, a]);
+    for (const m of PR.members()) if (inV(m, 20)) items.push([m.y, 6, m]);
     for (const o of SKY.flights) if (o.ground && inV(o, 90)) items.push([o.y, 3, o]);
     items.push([me.y, 4, me]);
     items.sort((a, b) => a[0] - b[0]);
@@ -446,6 +462,7 @@ export default async function render(el, params = new URLSearchParams()) {
       else if (kind === 1) {
         const dmg = (o.wrecked > 4 || o.smoke) && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
         drawVeh(o, dmg); if (o.driver && z >= 1.6) driverHead(o);
+        if (o.beacon) { const on = Math.floor(t * 4) % 2; ctx.fillStyle = on ? '#ffb020' : '#6b4a00'; ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, Math.PI * 2); ctx.fill(); if (on) lights.push({ x: o.x, y: o.y, r: 20, color: '#ffb020', ka: 0.6, halo: 0.6 }); }
         if (o.siren) { const on = Math.floor(t * 6) % 2; const c1 = on ? '#ff3a3a' : '#3a7aff'; ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(o.x, o.y, 2.4, 0, Math.PI * 2); ctx.fill(); lights.push({ x: o.x, y: o.y, r: 26, color: c1, ka: 0.7, halo: 0.7 }); }
         if (o.smoke && Math.random() < 0.08) puff(o.x, o.y - 4);
         if (night > 0.05 && !o.wrecked) addCarLights(lights, o);
@@ -454,10 +471,12 @@ export default async function render(el, params = new URLSearchParams()) {
         const key = hp < 35 && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
         if (o !== me.car) { ctx.strokeStyle = hp <= 0 ? '#ff4d5e' : '#2fd27a'; ctx.lineWidth = 1.1; ctx.setLineDash([2, 1.6]); ctx.beginPath(); ctx.arc(o.x, o.y, 15, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
         drawVeh(o, key); drawDoor(o); if (o === me.car && z >= 1.6) driverHead(o);
+        if (o.smokeT > 0) { o.smokeT -= 1 / 60; if (Math.random() < 0.12) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, 0.8); }
         if (hp < 45 && Math.random() < (hp <= 0 ? 0.25 : 0.06)) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, hp <= 0 ? 1.4 : 1);
         if (hp <= 0) { const f = fxFrame('fogo', t + o.L, 1); if (f) ctx.drawImage(f, o.x - 6 + Math.cos(o.a) * o.L * 0.3, o.y - 14 + Math.sin(o.a) * o.L * 0.3, 12, 14); }
         if (night > 0.05 && o === me.car) addCarLights(lights, o);
       } else if (kind === 3) drawPlane(o);
+      else if (kind === 6) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), o.to ? Math.floor(o.t / 3.2) % 4 : 0, 15); }
       else if (kind === 5) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), Math.floor(o.t / 3.2) % 4, 15); }
       else drawMe(t);
     }
@@ -482,8 +501,15 @@ export default async function render(el, params = new URLSearchParams()) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const pill = (x, y, text, bg, fg = '#fff', fs = 11) => { const im = labelImg(text, bg, fg, fs); ctx.drawImage(im, Math.round(x - im.width / 2 / LDPR), Math.round(y - im.height / 2 / LDPR), im.width / LDPR, im.height / LDPR); };
     for (const p of city.pois) { const [sx, sy] = S(p.at[0], p.at[1]); if (sx < -80 || sy < -20 || sx > vw + 80 || sy > vh + 20) continue; if (z < 0.8 && !['aeroporto', 'hospital', 'policia', 'shopping', 'estadio', 'terminal'].includes(p.id)) continue; pill(sx, sy, `${POI_IC[p.icon] || '•'} ${p.label}`, 'rgba(10,13,43,.84)', '#fff', z < 1.4 ? 10 : 11); }
+    // falas (motoristas, policial, curiosos, quem caiu)
+    if (z >= 1.2) {
+      const nowMs = performance.now(); const bub = (o, H) => { if (!o.say || o.say.until < nowMs || !inV(o, 0)) return; const [sx, sy] = S(o.x, o.y - H); pill(sx, sy, o.say.text, 'rgba(255,255,255,.94)', '#141832', 10); };
+      for (const a of ACC.S.actors) bub(a, 22); for (const p of P.peds) if (p.say) bub(p, p.state === 'caido' || p.state === 'ferido' ? 9 : 22);
+      // manifestação: cartazes balançando sobre as cabeças e palavras de ordem
+      for (const m of PR.members()) { if (!inV(m, 0)) continue; if (m.sign) { const up = m.state === 'protesta' ? Math.abs(Math.sin(t * 3 + m.phase)) * 3 : 0; const [sx, sy] = S(m.x, m.y - 19 - up); ctx.fillStyle = '#7a5230'; ctx.fillRect(Math.round(sx) - 0.5, Math.round(sy), 1.4, 6 * z / 3); pill(sx, sy, m.sign, '#fdfdf7', '#b4121f', 8); } bub(m, 27); }
+    }
     if (z >= 2.2) { let n = 0; for (const p of P.peds) { if (!p.real || p.state === 'levado' || !inV(p, 0) || n++ > 26) continue; const [sx, sy] = S(p.x, p.y - 17); pill(sx, sy, p.name.split(' ')[0], p.state === 'ferido' ? 'rgba(160,20,30,.85)' : 'rgba(10,13,43,.7)', '#fff', 9); } }
-    for (const o of own) { if (o === me.car || o === me.plane || !inV(o, 0)) continue; const [sx, sy] = S(o.x, o.y - (o.kind === 'aviao' ? 30 : 19)); pill(sx, sy, `${o.school ? 'ESCOLA' : 'SEU'} · ${o.name}${(o.health ?? 100) <= 0 ? ' (inutilizado)' : ''}`, (o.health ?? 100) <= 0 ? '#a3122a' : '#1f9d5a', '#fff', 10); }
+    for (const o of own) { if (o === me.car || o === me.plane || !inV(o, 0)) continue; const [sx, sy] = S(o.x, o.y - (o.kind === 'aviao' ? 30 : 19)); pill(sx, sy, `${o.school ? 'ESCOLA' : o.rental ? 'ALUGADO' : 'SEU'} · ${o.name.replace(' (alugado)', '')}${(o.health ?? 100) <= 0 ? ' (inutilizado)' : ''}`, (o.health ?? 100) <= 0 ? '#a3122a' : '#1f9d5a', '#fff', 10); }
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.5})`; ctx.fillRect(0, 0, vw, vh); }
   }
   // rótulos desenhados uma vez e reaproveitados (texto é caro de desenhar a cada quadro)
@@ -584,13 +610,16 @@ export default async function render(el, params = new URLSearchParams()) {
       if (ev?.crash) planeCrash(pl, ev.crash);
       else if (ev?.landed) toast('Pouso perfeito ✈', 'Bem-vindo(a) ao Aeroporto Nexus.', 'success');
       cam.tz = (cam.userZ || 0) > performance.now() ? null : (touch ? 2.4 : 2.2) / (1 + pl.h / 220);
-    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked]); me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
+    } else if (me.mode === 'foot' && !me.anim) { const ox = me.x; const oy = me.y; const pedsNear = P.peds.filter((q) => (q.state === 'walk' || q.state === 'olhando' || q.state === 'wait') && Math.abs(q.x - me.x) < 12 && Math.abs(q.y - me.y) < 12).map((q) => ({ x: q.x, y: q.y, L: 5 }));
+      stepWalker(me, inp, world, dt, [...T.cars, ...own.filter((o) => o.kind === 'carro' || o.ground), ...SKY.parked, ...(inp.run ? [] : pedsNear)]);
+      // correndo e esbarrando: a pessoa cai no chão (levanta em alguns segundos)
+      if (me.run && me.moving) for (const q of P.peds) if (['walk', 'olhando', 'wait'].includes(q.state) && Math.hypot(q.x - me.x, q.y - me.y) < 5.5) { q.state = 'caido'; q.fall = 3 + Math.random() * 2; q.fallA = me.a; q.say = { text: 'Ai!', until: performance.now() + 1500 }; me.walkT += 1; } me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
-    const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5 }] : []), ...P.peds.filter((p) => p.state === 'cross' || p.state === 'ferido' || p.state === 'jay').map((p) => ({ x: p.x, y: p.y, L: 6, W: 7 }))];
+    const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5, state: 'me' }] : []), ...P.peds.filter((p) => ['cross', 'ferido', 'jay', 'roda', 'volta', 'caido'].includes(p.state)).map((p) => ({ x: p.x, y: p.y, L: 6, W: 7, state: 'ped' })), ...ACC.S.actors.map((a) => ({ x: a.x, y: a.y, L: 5, W: 6, state: 'ped' }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
-    INC.step(dt, me); SKY.step(dt, cityNow().hour); ACC.step(dt, viewC);
+    INC.step(dt, me); SKY.step(dt, cityNow().hour); ACC.step(dt, viewC); PR.step(dt, viewC, cityNow().hour); if (PR.banner && PR.banner.until > performance.now() && (!SKY.banner || SKY.banner.until < performance.now())) SKY.banner = PR.banner;
     for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     for (let i = particles.length - 1; i >= 0; i--) if (particles[i].t > particles[i].life) particles.splice(i, 1);
     const tgtV = me.car || me.plane;
@@ -609,7 +638,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }

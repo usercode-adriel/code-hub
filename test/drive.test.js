@@ -135,3 +135,29 @@ test('aeroporto e trânsito: agenda de voos com moradores, sem repetir passageir
   assert.ok(p.agent.injuredUntil > new Date().toISOString(), 'ferido vai para o hospital');
   assert.ok((T.w.events || []).some((e) => e.title.includes(p.name) && e.title.includes('batida')), 'vira notícia');
 });
+
+test('locadora: aluguel diário, vistoria cobra danos e, sem saldo, a locadora processa', async () => {
+  const L = await import('../server/world/rental.js');
+  const { justice } = await import('../server/world/justice.js');
+  const ctx = T.ctx();
+  bankOf(T.w).balance = 5000;
+  const r = L.rentCar(ctx, { dias: 2 });
+  assert.equal(r.total, 170);
+  assert.throws(() => L.rentCar(ctx, { dias: 1 }), /já está com um carro/);
+  const st = D.driveState(T.w); const car = st.cars.find((c) => c.key === 'rent-rosso');
+  assert.ok(car && car.rental && car.sprite === 'aluguel-vermelho', 'carro alugado aparece no mapa');
+  D.damage(T.w, { itemId: car.id, health: 80 });
+  const back = L.returnCar(ctx);
+  assert.equal(back.fee, 180 + 20 * 110); assert.equal(back.paid, 'pago na conta');
+  assert.ok(!D.driveState(T.w).cars.some((c) => c.key === 'rent-rosso'), 'carro sai da garagem');
+  // sem saldo: processo civil
+  L.rentCar(ctx, { dias: 1 }); const c2 = D.driveState(T.w).cars.find((c) => c.key === 'rent-rosso');
+  D.damage(T.w, { itemId: c2.id, health: 0 });
+  bankOf(T.w).balance = 10;
+  const b2 = L.returnCar(ctx);
+  assert.equal(b2.paid, 'cobrado na Justiça');
+  assert.ok(justice(T.w).cases.some((k) => k.type === 'dano-locacao' && k.plaintiff === 'locadora' && k.amount === b2.fee));
+  const PR = await import('../server/world/protests.js');
+  const days = Array.from({ length: 30 }, (_, i) => PR.protestsOfDay(20400 + i)).flat();
+  assert.ok(days.length > 10 && days.every((p) => p.end > p.start && p.signs.length && PR.PLACES[p.place]), 'agenda de manifestações');
+});

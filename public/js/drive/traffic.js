@@ -3,14 +3,17 @@
 // mantêm distância (cone de visão à frente) e esperam pedestres. Sem física: rotas, pontos e controle de velocidade.
 import { along, turnPath, lightState, routeNodes } from './world.js';
 
-const LEN = { carro: 22, taxi: 22, policia: 23, ambulancia: 25, bombeiros: 30, caminhao: 30, van: 25, moto: 12, meu: 22, coleta: 30 };
+const LEN = { carro: 22, taxi: 22, policia: 23, ambulancia: 25, bombeiros: 30, caminhao: 30, van: 25, moto: 12, meu: 22, coleta: 30, guincho: 30 };
 export const lengthOf = (kind) => LEN[kind] || 22;
 const KMH = 0.72; // unidades/s → km/h (1 unidade ≈ 0,2 m)
 export const toKmh = (v) => Math.abs(v) * KMH;
-const CIVIL = ['azul', 'verde', 'laranja', 'branco', 'preto', 'roxo', 'suv-amarelo', 'esportivo-vermelho', 'branco', 'azul', 'preto'];
-const BIG = [['taxi', 'taxi', 0.14], ['van-branca', 'van', 0.06], ['picape-azul', 'van', 0.05], ['jipe-verde', 'van', 0.05], ['caminhao-branco', 'caminhao', 0.04], ['caminhao-vermelho', 'caminhao', 0.02], ['caminhao-azul', 'caminhao', 0.02], ['coleta', 'coleta', 0.02], ['betoneira', 'caminhao', 0.015]];
+const CIVIL = ['azul', 'verde', 'laranja', 'branco', 'preto', 'roxo', 'suv-amarelo', 'esportivo-vermelho', 'branco', 'azul', 'preto', 'city-vermelho', 'city-verde', 'city-roxo', 'city-azul', 'city-suv', 'city-vermelho', 'city-azul'];
+// variações de sprite por função (folha antiga e "City Cars")
+export const SPRITES = { policia: ['policia', 'city-policia'], ambulancia: ['ambulancia', 'city-ambulancia'], taxi: ['taxi', 'city-taxi'], guincho: ['caminhao-vermelho'] };
+export const spriteOf = (kind) => { const l = SPRITES[kind]; return l ? l[Math.floor(Math.random() * l.length)] : kind; };
+const BIG = [['taxi', 'taxi', 0.08], ['city-taxi', 'taxi', 0.07], ['city-van', 'van', 0.05], ['city-picape', 'van', 0.04], ['van-branca', 'van', 0.05], ['picape-azul', 'van', 0.05], ['jipe-verde', 'van', 0.05], ['caminhao-branco', 'caminhao', 0.04], ['caminhao-vermelho', 'caminhao', 0.02], ['caminhao-azul', 'caminhao', 0.02], ['coleta', 'coleta', 0.02], ['betoneira', 'caminhao', 0.015]];
 export function pickTraffic(i) {
-  if (i === 0 || i === 1) return { sprite: 'policia', kind: 'policia' }; // duas viaturas patrulhando
+  if (i === 0 || i === 1) return { sprite: spriteOf('policia'), kind: 'policia' }; // duas viaturas patrulhando
   let r = Math.random();
   for (const [s, k, p] of BIG) { if (r < p) return { sprite: s, kind: k }; r -= p; }
   return { sprite: CIVIL[Math.floor(Math.random() * CIVIL.length)], kind: 'carro' };
@@ -40,27 +43,34 @@ export function createTraffic(world, { count, near } = {}) {
   return { cars, placeCar, add, lanes };
 }
 
-// obstáculo mais próximo à frente (carros, jogador, estacionados, pedestres na pista)
-function ahead(c, list, maxD) {
+// obstáculo mais próximo à frente (carros, jogador, estacionados, pedestres na pista); devolve a distância e quem é.
+// skipStatic: ignora o que está parado de vez (carro batido, viatura atendendo) — usado ao contornar pela outra faixa
+function ahead(c, list, maxD, skipStatic = false) {
   const hx = Math.cos(c.a); const hy = Math.sin(c.a);
-  let best = Infinity;
+  let best = Infinity; let who = null;
   for (const o of list) {
-    if (o === c) continue;
+    if (o === c || o.towedBy === c) continue;
+    if (skipStatic && isStatic(o)) continue;
     const dx = o.x - c.x; const dy = o.y - c.y;
     if (Math.abs(dx) > maxD + 30 || Math.abs(dy) > maxD + 30) continue;
     const d = dx * hx + dy * hy; if (d <= 0 || d > maxD) continue;
-    const lat = Math.abs(-dx * hy + dy * hx);
+    const lat = Math.abs(-dx * hy + dy * hx - (c.lat || 0));
     if (lat > (o.W || 6) / 2 + 5) continue;
     if (o.a != null && Math.cos(o.a - c.a) < -0.6 && lat > 3) continue; // vem de frente na outra faixa
-    best = Math.min(best, d - (c.L / 2 + (o.L || 6) / 2 + 3));
+    const dd = d - (c.L / 2 + (o.L || 6) / 2 + 3);
+    if (dd < best) { best = dd; who = o; }
   }
+  ahead.who = who;
   return best;
 }
+// parado de vez no meio da rua: carro batido/rebocado, viatura ou ambulância atendendo
+const isStatic = (o) => (o.wrecked > 0 && !o.reckless) || o.hold || o.towedBy || o.sceneHold;
 
 export function stepTraffic(T, world, dt, t, ctx) {
   const obstacles = [...T.cars, ...ctx.extra];
   for (const c of T.cars) {
-    if (c.mode === 'chase' || c.mode === 'parked') continue; // perseguição é controlada pelo sistema de ocorrências
+    if (c.mode === 'chase' || c.mode === 'parked' || c.towedBy) continue;
+    if (c.sceneHold) { c.v = 0; continue; } // parado numa cena de acidente (motorista fora do carro) // perseguição é controlada pelo sistema de ocorrências
     if (c.wrecked > 0) { c.wrecked -= dt; c.v = 0; if (c.wrecked <= 0) c.smoke = 0; continue; }
     // motorista distraído (acidentes): não respeita sinal, faixa nem distância e acelera
     const rk = Boolean(c.reckless);
@@ -78,12 +88,22 @@ export function stepTraffic(T, world, dt, t, ctx) {
       if (c.target && c.target.lane === L) stop = Math.min(stop, c.target.s - c.s); // chegou ao local da ocorrência
     } else vmax = Math.min(vmax, c.lane.to.kind === 'round' ? 24 : 26);
     const look = 28 + c.v * 1.1;
-    const d = c.ghost > 0 || rk ? Infinity : ahead(c, obstacles, look);
-    if (d < Infinity) stop = Math.min(stop, d);
+    // ultrapassagem organizada: obstáculo parado de vez (acidente) ou viatura com sirene presa atrás de um carro
+    // → passa devagar pela outra faixa; pedestre na frente nunca é atravessado (o carro espera)
+    let d = c.ghost > 0 || rk ? Infinity : ahead(c, obstacles, look, c.passing > 0);
+    const who = ahead.who;
+    if (!rk && d < 40 && who && !who.state && (isStatic(who) || (c.siren && who.lane)) ) c.passing = 2.2;
+    if (c.passing > 0) { c.passing -= dt; vmax = Math.min(vmax, c.siren ? 30 : 13); if (d < Infinity && who && !isStatic(who) && !(c.siren && who.lane)) stop = Math.min(stop, d); }
+    else if (d < Infinity) stop = Math.min(stop, d);
+    // abre passagem: viatura/ambulância com sirene logo atrás na mesma faixa → encosta à direita e reduz
+    c.yield = 0;
+    if (!c.siren && !c.temp) for (const o of T.cars) if (o.siren && o !== c && o.lane === c.lane && !o.turn && c.s - o.s > 0 && c.s - o.s < 70) { c.yield = 1; vmax = Math.min(vmax, 10); break; }
+    const latT = c.passing > 0 ? -9 : c.yield ? 5 : 0; c.lat = (c.lat || 0) + (latT - (c.lat || 0)) * Math.min(1, dt * 3);
     const desired = Math.min(vmax, stop < Infinity ? Math.sqrt(Math.max(0, 2 * 70 * Math.max(0, stop))) : vmax);
     if (c.v < desired) c.v = Math.min(desired, c.v + 26 * dt); else c.v = Math.max(desired, c.v - 90 * dt);
     if (c.v < 0.5 && d < 30) c.wait += dt; else c.wait = 0;
-    if (c.wait > 7) { c.ghost = 1.6; c.wait = 0; }
+    // travado muito tempo atrás de um carro (nunca de uma pessoa): segue com cuidado
+    if (c.wait > 9 && !(ahead.who && ahead.who.state)) { c.ghost = 1.6; c.wait = 0; }
     if (c.ghost > 0) c.ghost -= dt;
     let mv = c.v * dt;
     while (mv > 0) {
@@ -117,7 +137,8 @@ export function stepTraffic(T, world, dt, t, ctx) {
     }
     const p = c.turn ? along(c.turn.path, c.ts) : along(c.lane.path, c.s);
     let da = p.a - c.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
-    c.a += da * Math.min(1, dt * 10); c.x = p.x; c.y = p.y;
+    c.a += da * Math.min(1, dt * 10);
+    const la = c.lat || 0; c.x = p.x - Math.sin(p.a) * la; c.y = p.y + Math.cos(p.a) * la; // deslocamento lateral (ultrapassar / encostar)
     // longe da câmera por muito tempo: reaparece perto (mantém o trânsito onde o jogador está)
     if (!c.temp && !c.siren && ctx.view) {
       const far = Math.hypot(c.x - ctx.view.x, c.y - ctx.view.y) > ctx.view.r + 1200;

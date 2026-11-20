@@ -80,7 +80,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   // ---------------------------------------------------------------- camadas
   const ground = []; // { mat, shape: 'rect'|'ellipse', x, y, w, h }
   const G = (mat, x, y, w, h, shape = 'rect', extra = {}) => ground.push({ mat, shape, x: snap(x), y: snap(y), w: snap(w), h: snap(h), ...extra });
-  const blds = []; const props = []; const lamps = []; const pois = []; const regions = []; const spots = [];
+  const blds = []; const props = []; const lamps = []; const pois = []; const regions = []; const spots = []; let rentSpot = null;
   // mar, praia e cinturões verdes
   G('water', 0, 0, 232, H); G('sand', 232, 0, 88, H);
   const beachFence = [];
@@ -309,6 +309,8 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
         G('lot', x0, y0, bw, bh, 'rect', { stalls: true });
         for (let r2 = 0; r2 < 3; r2++) for (let k = 0; k < 9; k++) spots.push([x0 + 24 + k * ((bw - 48) / 8), y0 + 40 + r2 * ((bh - 80) / 2), -Math.PI / 2]);
         poi('estacionamento', 'Estacionamento Central', cx, y1 + 20, '#/veiculos', 'car');
+        // Locadora Nexus Rent: balcão no estacionamento; o carro alugado fica na primeira fila
+        poi('locadora', 'Locadora Nexus Rent', x0 + 70, y0 + 14, '#/locadora', 'car'); rentSpot = [x0 + 40, y0 + 40, -Math.PI / 2];
         break;
       }
       case 'concessionaria': {
@@ -578,7 +580,7 @@ export function generateCity(seed = 20261119, { reforma = null } = {}) {
   for (const p of props) if (p.solid && (p.user || p.x < 0 || p.y < 0 || p.x > W || p.y > H)) { const r = p.spr.startsWith('arvore') ? 4 : 3; eFill(SOLID, p.x - r, p.y - r * 1.5, r * 2, r * 2); }
 
   return {
-    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: OX, oy: OY, bounds: BB, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, planeSpots,
+    W, H, CS, mw: emw, mh: emh, mask: emask, heights: eh, ox: OX, oy: OY, bounds: BB, coast, core: { w: W, h: H }, stubs, ground, blds, props, decals, lamps, pois, regions, bridges, driveways, fence, airport, runwayLights, spots, rentSpot, planeSpots,
     R: { w: W, h: H, nodes, roads, lights, lots: [], pois, regions, radars: [
       { at: [704, 760], limit: 50 }, { at: [1728, 2000], limit: 50 }, { at: [2200, 576], limit: 50 }, { at: [3300, 1504], limit: 50 }, { at: [1200, 2304], limit: 50 }, { at: [2752, 1900], limit: 50 }, { at: [1600, 1248], limit: 40 }, { at: [900, 928], limit: 40 },
     ] },

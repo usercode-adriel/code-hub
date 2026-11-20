@@ -4,7 +4,7 @@
 import { nearestLane, routeNodes, along } from './world.js';
 import { gather } from './peds.js';
 import { stepCar } from './player.js';
-import { lengthOf } from './traffic.js';
+import { lengthOf, spriteOf } from './traffic.js';
 
 export function createIncidents({ world, T, P, pois, notify, report }) {
   const list = []; const fx = [];
@@ -13,27 +13,39 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
   const chase = { on: false, car: null, level: 0, lost: 0, caught: 0, reason: '', t: 0 };
 
   // viatura/ambulância/caminhão saindo da base com destino ao local
-  function dispatch(kind, inc) {
-    const base = kind === 'ambulancia' ? H : kind === 'bombeiros' ? FIRE : POL;
+  const GAR = station('concessionaria') || station('estacionamento'); // oficina/guincho
+  function dispatch(kind, inc, opts = {}) {
+    const base = opts.base || (kind === 'ambulancia' ? H : kind === 'bombeiros' ? FIRE : kind === 'guincho' ? GAR : POL);
     if (!base) return null;
-    const start = nearestLane(world, base[0], base[1] - 30, (l) => !l.narrow);
-    const dest = nearestLane(world, inc.x, inc.y, (l) => !l.narrow);
+    let start = nearestLane(world, base[0], base[1] - 30, (l) => !l.narrow);
+    // base longe (> 900): a equipe vem de onde já estava rodando, a 350–750 do local (chega em ~15–25 s)
+    const tx = opts.at?.[0] ?? inc.x; const ty = opts.at?.[1] ?? inc.y;
+    if (Math.hypot(base[0] - tx, base[1] - ty) > 900) {
+      const lanes = world.lanes.filter((l) => !l.narrow && l.path.len > 40);
+      for (let k = 0; k < 60; k++) { const l = lanes[Math.floor(Math.random() * lanes.length)]; const s0 = Math.random() * l.path.len; const q = along(l.path, s0); const d = Math.hypot(q.x - tx, q.y - ty); if (d > 350 && d < 750) { start = { lane: l, s: s0 }; break; } }
+    }
+    const dest = nearestLane(world, opts.at?.[0] ?? inc.x, opts.at?.[1] ?? inc.y, (l) => !l.narrow);
     if (!start || !dest) return null;
     const route = routeNodes(world, start.lane.to.id, dest.lane.from.id, start.lane.edge);
     if (!route) return null;
     const p = along(start.lane.path, start.s);
-    const c = { id: `${kind}${Math.random().toString(36).slice(2, 7)}`, sprite: kind, kind, L: lengthOf(kind), W: 12, maxV: 52, temp: true, siren: true, driver: true,
-      lane: start.lane, s: start.s, turn: null, ts: 0, x: p.x, y: p.y, a: p.a, v: 0, wait: 0, ghost: 0, route, dest: dest.lane.from.id, target: { lane: dest.lane, s: Math.max(8, dest.s - 14) }, job: { inc, kind, phase: 'indo', t: 0, base } };
+    const c = { id: `${kind}${Math.random().toString(36).slice(2, 7)}`, sprite: spriteOf(kind), kind, L: lengthOf(kind), W: 12, maxV: 52, temp: true, siren: kind !== 'guincho', beacon: kind === 'guincho', driver: true,
+      lane: start.lane, s: start.s, turn: null, ts: 0, x: p.x, y: p.y, a: p.a, v: 0, wait: 0, ghost: 0, route, dest: dest.lane.from.id, target: { lane: dest.lane, s: Math.max(8, dest.s - (opts.back ?? 14)) }, job: { inc, kind, phase: 'indo', t: 0, base, ...opts.job } };
     T.cars.push(c); inc.units.push(c);
     return c;
   }
   function create(type, x, y, info = {}) {
-    const inc = { id: Math.random().toString(36).slice(2), type, x, y, t: 0, units: [], injured: info.injured || [], fire: info.fire || 0, culprit: info.culprit || false, done: false, ...info };
+    const { units: want, ...rest } = info; // equipes pedidas (não confundir com as despachadas em inc.units)
+    const inc = { id: Math.random().toString(36).slice(2), type, x, y, t: 0, injured: info.injured || [], fire: info.fire || 0, culprit: info.culprit || false, done: false, ...rest, units: [] };
     list.push(inc);
-    gather(P, x, y, type === 'queda-aviao' ? 260 : info.npc ? 240 : 170); // grupos de curiosos se juntam em volta
-    if (inc.injured.length || type === 'queda-aviao') dispatch('ambulancia', inc);
-    dispatch('policia', inc);
-    if (inc.fire) dispatch('bombeiros', inc);
+    if (!info.noCrowd) gather(P, x, y, type === 'queda-aviao' ? 260 : info.npc ? 240 : 170); // grupos de curiosos se juntam em volta
+    // equipes: as pedidas (cenas programadas de acidente) ou o padrão (ambulância se há ferido, polícia, bombeiros se há fogo)
+    if (want) for (const k of want) dispatch(k, inc);
+    else {
+      if (inc.injured.length || type === 'queda-aviao') dispatch('ambulancia', inc);
+      dispatch('policia', inc);
+      if (inc.fire) dispatch('bombeiros', inc);
+    }
     return inc;
   }
   const addFx = (kind, x, y, secs, scale = 1) => fx.push({ kind, x, y, t: 0, secs, scale });
@@ -97,14 +109,15 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
         if (j.phase === 'indo') {
           j.t += dt;
           // garantia: se travar no caminho, a equipe reaparece um pouco antes do local (pela mesma rua)
-          if (j.t > 40 && u.target) { const sp = Math.max(0, u.target.s - 60); const q = along(u.target.lane.path, sp); Object.assign(u, { lane: u.target.lane, s: sp, turn: null, x: q.x, y: q.y, a: q.a, v: 10, route: [], wait: 0 }); j.t = 0; }
+          if (j.t > 28 && u.target) { const sp = Math.max(0, u.target.s - 60); const q = along(u.target.lane.path, sp); Object.assign(u, { lane: u.target.lane, s: sp, turn: null, x: q.x, y: q.y, a: q.a, v: 10, route: [], wait: 0 }); j.t = 0; }
         }
         if (arrived || (j.phase === 'indo' && Math.hypot(u.x - inc.x, u.y - inc.y) < 70 && u.v < 1)) { j.phase = 'atendendo'; j.t = 0; u.target = null; u.v = 0; u.wrecked = 0.01; u.hold = true; }
         if (j.phase === 'atendendo') {
           u.wrecked = 0.2; j.t += dt;
-          if (j.kind === 'ambulancia' && j.t > 6 && inc.injured.length) { for (const p of inc.injured) { p.state = 'levado'; p.x = -999; } notify('🚑 Ambulância', `${inc.injured.map((p) => p.name).join(', ')} ${inc.injured.length > 1 ? 'foram levados' : 'foi levado(a)'} ao Hospital Nexus.`, 'info'); inc.injured = []; }
+          if (j.kind === 'ambulancia' && j.t > 6 && inc.injured.length) { inc.taken = true; for (const p of inc.injured) { p.state = 'levado'; p.x = -999; } notify('🚑 Ambulância', `${inc.injured.map((p) => p.name).join(', ')} ${inc.injured.length > 1 ? 'foram levados' : 'foi levado(a)'} ao Hospital Nexus.`, 'info'); inc.injured = []; }
           if (j.kind === 'bombeiros' && j.t > 8) inc.fire = 0;
-          const done = j.kind === 'ambulancia' ? !inc.injured.length && j.t > 7 : j.kind === 'bombeiros' ? !inc.fire && j.t > 9 : j.t > 14;
+          // cena programada: a equipe só vai embora quando a cena libera (u.release); senão, regra padrão
+          const done = u.release !== undefined ? u.release && j.t > 1 : j.kind === 'ambulancia' ? !inc.injured.length && j.t > 7 : j.kind === 'bombeiros' ? !inc.fire && j.t > 9 : j.t > 14;
           if (done) {
             j.phase = 'voltando'; u.wrecked = 0; u.siren = false; u.hold = false;
             const back = nearestLane(world, j.base[0], j.base[1] - 30, (l) => !l.narrow);
@@ -114,7 +127,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
         }
         if (j.phase === 'voltando') { j.t += dt; if ((j.backLane && u.lane === j.backLane) || j.t > 90) u.done = true; }
       }
-      if (inc.t > 120 || (inc.units.every((u) => u.done || u.job?.phase === 'voltando') && !inc.injured.length && !inc.fire)) inc.done = true;
+      if (inc.t > (inc.scene ? 420 : 120) || (!inc.scene?.active && inc.units.every((u) => u.done || u.job?.phase === 'voltando') && !inc.injured.length && !inc.fire)) inc.done = true;
       // fuga do local: jogador culpado se afasta antes da polícia chegar
       if (inc.culprit && !inc.fled && !chase.on) { const p = me.car || me.plane || me; if (Math.hypot(p.x - inc.x, p.y - inc.y) > 260 && inc.units.some((u) => u.kind === 'policia' && u.job?.phase === 'indo')) { inc.fled = true; startChase(2, 'Fuga de local de acidente', p); } }
     }

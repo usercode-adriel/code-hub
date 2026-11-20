@@ -109,6 +109,14 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Acidentes entre moradores (`public/js/drive/accidents.js`): motorista distraído ignora sinal e distância; colisão real com carro (batida) e com quem atravessa fora da faixa (atropelamento); ferido fica no local até a ambulância e vai ao hospital; curiosos em volta; carros rebocados depois
 - [x] Notícia + post de testemunha com foto em pixel (cenas do mapa em `public/assets/social`)
 
+### Veículos novos, locadora, colisões, cenas de acidente e manifestações
+- [x] 10 carros "City Cars" (civis, táxi, polícia, ambulância) e o Rosso GT recortados com versão danificada (`tools/drive/cars2.py`); polícia e ambulância novas fazem as mesmas funções das antigas
+- [x] Locadora Nexus Rent (`#/locadora`, `server/world/rental.js`): aluguel por dia da cidade (85 NXC), carro no Estacionamento Central, vistoria na devolução (danos, sinistro, perda total); sem saldo, processo civil da locadora no Fórum
+- [x] Colisões (`public/js/drive/obst.js`): objetos da cidade e da Construtora bloqueiam o jogador a pé e de carro; carros colidem pelo retângulo real; pedestres desviam entre si; correr e esbarrar derruba a pessoa
+- [x] Cenas de acidente (`public/js/drive/accidents.js`): batida → fumaça, motoristas conversam; polícia + guincho (motoristas vão com a polícia) ou só guincho (vão no guincho). Atropelamento → motorista vai até a vítima, roda de curiosos, ambulância leva, grupo se desfaz
+- [x] Trânsito: abre passagem para sirenes, contorna acidentes pela outra faixa, espera pedestres; equipes saem de perto quando a base está longe
+- [x] Manifestações (`server/world/protests.js`, `public/js/drive/protest.js`): agenda diária com tema, lugar e horário; multidão com cartazes e palavras de ordem; notícia e posts com foto
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

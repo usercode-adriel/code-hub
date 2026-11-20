@@ -14,7 +14,7 @@ export const CITY_NAV = [
   ['organizacoes', 'Organizações', 'users', '#a78bfa'], ['assistente', 'Chat', 'chat', '#22d3ee'], ['settings', 'Configurações', 'settings', '#94a3b8'],
 ];
 export const CITY_PLACES = [
-  ['banco', 'Banco Nexus', 'wallet', '#a78bfa'], ['policia', 'Delegacia', 'shield', '#60a5fa'], ['hospital', 'Hospital', 'hospital', '#f87171'],
+  ['banco', 'Banco Nexus', 'wallet', '#a78bfa'], ['locadora', 'Locadora de carros', 'car', '#ef4444'], ['policia', 'Delegacia', 'shield', '#60a5fa'], ['hospital', 'Hospital', 'hospital', '#f87171'],
   ['justica', 'Fórum', 'scale', '#fbbf24'], ['governo', 'Prefeitura', 'flag', '#34d399'], ['midia', 'Notícias', 'news', '#fb7185'],
   ['social', 'Social', 'users', '#60a5fa'], ['internet', 'Internet', 'globe', '#22d3ee'], ['acontecimentos', 'Acontecimentos', 'zap', '#facc15'],
   ['cidade', 'Desenvolvimento', 'pin', '#4ade80'], ['diversao', 'Diversão', 'play', '#f472b6'], ['arquivo', 'Arquivo', 'book', '#94a3b8'], ['controle', 'Controle da IA', 'cpu', '#94a3b8'],

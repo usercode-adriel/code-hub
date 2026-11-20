@@ -851,3 +851,17 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .fb-pax img { width: 18px; height: 18px; border-radius: 50%; image-rendering: pixelated; }
 .d2-fb { z-index: 8; }
 @media (max-width: 700px) { .fb-t th:nth-child(4), .fb-t td:nth-child(4) { display: none; } .fb-t { font-size: 11px; } }
+/* ---------- Locadora ---------- */
+.rt { display: grid; gap: 12px; padding-bottom: 24px; }
+.rt-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .rt-head > div:nth-child(2) { flex: 1; min-width: 200px; } .rt-head h1 { margin: 0; font-size: 22px; color: #fff; }
+.rt-car { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+.rt-art { width: 180px; height: 220px; display: grid; place-items: center; border-radius: 16px; background: repeating-linear-gradient(90deg, #3d4150 0 46px, #f1f1f1 46px 49px, #3d4150 49px 95px); }
+.rt-art img { height: 200px; image-rendering: pixelated; filter: drop-shadow(4px 6px 0 rgba(0,0,0,.35)); }
+.rt-info { flex: 1; min-width: 240px; } .rt-info h2 { margin: 0; color: #fff; }
+.rt-price { display: flex; align-items: baseline; gap: 6px; margin: 8px 0 2px; } .rt-price b { font-size: 30px; color: #fbbf24; }
+.rt-days { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; } .rt-days button { padding: 8px 12px; border-radius: 10px; background: var(--cx-panel); border: 2px solid var(--cx-line); color: #e6e8ff; cursor: pointer; font-weight: 700; }
+.rt-days button.on { background: #ef4444; border-color: #fca5a5; color: #fff; }
+.rt-go { font-size: 15px; padding: 10px 18px; }
+.rt-active { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(47,210,122,.08); border: 2px solid rgba(47,210,122,.4); } .rt-active h3 { margin: 0 0 4px; color: #6ee7b7; font-size: 14px; } .rt-active p { margin: 4px 0; }
+.rt-warn { color: #fda4af; } .rt-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.rt-terms ul, .rt-hist { margin: 6px 0 0; padding-left: 18px; color: #cbd5ff; font-size: 13px; line-height: 1.6; } .rt-terms h3 { margin: 0; color: #fff; font-size: 15px; display: flex; gap: 6px; align-items: center; }

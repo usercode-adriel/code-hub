@@ -100,10 +100,12 @@ const TITLES = {
   atropelamento: (n, r, c) => `${n || 'Pedestre'} é atropelado(a)${r ? ` em ${r}` : ''}${c ? ' — motorista era o(a) jogador(a)' : ''}`,
   acidente: (n, r) => (n ? `${n} se fere em batida de carros${r ? ` em ${r}` : ''}` : `Acidente de trânsito${r ? ` em ${r}` : ''}`),
   'queda-aviao': (n, r) => `Avião cai${r ? ` em ${r}` : ''}: bombeiros e ambulâncias no local`,
+  'batida-policia': (n, r) => `Batida entre carros${r ? ` em ${r}` : ''}: polícia registra a ocorrência e veículos são guinchados`,
+  'batida-guincho': (n, r) => `Batida entre carros${r ? ` em ${r}` : ''}: veículos são levados pelo guincho`,
   'perseguicao-presa': () => 'Polícia encerra perseguição e aborda motorista',
   'perseguicao-fuga': () => 'Motorista despista a polícia após perseguição',
 };
-export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc }) {
+export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc, nomes }) {
   const w = ctx.w; const u = account(w);
   if (!TITLES[tipo]) throw new BankError('Ocorrência desconhecida');
   u.mapIncidents ??= []; const today = nowIso().slice(0, 10);
@@ -119,13 +121,14 @@ export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, n
   }
   const imp = tipo === 'queda-aviao' ? 4 : tipo === 'atropelamento' ? 3 : 2;
   // nas redes: uma testemunha posta a foto do local (cena em pixel do mapa)
-  if (['atropelamento', 'acidente', 'queda-aviao'].includes(tipo)) {
+  if (['atropelamento', 'acidente', 'queda-aviao', 'batida-policia', 'batida-guincho'].includes(tipo)) {
     const wit = residents(w).filter((x) => x.id !== p?.id && x.agent?.status === 'ativo');
     const who = wit[Math.floor(Math.random() * wit.length)];
-    const what = tipo === 'atropelamento' ? `Acabei de ver um atropelamento${reg ? ` em ${reg}` : ''} 😰 a ambulância já tá chegando` : tipo === 'acidente' ? `Batida feia${reg ? ` em ${reg}` : ''} agora há pouco 🚗💥 juntou gente e a ambulância veio` : `Um avião caiu${reg ? ` perto de ${reg}` : ''}!! 😱 bombeiros no local`;
+    const what = tipo.startsWith('batida') ? `Batida${reg ? ` em ${reg}` : ''} agora há pouco 🚗💥 ${tipo === 'batida-policia' ? 'a polícia veio e chamou o guincho' : 'os motoristas discutiram e o guincho levou os carros'}` : tipo === 'atropelamento' ? `Acabei de ver um atropelamento${reg ? ` em ${reg}` : ''} 😰 a ambulância já tá chegando` : tipo === 'acidente' ? `Batida feia${reg ? ` em ${reg}` : ''} agora há pouco 🚗💥 juntou gente e a ambulância veio` : `Um avião caiu${reg ? ` perto de ${reg}` : ''}!! 😱 bombeiros no local`;
     if (who) try { worldPost(ctx, who, genderize(who, `${what}${p ? `. Força, ${p.name.split(' ')[0]}! 🙏` : ''}`), { image: photo('acidente') }); } catch { /* sem rede */ }
   }
-  record(ctx, { type: `mapa-${tipo}`, cat: 'seguranca', title: TITLES[tipo](p?.name || nome, reg, culpa), text: veiculo ? `Veículo envolvido: ${String(veiculo).slice(0, 40)}.` : '', actors: [...(culpa ? ['me'] : []), ...(p ? [p.id] : [])], importance: imp });
+  const who = Array.isArray(nomes) ? nomes.map((x) => String(x).slice(0, 40)).slice(0, 2) : [];
+  record(ctx, { type: `mapa-${tipo}`, cat: 'seguranca', title: TITLES[tipo](p?.name || nome, reg, culpa), text: [veiculo ? `Veículo envolvido: ${String(veiculo).slice(0, 40)}.` : '', who.length ? `Motoristas: ${who.join(' e ')}.` : ''].filter(Boolean).join(' '), actors: [...(culpa ? ['me'] : []), ...(p ? [p.id] : [])], importance: imp });
   services.live?.(w, { kind: tipo === 'atropelamento' || tipo === 'queda-aviao' ? 'atendimento' : 'ocorrencia', personaId: p?.id || (culpa ? 'me' : null), name: p?.name || (culpa ? 'Você' : null), text: TITLES[tipo](p?.name || nome, reg, false) });
   return { ok: true };
 }

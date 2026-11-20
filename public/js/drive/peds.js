@@ -43,7 +43,8 @@ export function createPeds(world, people, roles) {
   for (const p of peds) place(p);
   return { peds, walks };
 }
-function place(p) { const q = along(p.walk.path, p.s); p.x = q.x; p.y = q.y; p.a = q.a + (p.dir < 0 ? Math.PI : 0); p.face = Math.cos(p.a) < -0.2 ? -1 : Math.cos(p.a) > 0.2 ? 1 : p.face; }
+// lat: desvio lateral (passar ao lado de quem vem de frente), sempre pela direita de quem anda
+function place(p) { const q = along(p.walk.path, p.s); p.a = q.a + (p.dir < 0 ? Math.PI : 0); const la = p.lat || 0; p.x = q.x - Math.sin(p.a) * la; p.y = q.y + Math.cos(p.a) * la; p.face = Math.cos(p.a) < -0.2 ? -1 : Math.cos(p.a) > 0.2 ? 1 : p.face; }
 
 // espalha passantes perto de um ponto (mantém a cidade viva onde o jogador está)
 export function respawnNear(P, p, view) {
@@ -74,7 +75,17 @@ function crossesRoad(world, a, b) { let n = 0; for (let k = 1; k < 8; k++) { con
 export function stepPeds(P, world, dt, t, cars, view) {
   const crossing = new Set();
   for (const p of P.peds) {
-    if (p.state === 'ferido' || p.state === 'levado') continue;
+    if (p.state === 'ferido' || p.state === 'levado' || p.state === 'cena') continue;
+    if (p.state === 'caido') { p.fall -= dt; if (p.fall <= 0) { p.state = 'walk'; p.say = { text: 'Olha por onde anda!', until: performance.now() + 2200 }; place(p); } continue; }
+    if (p.state === 'roda' || p.state === 'volta') { // roda em volta de quem foi atropelado / voltando para a calçada
+      const r = p.roda; const to = p.state === 'roda' ? r.to : r.back || r.to;
+      if (p.state === 'volta' && !r.back) { r.back = [p.x, p.y]; const q = along(p.walk.path, p.s); r.back = [q.x, q.y]; }
+      const dx = to[0] - p.x; const dy = to[1] - p.y; const d = Math.hypot(dx, dy); const st = p.v * (d > 40 ? 2.4 : 1.1) * dt; // longe: vem correndo
+      if (d > st) { p.x += (dx / d) * st; p.y += (dy / d) * st; p.a = Math.atan2(dy, dx); p.rmove = true; }
+      else { p.rmove = false; if (p.state === 'volta') { p.state = 'walk'; p.roda = null; place(p); } else p.a = Math.atan2(r.at[1] - p.y, r.at[0] - p.x); }
+      if (p.state === 'roda' && !r.back) r.back = (() => { const q = along(p.walk.path, p.s); return [q.x, q.y]; })();
+      continue;
+    }
     if (p.state === 'olhando') { // curioso: anda até o ponto da calçada mais perto da ocorrência e fica olhando
       p.look -= dt;
       if (p.look <= 0) { p.state = 'walk'; continue; }
@@ -120,6 +131,19 @@ export function stepPeds(P, world, dt, t, cars, view) {
       } else { p.cross = { node: n, axis: 'H', to, walk: nx.walk, dir: nx.dir, mid: to, waited: 0 }; p.state = 'cross'; }
       continue;
     }
+    // desvio: perto do jogador, quem vem de frente passa pela direita; atrás de alguém mais lento, acompanha o passo
+    if (view && Math.abs(p.x - view.x) < view.r && Math.abs(p.y - view.y) < view.r) {
+      let want = 0;
+      for (const o of P.peds) {
+        if (o === p || o.state !== 'walk' || Math.abs(o.x - p.x) > 7 || Math.abs(o.y - p.y) > 7) continue;
+        const d = Math.hypot(o.x - p.x, o.y - p.y); if (d > 6) continue;
+        const ahead = (o.x - p.x) * Math.cos(p.a) + (o.y - p.y) * Math.sin(p.a);
+        if (ahead <= 0) continue;
+        if (o.walk === p.walk && o.dir === p.dir) { if (d < 4.5) p.s -= p.v * dt * p.dir * 0.8; } else want = 2.4;
+      }
+      p.latT = want ? want : Math.max(0, (p.latT || 0) - dt * 2);
+      p.lat = (p.lat || 0) + ((p.latT || 0) - (p.lat || 0)) * Math.min(1, dt * 6);
+    } else p.lat = 0;
     place(p);
     if (Math.random() < dt * 0.02) p.pause = 1 + Math.random() * 3;
     // passante longe da câmera reaparece perto (os moradores com nome continuam a rotina onde estiverem)
@@ -132,7 +156,8 @@ export function stepPeds(P, world, dt, t, cars, view) {
 export function gather(P, x, y, radius = 160, secs = 22) {
   let n = 0;
   for (const p of P.peds) {
-    if (p.state === 'ferido' || p.state === 'levado' || Math.hypot(p.x - x, p.y - y) > radius) continue;
+    if (p.state !== 'walk' && p.state !== 'wait' && p.state !== 'cross' && p.state !== 'olhando') continue;
+    if (Math.hypot(p.x - x, p.y - y) > radius) continue;
     let best = p.s; let bd = Infinity;
     for (let s = 0; s <= p.walk.path.len; s += 6) { const q = along(p.walk.path, s); const d = Math.hypot(q.x - x, q.y - y); if (d < bd) { bd = d; best = s; } }
     Object.assign(p, { state: 'olhando', look: secs + Math.random() * 8, lookS: Math.max(0, Math.min(p.walk.path.len, best + (Math.random() - 0.5) * 30)), lookAt: [x, y], cross: null });

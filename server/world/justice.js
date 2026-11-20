@@ -20,6 +20,7 @@ export const DEFAULT_PENALTIES = {
   desobediencia: { label: 'Desobediência', kind: 'criminal', sev: 1, fine: 400 },
   calote: { label: 'Cobrança de dívida entre pessoas', kind: 'civil', sev: 1, fine: 0 },
   execucao: { label: 'Execução de dívida bancária', kind: 'civil', sev: 1, fine: 0 },
+  'dano-locacao': { label: 'Cobrança de danos em carro alugado', kind: 'civil', sev: 1, fine: 0 },
 };
 export const STATUS_LABEL = { aberto: 'Ocorrência registrada', investigacao: 'Em investigação', intimado: 'Intimação para depor', decisao: 'Aguardando decisão', processo: 'Processo na Justiça', citado: 'Citação (ação civil)', arquivado: 'Arquivado', multa: 'Multa aplicada', condenado: 'Condenado(a)', absolvido: 'Absolvido(a)', acordo: 'Encerrado por acordo', preso: 'Prisão' };
 
@@ -28,7 +29,7 @@ export function justice(w) {
   return w.justice;
 }
 export const penalty = (w, type) => ({ ...DEFAULT_PENALTIES[type], ...(justice(w).cfg.penalties[type] || {}) });
-const who = (w, s) => (s?.type === 'user' || s === 'me' ? { id: 'me', name: 'Você' } : s?.type === 'banco' || s === 'banco' ? { id: 'banco', name: 'Banco Nexus' } : s === 'policia' ? { id: 'policia', name: 'Polícia de Nexus City' } : (() => { const p = personById(w, s?.id || s); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : { id: s?.id || s, name: (w.gone || {})[s?.id || s] || '—' }; })());
+const who = (w, s) => (s?.type === 'user' || s === 'me' ? { id: 'me', name: 'Você' } : s?.type === 'banco' || s === 'banco' ? { id: 'banco', name: 'Banco Nexus' } : s === 'locadora' ? { id: 'locadora', name: 'Locadora Nexus Rent' } : s === 'policia' ? { id: 'policia', name: 'Polícia de Nexus City' } : (() => { const p = personById(w, s?.id || s); return p ? { id: p.id, name: p.name, avatar: p.avatar, color: p.color } : { id: s?.id || s, name: (w.gone || {})[s?.id || s] || '—' }; })());
 
 // ---------------------------------------------------------------- estrutura: delegacia, policiais e juíza
 // monta (e recompõe) a equipe: juíza(iz) e policiais que faltarem — quem saiu da cidade ou foi presa(o) é substituída(o)
