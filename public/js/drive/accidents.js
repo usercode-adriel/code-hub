@@ -39,7 +39,8 @@ export function createAccidents({ world, T, P, INC, report, regionAt, notify, ch
     p.state = 'cena'; return p;
   }
   const giveBack = (p, view) => { if (p && p.state === 'cena') { p.state = 'walk'; respawnNear(P, p, view); } };
-  function driverFor(c, view) { const p = borrow(view); const [x, y] = door(c); const a = actor(p?.spr || chrFor({ id: `mot${Math.random()}` }), x, y, p?.name || null); a.ped = p; return a; }
+  // o motorista sai do carro sentindo a batida (reação de dor da folha de referência) e depois se recompõe
+  function driverFor(c, view) { const p = borrow(view); const [x, y] = door(c); const a = actor(p?.spr || chrFor({ id: `mot${Math.random()}` }), x, y, p?.name || null); a.ped = p; a.react = { kind: 'dor', t0: performance.now(), dur: 2.6, face: Math.random() < 0.5 ? 1 : -1 }; return a; }
 
   // ---------------------------------------------------------------- início das cenas
   function crashScene(cars, view, { police = Math.random() < 0.55, culprit = false, playerCar = null } = {}) {

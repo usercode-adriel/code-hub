@@ -8,6 +8,8 @@ import { icon } from '../icons.js';
 import { esc, toast } from '../ui.js';
 import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY } from '../drive/world.js';
 import { createBlitz } from '../drive/blitz.js';
+import { pose, drawPose } from '../drive/reactions.js';
+import { createCela } from '../drive/cela.js';
 import { generateCity, CS } from '../drive/city.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
@@ -97,7 +99,7 @@ export default async function render(el, params = new URLSearchParams()) {
   school.id = 'escola'; school.health = 100; own.push(school);
   const cars = () => own.filter((o) => o.kind === 'carro');
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
-  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'heroi'}`; })(), row: 0, walkT: 0 };
+  const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'jovem'}`; })(), row: 0, walkT: 0 };
   [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
   // detido(a) numa blitz: começa na delegacia (a detenção corre no relógio do servidor)
   let DET = state.detention || null;
@@ -193,7 +195,7 @@ export default async function render(el, params = new URLSearchParams()) {
   function pickLook() {
     let m = stage.querySelector('.d2-look'); if (m) { m.remove(); return; }
     m = document.createElement('div'); m.className = 'd2-look ed-modal';
-    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:${CHR[k].layout ? '700% 600%' : '400% 400%'};aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
+    m.innerHTML = `<div class="ed-card"><h3>Seu personagem</h3><p>Escolha o visual com que você anda pela cidade.</p><div class="d2-looks">${CHR_KEYS.map((k) => `<button data-k="${k}" class="${me.spr === `chr/${k}` ? 'on' : ''}" title="${esc(CHR[k].name)}"><i style="background-image:url(/assets/rpg/chr/${k}.png);background-size:400% 400%;aspect-ratio:${CHR[k].w}/${CHR[k].h}"></i><span>${esc(CHR[k].name)}</span></button>`).join('')}</div><div class="ed-row"><button class="cx-btn" data-x>Fechar</button></div></div>`;
     stage.appendChild(m);
     m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr2', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
     m.querySelector('[data-x]').onclick = () => m.remove();
@@ -424,10 +426,24 @@ export default async function render(el, params = new URLSearchParams()) {
     const im = IMG[key]; const m = CHR[key.slice(4)]; if (!im || !m) return false;
     const W = (H * m.w) / m.h; ctx.drawImage(im, frame * m.w, row * m.h, m.w, m.h, x - W / 2, y - H, W, H); return true;
   }
+  // personagem numa pose de reação (de lado, virado para onde cai)
+  function reactChr(key, x, y, ps, face, H) {
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x + face * (ps.rot > 1 ? H * 0.35 : 0), y, ps.rot > 1 ? H * 0.5 : 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(x, y);
+    drawPose(ctx, ps, H, () => drawChr(key, 0, 0, face > 0 ? 1 : 3, 0, H), face, performance.now() / 1000);
+    ctx.restore();
+  }
   function drawPed(p, t) {
     if (p.state === 'levado' || p.state === 'cena') return;
-    if (p.state === 'caido') { const im = IMG['npc/caido']; if (im) { ctx.save(); ctx.translate(p.x, p.y); if (Math.cos(p.fallA || 0) < 0) ctx.scale(-1, 1); ctx.drawImage(im, -9, -4, 18, 7); ctx.restore(); } return; }
-    if (p.state === 'ferido') { const im = IMG['npc/caido']; if (im) ctx.drawImage(im, p.x - 9, p.y - 4, 18, 7); ctx.fillStyle = 'rgba(200,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 2, 4, 1.6, 0, 0, Math.PI * 2); ctx.fill(); return; }
+    // reações (folha de referência): caído (esbarrão) se levanta no fim; atropelado fica deitado esperando a ambulância
+    if (p.state === 'caido' || p.state === 'ferido') {
+      const kind = p.state === 'caido' ? 'caido' : 'atropelado';
+      if (!p.react || p.react.kind !== kind) p.react = { kind, t0: performance.now(), face: Math.cos(p.fallA ?? p.a) < 0 ? -1 : 1 };
+      const el = (performance.now() - p.react.t0) / 1000;
+      const ps = p.state === 'caido' && p.fall < 0.6 ? pose('levantando', 0.6 - p.fall) : pose(kind, el);
+      reactChr(p.spr, p.x, p.y + 0.5, ps, p.react.face, 15); return;
+    }
+    p.react = null;
     const moving = ((p.state === 'walk' || p.state === 'cross' || p.state === 'jay') && !p.pause) || ((p.state === 'roda' || p.state === 'volta') && p.rmove);
     // olhando uma ocorrência: vira para ela; parado: mantém a última direção
     const ang = p.state === 'olhando' && p.lookAt ? Math.atan2(p.lookAt[1] - p.y, p.lookAt[0] - p.x) : p.state === 'conversa' && p.talk ? Math.atan2(p.talk.with.y - p.y, p.talk.with.x - p.x) : p.a;
@@ -506,7 +522,7 @@ export default async function render(el, params = new URLSearchParams()) {
           lights.push({ x: n.x + dx, y: n.y + dy - 2, r: 7, color: col(s), ka: 0.6, halo: 0.8 });
         }
       }
-      for (const sc of blitzScene.values()) if (sc) for (const [x, y] of sc.cones) { if (!inV({ x, y })) continue; ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 2.4, y - 0.6, 4.8, 1.4); ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(x, y - 6.5); ctx.lineTo(x + 2.6, y); ctx.lineTo(x - 2.6, y); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.5, y - 3.6, 3, 1); }
+      for (const sc of blitzScene.values()) if (sc) for (const [x, y] of sc.cones) { if (!inV({ x, y })) continue; const cn = IMG['prisao/cone']; ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x - 2.4, y - 0.6, 4.8, 1.4); if (cn) { const h = 8; const w = (h * cn.width) / cn.height; ctx.drawImage(cn, x - w / 2, y - h, w, h); } }
       for (const r of world.radars) { if (!inV({ x: r.at[0], y: r.at[1] })) continue; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#e11d48'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(r.at[0] + 18, r.at[1] - 18, 4.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#111'; ctx.font = 'bold 4.6px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(r.limit), r.at[0] + 18, r.at[1] - 17.7); ctx.fillStyle = '#334155'; ctx.fillRect(r.at[0] + 23, r.at[1] - 20, 4, 3); }
     }
     // objetos com profundidade (ordenados por y): pedestres, carros, aviões no chão, jogador
@@ -525,7 +541,7 @@ export default async function render(el, params = new URLSearchParams()) {
       if (kind === 0) drawPed(o, t);
       else if (kind === 1) {
         const dmg = (o.wrecked > 4 || o.smoke) && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
-        drawVeh(o, dmg); if (o.driver && z >= 1.6) driverHead(o);
+        drawVeh(o, dmg);
         if (o.beacon) { const on = Math.floor(t * 4) % 2; ctx.fillStyle = on ? '#ffb020' : '#6b4a00'; ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, Math.PI * 2); ctx.fill(); if (on) lights.push({ x: o.x, y: o.y, r: 20, color: '#ffb020', ka: 0.6, halo: 0.6 }); }
         if (o.siren) { const on = Math.floor(t * 6) % 2; const c1 = on ? '#ff3a3a' : '#3a7aff'; ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(o.x, o.y, 2.4, 0, Math.PI * 2); ctx.fill(); lights.push({ x: o.x, y: o.y, r: 26, color: c1, ka: 0.7, halo: 0.7 }); }
         if (o.smoke && Math.random() < 0.08) puff(o.x, o.y - 4);
@@ -534,12 +550,13 @@ export default async function render(el, params = new URLSearchParams()) {
         const hp = o.health ?? 100;
         const key = hp < 35 && IMG[`cars/${o.sprite}-dmg`] ? `cars/${o.sprite}-dmg` : `cars/${o.sprite}`;
         if (o !== me.car) { ctx.strokeStyle = hp <= 0 ? '#ff4d5e' : '#2fd27a'; ctx.lineWidth = 1.1; ctx.setLineDash([2, 1.6]); ctx.beginPath(); ctx.arc(o.x, o.y, 15, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
-        drawVeh(o, key); drawDoor(o); if (o === me.car && z >= 1.6) driverHead(o);
+        drawVeh(o, key); drawDoor(o);
         if (o.smokeT > 0) { o.smokeT -= 1 / 60; if (Math.random() < 0.12) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, 0.8); }
         if (hp < 45 && Math.random() < (hp <= 0 ? 0.25 : 0.06)) puff(o.x + Math.cos(o.a) * o.L * 0.35, o.y + Math.sin(o.a) * o.L * 0.35 - 3, hp <= 0 ? 1.4 : 1);
         if (hp <= 0) { const f = fxFrame('fogo', t + o.L, 1); if (f) ctx.drawImage(f, o.x - 6 + Math.cos(o.a) * o.L * 0.3, o.y - 14 + Math.sin(o.a) * o.L * 0.3, 12, 14); }
         if (night > 0.05 && o === me.car) addCarLights(lights, o);
       } else if (kind === 3) drawPlane(o);
+      else if (kind === 6 && o.react && (performance.now() - o.react.t0) / 1000 < (o.react.dur || 99)) reactChr(o.spr, o.x, o.y + 0.5, pose(o.react.kind, (performance.now() - o.react.t0) / 1000), o.react.face || 1, 15);
       else if (kind === 6) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), o.to ? Math.floor(o.t / 3.2) % 4 : 0, 15); }
       else if (kind === 5) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill(); drawChr(o.spr, o.x, o.y + 0.5, chrRow(o.a), Math.floor(o.t / 3.2) % 4, 15); }
       else drawMe(t);
@@ -737,6 +754,8 @@ export default async function render(el, params = new URLSearchParams()) {
     [me.x, me.y] = nearestWalk(world, pol[0], pol[1] - 10, 60) || pol; cam.follow = true; flash = 1;
     toast('🚓 Conduzido(a) à delegacia', `${det.local}. Seu carro ficou no pátio ao lado.`, 'warning');
   }
+  const CELA = createCela();
+  const celaMsg = () => { const m = $('#d2Jail .jl-m'); if (m) { const txt = CELA.msgUntil > performance.now() ? CELA.msg : 'Use as setas / WASD para andar pela cela.'; if (m.textContent !== txt) m.textContent = txt; } };
   function jailHud() {
     let el = $('#d2Jail');
     if (!DET) { el?.remove(); return; }
@@ -744,9 +763,8 @@ export default async function render(el, params = new URLSearchParams()) {
     if (left <= 0) { DET = null; el?.remove(); toast('🔓 Liberado(a)', 'Você cumpriu a detenção e saiu da delegacia.', 'success'); return; }
     if (!el) {
       el = document.createElement('div'); el.id = 'd2Jail'; el.className = 'd2-jail';
-      el.innerHTML = `<b>🚔 Detido(a) · ${esc(DET.local)}</b><small>${esc(DET.motivo)}</small><span class="jl-t"></span><button class="cx-btn" data-bail>Pagar fiança · ${DET.bail} NXC</button>`;
+      el.innerHTML = `<b>🚔 Cela · ${esc(DET.local)}</b><small>${esc(DET.motivo)} · porta trancada até cumprir o horário</small><span class="jl-t"></span><em class="jl-m"></em>`;
       stage.appendChild(el);
-      el.querySelector('[data-bail]').onclick = async () => { try { await api.post('/mundo/blitz/fianca', {}); DET = null; el.remove(); toast('🔓 Fiança paga', 'Você foi liberado(a).', 'success'); refreshStatus(true); } catch (err) { toast('Fiança', err.message, 'error'); } };
     }
     const s = Math.ceil(left / 1000); el.querySelector('.jl-t').textContent = `Liberação em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} (horário real)`;
   }
@@ -760,6 +778,8 @@ export default async function render(el, params = new URLSearchParams()) {
     const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
     const t = Date.now() / 1000;
     const inp = input.read();
+    stage.classList.toggle('jailed', Boolean(DET));
+    if (DET) { CELA.step(dt, inp, performance.now()); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); CELA.draw(ctx, { W: cam.vw, H: cam.vh, img: (k) => IMG[k], chr: (key, x, y, row, fr, H) => drawChr(key, x, y, row, fr, H), mySpr: me.spr, guardSpr: 'chr/policial', t }); celaMsg(); hudT += dt; if (hudT > 0.12) { hudT = 0; hud(); } return; }
     stepAnim(dt);
     if (ED.on) { if (inp.mx || inp.my) cam.pan(-inp.mx * 700 * dt, -inp.my * 700 * dt); } else if (me.mode === 'car' && !me.anim) {
       const c = me.car; if (inp.gearTap) { inp.gearTap = false; }

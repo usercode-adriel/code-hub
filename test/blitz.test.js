@@ -5,7 +5,8 @@ import { schedule, activeAt, createBlitz } from '../public/js/drive/blitz.js';
 
 const T = await bootWorld();
 const B = await import('../server/world/blitz.js');
-const { account, bankOf } = await import('../server/world/bank.js');
+const { account } = await import('../server/world/bank.js');
+const expire = () => { account(T.w).detention.until = new Date(Date.now() - 1000).toISOString(); }; // o horário da cela terminou
 
 const SPOTS = [{ id: 'a', name: 'Av. A', at: [0, 0] }, { id: 'b', name: 'Av. B', at: [500, 0] }, { id: 'c', name: 'Av. C', at: [0, 500] }, { id: 'd', name: 'Av. D', at: [900, 900] }];
 
@@ -48,38 +49,29 @@ test('entregar a habilitação regular: liberado, sem multa nem detenção', () 
   assert.equal((u.debts || []).length, debts);
 });
 
-test('não ter habilitação: multa, ocorrência na ficha e detenção; fiança libera', () => {
-  const ctx = T.ctx(); bankOf(T.w).balance = 5000;
+test('não ter habilitação: multa, ocorrência na ficha e cela pelo tempo da detenção (sem saída antes)', () => {
+  const ctx = T.ctx();
   const r = B.blitzAnswer(ctx, { opcao: 'sem', local: 'Rodovia Aurora', veiculo: 'Carro' });
   assert.equal(r.resultado, 'preso'); assert.equal(r.multa.amount, B.BLITZ_FINES['sem-habilitacao'].amount);
-  const d = B.detentionOf(T.w); assert.ok(d); assert.equal(d.local, 'Delegacia de Aurora');
+  const d = B.detentionOf(T.w); assert.ok(d); assert.equal(d.local, 'Delegacia de Aurora'); assert.equal(d.bail, undefined, 'sem fiança');
   assert.ok(new Date(d.until) - Date.now() > 1.9 * B.HOUR_MS, 'duas horas da cidade');
   assert.ok(T.w.userSheet.crimes.some((c) => c.tipo === 'dirigir_sem_habilitacao'), 'entra na ficha criminal');
   assert.ok(T.w.userSheet.prisoes >= 1);
-  assert.throws(() => B.blitzAnswer(ctx, { opcao: 'entregar' }), /detido/, 'detido não passa por outra blitz');
-  const before = bankOf(T.w).balance;
-  const p = B.payBail(ctx); assert.equal(p.paid, B.BAIL['sem-habilitacao']);
-  assert.equal(B.detentionOf(T.w), null); assert.ok(bankOf(T.w).balance < before);
+  assert.throws(() => B.blitzAnswer(ctx, { opcao: 'entregar' }), /detido/, 'preso(a) não passa por outra blitz');
+  expire(); assert.equal(B.detentionOf(T.w), null, 'cumprido o horário, sai da cela');
 });
 
-test('detido(a) sem saldo não sai pela fiança', () => {
-  const ctx = T.ctx(); bankOf(T.w).balance = 0;
-  B.blitzAnswer(ctx, { opcao: 'sem', local: 'Av. Central' });
-  assert.throws(() => B.payBail(ctx), /Saldo/);
-  assert.ok(B.detentionOf(T.w), 'continua detido(a)');
-  bankOf(T.w).balance = 5000; B.payBail(ctx);
-});
-
-test('desacato: multa maior, CNH suspensa; depois, entregar a CNH suspensa também leva à delegacia', () => {
-  const ctx = T.ctx(); bankOf(T.w).balance = 5000;
+test('desacato: multa maior, CNH suspensa e 3 h de cela; depois, CNH suspensa também leva à delegacia', () => {
+  const ctx = T.ctx();
   const r = B.blitzAnswer(ctx, { opcao: 'desacato', local: 'Boulevard Aurora' });
   assert.equal(r.resultado, 'preso'); assert.equal(r.multa.amount, B.BLITZ_FINES.desacato.amount);
+  assert.ok(new Date(r.detention.until) - Date.now() > 2.9 * B.HOUR_MS);
   assert.equal(B.cnhOf(T.w).status, 'suspensa');
   assert.ok(T.w.userSheet.crimes.some((c) => c.tipo === 'desacato'));
-  B.payBail(ctx);
+  expire();
   const r2 = B.blitzAnswer(ctx, { opcao: 'entregar', local: 'Av. Central' });
   assert.equal(r2.resultado, 'preso', 'habilitação suspensa = dirigir sem habilitação');
-  B.payBail(ctx);
+  expire();
 });
 
 test('estado do mapa informa CNH e detenção (persistente)', async () => {

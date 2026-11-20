@@ -155,6 +155,15 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Testes: `test/aurora.test.js` (7) e `test/blitz.test.js` (8); `npm test` com 87 testes passando
 - [ ] Limitações: voos programados continuam só no Aeroporto Nexus; a blitz só acontece em Aurora e na rodovia; a geração do mapa passou de ~0,15 s para ~0,4 s
 
+### Personagens novos, reações do corpo e cela
+- [x] Todos os personagens do jogo trocados pelas 35 figuras novas (`tools/drive/chars2.py`): moradores, passantes, policiais, médicos, bombeiros, construtores, entregadores, executivos, idosos, banhistas e o visual do jogador
+- [x] Caminhada em 4 direções gerada a partir das vistas de frente, lado e costas de cada personagem; papel e gênero usados na escolha de quem aparece em cada profissão
+- [x] Reações da folha de referência (`public/js/drive/reactions.js`): atropelado (arremesso, queda e poça de sangue), caído (esbarrão, levanta no fim), ferido, dor (motoristas depois de uma batida), baleado, sangramento, quase morte e morto, aplicadas sobre o próprio personagem
+- [x] Carros: não mostram mais quem está dentro; aparece só a pessoa entrando ou saindo
+- [x] Cela da Delegacia de Aurora montada com as peças do sistema prisional (`public/js/drive/cela.js`): piso, parede com janela gradeada, cama, pia, vaso, câmera, grade e porta trancada, carcereiro fazendo ronda; o jogador anda dentro, sem saída até cumprir o horário (sem fiança); continua presa ao recarregar a página
+- [x] Cone da blitz trocado pelo sprite da folha prisional
+- [ ] Limitações: as folhas só têm vistas paradas, então os passos são gerados (sem braços balançando) e as reações são poses aplicadas ao quadro do personagem, não quadros desenhados um a um; sete personagens não têm vista de costas (usam a frente); não há armas no jogo, então "baleado" existe mas ainda não é usado
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.

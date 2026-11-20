@@ -19,7 +19,7 @@ import { peopleView, housesPublic, housePublic, live } from './living.js';
 import { hospitalView, checkup, doctorChat } from './health.js';
 import { VEHICLES, isVehicle, vehicleOf, garage } from './vehicles.js';
 import { driveState, park, infraction, damage, tow, incident } from './drive.js';
-import { blitzAnswer, payBail } from './blitz.js';
+import { blitzAnswer } from './blitz.js';
 import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
@@ -474,9 +474,8 @@ router.post('/mundo/cidade2d/infracao', (req, res) => { const ctx = ctxOf(req); 
 router.post('/mundo/cidade2d/dano', (req, res) => { const w = world(req.user.id); run(res, () => damage(w, req.body || {})); });
 router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); run(res, () => tow(ctx, req.body || {})); });
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
-// blitz: resposta ao policial (entregar | sem | desacato) e fiança
+// blitz: resposta ao policial (entregar | sem | desacato); a detenção não tem fiança
 router.post('/mundo/blitz/responder', (req, res) => { const ctx = ctxOf(req); run(res, () => blitzAnswer(ctx, { opcao: String(req.body?.opcao || ''), local: req.body?.local, veiculo: req.body?.veiculo })); });
-router.post('/mundo/blitz/fianca', (req, res) => { const ctx = ctxOf(req); run(res, () => payBail(ctx)); });
 // diálogos entre moradores e com o jogador
 router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });
 router.get('/mundo/dialogo/abrir/:id', (req, res) => { const ctx = ctxOf(req); run(res, () => openTalk(ctx, req.params.id)); });
