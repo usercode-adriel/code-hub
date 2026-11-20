@@ -31,7 +31,7 @@ test('o assunto vem do que aconteceu na cidade (acidente recente vira assunto)',
 });
 
 test('cooldown: o mesmo par não conversa de novo logo em seguida', () => {
-  const [a, b] = pairOf(60);
+  const [a, b] = pairOf(60); if (T.w.dialogos?.cool) delete T.w.dialogos.cool[[a.id, b.id].sort().join('|')]; // par limpo (outro teste pode ter usado)
   assert.ok(Dg.generateTalk(T.ctx(), a.id, b.id));
   assert.equal(Dg.generateTalk(T.ctx(), a.id, b.id), null, 'dentro do cooldown não gera');
 });

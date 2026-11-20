@@ -32,7 +32,7 @@ test('perfis de motorista: cauteloso, comum, apressado e imprudente, com parâme
   const P = TR.PROFILES; assert.deepEqual(Object.keys(P), ['cauteloso', 'comum', 'apressado', 'imprudente']);
   assert.ok(P.cauteloso.T > P.comum.T && P.comum.T > P.apressado.T && P.apressado.T > P.imprudente.T, 'distância de segurança');
   assert.ok(P.cauteloso.react > P.imprudente.react, 'tempo de reação'); assert.ok(P.imprudente.v > P.cauteloso.v, 'velocidade');
-  const n = {}; for (let i = 0; i < 2000; i++) n[TR.pickProfile()] = (n[TR.pickProfile()] || 0) + 1;
+  const n = {}; for (let i = 0; i < 2000; i++) { const k = TR.pickProfile(); n[k] = (n[k] || 0) + 1; }
   assert.ok(n.imprudente < n.comum, 'imprudentes são minoria');
 });
 
