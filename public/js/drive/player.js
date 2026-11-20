@@ -1,11 +1,13 @@
 // VehicleSystem + DrivingController — direção simples e gostosa de explorar (não é corrida):
 // aceleração progressiva, frenagem gradual, inércia ao soltar, curvas suaves, freio de mão, ré e marcha D/N/R.
 // Colide com prédios, calçadas, obstáculos e outros carros; a pé, só anda em calçadas, faixas e estacionamentos.
-import { at, canDrive, canFoot, WATER } from './world.js';
+import { at, canDrive, canFoot, WATER, WALK } from './world.js';
 import { obstCar, obstAt, obb } from './obst.js';
 
 export const PHYS = { accel: 30, brake: 95, hand: 150, drag: 9, roll: 3, maxF: 62, maxR: 15, turn: 2.3 };
 export const WALK_V = 24;
+// o carro sobe na calçada, mas lá a velocidade máxima é metade (subir no meio-fio pesa)
+export const CALCADA_FATOR = 0.5;
 
 // pontos de contato do carro (cantos, frente e traseira)
 function corners(x, y, a, L, W) {
@@ -13,7 +15,9 @@ function corners(x, y, a, L, W) {
   return [[h, 0], [h, w], [h, -w], [-h, w], [-h, -w], [-h, 0], [0, w], [0, -w]].map(([u, v]) => [x + u * c - v * s, y + u * s + v * c]);
 }
 // cabe ali: todos os pontos de contato sobre pista e nenhum objeto (poste, banco, árvore...) encostando na lataria
-const fits = (world, x, y, a, L, W) => corners(x, y, a, L, W).every(([px, py]) => canDrive(at(world, px, py))) && !obstCar(world.obst, x, y, a, L, W);
+// onde o carro pode estar: pista, faixa, estacionamento, pista do aeroporto e calçada (com velocidade reduzida)
+const sobreCarro = (c) => canDrive(c) || c === WALK;
+const fits = (world, x, y, a, L, W) => corners(x, y, a, L, W).every(([px, py]) => sobreCarro(at(world, px, py))) && !obstCar(world.obst, x, y, a, L, W);
 // colisão precisa entre veículos: retângulos orientados de cada um (comprimento × largura reais)
 const hitCar = (x, y, a, L, others, W = 12) => {
   const me = { x, y, a, L, W };
@@ -41,7 +45,8 @@ export function stepCar(car, input, world, dt, others) {
   if (braking) v -= Math.sign(v) * Math.min(Math.abs(v), PHYS.brake * dt);
   if (input.hand) v -= Math.sign(v) * Math.min(Math.abs(v), PHYS.hand * dt);
   if (!pedal) v -= Math.sign(v) * Math.min(Math.abs(v), (PHYS.drag + Math.abs(v) * 0.05) * dt); // inércia
-  v = Math.max(-PHYS.maxR, Math.min(PHYS.maxF * spd, v));
+  const naCalcada = at(world, car.x, car.y) === WALK;
+  v = Math.max(-PHYS.maxR, Math.min(PHYS.maxF * spd * (naCalcada ? CALCADA_FATOR : 1), v));
   // direção suave, gira menos em alta velocidade, nada parado
   car.steer += (input.steer - car.steer) * Math.min(1, dt * 7);
   const grip = input.hand ? 1.35 : 1;
