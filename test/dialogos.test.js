@@ -4,6 +4,7 @@ import { bootWorld } from './helpers.js';
 
 const T = await bootWorld();
 const Dg = await import('../server/world/dialogos.js');
+const { account: bankAccount } = await import('../server/world/bank.js');
 const { residents, agentOf } = await import('../server/world/agents.js');
 const { toneOf } = Dg;
 
@@ -72,8 +73,40 @@ test('abrir conversa com o jogador traz fala, humor, relação e três opções'
   const p = at(100);
   const v = Dg.openTalk(T.ctx(), p.id);
   assert.ok(v.greeting.text && v.persona.name === p.name);
-  assert.deepEqual(v.options.map((o) => o.tone), ['educada', 'neutra', 'agressiva']);
+  const ids = v.options.map((o) => o.id);
+  assert.ok(ids.includes('educada') && ids.includes('neutra') && ids.includes('encerrar'), 'respostas básicas e sair sempre existem');
 });
+
+// fase 3: as opções dependem do contexto (medo, testemunha, hostilidade, reputação)
+const { OPCOES, opcoesDe, contextoDe } = Dg;
+test('opções condicionais: medo tira a agressividade e traz "acalmar"', () => {
+  const p = at(102); p.mood = { emotion: 'assustada', intensity: 0.8, reason: 'teste' };
+  const ids = opcoesDe(T.ctx(), p).map((o) => o.id);
+  assert.ok(ids.includes('acalmar')); assert.ok(!ids.includes('agressiva'), 'assustado(a) não aceita agressividade');
+});
+test('opções condicionais: quem viu um acontecimento oferece perguntar sobre ele', () => {
+  const p = at(104); p.mood = { emotion: 'neutro', intensity: 0.2, reason: 'x' };
+  const ctx = T.ctx();
+  assert.ok(!opcoesDe(ctx, p).some((o) => o.id === 'acontecimento'), 'sem testemunho, não aparece');
+  T.w.events.push({ id: 'ev-t', n: 999, at: ctx.at.toISOString(), type: 'atropelamento', cat: 'seguranca', title: 'Atropelamento na praça', text: '', actors: [p.id], refs: [], importance: 3, data: {} });
+  const o = opcoesDe(ctx, p).find((x) => x.id === 'acontecimento'); assert.ok(o, 'com testemunho, aparece');
+  const r = Dg.replyTalk(ctx, p.id, 'neutra', 'acontecimento');
+  assert.match(r.reply.text, /Atropelamento na praça/, 'a resposta usa o acontecimento real');
+});
+test('opções condicionais: hostilidade oferece pedir desculpas; a opção só vale se estiver disponível', () => {
+  const p = at(106); p.agent.hostileUntil = new Date(Date.now() + 3600000).toISOString();
+  const ids = opcoesDe(T.ctx(), p).map((o) => o.id);
+  assert.ok(ids.includes('desculpa'));
+  p.agent.hostileUntil = null;
+  assert.throws(() => Dg.replyTalk(T.ctx(), p.id, 'educada', 'desculpa'), /não faz sentido/);
+});
+test('opções condicionais: reputação muito ruim e antipatia — quase ninguém conversa (só sair)', () => {
+  const p = at(108); const prev = bankAccount(T.w).reputation; bankAccount(T.w).reputation = 10; p.agent.user.aff = -30;
+  const ids = opcoesDe(T.ctx(), p).map((o) => o.id);
+  bankAccount(T.w).reputation = prev; p.agent.user.aff = 0;
+  assert.ok(!ids.includes('educada') && !ids.includes('ajuda'), 'evita conversa'); assert.ok(ids.includes('encerrar'));
+});
+
 
 test('a conversa do jogador é guardada no mundo (persistente)', () => {
   const p = at(101);

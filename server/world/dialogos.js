@@ -9,7 +9,7 @@ import { remember, genderize } from '../social.js';
 import { gameNow } from './clock.js';
 import { weatherNow } from './city.js';
 import { pick, cap } from './util.js';
-import { BankError } from './bank.js';
+import { BankError, account } from './bank.js';
 
 const MIN = 60000;
 const COOL_MIN = 40; // minutos do jogo entre duas conversas do mesmo par
@@ -139,6 +139,44 @@ const OPTIONS = [
   { tone: 'neutra', label: 'Responder de forma neutra' },
   { tone: 'agressiva', label: 'Responder com agressividade' },
 ];
+// opções contextuais (fase 3): cada uma aparece só quando a situação permite. `tone` é o efeito base (já testado);
+// os extras (desculpar, acalmar, intimidar…) são aplicados depois em replyTalk.
+export const OPCOES = [
+  { id: 'cumprimentar', tone: 'educada', label: 'Cumprimentar', quando: (c) => !c.hostil },
+  { id: 'educada', tone: 'educada', label: 'Responder com educação', quando: (c) => !c.evitaVoce },
+  { id: 'neutra', tone: 'neutra', label: 'Responder de forma neutra', quando: (c) => !c.evitaVoce },
+  { id: 'agressiva', tone: 'agressiva', label: 'Responder com agressividade', quando: (c) => !c.medo && !c.evitaVoce },
+  { id: 'desculpa', tone: 'educada', label: 'Pedir desculpas', quando: (c) => c.hostil || c.ofendeu },
+  { id: 'acontecimento', tone: 'neutra', label: 'Perguntar sobre o que aconteceu', quando: (c) => c.testemunhou && !c.evitaVoce },
+  { id: 'ajuda', tone: 'educada', label: 'Pedir ajuda', quando: (c) => !c.hostil && !c.evitaVoce && c.confianca >= 35 },
+  { id: 'acalmar', tone: 'educada', label: 'Acalmar a pessoa', quando: (c) => c.medo && !c.evitaVoce },
+  { id: 'intimidar', tone: 'agressiva', label: 'Intimidar', quando: (c) => c.reputacaoRuim && !c.medo },
+  { id: 'encerrar', tone: 'neutra', label: 'Encerrar a conversa', quando: () => true, encerra: true },
+];
+const MEDO = ['assustada', 'assustado', 'medo', 'triste'];
+const CRIME_RE = /crime|acao-|mapa-|ferimento|atropel|roubo|furto|vandal|invas|prisao|queda|batida|discuss|tiro|assassin/;
+// situação da pessoa com você agora: o que o contexto permite dizer
+export function contextoDe(ctx, p) {
+  const w = ctx.w; const a = p.agent; const u = a.user || {};
+  const hostil = Boolean(a.hostileUntil && new Date(a.hostileUntil) > ctx.at);
+  const ofendeu = (u.notes || []).slice(-3).some((n) => /insult|ofend|xing|agred|mentir|discut/i.test(n.text));
+  const limite = ctx.at.getTime() - 6 * 3600000; // últimas 6 h de jogo (em tempo real, o que o relógio do mundo registra)
+  const testemunhou = (w.events || []).some((e) => e.at && new Date(e.at).getTime() > limite && (e.actors || []).includes(p.id) && CRIME_RE.test(e.type || ''));
+  const rep = account(w).reputation ?? 50;
+  return {
+    hostil, ofendeu, testemunhou,
+    medo: MEDO.includes(p.mood?.emotion),
+    confianca: Math.round(u.trust || 0), afeicao: Math.round(u.aff || 0),
+    reputacao: rep, reputacaoRuim: rep < 30,
+    evitaVoce: rep < 25 && (u.aff || 0) < -10, // reputação muito ruim e antipatia: quase não conversa
+  };
+}
+export function opcoesDe(ctx, p) {
+  const c = contextoDe(ctx, p);
+  const out = OPCOES.filter((o) => o.quando(c)).map(({ id, tone, label, encerra }) => ({ id, tone, label, ...(encerra ? { encerra: true } : {}) }));
+  if (!out.some((o) => o.encerra)) out.push({ id: 'encerrar', tone: 'neutra', label: 'Encerrar a conversa', encerra: true });
+  return out;
+}
 const GREET = (_p, kind) => pick(OPENERS[kind] || OPENERS.conhecido);
 
 // abre a conversa com o jogador: fala contextual, humor, relação e as três opções
@@ -152,16 +190,19 @@ export function openTalk(ctx, pid) {
   return {
     persona: { id: p.id, name: p.name, avatar: p.avatar, job: p.job, color: p.color, mood: p.mood?.emotion || 'neutro', relation: REL_LABEL[kind] || 'Conhecido', aff: Math.round(a.user.aff), trust: Math.round(a.user.trust), hostile: Boolean(hostile), tone: toneOf(p) },
     greeting: { text: greeting, emo: hostile ? 'irritado' : (p.mood?.emotion === 'triste' ? 'triste' : 'feliz') },
-    options: OPTIONS,
+    options: opcoesDe(ctx, p),
     history: D(w).list.filter((t) => t.a.id === pid || t.b.id === pid).slice(-3).reverse().map((t) => ({ at: t.at, lines: t.lines.slice(0, 2) })),
   };
 }
 
 // resposta do jogador: a personalidade do morador decide a reação; o relacionamento muda com ela
-export function replyTalk(ctx, pid, tone) {
+export function replyTalk(ctx, pid, tone, opcaoId = null) {
   const w = ctx.w; const p = personById(w, pid);
   if (!p?.agent?.resident) throw new BankError('Essa pessoa não está disponível');
-  const opt = OPTIONS.find((o) => o.tone === tone); if (!opt) throw new BankError('Escolha uma das respostas');
+  const opc = opcaoId ? OPCOES.find((o) => o.id === opcaoId) : null;
+  if (opc && !opcoesDe(ctx, p).some((o) => o.id === opc.id)) throw new BankError('Essa resposta não faz sentido agora');
+  const opt = opc ? { tone: opc.tone, label: opc.label } : OPTIONS.find((o) => o.tone === tone); if (!opt) throw new BankError('Escolha uma das respostas');
+  tone = opt.tone; // o tom base decide o efeito padrão; os extras vêm depois
   const t = toneOf(p); const a = p.agent;
   let text; let emo = 'neutro'; let delta = 0; let trust = 0; let ends = false; let escalate = null;
   if (tone === 'educada') {
@@ -181,6 +222,29 @@ export function replyTalk(ctx, pid, tone) {
     else if (t.arrogante) { text = pick(['E você acha que é quem?', 'Engraçado, vindo de quem vindo.']); emo = 'irritado'; delta = -6; trust = -4; }
     else if (t.sarcastico) { text = pick(['Nossa, que educação, hein.', 'Olha, que simpático(a) você é.']); emo = 'irritado'; delta = -5; trust = -3; }
     else { text = pick(['Hã? Que jeito é esse?', 'Ei, não me trata assim!']); emo = 'irritado'; delta = -5; trust = -3; }
+  }
+  // efeitos próprios das opções contextuais (fase 3)
+  if (opc) {
+    const c = contextoDe(ctx, p);
+    if (opc.id === 'desculpa') {
+      const calmo = t.calmo || t.timido; // quem é calmo ou tímido perdoa mais fácil
+      const perdoa = Math.random() < (calmo ? 0.85 : 0.45);
+      if (perdoa && c.hostil) { a.hostileUntil = null; text = pick(['Tá bom, esquece.', 'Tudo bem. Acontece.']); emo = 'neutro'; delta = Math.max(delta, 4); trust = Math.max(trust, 3); }
+      else { text = pick(['Desculpa não resolve tudo.', 'Hum. Pensa melhor da próxima vez.']); emo = 'irritado'; delta = Math.min(delta, 0); }
+    } else if (opc.id === 'acalmar') {
+      p.mood = { emotion: 'neutro', intensity: 0.2, reason: 'foi acalmado(a) numa conversa' }; text = pick(['Obrigado... estou melhor.', 'Respirar ajuda. Valeu.']); emo = 'feliz'; delta = Math.max(delta, 3);
+    } else if (opc.id === 'intimidar') {
+      p.mood = { emotion: 'assustada', intensity: 0.8, reason: 'foi intimidado(a) por você' };
+      text = pick(['Por favor, não me faz mal...', 'Eu não fiz nada! Me deixa em paz!']); emo = 'triste'; delta = -8; trust = -8;
+      if (p.agent.traits.volatility > 0.7 && Math.random() < 0.5) escalate = 'discussao';
+    } else if (opc.id === 'ajuda') {
+      text = pick(['Claro! Me diz o que precisa.', 'Pode contar comigo, vizinho(a).']); emo = 'feliz'; delta = Math.max(delta, 3); trust = Math.max(trust, 5);
+    } else if (opc.id === 'acontecimento') {
+      const lim = ctx.at.getTime() - 6 * 3600000;
+      const ev = (w.events || []).filter((e) => e.at && new Date(e.at).getTime() > lim && (e.actors || []).includes(p.id)).slice(-1)[0];
+      text = ev ? `Eu vi: ${ev.title}. ${pick(['Foi horrível.', 'Ainda estou assustado(a).', 'Não sei o que deu nele(a).'])}` : 'Não sei de nada que tenha acontecido por aqui.';
+      emo = 'surpresa';
+    } else if (opc.id === 'encerrar') { ends = true; }
   }
   text = genderize(p, text);
   bumpUser(ctx, p, delta, { trust, note: `${opt.label.toLowerCase()}: ${text}` });

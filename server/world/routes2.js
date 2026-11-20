@@ -489,7 +489,7 @@ ruaRoute('roubo', RUA.vehicleTheft); ruaRoute('captura', RUA.theftCaptured); rua
 // diálogos entre moradores e com o jogador
 router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });
 router.get('/mundo/dialogo/abrir/:id', (req, res) => { const ctx = ctxOf(req); run(res, () => openTalk(ctx, req.params.id)); });
-router.post('/mundo/dialogo/responder', (req, res) => { const ctx = ctxOf(req); run(res, () => replyTalk(ctx, String(req.body?.id || ''), String(req.body?.tone || ''))); });
+router.post('/mundo/dialogo/responder', (req, res) => { const ctx = ctxOf(req); run(res, () => replyTalk(ctx, String(req.body?.id || ''), String(req.body?.tone || ''), req.body?.opcao ? String(req.body.opcao) : null)); });
 router.get('/mundo/dialogos', (req, res) => { res.json({ talks: recentTalks(world(req.user.id), 30) }); });
 // fichas criminais (antecedentes registrados pela polícia)
 router.get('/mundo/fichas', (req, res) => { res.json({ fichas: criminalRecords(world(req.user.id)) }); });

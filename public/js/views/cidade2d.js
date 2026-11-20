@@ -201,7 +201,7 @@ export default async function render(el, params = new URLSearchParams()) {
     const box = document.createElement('div'); box.className = 'd2-talk';
     box.innerHTML = `<div class="tk-head"><img src="${esc(pr.avatar || '')}" alt=""><div><b>${esc(pr.name)}</b><small>${esc(pr.relation)} · ${esc(MOOD[pr.mood] || pr.mood || 'tranquilo(a)')}${pr.hostile ? ' · irritado(a) com você' : ''}</small></div><button class="tk-x" aria-label="Fechar">×</button></div>
       <div class="tk-log" id="tkLog"><p class="tk-npc">${esc(pr.name.split(' ')[0])}: ${esc(d.greeting.text)}</p></div>
-      <div class="tk-opts">${d.options.map((o) => `<button data-t="${o.tone}" class="tk-${o.tone}">${esc(o.label)}</button>`).join('')}</div>
+      <div class="tk-opts">${d.options.map((o) => `<button data-t="${o.tone}" data-o="${esc(o.id)}" class="tk-${o.tone}">${esc(o.label)}</button>`).join('')}</div>
       <div class="tk-foot"><small id="tkRel">Afeição ${pr.aff} · confiança ${pr.trust}</small><a href="#" class="tk-card">Ver ficha</a></div>`;
     stage.appendChild(box);
     ped.say = { text: d.greeting.text, emo: d.greeting.emo, until: performance.now() + balloonSecs(d.greeting.text) * 1000 };
@@ -211,7 +211,7 @@ export default async function render(el, params = new URLSearchParams()) {
     box.querySelectorAll('[data-t]').forEach((b) => { b.onclick = async () => {
       if (busy) return; busy = true; box.querySelectorAll('[data-t]').forEach((x) => { x.disabled = true; });
       try {
-        const r = await api.post('/mundo/dialogo/responder', { id: ped.id, tone: b.dataset.t });
+        const r = await api.post('/mundo/dialogo/responder', { id: ped.id, tone: b.dataset.t, opcao: b.dataset.o });
         log.insertAdjacentHTML('beforeend', `<p class="tk-me">Você: ${esc(b.textContent)}</p><p class="tk-npc">${esc(pr.name.split(' ')[0])}: ${esc(r.reply.text)}</p>`);
         log.scrollTop = log.scrollHeight;
         ped.say = { text: r.reply.text, emo: r.reply.emo, until: performance.now() + balloonSecs(r.reply.text) * 1000 };
