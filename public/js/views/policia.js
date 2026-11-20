@@ -10,8 +10,9 @@ const rk = (r, g) => (RANK[r] ? RANK[r][g === 'f' ? 1 : 0] : r ? r[0].toUpperCas
 
 export default async function render(el) {
   const body = shell(el, 'policia');
+
   bindEntities(body);
-  let stopLive = null;
+    let stopLive = null;
   const load = async () => {
     const d = await api.get('/mundo/policia');
     const duty = (d.team || []).find((o) => o.onDuty) || (d.team || [])[0] || null;
@@ -39,6 +40,8 @@ export default async function render(el) {
       <section class="cx-card dp-mine" id="dpMine"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#60a5fa">${icon('file', 15)}</span><h3>Meus inquéritos</h3></header>${d.mine.map((c) => caseCard(c)).join('') || '<p class="cx-mut">Nenhum caso envolvendo você. Ótimo sinal.</p>'}</section>
       <section class="cx-card dp-fines"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#f7c948">${icon('scale', 15)}</span><h3>Multas e fianças</h3><a class="cx-more-l" href="#/banco/pendencias">Pagar</a></header>
         ${(d.fines || []).map((f) => `<div class="dp-fine ${f.status === 'atrasada' ? 'late' : ''}"><div><b>${esc(f.desc)}</b><small>${esc(f.creditor || '')} · vence ${new Date(f.due).toLocaleDateString('pt-BR')}</small></div><em>${nx(f.amount)}</em></div>`).join('') || '<p class="cx-mut">Nada em aberto no seu nome.</p>'}</section>
+      <section class="cx-card dp-ficha" id="dpFicha"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#f87171">${icon('file', 15)}</span><h3>Antecedentes criminais</h3></header>
+        <div class="dp-fichas" data-loading>Carregando fichas…</div></section>
       <section class="cx-card dp-team"><header class="cx-card-h"><span class="cx-h-ic" style="--c:#2fd27a">${icon('shield', 15)}</span><h3>Policiais de IA</h3></header>
         <div class="dp-officers">${(d.team || []).map((o) => `<button data-person="${esc(o.id)}"><img src="${esc(o.avatar || '')}" alt=""><b>${esc(o.name.split(' ')[0])}</b><small>${esc(rk(o.rank, o.gender))}</small>${o.onDuty ? '<i class="dp-duty">plantão</i>' : ''}</button>`).join('') || '<p class="cx-mut">A delegacia ainda está montando a equipe.</p>'}</div></section>
       ${d.restricted ? `<section class="cx-card dp-auth">${icon('lock', 18)}<div><b>Painel interno restrito às autoridades</b><p class="cx-mut">${d.profession?.eligible ? `Você já tem o diploma (${esc((d.profession.needs || []).join(', '))}). Habilite-se pela ${esc(d.profession.via || 'carreira pública')}.` : `Para virar autoridade policial, forme-se em ${esc((d.profession?.needs || ['Direito']).join(' e '))}.`}</p></div><a class="cx-btn sm ghost" href="#/empresas/carreira">Carreira</a></section>`
@@ -70,7 +73,19 @@ export default async function render(el) {
       { name: 'relato', label: 'O que aconteceu', type: 'textarea', full: true, hint: 'Denúncia falsa sem provas é arquivada e a pessoa pode ficar sabendo.' }],
       onSubmit: async (v) => { const c = await api.post('/mundo/policia/denuncia', v); toast('Ocorrência registrada', `Caso nº ${c.n} · ${c.statusLabel}`, 'success'); await load(); } });
   };
-  try { await load(); } catch (err) { body.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b></div>`; }
+  // fichas criminais: a sua e as da cidade (só o que a polícia registrou), depois que a tela está montada
+  const loadFichas = async () => {
+    const host = body.querySelector('#dpFicha .dp-fichas'); if (!host) return;
+    try {
+      const d2 = await api.get('/mundo/fichas');
+      const row = (f) => `<div class="dp-ficha-row"><b>${esc(f.name)}</b><small>${esc(f.situacao)} · ${f.crimes.length} registro(s)${f.prisoes ? ` · ${f.prisoes} prisão(ões)` : ''}${f.reincidencia ? ` · reincidente` : ''}</small>
+        <ul>${f.crimes.slice(0, 4).map((c) => `<li>${esc(c.label)}${c.local ? ` em ${esc(c.local)}` : ''} · ${new Date(c.at).toLocaleDateString('pt-BR')}${c.reincidente ? ' <em>reincidente</em>' : ''}</li>`).join('')}</ul></div>`;
+      host.removeAttribute('data-loading');
+      host.innerHTML = d2.fichas.length ? d2.fichas.map(row).join('') : '<p class="cx-mut">Nenhuma ficha criminal registrada na cidade.</p>';
+    } catch (err) { host.textContent = 'Não foi possível carregar as fichas.'; }
+  };
+  
+  try { await load(); loadFichas(); } catch (err) { body.innerHTML = `<div class="w-empty"><b>${esc(err.message)}</b></div>`; }
   return () => stopLive?.();
 }
 

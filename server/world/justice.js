@@ -157,6 +157,7 @@ function decide(ctx, c) {
       const fine = Math.min(p.agent.cash, pen.fine); p.agent.cash = round2(p.agent.cash - fine); eco(w).treasury = round2((eco(w).treasury || 0) + fine);
       c.timeline.push({ at: ctx.at.toISOString(), text: `Prisão determinada e multa de ${fine.toLocaleString('pt-BR')} NXC.` });
       remember(p, `Fui presa(o) (inquérito nº ${c.n}).`);
+      { const sh = p.agent.sheet ??= { crimes: [], prisoes: 0, reincidencia: 0, situacao: 'sem antecedentes' }; sh.prisoes += 1; sh.situacao = 'preso(a)'; sh.lastPrisao = ctx.at.toISOString(); }
       record(ctx, { type: 'prisao', cat: 'seguranca', title: `${p.name} é ${genderize(p, 'presa(o)')} (${pen.label.toLowerCase()})`, actors: [p.id], importance: 3, storyId: c.storyId });
     } else { c.status = 'arquivado'; c.timeline.push({ at: ctx.at.toISOString(), text: 'Provas insuficientes para prisão. Arquivado.' }); }
     return;

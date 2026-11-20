@@ -10,6 +10,7 @@ import { remember, genderize } from '../social.js';
 import { round2, nowIso, cap } from './util.js';
 import { reformaPublic } from './construtora.js';
 import { injure, treat } from './injuries.js';
+import * as C from './crimes.js';
 import { photo } from './flights.js';
 import { worldPost } from '../social.js';
 import { MAX_BOUNDS as BOUNDS } from '../../public/js/drive/terreno.js';
@@ -106,7 +107,7 @@ const TITLES = {
   'perseguicao-presa': () => 'Polícia encerra perseguição e aborda motorista',
   'perseguicao-fuga': () => 'Motorista despista a polícia após perseguição',
 };
-export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc, nomes, kmh }) {
+export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, npc, nomes, kmh, npcWitnesses }) {
   const w = ctx.w; const u = account(w);
   if (!TITLES[tipo]) throw new BankError('Ocorrência desconhecida');
   u.mapIncidents ??= []; const today = nowIso().slice(0, 10);
@@ -120,6 +121,11 @@ export function incident(ctx, { tipo, personaId, nome, regiao, culpa, veiculo, n
     if (r?.state === 'morto') p.agent.injuredUntil = null;
     else if (r) { treat(ctx, p); }
     if (culpa) bumpUser(ctx, p, -12, { trust: -10, note: 'Me atropelou.' });
+  }
+  // crime: atropelamento com culpa do motorista (jogador ou morador) e testemunhas vira ocorrência criminal
+  if (tipo === 'atropelamento' && culpa && p && Number(kmh) >= 40) {
+    // o motorista é o jogador (culpa do jogador) quando o mapa informa; a vítima é sempre o morador atingido
+    try { C.registerCrime(ctx, { tipo: 'atropelamento_doloso', suspeito: 'me', vitima: p.id, local: reg, witnesses: Math.max(1, Math.min(4, Number(npcWitnesses) || 1)), desc: `Atropelamento com excesso de velocidade${reg ? ` em ${reg}` : ''}.` }); } catch { /* sem registro */ }
   }
   const imp = tipo === 'queda-aviao' ? 4 : tipo === 'atropelamento' ? 3 : 2;
   // nas redes: uma testemunha posta a foto do local (cena em pixel do mapa)

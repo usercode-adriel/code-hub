@@ -23,6 +23,8 @@ import { construtoraView, saveReforma } from './construtora.js';
 import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
 import './injuries.js';
+import './crimes.js';
+import { criminalRecords } from './crimes.js';
 import { protestsView } from './protests.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
 import { devicesOf, phoneOf, walletOf, clockOf, PHONES, TIERS, APPS } from './devices.js';
@@ -470,6 +472,8 @@ router.post('/mundo/cidade2d/infracao', (req, res) => { const ctx = ctxOf(req); 
 router.post('/mundo/cidade2d/dano', (req, res) => { const w = world(req.user.id); run(res, () => damage(w, req.body || {})); });
 router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); run(res, () => tow(ctx, req.body || {})); });
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
+// fichas criminais (antecedentes registrados pela polícia)
+router.get('/mundo/fichas', (req, res) => { res.json({ fichas: criminalRecords(world(req.user.id)) }); });
 // manifestações públicas (agenda do dia)
 router.get('/mundo/manifestacoes', (req, res) => { const w = world(req.user.id); res.json(protestsView(w)); });
 // Locadora Nexus Rent
