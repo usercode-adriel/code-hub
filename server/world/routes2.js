@@ -24,6 +24,7 @@ import { flightBoard } from './flights.js';
 import { rentalView, rentCar, returnCar } from './rental.js';
 import './injuries.js';
 import './crimes.js';
+import { generateTalk, openTalk, replyTalk, recentTalks } from './dialogos.js';
 import { criminalRecords } from './crimes.js';
 import { protestsView } from './protests.js';
 import { gameNow, SPEED, cityClock } from './clock.js';
@@ -472,6 +473,11 @@ router.post('/mundo/cidade2d/infracao', (req, res) => { const ctx = ctxOf(req); 
 router.post('/mundo/cidade2d/dano', (req, res) => { const w = world(req.user.id); run(res, () => damage(w, req.body || {})); });
 router.post('/mundo/cidade2d/reboque', (req, res) => { const ctx = ctxOf(req); run(res, () => tow(ctx, req.body || {})); });
 router.post('/mundo/cidade2d/ocorrencia', (req, res) => { const ctx = ctxOf(req); run(res, () => incident(ctx, req.body || {})); });
+// diálogos entre moradores e com o jogador
+router.post('/mundo/dialogo/gerar', (req, res) => { const ctx = ctxOf(req); run(res, () => generateTalk(ctx, String(req.body?.a || ''), String(req.body?.b || '')) || { skipped: true }); });
+router.get('/mundo/dialogo/abrir/:id', (req, res) => { const ctx = ctxOf(req); run(res, () => openTalk(ctx, req.params.id)); });
+router.post('/mundo/dialogo/responder', (req, res) => { const ctx = ctxOf(req); run(res, () => replyTalk(ctx, String(req.body?.id || ''), String(req.body?.tone || ''))); });
+router.get('/mundo/dialogos', (req, res) => { res.json({ talks: recentTalks(world(req.user.id), 30) }); });
 // fichas criminais (antecedentes registrados pela polícia)
 router.get('/mundo/fichas', (req, res) => { res.json({ fichas: criminalRecords(world(req.user.id)) }); });
 // manifestações públicas (agenda do dia)

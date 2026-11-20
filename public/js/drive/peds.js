@@ -76,6 +76,7 @@ export function stepPeds(P, world, dt, t, cars, view) {
   const crossing = new Set();
   for (const p of P.peds) {
     if (p.state === 'ferido' || p.state === 'levado' || p.state === 'cena') continue;
+    if (p.state === 'conversa') continue; // conversando: parado, virado para quem fala (talk.js controla)
     if (p.state === 'caido') { p.fall -= dt; if (p.fall <= 0) { p.state = 'walk'; p.say = { text: 'Olha por onde anda!', until: performance.now() + 2200 }; place(p); } continue; }
     if (p.state === 'roda' || p.state === 'volta') { // roda em volta de quem foi atropelado / voltando para a calçada
       const r = p.roda; const to = p.state === 'roda' ? r.to : r.back || r.to;

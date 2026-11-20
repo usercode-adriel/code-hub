@@ -20,6 +20,7 @@ import { createIncidents } from '../drive/incidents.js';
 import { createAccidents } from '../drive/accidents.js';
 import { buildObst } from '../drive/obst.js';
 import { createProtests } from '../drive/protest.js';
+import { createTalks, wrapText, balloonSecs, EMO_ICON } from '../drive/talk.js';
 import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
 import { cityNow, refreshStatus } from '../chrome.js';
@@ -74,6 +75,8 @@ export default async function render(el, params = new URLSearchParams()) {
   const realPeople = state.people.slice(0, touch ? 30 : 46).map((p) => ({ ...p, real: true }));
   const filler = Array.from({ length: touch ? 30 : 64 }, (_, i) => ({ id: `pass${i}`, name: 'Passante', job: i % 9 === 0 ? 'obra' : '' }));
   const P = createPeds(world, [...realPeople, ...filler], assets.roles);
+  // conversas entre moradores: o conteúdo vem do servidor (sem IA paga), o mapa só reproduz as falas em turnos
+  const TALKS = createTalks({ P, request: (a, b) => api.post('/mundo/dialogo/gerar', { a, b }).catch(() => null) });
   const sampleColor = (key) => { const im = IMG[key]; if (!im) return '#888'; const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.drawImage(im, im.width * 0.3, im.height * 0.55, im.width * 0.4, im.height * 0.15, 0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
   const now0 = Date.now();
   const own = []; // carros e aviões do jogador
@@ -118,6 +121,52 @@ export default async function render(el, params = new URLSearchParams()) {
     Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
+  }
+  // balão de fala: caixa branca com quebra automática de linha, humor no começo, some aos poucos no fim
+  function balloon(sx, sy, say, nowMs) {
+    const alpha = Math.max(0, Math.min(1, (say.until - nowMs) / 450));
+    const lines = wrapText(((EMO_ICON[say.emo] || '') + ' ' + say.text).trim(), 24);
+    ctx.save(); ctx.font = '600 10px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const lh = 12; const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 10; const h = lines.length * lh + 6;
+    const x = Math.round(sx - w / 2); const y = Math.round(sy - h - 6);
+    ctx.globalAlpha = alpha * 0.96; ctx.fillStyle = '#fbfbf7'; ctx.strokeStyle = 'rgba(20,24,50,.55)'; ctx.lineWidth = 1;
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - 3, y + h); ctx.lineTo(sx + 3, y + h); ctx.lineTo(sx, y + h + 4); ctx.closePath(); ctx.fillStyle = '#fbfbf7'; ctx.fill();
+    ctx.fillStyle = '#141832';
+    lines.forEach((l, i) => ctx.fillText(l, x + 5, y + 6 + lh / 2 + i * lh));
+    ctx.restore();
+  }
+  // conversa com um morador (toque nele): fala contextual, humor, relação e três respostas com consequências
+  async function talkPanel(ped) {
+    stage.querySelector('.d2-talk')?.remove();
+    let d;
+    try { d = await api.get(`/mundo/dialogo/abrir/${encodeURIComponent(ped.id)}`); }
+    catch (err) { toast(ped.name, err.message, 'info'); return; }
+    const pr = d.persona; const MOOD = { feliz: 'feliz', triste: 'triste', irritado: 'irritado', neutro: 'tranquilo(a)', apaixonada: 'apaixonado(a)', grata: 'grato(a)' };
+    const box = document.createElement('div'); box.className = 'd2-talk';
+    box.innerHTML = `<div class="tk-head"><img src="${esc(pr.avatar || '')}" alt=""><div><b>${esc(pr.name)}</b><small>${esc(pr.relation)} · ${esc(MOOD[pr.mood] || pr.mood || 'tranquilo(a)')}${pr.hostile ? ' · irritado(a) com você' : ''}</small></div><button class="tk-x" aria-label="Fechar">×</button></div>
+      <div class="tk-log" id="tkLog"><p class="tk-npc">${esc(pr.name.split(' ')[0])}: ${esc(d.greeting.text)}</p></div>
+      <div class="tk-opts">${d.options.map((o) => `<button data-t="${o.tone}" class="tk-${o.tone}">${esc(o.label)}</button>`).join('')}</div>
+      <div class="tk-foot"><small id="tkRel">Afeição ${pr.aff} · confiança ${pr.trust}</small><a href="#" class="tk-card">Ver ficha</a></div>`;
+    stage.appendChild(box);
+    ped.say = { text: d.greeting.text, emo: d.greeting.emo, until: performance.now() + balloonSecs(d.greeting.text) * 1000 };
+    const log = box.querySelector('#tkLog'); let busy = false;
+    box.querySelector('.tk-x').onclick = () => box.remove();
+    box.querySelector('.tk-card').onclick = (e) => { e.preventDefault(); personCard(ped.id); };
+    box.querySelectorAll('[data-t]').forEach((b) => { b.onclick = async () => {
+      if (busy) return; busy = true; box.querySelectorAll('[data-t]').forEach((x) => { x.disabled = true; });
+      try {
+        const r = await api.post('/mundo/dialogo/responder', { id: ped.id, tone: b.dataset.t });
+        log.insertAdjacentHTML('beforeend', `<p class="tk-me">Você: ${esc(b.textContent)}</p><p class="tk-npc">${esc(pr.name.split(' ')[0])}: ${esc(r.reply.text)}</p>`);
+        log.scrollTop = log.scrollHeight;
+        ped.say = { text: r.reply.text, emo: r.reply.emo, until: performance.now() + balloonSecs(r.reply.text) * 1000 };
+        box.querySelector('#tkRel').textContent = `${r.relation} · afeição ${r.aff} · confiança ${r.trust}`;
+        if (r.escalate) toast('⚠️ Discussão', `${pr.name.split(' ')[0]} ficou irritado(a) com você.`, 'warning');
+        if (r.ends) setTimeout(() => box.remove(), 1600);
+        else { box.querySelectorAll('[data-t]').forEach((x) => { x.disabled = false; }); }
+      } catch (err) { toast('Não deu', err.message, 'error'); box.querySelectorAll('[data-t]').forEach((x) => { x.disabled = false; }); }
+      busy = false;
+    }; });
   }
   // painel de voos (partidas e chegadas do dia, status, portão e passageiros conhecidos)
   const hhmm = (h) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -208,7 +257,7 @@ export default async function render(el, params = new URLSearchParams()) {
     const o = own.find((c) => Math.hypot(c.x - wx, c.y - wy) < 18);
     if (o) { if (me.mode === 'foot' && Math.hypot(o.x - me.x, o.y - me.y) <= 46) act(); else toast(o.name, me.mode === 'foot' ? 'Ande até ele e toque em Entrar.' : 'Seu veículo.', 'info'); return; }
     const ped = P.peds.find((p) => p.real && Math.hypot(p.x - wx, p.y - wy + 6) < 9);
-    if (ped) { personCard(ped.id); return; }
+    if (ped) { talkPanel(ped); return; }
     const poi = city.pois.find((p) => Math.abs(p.at[0] - wx) < 60 / cam.z * 1.6 && Math.abs(p.at[1] - wy) < 14 / cam.z * 1.6);
     if (poi) location.hash = poi.route;
   }
@@ -367,8 +416,8 @@ export default async function render(el, params = new URLSearchParams()) {
     if (p.state === 'ferido') { const im = IMG['npc/caido']; if (im) ctx.drawImage(im, p.x - 9, p.y - 4, 18, 7); ctx.fillStyle = 'rgba(200,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x + 3, p.y + 2, 4, 1.6, 0, 0, Math.PI * 2); ctx.fill(); return; }
     const moving = ((p.state === 'walk' || p.state === 'cross' || p.state === 'jay') && !p.pause) || ((p.state === 'roda' || p.state === 'volta') && p.rmove);
     // olhando uma ocorrência: vira para ela; parado: mantém a última direção
-    const ang = p.state === 'olhando' && p.lookAt ? Math.atan2(p.lookAt[1] - p.y, p.lookAt[0] - p.x) : p.a;
-    if (moving || p.state === 'olhando' || p.row == null) p.row = chrRow(ang);
+    const ang = p.state === 'olhando' && p.lookAt ? Math.atan2(p.lookAt[1] - p.y, p.lookAt[0] - p.x) : p.state === 'conversa' && p.talk ? Math.atan2(p.talk.with.y - p.y, p.talk.with.x - p.x) : p.a;
+    if (moving || p.state === 'olhando' || p.state === 'conversa' || p.row == null) p.row = chrRow(ang);
     // o passo acompanha a velocidade (≈ 0,7 passo por unidade/s); parado fica no quadro de descanso
     const frame = moving ? Math.floor(t * (p.v || 9) * 0.75 + p.phase * 4) % 4 : 0;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 3.4, 1.4, 0, 0, Math.PI * 2); ctx.fill();
@@ -503,7 +552,7 @@ export default async function render(el, params = new URLSearchParams()) {
     for (const p of city.pois) { const [sx, sy] = S(p.at[0], p.at[1]); if (sx < -80 || sy < -20 || sx > vw + 80 || sy > vh + 20) continue; if (z < 0.8 && !['aeroporto', 'hospital', 'policia', 'shopping', 'estadio', 'terminal'].includes(p.id)) continue; pill(sx, sy, `${POI_IC[p.icon] || '•'} ${p.label}`, 'rgba(10,13,43,.84)', '#fff', z < 1.4 ? 10 : 11); }
     // falas (motoristas, policial, curiosos, quem caiu)
     if (z >= 1.2) {
-      const nowMs = performance.now(); const bub = (o, H) => { if (!o.say || o.say.until < nowMs || !inV(o, 0)) return; const [sx, sy] = S(o.x, o.y - H); pill(sx, sy, o.say.text, 'rgba(255,255,255,.94)', '#141832', 10); };
+      const nowMs = performance.now(); const bub = (o, H) => { if (!o.say || o.say.until < nowMs || !inV(o, 0)) return; const [sx, sy] = S(o.x, o.y - H); balloon(sx, sy, o.say, nowMs); };
       for (const a of ACC.S.actors) bub(a, 22); for (const p of P.peds) if (p.say) bub(p, p.state === 'caido' || p.state === 'ferido' ? 9 : 22);
       // manifestação: cartazes balançando sobre as cabeças e palavras de ordem
       for (const m of PR.members()) { if (!inV(m, 0)) continue; if (m.sign) { const up = m.state === 'protesta' ? Math.abs(Math.sin(t * 3 + m.phase)) * 3 : 0; const [sx, sy] = S(m.x, m.y - 19 - up); ctx.fillStyle = '#7a5230'; ctx.fillRect(Math.round(sx) - 0.5, Math.round(sy), 1.4, 6 * z / 3); pill(sx, sy, m.sign, '#fdfdf7', '#b4121f', 8); } bub(m, 27); }
@@ -616,6 +665,7 @@ export default async function render(el, params = new URLSearchParams()) {
       if (me.run && me.moving) for (const q of P.peds) if (['walk', 'olhando', 'wait'].includes(q.state) && Math.hypot(q.x - me.x, q.y - me.y) < 5.5) { q.state = 'caido'; q.fall = 3 + Math.random() * 2; q.fallA = me.a; q.say = { text: 'Ai!', until: performance.now() + 1500 }; me.walkT += 1; } me.walkT += Math.hypot(me.x - ox, me.y - oy) / (me.run ? 5 : 3.2); } // um quadro a cada ~3 unidades andadas (correndo, passadas maiores)
     const viewC = { x: cam.x, y: cam.y, r: Math.max(cam.vw, cam.vh) / cam.z / 2 + 60 };
     const crossing = stepPeds(P, world, dt, t, [...T.cars, ...(me.car ? [me.car] : [])], viewC);
+    TALKS.scan(dt, viewC); TALKS.tick(dt); // conversas entre moradores que se encontram na rua
     const extra = [...own.filter((o) => o !== me.car && (o.kind === 'carro' || o.ground)).map((o) => ({ x: o.x, y: o.y, a: o.a, L: o.L, W: o.W })), ...(me.car ? [me.car] : []), ...(me.mode === 'foot' && canDrive(at(world, me.x, me.y)) ? [{ x: me.x, y: me.y, L: 5, W: 5, state: 'me' }] : []), ...P.peds.filter((p) => ['cross', 'ferido', 'jay', 'roda', 'volta', 'caido'].includes(p.state)).map((p) => ({ x: p.x, y: p.y, L: 6, W: 7, state: 'ped' })), ...ACC.S.actors.map((a) => ({ x: a.x, y: a.y, L: 5, W: 6, state: 'ped' }))];
     const tS = performance.now(); stepTraffic(T, world, dt, t, { extra, crossing, view: viewC }); perf.sim = (perf.sim || 0) + performance.now() - tS;
     if (INC.chase.on) INC.stepChase(dt, me, world, [...T.cars.filter((c) => c !== INC.chase.car), ...own.filter((o) => o !== me.car)]);
@@ -638,7 +688,7 @@ export default async function render(el, params = new URLSearchParams()) {
   }
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
-  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow };
+  window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel };
   if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }

@@ -131,6 +131,14 @@ memórias, organizações, automações) continua igual. Nenhuma tela nova usa d
 - [x] Atropelamentos (do jogador e do trânsito) enviam a velocidade; ferimentos viram evento e notícia
 - [ ] Ainda não feito nesta etapa: polícia e prisões, combate, diálogos entre NPCs, trânsito novo e persistência das cenas
 
+### Diálogos entre moradores e com o jogador (etapa 3 da expansão urbana)
+- [x] Conteúdo no servidor (`server/world/dialogos.js`), sem IA paga: falas por modelos, tom da personalidade (calmo, agressivo, tímido, arrogante, extrovertido, sarcástico), tema do momento (acidente, crime, manifestação, notícia, clima) e memória da relação
+- [x] Desfecho e efeitos decididos pelo servidor: afeição e confiança entre os dois, memória de cada um, discussão ou briga registrada como evento; cooldown de 40 min de jogo por par
+- [x] Mapa (`public/js/drive/talk.js`, `cidade2d.js`): dois moradores que se encontram na rua param, viram-se um para o outro e trocam balões em turnos; no máximo 3 conversas ao mesmo tempo; pedestres em conversa não andam
+- [x] Painel de conversa ao tocar em um morador: histórico, três respostas (educada, neutra, agressiva) com efeito na relação e link para a ficha
+- [x] Testes: `test/dialogos.test.js` e `test/talk.test.js`; `npm test` com 71 testes passando
+- [ ] Limitações: moradores sem nome (figurantes) não conversam; briga só registra evento e hostilidade, sem combate; polícia não intervém na conversa; sem perseguição, prisão na rua e trânsito com guincho coordenado pela polícia
+
 ### Próximos refinamentos
 - Social, Notícias, Governo, Justiça, Internet, Diversão, Arquivo e Controle usam as telas existentes já recoloridas pelo design system; podem ganhar layouts próprios no padrão das instituições.
 - Relógio acelerado da cidade (botões 4× e 16× do mapa) e população acima de 500 moradores.
