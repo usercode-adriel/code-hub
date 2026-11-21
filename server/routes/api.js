@@ -84,7 +84,8 @@ router.post('/auth/register', wrap(async (req, res) => {
   if (password.length < 6) return bad(res, 'A senha precisa de pelo menos 6 caracteres');
   if (db().users.some((u) => u.email === email)) return bad(res, 'E-mail já cadastrado', 409);
   if (!systemConfig().allowRegistration && db().users.length) return bad(res, 'Novos cadastros estão desativados pelo administrador', 403);
-  const user = createUser({ name, email, password });
+  // toda conta criada na tela de login já começa como administradora (pedido do dono do sistema)
+  const user = createUser({ name, email, password, role: 'admin' });
   user.lastSeenVersion = APP_VERSION;
   save();
   res.status(201).json({ token: signToken(user), user: publicUser(user) });
