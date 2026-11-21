@@ -198,14 +198,20 @@ app.use((err, _req, res, _next) => {
 // Só escuta na máquina local, a não ser que o acesso pelo celular esteja ligado (HOST=0.0.0.0 no .env).
 const HOST = process.env.HOST || '127.0.0.1';
 let server;
+// porta em uso (outro programa): tenta as seguintes, e grava a escolhida em porta.txt para o lançador do Windows abrir
+const PORTA_FILE = path.join(DATA_DIR, 'porta.txt');
+let porta = PORT;
 function listen(attempt = 0) {
-  server = app.listen(PORT, HOST, () => {
-    console.log(`» Codeniac rodando em http://localhost:${PORT}${HOST === '0.0.0.0' ? ' (acesso pela rede ligado)' : ''}  (assistente: ${assistantMode()})`);
+  porta = PORT + attempt;
+  server = app.listen(porta, HOST, () => {
+    try { fs.writeFileSync(PORTA_FILE, String(porta)); } catch (err) { console.error('» Não consegui gravar porta.txt:', err.message); }
+    console.log(`» Codeniac rodando em http://localhost:${porta}${HOST === '0.0.0.0' ? ' (acesso pela rede ligado)' : ''}  (assistente: ${assistantMode()})`);
   });
   server.on('error', (err) => {
     // logo após um reinício a porta pode levar um instante para ser liberada
     if (err.code === 'EADDRINUSE' && process.env.CODENIAC_RESTARTED && attempt < 20) { setTimeout(() => listen(attempt + 1), 500); return; }
-    if (err.code === 'EADDRINUSE') console.error(`» A porta ${PORT} já está em uso. O Codeniac provavelmente já está aberto.`);
+    if (err.code === 'EADDRINUSE' && attempt < 20) { console.log(`» Porta ${porta} ocupada; tentando ${porta + 1}…`); listen(attempt + 1); return; }
+    if (err.code === 'EADDRINUSE') console.error(`» Nenhuma porta livre entre ${PORT} e ${PORT + 20}.`);
     else console.error(err);
     process.exit(1);
   });
@@ -220,6 +226,7 @@ function shutdown() {
   try { flushWorld(); } catch (err) { console.error(err); }
   saveLibraryNow();
   fs.rmSync(TOKEN_FILE, { force: true });
+  fs.rmSync(PORTA_FILE, { force: true });
   server.close();
   process.exit(0);
 }

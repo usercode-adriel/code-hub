@@ -1,12 +1,15 @@
 ' Encerra o servidor do Codeniac com segurança (salva os dados antes de fechar).
 ' Argumento: /silent (não mostra mensagens; usado pelo instalador)
 Option Explicit
-Dim sh, fso, appDir, dataDir, tokenFile, token, h, ok, silent, nodeExe, wmi, p, killed
+Dim sh, fso, appDir, dataDir, tokenFile, token, h, ok, silent, nodeExe, wmi, p, killed, port, portaFile
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 appDir = fso.GetParentFolderName(WScript.ScriptFullName)
 dataDir = Replace(sh.ExpandEnvironmentStrings("%APPDATA%"), Chr(0), "") & "\Codeniac"
 tokenFile = dataDir & "\.control-token"
+portaFile = dataDir & "\porta.txt"
+port = "3000"
+If fso.FileExists(portaFile) Then port = Trim(fso.OpenTextFile(portaFile, 1).ReadAll())
 nodeExe = LCase(appDir & "\node\node.exe")
 silent = False
 If WScript.Arguments.Count > 0 Then silent = (LCase(WScript.Arguments(0)) = "/silent")
@@ -17,7 +20,7 @@ If fso.FileExists(tokenFile) Then
   On Error Resume Next
   Set h = CreateObject("MSXML2.ServerXMLHTTP.6.0")
   h.setTimeouts 1000, 1000, 3000, 3000
-  h.open "POST", "http://127.0.0.1:3000/api/system/shutdown", False
+  h.open "POST", "http://127.0.0.1:" & port & "/api/system/shutdown", False
   h.setRequestHeader "x-codeniac-control", token
   h.send
   ok = (Err.Number = 0)

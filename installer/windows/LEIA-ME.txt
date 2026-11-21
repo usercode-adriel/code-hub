@@ -3,7 +3,7 @@ CODENIAC 2.3 — seu hub pessoal
 
 COMO ABRIR
 - Clique em "Codeniac" na área de trabalho ou no menu Iniciar.
-  O navegador abre sozinho em http://localhost:3000 (sem janela preta de terminal).
+  O navegador abre sozinho em http://localhost:3000, ou na próxima porta livre se a 3000 estiver ocupada (sem janela preta de terminal).
 - Para fechar de verdade: menu Iniciar > Codeniac > "Parar Codeniac".
   Fechar só a aba do navegador deixa o Codeniac ligado em segundo plano (ele usa pouca memória).
 
