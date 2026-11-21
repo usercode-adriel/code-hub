@@ -58,7 +58,7 @@ export function saveReforma(w, body = {}) {
     const o = { k: c.key, x, y }; const rot = num(f.r); if (rot && Math.abs(rot) <= 7) o.r = rot;
     return o;
   });
-  const outDel = [...new Set(del.map((d) => String(d).slice(0, 60)).filter((d) => /^[\w:.-]+@-?\d+,-?\d+$/.test(d)))];
+  const outDel = [...new Set(del.map((d) => String(d).slice(0, 60)).filter((d) => /^[\w:./-]+@-?\d+,-?\d+$/.test(d)))];
   Object.assign(r, { shape, add: outAdd, floor: outFloor, del: outDel, updatedAt: nowIso() });
   return { ok: true, saved: { add: outAdd.length, floor: outFloor.length, del: outDel.length }, shape };
 }

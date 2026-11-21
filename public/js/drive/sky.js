@@ -18,12 +18,21 @@ export const SCHEDULE = [
   { at: 23, kind: 'sobrevoo', spr: 'av-caca-cinza', L: 54, label: 'Jato supersônico cruzando o céu' },
 ];
 // pista: x 2880..4040, eixo y 428; pátio y ~870
-const RW = { x0: 2880, x1: 4040, y: 428 }; const PARK = [3640, 870];
+let RW = { x0: 2880, x1: 4040, y: 428 }; let PARK = [3640, 870]; let TAXI = 660; let VIRA = 3460; let CEN = [2000, 1400]; let VAGAS = [];
+// o aeroporto vem do mapa (pista, taxiway, portão e vagas de avião); sem ele, valem os valores acima
+function configurar(ap, vagas, centro) {
+  if (!ap) return;
+  const [rx, ry, rw, rh] = ap.runway; RW = { x0: rx, x1: rx + rw, y: ry + rh / 2 };
+  TAXI = ap.taxi[1] + ap.taxi[3] / 2; VAGAS = vagas || [];
+  PARK = VAGAS.length > 2 ? [VAGAS[2][0], VAGAS[2][1]] : [ap.apron[0] + ap.apron[2] / 2, ap.apron[1] + ap.apron[3] / 2];
+  VIRA = PARK[0] - 180; if (centro) CEN = centro;
+  const [gx, gy, gw, gh] = ap.gate; DOORS = [0, 1, 2].map((k) => [gx + gw + 20 + k * 40, gy + gh / 2]); STAIR = [PARK[0] - 16, PARK[1] + 22];
+}
 
 function route(kind, b, R) {
-  const cx = 2000; const cy = 1400;
-  if (kind === 'chegada') return [[RW.x1 + 3200, RW.y - 260, 300, 190], [RW.x1 + 900, RW.y, 120, 165], [RW.x1 - 40, RW.y, 0, 150], [3460, RW.y, 0, 34], [3460, RW.y + 36, 0, 26], [3460, 660, 0, 26], [PARK[0], 660, 0, 26], [PARK[0], PARK[1], 0, 8]];
-  if (kind === 'partida') return [[PARK[0], PARK[1], 0, 10], [PARK[0], 660, 0, 26], [RW.x0 + 60, 660, 0, 26], [RW.x0 + 60, RW.y, 0, 12], [RW.x0 + 640, RW.y, 0, 120], [RW.x1 - 120, RW.y, 0, 170], [RW.x1 + 900, RW.y - 200, 160, 200], [RW.x1 + 4000, RW.y - 1400, 340, 230]];
+  const cx = CEN[0]; const cy = CEN[1];
+  if (kind === 'chegada') return [[RW.x1 + 3200, RW.y - 260, 300, 190], [RW.x1 + 900, RW.y, 120, 165], [RW.x1 - 40, RW.y, 0, 150], [VIRA, RW.y, 0, 34], [VIRA, RW.y + 36, 0, 26], [VIRA, TAXI, 0, 26], [PARK[0], TAXI, 0, 26], [PARK[0], PARK[1], 0, 8]];
+  if (kind === 'partida') return [[PARK[0], PARK[1], 0, 10], [PARK[0], TAXI, 0, 26], [RW.x0 + 60, TAXI, 0, 26], [RW.x0 + 60, RW.y, 0, 12], [RW.x0 + 640, RW.y, 0, 120], [RW.x1 - 120, RW.y, 0, 170], [RW.x1 + 900, RW.y - 200, 160, 200], [RW.x1 + 4000, RW.y - 1400, 340, 230]];
   const side = R() < 0.5;
   const from = side ? [b.x0 + 100, cy - 900 + R() * 1800] : [cx - 1600 + R() * 3200, b.y0 + 100];
   const to = side ? [b.x1 - 100, cy - 900 + R() * 1800] : [cx - 1600 + R() * 3200, b.y1 - 100];
@@ -33,11 +42,12 @@ function route(kind, b, R) {
 }
 
 // portas do terminal (frente do prédio, no pátio) e a escada do avião estacionado
-const DOORS = [[3060, 1118], [3150, 1118], [3240, 1118], [3330, 1118], [3420, 1118]];
-const STAIR = [PARK[0] - 16, PARK[1] + 22];
+let DOORS = [[3060, 1118], [3150, 1118], [3240, 1118], [3330, 1118], [3420, 1118]];
+let STAIR = [PARK[0] - 16, PARK[1] + 22];
 
 // chrFor(pessoa) → sprite animado do passageiro (o mapa passa a mesma escolha dos pedestres)
-export function createSky(world, { chrFor = () => null } = {}) {
+export function createSky(world, { chrFor = () => null, airport = null, planeSpots = null, centro = null } = {}) {
+  configurar(airport, planeSpots, centro);
   const S = { flights: [], parked: [], lastHour: null, banner: null, seq: 0, walkers: [], board: null, boarded: new Set() };
   // agenda do servidor (número do voo, cidade, passageiros) para o horário de um voo do mapa
   const infoOf = (at) => S.board?.flights.find((f) => !f.tomorrow && f.at === at) || null;
@@ -53,10 +63,11 @@ export function createSky(world, { chrFor = () => null } = {}) {
     S.banner = { text: label(sl), until: performance.now() + 9000 };
   };
   // aviões parados no pátio quando o mapa abre (alguns já "chegaram")
-  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-airliner', L: 96, W: 96, x: PARK[0] + 150, y: PARK[1] + 130, a: -Math.PI / 2, h: 0, ground: true, health: 100 });
-  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-executivo', L: 60, W: 60, x: 3240, y: 870, a: -Math.PI / 2, h: 0, ground: true, health: 100 });
-  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-jato-vermelho', L: 46, W: 46, x: 3420, y: 870, a: -Math.PI / 2, h: 0, ground: true, health: 100 });
-  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-heli-policia', L: 48, W: 48, x: 2960, y: 870, a: -Math.PI / 2, h: 0, ground: true, heli: true, health: 100 });
+  const vaga = (k, dx, dy) => (VAGAS[k] ? [VAGAS[k][0], VAGAS[k][1]] : [PARK[0] + dx, PARK[1] + dy]);
+  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-airliner', L: 96, W: 96, x: vaga(4, 150, 0)[0], y: vaga(4, 150, 0)[1], a: -Math.PI / 2, h: 0, ground: true, health: 100 });
+  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-executivo', L: 60, W: 60, x: vaga(0, -400, 0)[0], y: vaga(0, -400, 0)[1], a: -Math.PI / 2, h: 0, ground: true, health: 100 });
+  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-jato-vermelho', L: 46, W: 46, x: vaga(1, -220, 0)[0], y: vaga(1, -220, 0)[1], a: -Math.PI / 2, h: 0, ground: true, health: 100 });
+  S.parked.push({ kind: 'aviao', ai: true, sprite: 'av-heli-policia', L: 48, W: 48, x: vaga(5, 360, 0)[0], y: vaga(5, 360, 0)[1], a: -Math.PI / 2, h: 0, ground: true, heli: true, health: 100 });
 
   S.step = (dt, hour) => {
     // embarque: entre 27 e 5 minutos antes da partida, passageiros saem do terminal até a escada do avião

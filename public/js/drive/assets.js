@@ -19,6 +19,8 @@ export function loadAssets() {
     for (const [k, v] of Object.entries(frota)) { const n = k.split('/')[1]; meta[`cars/${n}`] = v; SRC[`cars/${n}`] = `/assets/mundo/veiculos/${n}.png`; }
     const aero = await (await fetch('/assets/mundo/aeronaves/meta.json')).json();
     for (const alvo of ['air/av-airliner', 'air/av-executivo']) { meta[alvo] = aero['aeronaves/aviao']; SRC[alvo] = '/assets/mundo/aeronaves/aviao.png'; }
+    const cen = await (await fetch('/assets/mundo/cenario.json')).json();
+    for (const [k, v] of Object.entries(cen)) { meta[`mundo/${k}`] = v; SRC[`mundo/${k}`] = `/assets/mundo/${k}.png`; }
     const img = {};
     await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = SRC[k] || `/assets/rpg/${k}.png`; })));
     // sprites extras da Construtora: carregados só quando usados (no mapa ou na prévia do editor)

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCity } from '../public/js/drive/city.js';
+import { generateCity } from '../public/js/drive/mundo.js';
 import { buildGraph } from '../public/js/drive/world.js';
 import * as TR from '../public/js/drive/traffic.js';
 import { createCityEvents, CITY } from '../public/js/drive/cityevents.js';
@@ -20,8 +20,8 @@ const sim = (x, y, n, secs, setup) => {
   return { T, world, ov, moving: moving / samples };
 };
 
-test('nenhum carro atravessa outro: 60 carros por 60 s em Nexus City e em Aurora', () => {
-  for (const [x, y] of [[1560, 1730], [6880, -160]]) {
+test('nenhum carro atravessa outro: 60 carros por 60 s no centro e na orla da cidade nova', () => {
+  for (const [x, y] of [[888, 480], [500, 822]]) {
     const r = sim(x, y, 60, 60);
     assert.equal(r.ov, 0, `sobreposições em ${x},${y}`);
     assert.ok(r.moving > 0.25, `o trânsito anda (${(r.moving * 100).toFixed(0)}% em movimento)`);
@@ -37,7 +37,7 @@ test('perfis de motorista: cauteloso, comum, apressado e imprudente, com parâme
 });
 
 test('via bloqueada: o carro parado de vez publica o bloqueio e os outros desviam ou esperam, sem atravessar', () => {
-  const r = sim(1560, 1730, 50, 40, (T) => { const c = T.cars.find((k) => !k.siren && k.lane.path.len > 200); c.sceneHold = true; c.wrecked = 9999; c.blockTest = true; });
+  const r = sim(888, 480, 50, 40, (T) => { const c = T.cars.find((k) => !k.siren && k.lane.path.len > 200); c.sceneHold = true; c.wrecked = 9999; c.blockTest = true; });
   const blocked = r.T.cars.find((k) => k.blockTest);
   assert.ok(CITY.blocked(blocked.lane), 'faixa marcada como bloqueada');
   assert.equal(r.world.penalty(blocked.lane), 3000, 'rotas pagam caro para passar ali');
@@ -55,7 +55,7 @@ test('eventos urbanos: assinatura, bloqueio e liberação', () => {
 
 test('guinchos e roubo: tempos configuráveis e descrição do carro para a denúncia', () => {
   assert.equal(TOW.start, 120); assert.ok(TOW.work >= 50 && TOW.work <= 65, '~1 min por carro');
-  assert.deepEqual(describeCar({ sprite: 'city-vermelho', kind: 'carro' }), { modelo: 'Carro', cor: 'vermelho' });
+  assert.deepEqual(describeCar({ sprite: 'benson', kind: 'carro' }), { modelo: 'Benson', cor: 'vermelho' });
   assert.deepEqual(describeCar({ sprite: 'taxi', kind: 'taxi' }), { modelo: 'Táxi', cor: 'amarelo' });
   assert.ok(FEAR.length >= 7);
 });

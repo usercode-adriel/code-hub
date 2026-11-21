@@ -6,13 +6,13 @@
 import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { esc, toast } from '../ui.js';
-import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY, SOLID } from '../drive/world.js';
+import { buildGraph, lightState, nearestWalk, nearestLane, along, laneDist, at, canFoot, canWalk, canDrive, WATER, RUNWAY, SOLID, ROAD, LOT } from '../drive/world.js';
 import { createBlitz } from '../drive/blitz.js';
 import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
 import { createStreet, looksOf } from '../drive/street.js';
 import { createCarjack } from '../drive/carjack.js';
-import { generateCity, CS } from '../drive/city.js';
+import { generateCity, CS } from '../drive/mundo.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import * as TR from '../drive/traffic.js';
@@ -95,11 +95,15 @@ export default async function render(el, params = new URLSearchParams()) {
   for (const c of state.cars) {
     if (c.repairUntil && new Date(c.repairUntil).getTime() > now0) continue;
     if (c.type === 'aeronave') {
-      const sp = c.parked || city.planeSpots[1 + (pi++ % (city.planeSpots.length - 1))];
+      // vaga salva no mapa antigo que agora não é pista nem pátio: volta para uma vaga do aeroporto
+      const salvo = c.parked && [RUNWAY, ROAD, LOT].includes(at(world, c.parked.x, c.parked.y)) ? c.parked : null;
+      const sp = salvo || city.planeSpots[1 + (pi++ % (city.planeSpots.length - 1))];
       const p = createPlane({ ...c, own: true, sprite: c.sprite, L: c.L || (c.key.includes('jato') ? 52 : 42), W: c.L || (c.key.includes('jato') ? 46 : 54) }, sp.x ?? sp[0], sp.y ?? sp[1], sp.a ?? sp[2]);
       p.id = c.id; p.health = c.health ?? 100; own.push(p); continue;
     }
-    const sp = c.parked ? [c.parked.x, c.parked.y, c.parked.a] : c.rental && city.rentSpot ? city.rentSpot : city.spots[(si++ * 3) % city.spots.length];
+    // vaga salva que deixou de ser rua/estacionamento (mundo novo): o carro vai para uma vaga livre
+    const salvo = c.parked && canDrive(at(world, c.parked.x, c.parked.y)) ? c.parked : null;
+    const sp = salvo ? [salvo.x, salvo.y, salvo.a] : c.rental && city.rentSpot ? city.rentSpot : city.spots[(si++ * 3) % city.spots.length];
     own.push({ own: true, rental: Boolean(c.rental), kind: 'carro', id: c.id, key: c.key, name: c.name, sprite: c.sprite || 'jefferson', speed: c.speed || 1, x: sp[0], y: sp[1], a: sp[2], v: 0, steer: 0, gear: 'D', L: lengthOf('carro', c.sprite || 'jefferson'), W: widthOf('carro', c.sprite || 'jefferson'), health: c.health ?? 100, door: 0, color: sampleColor(`cars/${c.sprite || 'jefferson'}`) });
   }
   // avião-escola da escola de voo (sempre disponível para treinar)
@@ -108,7 +112,7 @@ export default async function render(el, params = new URLSearchParams()) {
   const cars = () => own.filter((o) => o.kind === 'carro');
   const startCar = cars().find((c) => c.id === state.main) || cars()[0];
   const me = { x: 0, y: 0, a: 0, v: 0, mode: 'foot', car: null, plane: null, moving: false, anim: null, spr: (() => { const saved = localStorage.getItem('codeniac.chr2'); return `chr/${saved && CHR[saved] ? saved : 'barbudo'}`; })(), row: 0, walkT: 0 };
-  [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 1728 - 40, 1504 + 40, 80) || [1690, 1544];
+  [me.x, me.y] = (startCar && nearestWalk(world, startCar.x, startCar.y + 18, 60)) || nearestWalk(world, 690, 600, 120) || [690, 600]; // Praça da Fonte
   // detido(a) numa blitz: começa na delegacia (a detenção corre no relógio do servidor)
   let DET = state.detention || null;
   const stationNear = (id, x, y) => city.pois.filter((p) => p.id === id || p.id.startsWith(`${id}-`)).sort((a, b) => Math.hypot(a.at[0] - x, a.at[1] - y) - Math.hypot(b.at[0] - x, b.at[1] - y))[0]?.at;
@@ -117,7 +121,7 @@ export default async function render(el, params = new URLSearchParams()) {
   const particles = [];
   const notify = (t, m, k = 'info') => toast(t, m, k);
   const report = (body) => api.post('/mundo/cidade2d/ocorrencia', { regiao: regionAt(me.car || me.plane || me), ...body }).catch(() => {});
-  const SKY = createSky(world, { chrFor: (p) => spriteFor(p, assets.roles, p.id) });
+  const SKY = createSky(world, { chrFor: (p) => spriteFor(p, assets.roles, p.id), airport: city.airport, planeSpots: city.planeSpots, centro: [700, 500] });
   // agenda de voos do servidor (painel, nomes dos passageiros); atualiza a cada 30 s
   const PR = createProtests({ world, pois: city.pois, chrFor: (p) => spriteFor(p, assets.roles, p.id), mobile: touch });
   const loadBoard = () => Promise.all([api.get('/mundo/voos').then((b) => { SKY.board = b; }), api.get('/mundo/manifestacoes').then((m) => PR.set(m))]).catch(() => {});

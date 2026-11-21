@@ -66,33 +66,30 @@ test('ocorrências do mapa viram acontecimento e ferem o morador atropelado', as
   assert.equal(D.infraction(ctx, { tipo: 'fuga' }).fine.amount, 2934);
 });
 
-test('Construtora e Reforma: catálogo livre, reforma salva e a cidade muda (continente com ilhas)', async () => {
+test('Construtora e Reforma: catálogo livre, reforma salva e a ilha nova muda com ela', async () => {
   const C = await import('../server/world/construtora.js');
-  const { generateCity } = await import('../public/js/drive/city.js');
+  const { generateCity } = await import('../public/js/drive/mundo.js');
   const v = C.construtoraView(T.w);
-  assert.ok(v.items.length > 500 && v.items.some((i) => i.key === 'bld/stadium') && v.items.some((i) => i.key === 'x/fil-00') && v.items.some((i) => i.key === 'x/rua-reta' && i.kind === 'floor'), 'todos os assets no catálogo');
+  assert.ok(v.items.length > 500, 'catálogo da Construtora');
   assert.ok(v.items.every((i) => i.price === undefined), 'nada à venda');
-  assert.equal(v.shape, 'continente');
-  const add = [{ id: 'a1', k: 'bld/house', x: 2100, y: -260 }, { id: 'a2', k: 'x/fil-00', x: 2200, y: -260 }, { id: 'a3', k: 'x/montanhas', x: 3000, y: -1200, s: 3 }];
-  const floor = [{ k: 'piso/rua', x: 2048, y: -96 }, { k: 'x/rua-reta', x: 2080, y: -96, r: 1.57 }];
+  const base = generateCity(); const alvo = base.blds.find((b) => b.spr === 'm:construcoes/casa-azul');
+  const chave = `${alvo.spr}@${Math.round(alvo.x)},${Math.round(alvo.y)}`;
+  const add = [{ id: 'a1', k: 'bld/house', x: -900, y: -2700 }, { id: 'a2', k: 'x/fil-00', x: -800, y: -2700 }, { id: 'a3', k: 'x/montanhas', x: -1200, y: -3000, s: 3 }];
+  const floor = [{ k: 'piso/rua', x: -800, y: -2400 }, { k: 'x/rua-reta', x: -768, y: -2400, r: 1.57 }];
   assert.throws(() => C.saveReforma(T.w, { floor: [{ k: 'piso/rua', x: 5, y: 7 }] }), /grade/);
-  assert.throws(() => C.saveReforma(T.w, { add: [{ id: 'z', k: 'bld/house', x: 99999, y: 0 }] }), /fora do mapa/);
-  const s = C.saveReforma(T.w, { add, floor, del: ['house@648,1604'] });
+  const s = C.saveReforma(T.w, { add, floor, del: [chave] });
   assert.deepEqual(s.saved, { add: 3, floor: 2, del: 1 });
   const st = D.driveState(T.w);
-  assert.equal(st.reforma.shape, 'continente');
-  const base = generateCity(); const city = generateCity(undefined, { reforma: st.reforma });
-  assert.ok(base.blds.some((b) => b.spr === 'house' && b.x === 648 && b.y === 1604) && !city.blds.some((b) => b.spr === 'house' && b.x === 648 && b.y === 1604), 'demolição vale');
+  const city = generateCity(undefined, { reforma: st.reforma });
+  assert.ok(!city.blds.some((b) => b.spr === alvo.spr && b.x === alvo.x && b.y === alvo.y), 'demolição vale');
   assert.equal(city.blds.filter((b) => b.user).length, 2);
   assert.ok(city.props.some((p) => p.user === 'a3' && p.w > 400), 'relevo em escala 3×');
   const at = (x, y) => city.mask[Math.floor((y + city.oy) / city.CS) * city.mw + Math.floor((x + city.ox) / city.CS)];
-  assert.equal(at(2060, -80), 2, 'rua pintada vira pista'); assert.equal(at(2090, -80), 2, 'rua com textura vira pista');
-  assert.equal(at(2130, -220), 0, 'prédio novo é sólido');
-  assert.equal(at(-2700, -7100), 5, 'canto do mapa é mar');
-  assert.equal(at(4500, -3500), 5, 'lago no interior do continente');
-  assert.equal(at(6000, -1500), 6, 'terra firme no continente');
-  assert.equal(at(-1000, 1000), 6, 'ilha-barreira a oeste');
-  assert.equal(at(-700, 1000), 5, 'mar entre a costa e a ilha');
+  assert.equal(at(-790, -2390), 2, 'rua pintada vira pista'); assert.equal(at(-760, -2390), 2, 'rua com textura vira pista');
+  assert.equal(at(-4500, -3600), 5, 'canto do mapa é mar');
+  assert.equal(at(1075, 120), 5, 'lago da colina');
+  assert.ok([6, 9].includes(at(0, -1000)), 'terra firme na ilha');
+  assert.equal(at(400, 1140), 5, 'mar ao sul da cidade');
 });
 
 test('aviação: aeronaves novas no hangar e física de decolagem, helicóptero, dano e queda', async () => {

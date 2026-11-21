@@ -11,6 +11,7 @@
 //    imprudente; o dono chama a polícia, que persegue; o ladrão é preso ou abandona o carro e foge a pé.
 import { nearestLane, along } from './world.js';
 import { lengthOf, spriteOf } from './traffic.js';
+import { MODELO as FROTA_MODELO, COR as FROTA_COR } from './frota.js';
 import { CITY } from './cityevents.js';
 
 export const WANTED = { seen: 230, lvl3: 45, lvl4: 100, forget: 60, npcEvery: [360, 600] }; // distâncias em unidades, tempos em s
@@ -18,7 +19,9 @@ export const FEAR = ['Pode levar! Não faz nada comigo!', 'Calma! Já estou sain
 const CALL = (d) => `Alô, polícia? Roubaram meu carro! ${d.modelo} ${d.cor}${d.direcao ? `, foi ${d.direcao}` : ''}!`;
 const COR = { azul: 'azul', verde: 'verde', laranja: 'laranja', branco: 'branco', preto: 'preto', roxo: 'roxo', amarelo: 'amarelo', vermelho: 'vermelho', taxi: 'amarelo', policia: 'branco e azul', suv: 'prata', bege: 'bege' };
 export function describeCar(c) {
-  const sp = String(c.sprite || ''); const cor = Object.keys(COR).find((k) => sp.includes(k)); const k = c.kind;
+  const sp = String(c.sprite || '');
+  // frota nova: modelo e cor de cada veículo (frota.js); viaturas e táxis continuam pelo tipo
+  if (FROTA_COR[sp]) return { modelo: c.kind === 'taxi' ? 'Táxi' : c.kind === 'policia' ? 'Viatura' : FROTA_MODELO[sp], cor: FROTA_COR[sp] }; const cor = Object.keys(COR).find((k) => sp.includes(k)); const k = c.kind;
   return { modelo: k === 'taxi' ? 'Táxi' : k === 'van' ? 'Van' : k === 'caminhao' || k === 'coleta' ? 'Caminhão' : k === 'policia' ? 'Viatura' : sp.includes('suv') ? 'SUV' : sp.includes('esportivo') ? 'Esportivo' : sp.includes('picape') ? 'Picape' : 'Carro', cor: COR[cor] || 'prata' };
 }
 const dirOf = (a) => { const d = ['para o leste', 'para o sul', 'para o oeste', 'para o norte']; return d[((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4]; };

@@ -29,6 +29,8 @@ function makeTextures() {
     walk: texture(16, '#bdb8ad', [['#c9c4b9', 30], ['#aea99e', 30]], 8, (x) => { x.fillStyle = '#a39e93'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 0, 1, 16); x.fillRect(0, 8, 16, 1); x.fillRect(8, 0, 1, 8); x.fillRect(4, 8, 1, 8); x.fillRect(12, 8, 1, 8); }),
     // calçamento de pedra dos quarteirões (fiadas desencontradas)
     pave: texture(16, '#8b867c', [['#958f84', 34], ['#7f7a71', 34], ['#9a948a', 10]], 11, (x) => { x.fillStyle = '#726d65'; x.fillRect(0, 0, 16, 1); x.fillRect(0, 8, 16, 1); x.fillRect(0, 0, 1, 8); x.fillRect(8, 8, 1, 8); }),
+    // tábuas do píer e da marina (madeira da prancha de cenário)
+    pier: texture(16, '#a4692f', [['#b47838', 40], ['#8f5a28', 30]], 12, (x) => { x.fillStyle = '#6e4420'; for (let k = 0; k < 16; k += 4) x.fillRect(0, k, 16, 1); x.fillRect(5, 0, 1, 4); x.fillRect(12, 4, 1, 4); x.fillRect(3, 8, 1, 4); x.fillRect(10, 12, 1, 4); }),
     plaza: texture(12, '#cdbd9c', [['#d8c9a8', 14], ['#bfae8c', 14]], 9, (x) => { x.fillStyle = '#b3a283'; x.fillRect(0, 0, 12, 1); x.fillRect(0, 0, 1, 6); x.fillRect(6, 6, 1, 6); x.fillRect(0, 6, 12, 1); }),
   };
   return T;
@@ -42,6 +44,9 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   // texturas da folha de ruas e calçadas (quando carregadas)
   if (assets.img['tiles/sidewalk']) pat.walk = tmp.createPattern(assets.img['tiles/sidewalk'], 'repeat');
   if (assets.img['tiles/asphalt']) pat.road = tmp.createPattern(assets.img['tiles/asphalt'], 'repeat');
+  // mundo novo: ladrilhos da prancha de cenário (1 pixel da arte = 0,8 unidade, a mesma escala das construções)
+  const tile = (k) => { const im = assets.img[`mundo/terreno/${k}`]; if (!im) return null; const p = tmp.createPattern(im, 'repeat'); p.setTransform?.(new DOMMatrix([0.8, 0, 0, 0.8, 0, 0])); return p; };
+  for (const [mat, k] of [['grass', 'grama'], ['park', 'grama'], ['sand', 'areia'], ['water', 'agua'], ['road', 'asfalto'], ['lot', 'asfalto'], ['runway', 'asfalto'], ['walk', 'calcada'], ['pave', 'pedra'], ['plaza', 'pedra'], ['mata', 'mata'], ['campo', 'grama-clara'], ['terra', 'terra'], ['canteiro', 'canteiro'], ['curb', 'calcada']]) { const p = tile(k); if (p) pat[mat] = p; }
   const frontImg = assets.img['tiles/front'];
   const img = (k) => assets.img[k];
   // índice espacial dos elementos por bloco
@@ -82,8 +87,9 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     x.restore();
   }
   // sprites das folhas extras ('x:chave') e do pacote de decoração ('d:chave')
-  const sprImg = (spr, base) => (spr.startsWith('x:') ? img(`extra/${spr.slice(2)}`) : spr.startsWith('d:') ? img(`deco/${spr.slice(2)}`) : img(`${base}/${spr}`));
-  const MAT_ORDER = ['water', 'sand', 'grass', 'plaza', 'front', 'walk', 'base', 'curb', 'pave', 'lot', 'bed', 'pond', 'access', 'road', 'cross', 'runway'];
+  const sprImg = (spr, base) => (spr.startsWith('m:') ? img(`mundo/${spr.slice(2)}`) : spr.startsWith('x:') ? img(`extra/${spr.slice(2)}`) : spr.startsWith('d:') ? img(`deco/${spr.slice(2)}`) : img(`${base}/${spr}`));
+  const bldKey = (spr) => (spr.startsWith('m:') ? `mundo/${spr.slice(2)}` : `bld/${spr}`);
+  const MAT_ORDER = ['grass', 'water', 'sand', 'campo', 'mata', 'terra', 'canteiro', 'plaza', 'front', 'walk', 'base', 'curb', 'pave', 'lot', 'bed', 'pond', 'access', 'pier', 'road', 'cross', 'runway'];
 
   const polyPath = (x, g) => { x.beginPath(); g.pts.forEach(([px, py], k) => (k ? x.lineTo(px, py) : x.moveTo(px, py))); x.closePath(); };
   function fillShape(x, g, style) {
@@ -219,10 +225,10 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
   function silhouette(k, im) { let c = sil.get(k); if (c) return c; c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#0a0e1e'; g.fillRect(0, 0, c.width, c.height); sil.set(k, c); return c; }
   function drawBuilding(x, b, lit) {
     if (b.kind === 'sprite') {
-      const im = img(`bld/${b.spr}`);
+      const im = img(bldKey(b.spr));
       if (im) {
         // sombra suave à direita/abaixo e o sprite ocupando exatamente o lote
-        x.globalAlpha = 0.28; x.drawImage(silhouette(`bld/${b.spr}`, im), b.x + 5, b.y + 4, b.w, b.h); x.globalAlpha = 1;
+        x.globalAlpha = 0.28; x.drawImage(silhouette(bldKey(b.spr), im), b.x + 5, b.y + 4, b.w, b.h); x.globalAlpha = 1;
         x.drawImage(im, b.x, b.y, b.w, b.h);
         const L = img(`bld/${b.spr}-lit`); if (L) lit.push({ img: L, x: b.x, y: b.y, w: b.w, h: b.h });
         return;
@@ -321,7 +327,7 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
 
   function drawProp(x, p) {
     if (p.hidden) return; // obstáculo invisível (bacia do chafariz desenhado no chão)
-    if (p.spr.startsWith('d:') || p.spr.startsWith('x:')) {
+    if (p.spr.startsWith('m:') || p.spr.startsWith('d:') || p.spr.startsWith('x:')) {
       const im = sprImg(p.spr); if (!im) return;
       if (p.rot) { x.save(); x.translate(p.x, p.y - p.h / 2); x.rotate(p.rot); x.drawImage(im, -p.w / 2, -p.h / 2, p.w, p.h); x.restore(); return; }
       if (p.solid || p.h > 14) { x.fillStyle = 'rgba(10,14,30,.22)'; x.beginPath(); x.ellipse(p.x + 1, p.y - 1, p.w * 0.42, Math.max(1.5, p.w * 0.14), 0, 0, Math.PI * 2); x.fill(); }
@@ -381,16 +387,19 @@ export function createRenderer(city, assets, { mobile = false } = {}) {
     const x = overview.getContext('2d'); x.setTransform(OV, 0, 0, OV, -bd.x0 * OV, -bd.y0 * OV); x.imageSmoothingEnabled = true;
     x.save(); if (rect) { x.beginPath(); x.rect(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]); x.clip(); }
     const hit = (o, m = 0) => !rect || (o.x - m < rect[2] && o.x + (o.w || 0) + m > rect[0] && o.y - m - 60 < rect[3] && o.y + (o.h || 0) + m > rect[1]);
-    x.fillStyle = '#2f6fd0'; x.fillRect(bd.x0, bd.y0, bd.x1 - bd.x0, bd.y1 - bd.y0);
-    const C = coastP(); if (C) { x.lineJoin = 'round'; x.strokeStyle = '#7fbff0'; x.lineWidth = BW + 60; x.stroke(C.land); x.fillStyle = '#2f5d27'; x.fill(C.land); x.strokeStyle = '#e8cf8a'; x.lineWidth = BW; x.stroke(C.land); if (C.hasLakes) { x.fillStyle = '#2f6fd0'; x.fill(C.lakes); x.strokeStyle = '#e8cf8a'; x.stroke(C.lakes); } } else { x.fillStyle = '#2f5d27'; x.fillRect(0, 0, city.W, city.H); }
-    const core = city.core || { w: city.W, h: city.H }; x.fillStyle = '#2f5d27'; x.fillRect(0, 0, core.w, core.h);
+    // mapa geral com os mesmos ladrilhos do jogo (água, grama, areia) — nada de cor lisa
+    x.fillStyle = pat.water; x.fillRect(bd.x0, bd.y0, bd.x1 - bd.x0, bd.y1 - bd.y0);
+    const C = coastP(); if (C) { x.lineJoin = 'round'; x.strokeStyle = 'rgba(160,215,250,.6)'; x.lineWidth = BW + 60; x.stroke(C.land); x.fillStyle = pat.grass; x.fill(C.land); x.strokeStyle = pat.sand; x.lineWidth = BW; x.stroke(C.land); if (C.hasLakes) { x.fillStyle = pat.water; x.fill(C.lakes); x.strokeStyle = pat.sand; x.stroke(C.lakes); } } else { x.fillStyle = pat.grass; x.fillRect(0, 0, city.W, city.H); }
+    const core = city.core || { w: city.W, h: city.H }; x.fillStyle = pat.grass; x.fillRect(0, 0, core.w, core.h);
     const col = { base: '#3f424b', curb: '#a9a59b', pave: '#8b867c', bed: '#33662a', access: '#4a4d57', front: '#bdb8ad', pond: '#2f6fd0', water: '#2f6fd0', sand: '#e8cf8a', grass: '#2f5d27', plaza: '#cdbd9c', lot: '#565962', walk: '#bdb8ad', road: '#4a4d57', cross: '#4a4d57', runway: '#3c3f47' };
-    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? '#33662a' : col[m]);
+    const tex = (g) => (g.mat === 'grass' ? (g.park ? pat.park : pat.grass) : g.mat === 'curb' || g.mat === 'front' ? pat.walk : g.mat === 'base' || g.mat === 'cross' || g.mat === 'access' ? pat.road : g.mat === 'pond' ? pat.water : g.mat === 'bed' ? pat.park : pat[g.mat] || col[g.mat]);
+    for (const m of MAT_ORDER) for (const g of city.ground) if (g.mat === m && !g.u && hit(g)) fillShape(x, g, g.island ? pat.park : tex(g));
     for (const g of city.ground) if (g.u && hit(g)) fillShape(x, g, col[g.mat] || '#2f5d27');
     x.fillStyle = '#f2c94c'; for (const s of city.segs) if (s.w >= 48) { if (s.v) x.fillRect(s.x - 2, s.y0, 4, s.y1 - s.y0); else x.fillRect(s.x0, s.y - 2, s.x1 - s.x0, 4); }
-    for (const b of city.blds) { if (!hit(b)) continue; if (b.kind === 'sprite' && img(`bld/${b.spr}`)) { x.drawImage(img(`bld/${b.spr}`), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
+    for (const b of city.blds) { if (!hit(b)) continue; if (b.kind === 'sprite' && img(bldKey(b.spr))) { x.drawImage(img(bldKey(b.spr)), b.x, b.y, b.w, b.h); continue; } x.fillStyle = 'rgba(10,14,30,.3)'; x.fillRect(b.x + 6, b.y + 6, b.w, b.h); x.fillStyle = b.roof || '#888'; if (b.round) { x.beginPath(); x.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); x.fill(); } else x.fillRect(b.x, b.y, b.w, b.h); }
     const TRE = /^(arvore|arbusto|d:arvore|d:coqueiro|x:pinheiro|x:arvore-nat)/;
     for (const p of city.props) { if (!hit(p, 20)) continue;
+      if (p.spr.startsWith('m:')) { const im = img(`mundo/${p.spr.slice(2)}`); if (im) x.drawImage(im, p.x - p.w / 2, p.y - p.h, p.w, p.h); continue; }
       if (p.spr === 'x:montanhas') { const im = img('extra/montanhas'); if (im) x.drawImage(im, p.x - p.w / 2, p.y - p.h, p.w, p.h); continue; }
       if (TRE.test(p.spr)) { const pn = p.spr.startsWith('x:pinheiro'); x.fillStyle = pn ? '#1f4d22' : '#2b5f22'; x.beginPath(); x.ellipse(p.x, p.y - 10, pn ? 7 : 9, pn ? 9 : 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = 'rgba(120,170,80,.35)'; x.beginPath(); x.ellipse(p.x - 2, p.y - 13, 3, 3, 0, 0, Math.PI * 2); x.fill(); } }
     x.restore();

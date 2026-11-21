@@ -60,13 +60,20 @@ function continente() {
   return { bounds: CONT_BOUNDS, land, lakes };
 }
 
+// ILHA (mundo novo): costa, ilhotas, lagos e rio traçados do mapa da ilha de referência (planta.js)
+import { PLANTA } from './planta.js';
+const alinha = (v, f) => f(v / CS) * CS;
+export const ILHA_BOUNDS = { x0: alinha(PLANTA.bounds.x0, Math.floor), y0: alinha(PLANTA.bounds.y0, Math.floor), x1: alinha(PLANTA.bounds.x1, Math.ceil), y1: alinha(PLANTA.bounds.y1, Math.ceil) };
+function ilha() { return { bounds: ILHA_BOUNDS, land: PLANTA.land, lakes: PLANTA.lakes }; }
+
 // polígonos do formato (barato: serve também para as miniaturas do seletor)
 const POLYS = new Map();
 export function shapePolys(shape) {
-  const k = SHAPES[shape] ? shape : 'continente';
+  const k = shape === 'ilha' ? 'ilha' : SHAPES[shape] ? shape : 'continente';
   if (POLYS.has(k)) return POLYS.get(k);
   let p;
-  if (k === 'continente') p = continente();
+  if (k === 'ilha') p = ilha();
+  else if (k === 'continente') p = continente();
   else { const c = coastOf(k, 4); p = { bounds: BOUNDS, land: [c.poly(0, 720, 276)], lakes: [] }; }
   p.shape = k; POLYS.set(k, p);
   return p;

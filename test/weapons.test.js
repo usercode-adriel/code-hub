@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCity } from '../public/js/drive/city.js';
+import { generateCity } from '../public/js/drive/mundo.js';
 import { buildGraph, SOLID } from '../public/js/drive/world.js';
 import * as W from '../public/js/drive/weapons.js';
 
