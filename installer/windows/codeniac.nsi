@@ -56,6 +56,14 @@ Section "Codeniac (obrigatório)" SecMain
   SetOutPath "$INSTDIR"
   File /r "app\*.*"
 
+  ; extrai o conteúdo compactado (public e node_modules) com o PowerShell, que já vem no Windows 10 e 11
+  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath \"$INSTDIR\payload-public.zip\" -DestinationPath \"$INSTDIR\public\" -Force; Expand-Archive -LiteralPath \"$INSTDIR\payload-node_modules.zip\" -DestinationPath \"$INSTDIR\" -Force"' $0
+  StrCmp $0 0 +3 0
+    MessageBox MB_OK|MB_ICONSTOP "Não consegui extrair os arquivos do Codeniac. Tente instalar de novo."
+    Abort
+  Delete "$INSTDIR\payload-public.zip"
+  Delete "$INSTDIR\payload-node_modules.zip"
+
   ; (a logo e o ícone novos "code hub" substituem os antigos; logos personalizadas pelo painel ficam nos dados e não são afetadas)
   ClearErrors
 

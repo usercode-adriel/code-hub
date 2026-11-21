@@ -9,7 +9,8 @@ export const CLOUD_PROVIDERS = {
   groq: {
     label: 'Groq', env: 'GROQ_API_KEY', keyRe: /^gsk_[\w-]{16,200}$/,
     base: () => (process.env.GROQ_API_BASE || 'https://api.groq.com/openai/v1').replace(/\/$/, ''),
-    defaultModel: 'llama-3.3-70b-versatile', fallback: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    // modelos aposentados pelo Groq (retornam 404) saíram daqui; a lista real vem de /models
+    defaultModel: 'openai/gpt-oss-120b', fallback: ['openai/gpt-oss-120b'],
     visionModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
     skip: /whisper|tts|guard|embed|moderation|orpheus/i,
   },
@@ -204,7 +205,7 @@ async function candidates(name, wanted, images) {
   const out = [];
   if (images && def.visionModel) out.push(def.visionModel);
   if (wanted) out.push(wanted);
-  if (name === 'openrouter') {
+  if (name === 'openrouter' || name === 'groq') { // lista viva do provedor: só entram modelos que ele de fato oferece
     try {
       const prefer = /llama-3\.3|llama-4|gemma-3|qwen|mistral|deepseek|gpt-oss/i;
       const list = await listModels(name);

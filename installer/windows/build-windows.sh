@@ -13,9 +13,12 @@ APP="$WORK/app"
 mkdir -p "$APP/node" "$OUT"
 
 # 1) programa
-cp -r "$ROOT/server" "$ROOT/public" "$APP/"
+cp -r "$ROOT/server" "$APP/"
 cp "$ROOT/package.json" "$APP/"
-cp -r "$ROOT/node_modules" "$APP/node_modules"
+# public e node_modules têm milhares de arquivos: vão em zips (sem compressão, para extrair rápido) e o instalador os extrai.
+# Isso também contorna o limite do compilador NSIS com muitos arquivos numa mesma pasta.
+(cd "$ROOT/public" && zip -q -0 -r "$APP/payload-public.zip" .)
+(cd "$ROOT" && zip -q -0 -r "$APP/payload-node_modules.zip" node_modules)
 cp "$NODE_EXE" "$APP/node/node.exe"
 cp "$HERE/codeniac.ico" "$APP/"
 python3 "$HERE/vbs-ascii.py" "$HERE/Codeniac.vbs" "$APP/Codeniac.vbs"
@@ -33,5 +36,5 @@ cp "$HERE/codeniac.nsi" "$WORK/"
 
 # 4) zips: instalador e versão portátil
 (cd "$OUT" && rm -f "Codeniac-Instalador-$VERSION.zip" && zip -q -9 "Codeniac-Instalador-$VERSION.zip" "Codeniac-Setup-$VERSION.exe")
-(cd "$WORK" && mv app Codeniac && rm -f "$OUT/Codeniac-Portatil-$VERSION.zip" && zip -q -r -9 "$OUT/Codeniac-Portatil-$VERSION.zip" Codeniac)
+(cd "$WORK" && mv app Codeniac && unzip -q "Codeniac/payload-public.zip" -d Codeniac/public && unzip -q "Codeniac/payload-node_modules.zip" -d Codeniac && rm -f Codeniac/payload-*.zip && rm -f "$OUT/Codeniac-Portatil-$VERSION.zip" && zip -q -r -9 "$OUT/Codeniac-Portatil-$VERSION.zip" Codeniac)
 ls -la "$OUT"
