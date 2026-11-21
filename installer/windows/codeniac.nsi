@@ -56,13 +56,6 @@ Section "Codeniac (obrigatório)" SecMain
   SetOutPath "$INSTDIR"
   File /r "app\*.*"
 
-  ; extrai o conteúdo compactado (public e node_modules) com o PowerShell, que já vem no Windows 10 e 11
-  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath \"$INSTDIR\payload-public.zip\" -DestinationPath \"$INSTDIR\public\" -Force; Expand-Archive -LiteralPath \"$INSTDIR\payload-node_modules.zip\" -DestinationPath \"$INSTDIR\" -Force"' $0
-  StrCmp $0 0 +3 0
-    MessageBox MB_OK|MB_ICONSTOP "Não consegui extrair os arquivos do Codeniac. Tente instalar de novo."
-    Abort
-  Delete "$INSTDIR\payload-public.zip"
-  Delete "$INSTDIR\payload-node_modules.zip"
 
   ; (a logo e o ícone novos "code hub" substituem os antigos; logos personalizadas pelo painel ficam nos dados e não são afetadas)
   ClearErrors
@@ -92,6 +85,21 @@ Section "Codeniac (obrigatório)" SecMain
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $1
   WriteUninstaller "$INSTDIR\Desinstalar.exe"
 
+  ; extrai os pacotes compactados (public e node_modules). Tenta o tar.exe (vem no Windows 10 e 11) e, se falhar, o PowerShell
+  CreateDirectory "$INSTDIR\public"
+  ExecWait '"$SYSDIR\tar.exe" -xf "$INSTDIR\payload-public.zip" -C "$INSTDIR\public"' $0
+  StrCmp $0 0 +4 0
+  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath \"$INSTDIR\payload-public.zip\" -DestinationPath \"$INSTDIR\public\" -Force"' $0
+  StrCmp $0 0 +2 0
+  Call FalhaExtracao
+  ExecWait '"$SYSDIR\tar.exe" -xf "$INSTDIR\payload-node_modules.zip" -C "$INSTDIR"' $0
+  StrCmp $0 0 +4 0
+  ExecWait '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath \"$INSTDIR\payload-node_modules.zip\" -DestinationPath \"$INSTDIR\" -Force"' $0
+  StrCmp $0 0 +2 0
+  Call FalhaExtracao
+  Delete "$INSTDIR\payload-public.zip"
+  Delete "$INSTDIR\payload-node_modules.zip"
+
   ; login recusado: instalações antigas mantêm os dados e a conta do administrador com outra senha.
   ; Só redefine com a confirmação do usuário (padrão: Não). Feche o Codeniac antes.
   MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "Se o login recusar a senha codeniac123, clique em Sim para redefinir a senha da conta admin@codeniac.dev para codeniac123.$\r$\n$\r$\nFeche o Codeniac antes de continuar. Seus dados não são apagados." IDNO +2
@@ -114,6 +122,11 @@ SectionEnd
 
 Function OpenNow
   Exec '"$SYSDIR\wscript.exe" "$INSTDIR\Codeniac.vbs"'
+FunctionEnd
+
+Function FalhaExtracao
+  MessageBox MB_OK|MB_ICONSTOP "Não consegui extrair os arquivos do Codeniac. Feche o Codeniac e tente instalar de novo."
+  Abort
 FunctionEnd
 
 Function .onInit
