@@ -10,6 +10,8 @@ COMO ABRIR
 PRIMEIRO ACESSO
 - E-mail: admin@codeniac.dev   Senha: codeniac123
 - Depois entre em Perfil e troque o e-mail e a senha.
+- Se o login recusar codeniac123 (instalação antiga com dados mantidos), rode o instalador de novo
+  e responda Sim na pergunta de redefinição de senha, com o Codeniac fechado.
 
 O QUE HÁ DE NOVO NA 2.3 — VOCÊ É UM CIDADÃO DE NEXUS CITY
 - Você entra como cidadão comum e anônimo: ninguém na cidade te conhece de início.

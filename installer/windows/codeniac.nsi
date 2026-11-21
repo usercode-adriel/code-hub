@@ -83,6 +83,11 @@ Section "Codeniac (obrigatório)" SecMain
   ${GetSize} "$INSTDIR" "/S=0K" $1 $2 $3
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" $1
   WriteUninstaller "$INSTDIR\Desinstalar.exe"
+
+  ; login recusado: instalações antigas mantêm os dados e a conta do administrador com outra senha.
+  ; Só redefine com a confirmação do usuário (padrão: Não). Feche o Codeniac antes.
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "Se o login recusar a senha codeniac123, clique em Sim para redefinir a senha da conta admin@codeniac.dev para codeniac123.$\r$\n$\r$\nFeche o Codeniac antes de continuar. Seus dados não são apagados." IDNO +2
+    ExecWait '"$INSTDIR\node\node.exe" "$INSTDIR\server\redefinir-senha.mjs" --data-dir "$APPDATA\Codeniac"'
 SectionEnd
 
 Section "Atalho na área de trabalho" SecDesktop
