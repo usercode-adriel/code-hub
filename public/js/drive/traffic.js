@@ -14,15 +14,20 @@
 import { along, turnPath, lightState, routeNodes, stepSmartLights } from './world.js';
 import { obb } from './obst.js';
 import { CITY } from './cityevents.js';
+import { medidas, CIVIS, UTILITARIOS, CAMINHOES, TAXIS, ESPECIAIS, SERVICO } from './frota.js';
 
 const LEN = { carro: 22, taxi: 22, policia: 23, ambulancia: 25, bombeiros: 30, caminhao: 30, van: 25, moto: 12, meu: 22, coleta: 30, guincho: 30 };
-export const lengthOf = (kind) => LEN[kind] || 22;
+// comprimento/largura: pela proporção real do sprite da frota nova; sem sprite conhecido, pelo tipo
+export const lengthOf = (kind, sprite = null) => medidas(sprite)?.L ?? LEN[kind] ?? 22;
+export const widthOf = (kind, sprite = null) => medidas(sprite)?.W ?? (kind === 'moto' ? 6 : 12);
 const KMH = 0.72; // unidades/s → km/h (1 unidade ≈ 0,2 m)
 export const toKmh = (v) => Math.abs(v) * KMH;
-const CIVIL = ['azul', 'verde', 'laranja', 'branco', 'preto', 'roxo', 'suv-amarelo', 'esportivo-vermelho', 'branco', 'azul', 'preto', 'city-vermelho', 'city-verde', 'city-roxo', 'city-azul', 'city-suv', 'city-vermelho', 'city-azul'];
-export const SPRITES = { policia: ['city-policia'], ambulancia: ['city-ambulancia'], bombeiros: ['city-bombeiros'], taxi: ['taxi', 'city-taxi'], guincho: ['caminhao-vermelho'] };
+const CIVIL = CIVIS; // frota nova (public/assets/mundo/veiculos)
+// viaturas de emergência: modelos com quadros de porta (abre/fecha); demais serviços da frota nova
+export const SPRITES = { policia: ['city-policia'], ambulancia: ['city-ambulancia'], bombeiros: ['city-bombeiros'], taxi: TAXIS, guincho: ['truck-cab-sx'], coleta: [SERVICO.coleta], onibus: [SERVICO.onibus] };
 export const spriteOf = (kind) => { const l = SPRITES[kind]; return l ? l[Math.floor(Math.random() * l.length)] : kind; };
-const BIG = [['city-bombeiros', 'bombeiros', 0.012], ['taxi', 'taxi', 0.08], ['city-taxi', 'taxi', 0.07], ['city-van', 'van', 0.05], ['city-picape', 'van', 0.04], ['van-branca', 'van', 0.05], ['picape-azul', 'van', 0.05], ['jipe-verde', 'van', 0.05], ['caminhao-branco', 'caminhao', 0.04], ['caminhao-vermelho', 'caminhao', 0.02], ['caminhao-azul', 'caminhao', 0.02], ['coleta', 'coleta', 0.02], ['betoneira', 'caminhao', 0.015]];
+const BIG = [['city-bombeiros', 'bombeiros', 0.012], ...TAXIS.map((t) => [t, 'taxi', 0.07]), ...UTILITARIOS.map((u) => [u, 'van', 0.035]), ...CAMINHOES.map((c) => [c, 'caminhao', 0.02]),
+  [SERVICO.coleta, 'coleta', 0.02], [SERVICO.onibus, 'caminhao', 0.02], ...ESPECIAIS.map((e) => [e, 'carro', 0.01])];
 export function pickTraffic(i) {
   if (i === 0 || i === 1) return { sprite: spriteOf('policia'), kind: 'policia' }; // duas viaturas patrulhando
   let r = Math.random();
@@ -92,7 +97,7 @@ export function createTraffic(world, { count, near } = {}) {
   };
   const add = (spec, view) => {
     const prof = spec.extra?.prof || pickProfile();
-    const c = { id: `t${cars.length}${Math.random().toString(36).slice(2, 6)}`, sprite: spec.sprite, kind: spec.kind, L: lengthOf(spec.kind), W: spec.kind === 'moto' ? 6 : 12, maxV: ['caminhao', 'coleta', 'bombeiros'].includes(spec.kind) ? 40 : 46 + Math.random() * 8, driver: true, prof, ...spec.extra };
+    const c = { id: `t${cars.length}${Math.random().toString(36).slice(2, 6)}`, sprite: spec.sprite, kind: spec.kind, L: lengthOf(spec.kind, spec.sprite), W: widthOf(spec.kind, spec.sprite), maxV: ['caminhao', 'coleta', 'bombeiros'].includes(spec.kind) ? 40 : 46 + Math.random() * 8, driver: true, prof, ...spec.extra };
     if (placeCar(c, view)) { cars.push(c); return c; }
     return null;
   };

@@ -4,7 +4,7 @@
 import { nearestLane, routeNodes, along } from './world.js';
 import { gather } from './peds.js';
 import { stepCar } from './player.js';
-import { lengthOf, spriteOf } from './traffic.js';
+import { lengthOf, widthOf, spriteOf } from './traffic.js';
 
 export function createIncidents({ world, T, P, pois, notify, report }) {
   const list = []; const fx = [];
@@ -32,7 +32,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
     const route = routeNodes(world, start.lane.to.id, dest.lane.from.id, start.lane.edge);
     if (!route) return null;
     const p = along(start.lane.path, start.s);
-    const c = { id: `${kind}${Math.random().toString(36).slice(2, 7)}`, sprite: spriteOf(kind), kind, L: lengthOf(kind), W: 12, maxV: 52, temp: true, siren: kind !== 'guincho', beacon: kind === 'guincho', driver: true,
+    const c = { id: `${kind}${Math.random().toString(36).slice(2, 7)}`, sprite: spriteOf(kind), kind, L: lengthOf(kind), W: widthOf(kind), maxV: 52, temp: true, siren: kind !== 'guincho', beacon: kind === 'guincho', driver: true,
       lane: start.lane, s: start.s, turn: null, ts: 0, x: p.x, y: p.y, a: p.a, v: 0, wait: 0, ghost: 0, route, dest: dest.lane.from.id, target: { lane: dest.lane, s: Math.max(8, dest.s - (opts.back ?? 14)) }, job: { inc, kind, phase: 'indo', t: 0, base, ...opts.job } };
     T.cars.push(c); inc.units.push(c);
     return c;
@@ -62,7 +62,7 @@ export function createIncidents({ world, T, P, pois, notify, report }) {
     if (!car || Math.hypot(car.x - me.x, car.y - me.y) > 900) {
       const pol = station('policia', me.x, me.y) || POL; const lane = nearestLane(world, me.x + 260, me.y + 260, (l) => !l.narrow) || nearestLane(world, pol[0], pol[1]);
       const p = along(lane.lane.path, lane.s);
-      car = { id: `pol${Date.now()}`, sprite: 'policia', kind: 'policia', L: lengthOf('policia'), W: 12, maxV: 60, temp: true, driver: true, lane: lane.lane, s: lane.s, x: p.x, y: p.y, a: p.a, v: 0 };
+      car = { id: `pol${Date.now()}`, sprite: spriteOf('policia'), kind: 'policia', L: lengthOf('policia'), W: 12, maxV: 60, temp: true, driver: true, lane: lane.lane, s: lane.s, x: p.x, y: p.y, a: p.a, v: 0 };
       T.cars.push(car);
     }
     Object.assign(car, { mode: 'pursuit', siren: true, steer: 0, gear: 'D', speed: 1.2, health: 100, route: [], replan: 0 });

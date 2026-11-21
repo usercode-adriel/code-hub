@@ -13,8 +13,14 @@ export function loadAssets() {
     // personagens animados: folha 4×4 por personagem (frente, direita, costas, esquerda × 4 passos)
     const chr = await (await fetch('/assets/rpg/chr/meta.json')).json();
     for (const [k, v] of Object.entries(chr)) { meta[`chr/${k}`] = [v.w * 4, v.h * (v.rows || 4)]; meta[`chr/${k}-rx`] = [64 * 7, 56 * 10]; } // folha de reações
+    // mundo novo (public/assets/mundo): frota e aeronaves com as mesmas chaves que o jogo já usa (cars/<nome>, air/<nome>)
+    const SRC = {};
+    const frota = await (await fetch('/assets/mundo/veiculos/meta.json')).json();
+    for (const [k, v] of Object.entries(frota)) { const n = k.split('/')[1]; meta[`cars/${n}`] = v; SRC[`cars/${n}`] = `/assets/mundo/veiculos/${n}.png`; }
+    const aero = await (await fetch('/assets/mundo/aeronaves/meta.json')).json();
+    for (const alvo of ['air/av-airliner', 'air/av-executivo']) { meta[alvo] = aero['aeronaves/aviao']; SRC[alvo] = '/assets/mundo/aeronaves/aviao.png'; }
     const img = {};
-    await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = `/assets/rpg/${k}.png`; })));
+    await Promise.all(Object.keys(meta).map((k) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[k] = i; ok(); }; i.onerror = () => ok(); i.src = SRC[k] || `/assets/rpg/${k}.png`; })));
     // sprites extras da Construtora: carregados só quando usados (no mapa ou na prévia do editor)
     const pend = new Map();
     const loadExtra = (k) => {

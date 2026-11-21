@@ -17,7 +17,7 @@ import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import * as TR from '../drive/traffic.js';
 import { CITY } from '../drive/cityevents.js';
-import { createTraffic, stepTraffic, toKmh, lengthOf } from '../drive/traffic.js';
+import { createTraffic, stepTraffic, toKmh, lengthOf, widthOf } from '../drive/traffic.js';
 import { createPeds, stepPeds, gather, chrRow, CHR_KEYS, spriteFor } from '../drive/peds.js';
 import { CHR } from '../drive/chrmeta.js';
 import { stepCar, stepWalker, crashDamage } from '../drive/player.js';
@@ -100,7 +100,7 @@ export default async function render(el, params = new URLSearchParams()) {
       p.id = c.id; p.health = c.health ?? 100; own.push(p); continue;
     }
     const sp = c.parked ? [c.parked.x, c.parked.y, c.parked.a] : c.rental && city.rentSpot ? city.rentSpot : city.spots[(si++ * 3) % city.spots.length];
-    own.push({ own: true, rental: Boolean(c.rental), kind: 'carro', id: c.id, key: c.key, name: c.name, sprite: c.sprite || 'branco', speed: c.speed || 1, x: sp[0], y: sp[1], a: sp[2], v: 0, steer: 0, gear: 'D', L: lengthOf(c.key === 'car-van-bege' || c.key === 'car-sorvete' ? 'van' : 'carro'), W: 12, health: c.health ?? 100, door: 0, color: sampleColor(`cars/${c.sprite || 'branco'}`) });
+    own.push({ own: true, rental: Boolean(c.rental), kind: 'carro', id: c.id, key: c.key, name: c.name, sprite: c.sprite || 'jefferson', speed: c.speed || 1, x: sp[0], y: sp[1], a: sp[2], v: 0, steer: 0, gear: 'D', L: lengthOf('carro', c.sprite || 'jefferson'), W: widthOf('carro', c.sprite || 'jefferson'), health: c.health ?? 100, door: 0, color: sampleColor(`cars/${c.sprite || 'jefferson'}`) });
   }
   // avião-escola da escola de voo (sempre disponível para treinar)
   const school = createPlane({ name: 'Avião-escola Paulistinha', sprite: 'mono-amarelo', school: true, L: 42, W: 54, air: { thrust: 44, vmax: 220, vstall: 92, turn: 1 } }, ...city.planeSpots[0]);

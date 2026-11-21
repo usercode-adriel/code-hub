@@ -12,7 +12,7 @@ test('carros comprados aparecem na cidade 2D e o estacionamento é salvo', () =>
   const ctx = T.ctx();
   const car = I.makeItem(ctx, { key: 'car-sedan-vinho', price: 32000 });
   const st = D.driveState(T.w);
-  assert.ok(st.cars.some((c) => c.id === car.id && c.sprite === 'preto'), 'sprite novo da folha de carros');
+  assert.ok(st.cars.some((c) => c.id === car.id && c.sprite === 'trans-am'), 'carro antigo usa a arte da frota nova');
   assert.ok(st.people.length > 10, 'moradores reais viram pedestres');
   D.park(T.w, { itemId: car.id, x: 900, y: 330, a: 1.2 });
   assert.deepEqual(D.driveState(T.w).cars.find((c) => c.id === car.id).parked.x, 900);
@@ -145,7 +145,7 @@ test('locadora: aluguel diário, vistoria cobra danos e, sem saldo, a locadora p
   assert.equal(r.total, 170);
   assert.throws(() => L.rentCar(ctx, { dias: 1 }), /já está com um carro/);
   const st = D.driveState(T.w); const car = st.cars.find((c) => c.key === 'rent-rosso');
-  assert.ok(car && car.rental && car.sprite === 'aluguel-vermelho', 'carro alugado aparece no mapa');
+  assert.ok(car && car.rental && car.sprite === 'stinger', 'carro alugado aparece no mapa');
   D.damage(T.w, { itemId: car.id, health: 80 });
   const back = L.returnCar(ctx);
   assert.equal(back.fee, 180 + 20 * 110); assert.equal(back.paid, 'pago na conta');
@@ -185,4 +185,16 @@ test('ferimentos dos moradores: gravidade pela velocidade, internação do grave
   const q = residents(T.w)[6];
   I.injure(ctx, q, { kmh: 10 }); assert.equal(q.agent.health.state, 'ferido');
   assert.equal(I.injure(ctx, residents(T.w)[7], { kmh: 80 }).state !== undefined, true);
+});
+
+test('frota nova: modelos antigos saem da loja, cada sprite da frota existe e tem arte de inventário', async () => {
+  const fs = await import('node:fs');
+  const { VEHICLES } = await import('../server/world/vehicles.js');
+  const aVenda = Object.entries(VEHICLES).filter(([, v]) => !v.retired && !v.rental);
+  assert.ok(aVenda.length >= 50, 'frota nova à venda');
+  assert.ok(Object.entries(VEHICLES).filter(([k]) => ['car-hatch-cinza', 'car-sedan-vinho', 'car-sorvete'].includes(k)).every(([, v]) => v.retired), 'modelos antigos aposentados');
+  for (const [k, v] of Object.entries(VEHICLES)) {
+    assert.ok(fs.existsSync(`public/assets/mundo/veiculos/${v.sprite}.png`), `sprite de ${k}`);
+    assert.ok(fs.existsSync(`public/assets/items/${k}.png`), `arte de inventário de ${k}`);
+  }
 });
