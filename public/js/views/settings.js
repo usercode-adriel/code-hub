@@ -9,7 +9,7 @@ import { PERSONA } from '../chatui.js';
 import { NAV_KEYS } from '../app.js';
 import { AVATAR_SLOTS } from '../avatars.js';
 
-const TABS = [['aparencia', 'Aparência', 'palette'], ['rotina', 'Rotina', 'sun'], ['assistente', 'Assistente', 'bot'], ['conexoes', 'Conexões', 'link'], ['dev', 'Desenvolvedor', 'code'], ['notificacoes', 'Notificações', 'bell'], ['dados', 'Dados', 'download'], ['admin', 'Administração', 'shield']];
+const TABS = [['aparencia', 'Aparência', 'palette'], ['rotina', 'Rotina', 'sun'], ['assistente', 'Assistente', 'bot'], ['conexoes', 'Conexões', 'link'], ['dev', 'Desenvolvedor', 'code'], ['notificacoes', 'Notificações', 'bell'], ['dados', 'Dados', 'download'], ['mapas', 'Criar mapa', 'pin'], ['admin', 'Administração', 'shield']];
 const AVATARS = ['🤖', '🦉', '🐱', '🦊', '🐼', '🧠', '👾', '🚀', '🌵', '🧙', '🐉', '⚡'];
 const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
@@ -502,6 +502,22 @@ async function adminTab(box) {
   box.querySelector('#bcForm').onsubmit = async (e) => { e.preventDefault(); try { const r = await api.post('/notifications/broadcast', { title: e.target.title.value, message: e.target.message.value }); toast('Aviso enviado', `${r.delivered} usuário(s)`, 'success'); e.target.reset(); } catch (err) { toast('Erro', err.message, 'error'); } };
 }
 
+// Criar mapa: abre o editor e mostra qual mapa está em "Vida" (o mapa do jogo)
+async function mapasTab(box) {
+  const { mapas, vida } = await api.get('/mapas');
+  const ativo = mapas.find((m) => m.id === vida);
+  box.innerHTML = `<div class="card" style="padding:14px">
+    <h3 class="title">Criar mapa</h3>
+    <p class="muted">Monte o seu próprio mundo, peça por peça, com o inventário de assets. Quando estiver pronto, aperte <b>Vida</b> no editor: o jogo passa a rodar no seu mapa, com a mesma lógica.</p>
+    <p>${ativo ? `Mapa do jogo agora: <b>${esc(ativo.nome)}</b>` : 'O jogo está na cidade padrão.'}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <a class="btn primary" href="#/criar-mapa">Abrir o editor</a>
+      ${ativo ? '<button class="btn" id="mVoltar">Voltar à cidade padrão</button>' : ''}
+    </div></div>`;
+  const v = box.querySelector('#mVoltar');
+  if (v) v.onclick = async () => { await api.del('/mapas/vida/ativo'); toast('Mapa', 'O jogo voltou à cidade padrão.', 'info'); mapasTab(box); };
+}
+
 export default async function render(el, [tab = 'aparencia']) {
   const tabs = TABS.filter(([k]) => !['admin', 'dev'].includes(k) || store.user.role === 'admin');
   const cur = tabs.find((t) => t[0] === tab) ? tab : 'aparencia';
@@ -509,7 +525,7 @@ export default async function render(el, [tab = 'aparencia']) {
     <div class="tabs settings-tabs" style="flex-wrap:wrap;width:auto">${tabs.map(([k, l, ic]) => `<button data-t="${k}" class="${k === cur ? 'on' : ''}">${icon(ic, 13)} ${l}</button>`).join('')}</div><div id="tab"></div>`;
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => { location.hash = `#/settings/${b.dataset.t}`; }; });
   const box = el.querySelector('#tab');
-  const fn = { aparencia: appearance, rotina: routine, assistente: assistantTab, conexoes: connectTab, dev: devTab, notificacoes: notifTab, dados: dataTab, admin: adminTab }[cur];
+  const fn = { aparencia: appearance, rotina: routine, assistente: assistantTab, conexoes: connectTab, dev: devTab, notificacoes: notifTab, dados: dataTab, mapas: mapasTab, admin: adminTab }[cur];
   await fn(box);
   return () => { if (Object.keys(pending).length) patch({}, true); };
 }
