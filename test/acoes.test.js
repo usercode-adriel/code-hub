@@ -29,7 +29,8 @@ test('motor: duplicata dentro da janela é recusada; depois da janela, aceita', 
 
 test('motor: condição falsa recusa com o motivo, sem registrar nada', () => {
   const ctx = T.ctx(); const n = T.w.events.length;
-  const pobre = residents(T.w)[41]; pobre.agent.cash = 0; // sem dinheiro: não há o que furtar
+  // a população de moradores varia a cada geração: escolhe um com agente (sem depender do índice 41)
+  const comAgente = residents(T.w).filter((p) => p.agent); const pobre = comAgente[41 % comAgente.length]; pobre.agent.cash = 0; // sem dinheiro: não há o que furtar
   const r = I.infracao(ctx, { tipo: 'furto', vitima: pobre.id, valor: 10, rnd: sem() });
   assert.equal(r.ok, false); assert.equal(r.motivo, 'condicao');
   assert.ok(r.condicoes.some((c) => c.ok === false), 'mostra qual condição falhou');
