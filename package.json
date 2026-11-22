@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "assets": "python3 tools/assets/atlas.py",
+    "assets:validar": "python3 tools/assets/atlas.py --so-validar"
   },
   "engines": {
     "node": ">=20.12"
