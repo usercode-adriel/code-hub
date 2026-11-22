@@ -12,7 +12,8 @@ import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
 import { createStreet, looksOf } from '../drive/street.js';
 import { createCarjack } from '../drive/carjack.js';
-import { generateCity, CS } from '../drive/mundo.js';
+import { CS } from '../drive/mundo.js';
+import { gerarCidade } from '../drive/mundo-cliente.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import * as TR from '../drive/traffic.js';
@@ -71,7 +72,7 @@ export default async function render(el, params = new URLSearchParams()) {
   if (!alive) return;
   await new Promise((r) => setTimeout(r, 0));
   let reforma = state.reforma || null;
-  const city = generateCity(undefined, { reforma });
+  const city = await gerarCidade(reforma);
   const world = buildGraph(city.R);
   const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars, obst: buildObst(city.props) });
   syncWorld();
@@ -242,9 +243,11 @@ export default async function render(el, params = new URLSearchParams()) {
   input.touchUI = touch;
   stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } if (z === 'look') { pickLook(); return; } if (z === 'voos') { flightPanel(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
   // modo Reforma: refaz a cidade com a reforma (geração + edições) e descarta só os blocos afetados
-  function rebuildCity(rf, rect, full) {
-    const t0 = performance.now();
-    Object.assign(city, generateCity(undefined, { reforma: rf })); syncWorld();
+  let reconstrucao = 0; // só vale a reconstrução mais recente (uma antiga pode terminar depois)
+  async function rebuildCity(rf, rect, full) {
+    const t0 = performance.now(); const minha = ++reconstrucao;
+    const nova = await gerarCidade(rf); if (minha !== reconstrucao) return;
+    Object.assign(city, nova); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
   }

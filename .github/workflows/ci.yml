@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [dev-ui-2.4, main]
+  pull_request:
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow scipy numpy
+      - run: npm ci
+      - name: Validar assets
+        run: npm run assets:validar
+      - name: Testes unitários
+        run: npm test
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Testes de navegador
+        run: npm run test:browser
