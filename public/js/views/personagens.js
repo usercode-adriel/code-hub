@@ -51,7 +51,7 @@ export default async function render(el) {
     <p class="muted" id="pgStatus" style="font-size:12px;min-height:16px"></p>
     <h4 style="margin-top:16px">Meus personagens</h4>
     <div id="pgSalvos" class="muted"></div>
-    <details style="margin-top:14px"><summary>Créditos das peças</summary><pre style="white-space:pre-wrap;font-size:11px">${esc(creditos)}</pre></details>
+    <p style="margin-top:14px"><a href="#/creditos">Ver créditos das peças e licenças</a></p>
   </section>`;
 
   const previa = el.querySelector('#pgPrevia'); const ctx = previa.getContext('2d'); ctx.imageSmoothingEnabled = false;
