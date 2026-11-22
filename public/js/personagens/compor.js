@@ -1,6 +1,7 @@
 // COMPOSIÇÃO DO PERSONAGEM (canvas): sobrepõe as camadas escolhidas numa folha de andar só (576×256, 9 quadros × 4 direções).
 // A folha composta é guardada por personagem (uma imagem por personagem, em vez de uma por camada).
 import { camadas } from './escolha.js';
+import { folhaParaJogo } from './formato-jogo.js';
 
 export async function carregarPeca(url) {
   const r = await fetch(url); if (!r.ok) throw new Error(`peça não encontrada: ${url}`);
@@ -16,4 +17,9 @@ export async function comporFolha(escolha, base = '/assets/personagens/') {
   g.imageSmoothingEnabled = false;
   for (const im of imagens) { if (im.width !== w || im.height !== h) throw new Error('camadas com tamanhos diferentes'); g.drawImage(im, 0, 0); }
   return tela;
+}
+
+// folha no formato do jogo (4 passos × 4 direções, 256×256)
+export async function comporFolhaJogo(escolha, base) {
+  return folhaParaJogo(await comporFolha(escolha, base));
 }
