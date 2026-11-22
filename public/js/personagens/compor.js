@@ -23,3 +23,20 @@ export async function comporFolha(escolha, base = '/assets/personagens/') {
 export async function comporFolhaJogo(escolha, base) {
   return folhaParaJogo(await comporFolha(escolha, base));
 }
+
+// ----- animações (prévia): cada peça tem a própria folha da animação; o quadro é montado camada por camada
+const cacheImg = new Map();
+async function imagemDe(url) {
+  if (!cacheImg.has(url)) cacheImg.set(url, carregarPeca(url));
+  return cacheImg.get(url);
+}
+// monta um quadro (64×64) da animação `anim` na linha `linha` e coluna `coluna` (formato da folha LPC)
+export async function quadroAnimacao(escolha, anim, linha, coluna, base = '/assets/personagens/') {
+  const out = new OffscreenCanvas(64, 64); const g = out.getContext('2d'); g.imageSmoothingEnabled = false;
+  for (const rel of camadas(escolha)) {
+    const pasta = rel.replace(/\/walk\.png$/, '');
+    const im = await imagemDe(`${base}${pasta}/${anim}.png`);
+    g.drawImage(im, coluna * 64, linha * 64, 64, 64, 0, 0, 64, 64);
+  }
+  return out;
+}

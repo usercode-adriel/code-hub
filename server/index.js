@@ -32,6 +32,7 @@ import {
 import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
+import personagens from './personagens.js';
 
 load();
 loadLibrary();
@@ -181,6 +182,7 @@ app.post('/api/system/shutdown', (req, res) => {
 app.use('/api/ai', aiRoutes);
 app.use('/api/library', requireAuth, library);
 app.use('/api', api);
+app.use('/api/personagens', requireAuth, personagens);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
