@@ -1,4 +1,4 @@
-# PROTÓTIPO (Godot 4.4): mapa top-down da cidade, lido da API do Codeniac, com um personagem andando.
+# PROTÓTIPO (Godot 4.7): mapa top-down da cidade, lido da API do Codeniac, com um personagem andando.
 # Setas ou WASD movem. Prédios bloqueiam o caminho (caixas simples). Cidade e sprites vêm do servidor/assets copiados.
 extends Node2D
 

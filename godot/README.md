@@ -1,4 +1,4 @@
-# Protótipo do cliente em Godot (Codeniac)
+# Protótipo do cliente em Godot (4.7) (Codeniac)
 
 Mapa top-down da cidade Vicewood, lido da API do Codeniac, com um personagem andando.
 O servidor Node continua sendo a fonte da verdade; este cliente só desenha e anda.
@@ -19,7 +19,7 @@ O servidor Node continua sendo a fonte da verdade; este cliente só desenha e an
    python3 tools/godot/copiar_assets.py /tmp/cidade.json
    ```
 
-3. Abra `godot/project.godot` no Godot 4.4 ou mais novo. No Inspector do nó `Mundo`, preencha
+3. Abra `godot/project.godot` no Godot 4.7. No Inspector do nó `Mundo`, preencha
    `email` e `senha`, e rode a cena (F5).
 
 Setas ou WASD andam. Prédios bloqueiam o caminho. Perto de um ponto de interesse, o nome aparece no canto.
