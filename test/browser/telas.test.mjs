@@ -69,13 +69,32 @@ test('telas principais carregam sem erro de script e sem arquivo faltando', asyn
   await ctx.close();
 });
 
+// cria um mapa com ruas (cruz) e o marca como Vida: o jogo carrega esse mapa
+async function mapaComRuasComoVida(p) {
+  await p.evaluate(async () => {
+    const h = { Authorization: 'Bearer ' + localStorage.getItem('codeniac.token'), 'Content-Type': 'application/json' };
+    const m = await (await fetch('/api/mapas', { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Teste de navegador' }) })).json();
+    const celulas = {};
+    for (let x = 0; x < 20; x++) celulas[`${x},7`] = 'terreno/asfalto';
+    for (let y = 0; y < 14; y++) celulas[`10,${y}`] = 'terreno/asfalto';
+    for (let x = 0; x < 20; x++) if (x !== 10) celulas[`${x},6`] = 'terreno/calcada';
+    const itens = [{ chave: 'construcoes/hospital', x: 200, y: 120, dados: { nome: 'Hospital', rota: '#/hospital' } }];
+    for (let k = 0; k < 3; k++) itens.push({ chave: 'personagens/' + ['policial', 'enfermeira', 'barbudo'][k], x: 100 + k * 40, y: 208, dados: { nome: 'Personagem ' + (k + 1) } });
+    await fetch(`/api/mapas/${m.id}`, { method: 'PUT', headers: h, body: JSON.stringify({ largura: 20, altura: 14, celulas, itens }) });
+    await fetch(`/api/mapas/${m.id}/vida`, { method: 'POST', headers: h, body: '{}' });
+  });
+}
+
 test('mapa: carros e pedestres aparecem, sprites vêm do atlas em poucas requisições', async () => {
   const { p, ctx } = await paginaLogada();
+  await mapaComRuasComoVida(p);
   await p.goto(`${BASE}/#/mapa`);
   await p.waitForFunction(() => window.__d2?.T?.cars?.length > 5, null, { timeout: 60000 });
   await p.waitForTimeout(1500);
   const info = await p.evaluate(() => ({ carros: __d2.T.cars.length, pedestres: __d2.P.peds.length, emMovimento: __d2.T.cars.filter((c) => c.v > 2).length }));
-  assert.ok(info.carros > 5 && info.pedestres > 5, JSON.stringify(info));
+  // pedestres vêm dos personagens colocados no mapa (3 nesta cena de teste)
+  const doMapa = await p.evaluate(() => __d2.P.peds.filter((q) => q.spr && q.spr.startsWith('chr/')).length);
+  assert.ok(info.carros > 5 && doMapa >= 3, JSON.stringify({ ...info, doMapa }));
   assert.ok(p.pedidosAtlas >= 1 && p.pedidosAtlas <= 8, `requisições do atlas: ${p.pedidosAtlas}`);
   assert.deepEqual(p.errosJS, [], 'erros de script no mapa');
   assert.deepEqual(p.falhas, [], 'assets que não carregaram');
@@ -91,6 +110,20 @@ test('diagnóstico: administrador vê os números, visitante não', async () => 
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.ok(j.memoriaMB.rss > 0 && Array.isArray(j.pedidos), 'dados do diagnóstico');
+  await ctx.close();
+});
+
+test('criar mapa: o editor abre, aceita peça do inventário e salva', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/settings/mapas`); await p.waitForSelector('a[href="#/criar-mapa"]', { timeout: 30000 });
+  await p.click('a[href="#/criar-mapa"]'); await p.waitForSelector('#mNovo', { timeout: 15000 });
+  await p.click('#mNovo'); await p.waitForSelector('#eTela', { timeout: 15000 });
+  await p.click('#ePaleta [data-chave]'); await p.waitForTimeout(300);
+  const tela = await p.locator('#eTela').boundingBox();
+  await p.mouse.click(tela.x + tela.width / 2, tela.y + tela.height / 2);
+  await p.click('#eSalvar'); await p.waitForTimeout(800);
+  assert.match(await p.evaluate(() => document.querySelector('#eEstado').textContent), /Salvo/);
+  assert.deepEqual(p.errosJS, [], 'erros de script no editor');
   await ctx.close();
 });
 

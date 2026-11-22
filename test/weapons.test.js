@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCity } from '../public/js/drive/mundo.js';
+import { cidadeDeTeste } from './helpers/mapa-teste.js';
 import { buildGraph, SOLID } from '../public/js/drive/world.js';
 import * as W from '../public/js/drive/weapons.js';
 
-const city = generateCity();
+const city = cidadeDeTeste();
 const world = buildGraph(city.R);
 Object.assign(world, { mask: city.mask, cs: 4, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds });
 // parede de teste: todo ponto com x entre 500 e 510 é sólido (linha vertical)

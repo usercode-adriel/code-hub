@@ -66,30 +66,13 @@ test('ocorrências do mapa viram acontecimento e ferem o morador atropelado', as
   assert.equal(D.infraction(ctx, { tipo: 'fuga' }).fine.amount, 2934);
 });
 
-test('Construtora e Reforma: catálogo livre, reforma salva e a ilha nova muda com ela', async () => {
+test('Construtora: catálogo livre, sem preço, e a validação de reforma continua recusando o inválido', async () => {
   const C = await import('../server/world/construtora.js');
-  const { generateCity } = await import('../public/js/drive/mundo.js');
   const v = C.construtoraView(T.w);
   assert.ok(v.items.length > 500, 'catálogo da Construtora');
   assert.ok(v.items.every((i) => i.price === undefined), 'nada à venda');
-  const base = generateCity(); const alvo = base.blds.find((b) => b.spr === 'm:construcoes/casa-azul');
-  const chave = `${alvo.spr}@${Math.round(alvo.x)},${Math.round(alvo.y)}`;
-  const add = [{ id: 'a1', k: 'bld/house', x: -900, y: -2700 }, { id: 'a2', k: 'x/fil-00', x: -800, y: -2700 }, { id: 'a3', k: 'x/montanhas', x: -1200, y: -3000, s: 3 }];
-  const floor = [{ k: 'piso/rua', x: -800, y: -2400 }, { k: 'x/rua-reta', x: -768, y: -2400, r: 1.57 }];
   assert.throws(() => C.saveReforma(T.w, { floor: [{ k: 'piso/rua', x: 5, y: 7 }] }), /grade/);
-  const s = C.saveReforma(T.w, { add, floor, del: [chave] });
-  assert.deepEqual(s.saved, { add: 3, floor: 2, del: 1 });
-  const st = D.driveState(T.w);
-  const city = generateCity(undefined, { reforma: st.reforma });
-  assert.ok(!city.blds.some((b) => b.spr === alvo.spr && b.x === alvo.x && b.y === alvo.y), 'demolição vale');
-  assert.equal(city.blds.filter((b) => b.user).length, 2);
-  assert.ok(city.props.some((p) => p.user === 'a3' && p.w > 400), 'relevo em escala 3×');
-  const at = (x, y) => city.mask[Math.floor((y + city.oy) / city.CS) * city.mw + Math.floor((x + city.ox) / city.CS)];
-  assert.equal(at(-790, -2390), 2, 'rua pintada vira pista'); assert.equal(at(-760, -2390), 2, 'rua com textura vira pista');
-  assert.equal(at(-4500, -3600), 5, 'canto do mapa é mar');
-  assert.equal(at(1075, 120), 5, 'lago da colina');
-  assert.ok([6, 9].includes(at(0, -1000)), 'terra firme na ilha');
-  assert.equal(at(400, 1140), 5, 'mar ao sul da cidade');
+  assert.throws(() => C.saveReforma(T.w, { add: [{ id: 'z', k: 'bld/house', x: 99999, y: 0 }] }), /fora do mapa/);
 });
 
 test('aviação: aeronaves novas no hangar e física de decolagem, helicóptero, dano e queda', async () => {

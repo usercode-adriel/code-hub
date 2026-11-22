@@ -12,8 +12,8 @@ import { drawReaction } from '../drive/reactions.js';
 import { createCela } from '../drive/cela.js';
 import { createStreet, looksOf } from '../drive/street.js';
 import { createCarjack } from '../drive/carjack.js';
-import { CS } from '../drive/mundo.js';
-import { gerarCidade } from '../drive/mundo-cliente.js';
+const CS = 4; // resolução da máscara de colisão (igual ao conversor de mapas)
+import { mundoAtivo } from '../mapas/mundo-ativo.js';
 import { createRenderer } from '../drive/render.js';
 import { loadAssets, extrasOf } from '../drive/assets.js';
 import * as TR from '../drive/traffic.js';
@@ -33,7 +33,6 @@ import { DUR } from '../drive/reactions.js';
 import { FEAR } from '../drive/carjack.js';
 import { createProtests } from '../drive/protest.js';
 import { createTalks, wrapText, balloonSecs, EMO_ICON } from '../drive/talk.js';
-import { createEditor } from '../drive/editor.js';
 import { createInput, createCamera } from '../drive/input.js';
 import { cityNow, refreshStatus } from '../chrome.js';
 import { personCard } from '../world/wui.js';
@@ -72,7 +71,7 @@ export default async function render(el, params = new URLSearchParams()) {
   if (!alive) return;
   await new Promise((r) => setTimeout(r, 0));
   let reforma = state.reforma || null;
-  const city = await gerarCidade(reforma);
+  const city = await mundoAtivo(); // o mapa marcado em "Vida" (ou um mapa vazio)
   const world = buildGraph(city.R);
   const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars, obst: buildObst(city.props) });
   syncWorld();
@@ -85,8 +84,9 @@ export default async function render(el, params = new URLSearchParams()) {
   // ---------------- entidades
   const T = createTraffic(world, { count: touch ? 30 : 50 });
   const realPeople = state.people.slice(0, touch ? 30 : 46).map((p) => ({ ...p, real: true }));
-  const filler = Array.from({ length: touch ? 30 : 64 }, (_, i) => ({ id: `pass${i}`, name: 'Passante', job: i % 9 === 0 ? 'obra' : '' }));
-  const P = createPeds(world, [...realPeople, ...filler], assets.roles);
+  // pessoas na rua: os moradores da conta e os personagens colocados no seu mapa (sem passantes genéricos)
+  const doMapa = (city.personagens || []).map((c) => ({ id: c.id, name: c.nome, spr: c.spr, job: '', real: false }));
+  const P = createPeds(world, [...realPeople, ...doMapa], assets.roles);
   // conversas entre moradores: o conteúdo vem do servidor (sem IA paga), o mapa só reproduz as falas em turnos
   const TALKS = createTalks({ P, request: (a, b) => api.post('/mundo/dialogo/gerar', { a, b }).catch(() => null) });
   const sampleColor = (key) => { const im = IMG[key]; if (!im) return '#888'; const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.drawImage(im, im.width * 0.3, im.height * 0.55, im.width * 0.4, im.height * 0.15, 0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
@@ -241,12 +241,12 @@ export default async function render(el, params = new URLSearchParams()) {
   // ---------------- entrada
   const input = createInput(stage, { onEnter: () => act(), onZoom: (f, sx, sy) => { cam.userZ = performance.now() + 6000; cam.zoomAt(f, sx, sy); }, onPan: (dx, dy) => cam.pan(dx, dy), onTap: (sx, sy) => (ED?.on ? ED.tap(sx, sy) : tap(sx, sy)), onHover: (sx, sy) => ED?.on && ED.hover(sx, sy), paint: { active: () => ED?.paints(), at: (sx, sy) => ED.paintAt(sx, sy), end: () => ED.paintEnd() } });
   input.touchUI = touch;
-  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { if (ED.on) ED.close(); else ED.open(reforma); return; } if (z === 'look') { pickLook(); return; } if (z === 'voos') { flightPanel(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
+  stage.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { const z = b.dataset.z; if (z === 'me') { cam.follow = true; return; } if (z === 'rot') { rotate(); return; } if (z === 'edit') { location.hash = '#/criar-mapa'; return; } if (z === 'look') { pickLook(); return; } if (z === 'voos') { flightPanel(); return; } cam.zoomAt(z === 'in' ? 1.3 : 1 / 1.3, cam.vw / 2, cam.vh / 2); }; });
   // modo Reforma: refaz a cidade com a reforma (geração + edições) e descarta só os blocos afetados
   let reconstrucao = 0; // só vale a reconstrução mais recente (uma antiga pode terminar depois)
   async function rebuildCity(rf, rect, full) {
     const t0 = performance.now(); const minha = ++reconstrucao;
-    const nova = await gerarCidade(rf); if (minha !== reconstrucao) return;
+    const nova = await mundoAtivo(); if (minha !== reconstrucao) return;
     Object.assign(city, nova); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });
@@ -360,7 +360,8 @@ export default async function render(el, params = new URLSearchParams()) {
     m.querySelectorAll('[data-k]').forEach((b) => { b.onclick = () => { me.spr = `chr/${b.dataset.k}`; localStorage.setItem('codeniac.chr2', b.dataset.k); m.remove(); toast('Visual trocado', CHR[b.dataset.k].name, 'success'); }; });
     m.querySelector('[data-x]').onclick = () => m.remove();
   }
-  const ED = createEditor({ stage, cam, city, world, assets, api, toast, rebuild: rebuildCity, onExit: (rf) => { reforma = { ...(reforma || {}), ...rf }; cam.follow = true; } });
+  // a Reforma antiga saiu: o botão leva ao editor de mapas. Este objeto mantém a forma que o loop do jogo usa.
+  const ED = { on: false, draw() {}, tap() {}, hover() {}, paints: () => false, paintAt() {}, paintEnd() {}, open() {}, close() {}, destroy() {} };
   $('#d2GearB').addEventListener('pointerup', () => { if (me.mode !== 'car') return; const c = me.car; c.gear = c.gear === 'D' ? 'N' : c.gear === 'N' ? 'R' : 'D'; });
 
   const regionAt = (p) => { const r = city.regions.find((g) => p.x >= g.rect[0] && p.x < g.rect[2] && p.y >= g.rect[1] && p.y < g.rect[3]); if (r) return r.name; let best = null; let bd = Infinity; for (const g of city.regions) { const dx = Math.max(g.rect[0] - p.x, 0, p.x - g.rect[2]); const dy = Math.max(g.rect[1] - p.y, 0, p.y - g.rect[3]); const d = dx + dy; if (d < bd) { bd = d; best = g; } } return best?.name || 'Nexus City'; };
@@ -1001,7 +1002,6 @@ export default async function render(el, params = new URLSearchParams()) {
   raf = requestAnimationFrame(frame);
   $('#d2Air').onclick = () => flightPanel();
   window.__d2 = { me, own, T, P, world, city, cam, input, act, perf, INC, R, ED, SKY, ACC, PR, viewNow, TALKS, talkPanel, STREET, BLZ, TR, CITY, CARJ, WPN, obstAt, blitzScene, blitzSetup, get DET() { return DET; } };
-  if (params.has('reforma')) setTimeout(() => ED.open(reforma, params.get('item')), 50); // inspeção (testes automáticos)
   if (!touch) setTimeout(() => $('#d2Help')?.classList.add('fade'), 10000);
   if (touch && !localStorage.getItem('codeniac.runhint')) { localStorage.setItem('codeniac.runhint', '1'); setTimeout(() => toast('Correr', 'Toque duas vezes no joystick e segure para correr.', 'info'), 2500); }
   return () => { alive = false; removeEventListener('keydown', keyArmas); clearInterval(boardTimer); cancelAnimationFrame(raf); ro.disconnect(); input.destroy(); ED.destroy(); document.removeEventListener('fullscreenchange', fsOff); if (window.__d2?.me === me) delete window.__d2; if (me.car) savePark(me.car); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };

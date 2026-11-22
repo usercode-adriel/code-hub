@@ -131,3 +131,12 @@ router.delete('/vida/ativo', (req, res) => {
 });
 
 export default router;
+
+// usado por outros módulos do servidor (exportação para o Godot): o mapa "Vida" do usuário, ou null
+export function mapaAtivoDoUsuario(uid) {
+  const u = db().users.find((x) => x.id === uid);
+  return u?.mapaVida ? lerMapa(uid, u.mapaVida) : null;
+}
+export function inventarioServidor() {
+  return inventario();
+}

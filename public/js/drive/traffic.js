@@ -82,6 +82,8 @@ export function createTraffic(world, { count, near } = {}) {
   laneInit(world);
   const cars = [];
   const lanes = world.lanes.filter((l) => !l.narrow && l.path.len > 30);
+  // sem vias (mapa vazio ou sem ruas), não há trânsito: o mapa continua funcionando sem carros
+  if (!lanes.length) return { cars, lanes, placeCar: () => false, add: () => null };
   // coloca o carro numa faixa (de preferência perto da câmera, mas fora da tela) sem encostar em ninguém
   const placeCar = (c, view) => {
     for (let k = 0; k < 60; k++) {

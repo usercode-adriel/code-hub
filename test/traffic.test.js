@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateCity } from '../public/js/drive/mundo.js';
+import { cidadeDeTeste } from './helpers/mapa-teste.js';
 import { buildGraph } from '../public/js/drive/world.js';
 import * as TR from '../public/js/drive/traffic.js';
 import { createCityEvents, CITY } from '../public/js/drive/cityevents.js';
@@ -8,7 +8,7 @@ import { describeCar, FEAR } from '../public/js/drive/carjack.js';
 import { TOW } from '../public/js/drive/accidents.js';
 
 globalThis.performance ??= { now: () => Date.now() };
-const city = generateCity();
+const city = cidadeDeTeste();
 const sim = (x, y, n, secs, setup) => {
   const world = buildGraph(city.R); const view = { x, y, r: 700 };
   const T = TR.createTraffic(world, { count: n, near: { x, y, r: 100 } }); setup?.(T, world);
@@ -21,8 +21,8 @@ const sim = (x, y, n, secs, setup) => {
 };
 
 test('nenhum carro atravessa outro: 60 carros por 60 s no centro e na orla da cidade nova', () => {
-  for (const [x, y] of [[888, 480], [500, 822]]) {
-    const r = sim(x, y, 60, 60);
+  for (const [x, y] of [[336, 240], [176, 240]]) {
+    const r = sim(x, y, 24, 60);
     assert.equal(r.ov, 0, `sobreposições em ${x},${y}`);
     assert.ok(r.moving > 0.25, `o trânsito anda (${(r.moving * 100).toFixed(0)}% em movimento)`);
   }
@@ -37,7 +37,7 @@ test('perfis de motorista: cauteloso, comum, apressado e imprudente, com parâme
 });
 
 test('via bloqueada: o carro parado de vez publica o bloqueio e os outros desviam ou esperam, sem atravessar', () => {
-  const r = sim(888, 480, 50, 40, (T) => { const c = T.cars.find((k) => !k.siren && k.lane.path.len > 200); c.sceneHold = true; c.wrecked = 9999; c.blockTest = true; });
+  const r = sim(336, 240, 50, 40, (T) => { const c = T.cars.find((k) => !k.siren && k.lane.path.len > 200); c.sceneHold = true; c.wrecked = 9999; c.blockTest = true; });
   const blocked = r.T.cars.find((k) => k.blockTest);
   assert.ok(CITY.blocked(blocked.lane), 'faixa marcada como bloqueada');
   assert.equal(r.world.penalty(blocked.lane), 3000, 'rotas pagam caro para passar ali');

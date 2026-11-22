@@ -3,7 +3,7 @@
 // O formato do mapa (continente com ilhas, quadrado, arredondado, circular, ilha) é escolhido no editor.
 // A reforma salva fica no servidor e vale toda vez que o mapa abre.
 import { CATALOG, CATS, SHAPES, TILE } from '../../public/js/drive/obra.js';
-import { MAX_BOUNDS } from '../../public/js/drive/terreno.js';
+import { MAX_BOUNDS } from '../../public/js/mapas/limites.js';
 import { nowIso } from './util.js';
 import { account } from './bank.js';
 

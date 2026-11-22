@@ -37,6 +37,8 @@ export function createPeds(world, people, roles) {
   // só calçadas de verdade: ao menos 92% do trajeto sobre calçada/faixa
   const ok = (w) => { let n = 0; let t = 0; for (let s = 0; s < w.len; s += 4) { const q = along(w, s); t++; if (canWalk(at(world, q.x, q.y))) n++; } return t && n / t >= 0.92; };
   for (const e of world.edges) e.walks.forEach((w, i) => { if (w && w.len > 20 && ok(w)) walks.push({ e, side: i, path: w }); else e.walks[i] = null; });
+  // sem calçadas (mapa vazio ou sem calçadas), ninguém anda pela rua: os moradores continuam existindo, só não aparecem
+  if (!walks.length) return { peds: [], walks };
   const peds = people.map((p, i) => {
     const w = walks[Math.floor(Math.random() * walks.length)];
     const dir = Math.random() < 0.5 ? 1 : -1;
