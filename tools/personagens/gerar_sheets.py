@@ -85,7 +85,8 @@ def celula_queda(parado_img, angulo, pivo_x=None, pivo_y=BASE_RX):
 def montar_rx(pastas):
     folha = Image.new('RGBA', (7 * CELULA_RX[0], 10 * CELULA_RX[1]), (0, 0, 0, 0))
     parado = redimensionar(compor(pastas, 'idle', LPC_LINHA['baixo'], 0))
-    sit = [redimensionar(compor(pastas, 'sit', LPC_LINHA['baixo'], c)) for c in range(3)]
+    # sentado: só os quadros em que o corpo está sentado de fato (o quadro 2 da folha LPC está em pé)
+    sit = [redimensionar(compor(pastas, 'sit', LPC_LINHA['baixo'], c)) for c in (0, 1)]
     hurt = [redimensionar(compor(pastas, 'hurt', 0, c, QUADRO, QUADRO)) for c in range(6)]
     # cada célula tem o mesmo sistema de pés: o desenho do quadro LPC vai para a base do quadro do jogo
     for linha, nome in enumerate(REACOES):
