@@ -22,9 +22,9 @@ test('todo personagem tem folha de caminhada (7 linhas, com corrida) e de reaç�
 });
 
 test('personagens: os 11 das folhas animadas, com polícia e enfermeira', () => {
-  assert.equal(Object.keys(CHR).length, 11);
+  assert.equal(Object.keys(CHR).length, 12, 'elenco: 4 com nome fixo + 8 moradores');
   for (const k of ['policial', 'policial2', 'enfermeira', 'barbudo']) assert.ok(CHR[k], k);
-  assert.ok(Object.values(CHR).every((v) => v.h === 48 && ['m', 'f'].includes(v.g)));
+  assert.ok(Object.values(CHR).every((v) => v.h === 64 && v.rows === 7 && ['m', 'f'].includes(v.g)), 'quadro do jogo: 64 px, 7 linhas');
 });
 
 

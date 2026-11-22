@@ -64,7 +64,7 @@ test('esbarrar num policial: agressão a policial, 2 dias ou fiança', async () 
 
 test('falas no gênero certo e descrição do culpado', () => {
   assert.equal(gz('{Ele|Ela} caiu', 'f'), 'Ela caiu'); assert.equal(gz('Senhor{|a}?', 'm'), 'Senhor?');
-  assert.equal(looksOf('chr/executiva'), 'aquela executiva');
+  assert.equal(looksOf('chr/enfermeira'), 'aquela enfermeira');
 });
 
 test('servidor: queda fere o morador, acusação vai para a ficha; prisão de 1 dia ou fiança', () => {
