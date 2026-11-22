@@ -1,0 +1,1411 @@
+{
+ "versao": 1,
+ "categorias": [
+  "terreno",
+  "construcoes",
+  "objetos",
+  "vegetacao",
+  "relevo",
+  "veiculos",
+  "aeronaves",
+  "personagens"
+ ],
+ "itens": [
+  {
+   "chave": "terreno/grama-base",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama (base)",
+   "arquivo": "/assets/mapas/inventario/terreno/grama-base.png",
+   "w": 1536,
+   "h": 1024,
+   "base": true
+  },
+  {
+   "chave": "terreno/agua",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Agua",
+   "arquivo": "/assets/mundo/terreno/agua.png",
+   "w": 160,
+   "h": 196
+  },
+  {
+   "chave": "terreno/areia",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Areia",
+   "arquivo": "/assets/mundo/terreno/areia.png",
+   "w": 110,
+   "h": 110
+  },
+  {
+   "chave": "terreno/asfalto",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Asfalto",
+   "arquivo": "/assets/mundo/terreno/asfalto.png",
+   "w": 378,
+   "h": 44
+  },
+  {
+   "chave": "terreno/calcada",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Calcada",
+   "arquivo": "/assets/mundo/terreno/calcada.png",
+   "w": 212,
+   "h": 212
+  },
+  {
+   "chave": "terreno/canteiro",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Canteiro",
+   "arquivo": "/assets/mundo/terreno/canteiro.png",
+   "w": 114,
+   "h": 114
+  },
+  {
+   "chave": "terreno/grama-clara",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama clara",
+   "arquivo": "/assets/mundo/terreno/grama-clara.png",
+   "w": 90,
+   "h": 94
+  },
+  {
+   "chave": "terreno/grama-flores",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama flores",
+   "arquivo": "/assets/mundo/terreno/grama-flores.png",
+   "w": 118,
+   "h": 118
+  },
+  {
+   "chave": "terreno/grama-florida",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama florida",
+   "arquivo": "/assets/mundo/terreno/grama-florida.png",
+   "w": 110,
+   "h": 114
+  },
+  {
+   "chave": "terreno/grama-roxa",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama roxa",
+   "arquivo": "/assets/mundo/terreno/grama-roxa.png",
+   "w": 110,
+   "h": 114
+  },
+  {
+   "chave": "terreno/grama",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Grama",
+   "arquivo": "/assets/mundo/terreno/grama.png",
+   "w": 118,
+   "h": 118
+  },
+  {
+   "chave": "terreno/mata",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Mata",
+   "arquivo": "/assets/mundo/terreno/mata.png",
+   "w": 118,
+   "h": 114
+  },
+  {
+   "chave": "terreno/pedra",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Pedra",
+   "arquivo": "/assets/mundo/terreno/pedra.png",
+   "w": 156,
+   "h": 204
+  },
+  {
+   "chave": "terreno/terra",
+   "categoria": "terreno",
+   "tipo": "tile",
+   "nome": "Terra",
+   "arquivo": "/assets/mundo/terreno/terra.png",
+   "w": 110,
+   "h": 110
+  },
+  {
+   "chave": "construcoes/aeroporto",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Aeroporto",
+   "arquivo": "/assets/mundo/construcoes/aeroporto.png",
+   "w": 290,
+   "h": 251
+  },
+  {
+   "chave": "construcoes/cabana-palha",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Cabana palha",
+   "arquivo": "/assets/mundo/construcoes/cabana-palha.png",
+   "w": 193,
+   "h": 120
+  },
+  {
+   "chave": "construcoes/casa-ardosia",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa ardosia",
+   "arquivo": "/assets/mundo/construcoes/casa-ardosia.png",
+   "w": 193,
+   "h": 147
+  },
+  {
+   "chave": "construcoes/casa-azul",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa azul",
+   "arquivo": "/assets/mundo/construcoes/casa-azul.png",
+   "w": 191,
+   "h": 178
+  },
+  {
+   "chave": "construcoes/casa-branca",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa branca",
+   "arquivo": "/assets/mundo/construcoes/casa-branca.png",
+   "w": 167,
+   "h": 147
+  },
+  {
+   "chave": "construcoes/casa-cinza",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa cinza",
+   "arquivo": "/assets/mundo/construcoes/casa-cinza.png",
+   "w": 185,
+   "h": 178
+  },
+  {
+   "chave": "construcoes/casa-noturna",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa noturna",
+   "arquivo": "/assets/mundo/construcoes/casa-noturna.png",
+   "w": 299,
+   "h": 208
+  },
+  {
+   "chave": "construcoes/casa-vermelha",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Casa vermelha",
+   "arquivo": "/assets/mundo/construcoes/casa-vermelha.png",
+   "w": 187,
+   "h": 171
+  },
+  {
+   "chave": "construcoes/delegacia",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Delegacia",
+   "arquivo": "/assets/mundo/construcoes/delegacia.png",
+   "w": 276,
+   "h": 205
+  },
+  {
+   "chave": "construcoes/farol",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Farol",
+   "arquivo": "/assets/mundo/construcoes/farol.png",
+   "w": 158,
+   "h": 282
+  },
+  {
+   "chave": "construcoes/hospital",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Hospital",
+   "arquivo": "/assets/mundo/construcoes/hospital.png",
+   "w": 233,
+   "h": 212
+  },
+  {
+   "chave": "construcoes/hotel",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Hotel",
+   "arquivo": "/assets/mundo/construcoes/hotel.png",
+   "w": 146,
+   "h": 234
+  },
+  {
+   "chave": "construcoes/lanchonete",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Lanchonete",
+   "arquivo": "/assets/mundo/construcoes/lanchonete.png",
+   "w": 264,
+   "h": 206
+  },
+  {
+   "chave": "construcoes/mercado-24h",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Mercado 24h",
+   "arquivo": "/assets/mundo/construcoes/mercado-24h.png",
+   "w": 295,
+   "h": 188
+  },
+  {
+   "chave": "construcoes/posto",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Posto",
+   "arquivo": "/assets/mundo/construcoes/posto.png",
+   "w": 242,
+   "h": 169
+  },
+  {
+   "chave": "construcoes/predio-azul-baixo",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Predio azul baixo",
+   "arquivo": "/assets/mundo/construcoes/predio-azul-baixo.png",
+   "w": 162,
+   "h": 153
+  },
+  {
+   "chave": "construcoes/predio-bege",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Predio bege",
+   "arquivo": "/assets/mundo/construcoes/predio-bege.png",
+   "w": 210,
+   "h": 172
+  },
+  {
+   "chave": "construcoes/predio-branco",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Predio branco",
+   "arquivo": "/assets/mundo/construcoes/predio-branco.png",
+   "w": 174,
+   "h": 235
+  },
+  {
+   "chave": "construcoes/predio-laranja",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Predio laranja",
+   "arquivo": "/assets/mundo/construcoes/predio-laranja.png",
+   "w": 145,
+   "h": 183
+  },
+  {
+   "chave": "construcoes/quiosque-palafita",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Quiosque palafita",
+   "arquivo": "/assets/mundo/construcoes/quiosque-palafita.png",
+   "w": 127,
+   "h": 162
+  },
+  {
+   "chave": "construcoes/sobrado-vermelho",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Sobrado vermelho",
+   "arquivo": "/assets/mundo/construcoes/sobrado-vermelho.png",
+   "w": 235,
+   "h": 167
+  },
+  {
+   "chave": "construcoes/torre-cilindrica",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Torre cilindrica",
+   "arquivo": "/assets/mundo/construcoes/torre-cilindrica.png",
+   "w": 113,
+   "h": 238
+  },
+  {
+   "chave": "construcoes/torre-vidro",
+   "categoria": "construcoes",
+   "tipo": "objeto",
+   "nome": "Torre vidro",
+   "arquivo": "/assets/mundo/construcoes/torre-vidro.png",
+   "w": 206,
+   "h": 242
+  },
+  {
+   "chave": "objetos/banca-mercado-2",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Banca mercado 2",
+   "arquivo": "/assets/mundo/objetos/banca-mercado-2.png",
+   "w": 77,
+   "h": 80
+  },
+  {
+   "chave": "objetos/banca-mercado",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Banca mercado",
+   "arquivo": "/assets/mundo/objetos/banca-mercado.png",
+   "w": 57,
+   "h": 79
+  },
+  {
+   "chave": "objetos/banco-jardim",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Banco jardim",
+   "arquivo": "/assets/mundo/objetos/banco-jardim.png",
+   "w": 104,
+   "h": 40
+  },
+  {
+   "chave": "objetos/cabine-azul",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cabine azul",
+   "arquivo": "/assets/mundo/objetos/cabine-azul.png",
+   "w": 52,
+   "h": 109
+  },
+  {
+   "chave": "objetos/cabine-vermelha",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cabine vermelha",
+   "arquivo": "/assets/mundo/objetos/cabine-vermelha.png",
+   "w": 48,
+   "h": 108
+  },
+  {
+   "chave": "objetos/cadeira-praia",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cadeira praia",
+   "arquivo": "/assets/mundo/objetos/cadeira-praia.png",
+   "w": 32,
+   "h": 38
+  },
+  {
+   "chave": "objetos/cerca-jardim",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cerca jardim",
+   "arquivo": "/assets/mundo/objetos/cerca-jardim.png",
+   "w": 108,
+   "h": 39
+  },
+  {
+   "chave": "objetos/cerca-madeira-2",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cerca madeira 2",
+   "arquivo": "/assets/mundo/objetos/cerca-madeira-2.png",
+   "w": 134,
+   "h": 80
+  },
+  {
+   "chave": "objetos/cerca-madeira",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Cerca madeira",
+   "arquivo": "/assets/mundo/objetos/cerca-madeira.png",
+   "w": 135,
+   "h": 100
+  },
+  {
+   "chave": "objetos/guarda-sol-2",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Guarda sol 2",
+   "arquivo": "/assets/mundo/objetos/guarda-sol-2.png",
+   "w": 56,
+   "h": 47
+  },
+  {
+   "chave": "objetos/guarda-sol",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Guarda sol",
+   "arquivo": "/assets/mundo/objetos/guarda-sol.png",
+   "w": 48,
+   "h": 43
+  },
+  {
+   "chave": "objetos/piscina",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Piscina",
+   "arquivo": "/assets/mundo/objetos/piscina.png",
+   "w": 99,
+   "h": 36
+  },
+  {
+   "chave": "objetos/portal-jardim",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Portal jardim",
+   "arquivo": "/assets/mundo/objetos/portal-jardim.png",
+   "w": 73,
+   "h": 57
+  },
+  {
+   "chave": "objetos/poste-luz-2",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Poste luz 2",
+   "arquivo": "/assets/mundo/objetos/poste-luz-2.png",
+   "w": 33,
+   "h": 141
+  },
+  {
+   "chave": "objetos/poste-luz",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Poste luz",
+   "arquivo": "/assets/mundo/objetos/poste-luz.png",
+   "w": 31,
+   "h": 144
+  },
+  {
+   "chave": "objetos/pranchas",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Pranchas",
+   "arquivo": "/assets/mundo/objetos/pranchas.png",
+   "w": 56,
+   "h": 80
+  },
+  {
+   "chave": "objetos/salva-vidas",
+   "categoria": "objetos",
+   "tipo": "objeto",
+   "nome": "Salva vidas",
+   "arquivo": "/assets/mundo/objetos/salva-vidas.png",
+   "w": 74,
+   "h": 119
+  },
+  {
+   "chave": "vegetacao/arbusto-1",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arbusto 1",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-1.png",
+   "w": 30,
+   "h": 33
+  },
+  {
+   "chave": "vegetacao/arbusto-2",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arbusto 2",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-2.png",
+   "w": 33,
+   "h": 32
+  },
+  {
+   "chave": "vegetacao/arbusto-3",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arbusto 3",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-3.png",
+   "w": 30,
+   "h": 37
+  },
+  {
+   "chave": "vegetacao/arbusto-4",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arbusto 4",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-4.png",
+   "w": 34,
+   "h": 35
+  },
+  {
+   "chave": "vegetacao/arvore-copa",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arvore copa",
+   "arquivo": "/assets/mundo/vegetacao/arvore-copa.png",
+   "w": 89,
+   "h": 124
+  },
+  {
+   "chave": "vegetacao/arvore-grande",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arvore grande",
+   "arquivo": "/assets/mundo/vegetacao/arvore-grande.png",
+   "w": 105,
+   "h": 144
+  },
+  {
+   "chave": "vegetacao/arvore-pequena",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Arvore pequena",
+   "arquivo": "/assets/mundo/vegetacao/arvore-pequena.png",
+   "w": 73,
+   "h": 68
+  },
+  {
+   "chave": "vegetacao/ipe-rosa",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Ipe rosa",
+   "arquivo": "/assets/mundo/vegetacao/ipe-rosa.png",
+   "w": 100,
+   "h": 132
+  },
+  {
+   "chave": "vegetacao/moita-alta-2",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Moita alta 2",
+   "arquivo": "/assets/mundo/vegetacao/moita-alta-2.png",
+   "w": 37,
+   "h": 55
+  },
+  {
+   "chave": "vegetacao/moita-alta",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Moita alta",
+   "arquivo": "/assets/mundo/vegetacao/moita-alta.png",
+   "w": 39,
+   "h": 58
+  },
+  {
+   "chave": "vegetacao/moita-flor",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Moita flor",
+   "arquivo": "/assets/mundo/vegetacao/moita-flor.png",
+   "w": 28,
+   "h": 48
+  },
+  {
+   "chave": "vegetacao/palmeira-2",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Palmeira 2",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-2.png",
+   "w": 67,
+   "h": 135
+  },
+  {
+   "chave": "vegetacao/palmeira-3",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Palmeira 3",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-3.png",
+   "w": 69,
+   "h": 140
+  },
+  {
+   "chave": "vegetacao/palmeira-alta",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Palmeira alta",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-alta.png",
+   "w": 73,
+   "h": 156
+  },
+  {
+   "chave": "vegetacao/palmeira",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Palmeira",
+   "arquivo": "/assets/mundo/vegetacao/palmeira.png",
+   "w": 66,
+   "h": 123
+  },
+  {
+   "chave": "vegetacao/samambaia",
+   "categoria": "vegetacao",
+   "tipo": "objeto",
+   "nome": "Samambaia",
+   "arquivo": "/assets/mundo/vegetacao/samambaia.png",
+   "w": 57,
+   "h": 56
+  },
+  {
+   "chave": "relevo/montanha",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Montanha",
+   "arquivo": "/assets/mundo/relevo/montanha.png",
+   "w": 404,
+   "h": 194
+  },
+  {
+   "chave": "relevo/pedras-2",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Pedras 2",
+   "arquivo": "/assets/mundo/relevo/pedras-2.png",
+   "w": 63,
+   "h": 61
+  },
+  {
+   "chave": "relevo/pedras-3",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Pedras 3",
+   "arquivo": "/assets/mundo/relevo/pedras-3.png",
+   "w": 32,
+   "h": 52
+  },
+  {
+   "chave": "relevo/pedras-roxas",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Pedras roxas",
+   "arquivo": "/assets/mundo/relevo/pedras-roxas.png",
+   "w": 63,
+   "h": 73
+  },
+  {
+   "chave": "relevo/pedras",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Pedras",
+   "arquivo": "/assets/mundo/relevo/pedras.png",
+   "w": 68,
+   "h": 61
+  },
+  {
+   "chave": "relevo/penhasco-baixo",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Penhasco baixo",
+   "arquivo": "/assets/mundo/relevo/penhasco-baixo.png",
+   "w": 182,
+   "h": 115
+  },
+  {
+   "chave": "relevo/penhasco-cascata",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Penhasco cascata",
+   "arquivo": "/assets/mundo/relevo/penhasco-cascata.png",
+   "w": 166,
+   "h": 127
+  },
+  {
+   "chave": "relevo/penhasco-caverna",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Penhasco caverna",
+   "arquivo": "/assets/mundo/relevo/penhasco-caverna.png",
+   "w": 220,
+   "h": 156
+  },
+  {
+   "chave": "relevo/penhasco-grande",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Penhasco grande",
+   "arquivo": "/assets/mundo/relevo/penhasco-grande.png",
+   "w": 172,
+   "h": 186
+  },
+  {
+   "chave": "relevo/penhasco-medio",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Penhasco medio",
+   "arquivo": "/assets/mundo/relevo/penhasco-medio.png",
+   "w": 95,
+   "h": 128
+  },
+  {
+   "chave": "relevo/rochas",
+   "categoria": "relevo",
+   "tipo": "objeto",
+   "nome": "Rochas",
+   "arquivo": "/assets/mundo/relevo/rochas.png",
+   "w": 106,
+   "h": 84
+  },
+  {
+   "chave": "veiculos/a-type",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "A type",
+   "arquivo": "/assets/mundo/veiculos/a-type.png",
+   "w": 83,
+   "h": 174
+  },
+  {
+   "chave": "veiculos/aniston-bd4",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Aniston bd4",
+   "arquivo": "/assets/mundo/veiculos/aniston-bd4.png",
+   "w": 88,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/arachnid",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Arachnid",
+   "arquivo": "/assets/mundo/veiculos/arachnid.png",
+   "w": 84,
+   "h": 171
+  },
+  {
+   "chave": "veiculos/armed-land-roamer",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Armed land roamer",
+   "arquivo": "/assets/mundo/veiculos/armed-land-roamer.png",
+   "w": 88,
+   "h": 154
+  },
+  {
+   "chave": "veiculos/b-type",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "B type",
+   "arquivo": "/assets/mundo/veiculos/b-type.png",
+   "w": 86,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/beamer",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Beamer",
+   "arquivo": "/assets/mundo/veiculos/beamer.png",
+   "w": 84,
+   "h": 165
+  },
+  {
+   "chave": "veiculos/benson",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Benson",
+   "arquivo": "/assets/mundo/veiculos/benson.png",
+   "w": 92,
+   "h": 171
+  },
+  {
+   "chave": "veiculos/big-bug",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Big bug",
+   "arquivo": "/assets/mundo/veiculos/big-bug.png",
+   "w": 84,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/box-truck",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Box truck",
+   "arquivo": "/assets/mundo/veiculos/box-truck.png",
+   "w": 93,
+   "h": 179
+  },
+  {
+   "chave": "veiculos/bug",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Bug",
+   "arquivo": "/assets/mundo/veiculos/bug.png",
+   "w": 85,
+   "h": 149
+  },
+  {
+   "chave": "veiculos/bulwark",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Bulwark",
+   "arquivo": "/assets/mundo/veiculos/bulwark.png",
+   "w": 85,
+   "h": 175
+  },
+  {
+   "chave": "veiculos/bus",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Bus",
+   "arquivo": "/assets/mundo/veiculos/bus.png",
+   "w": 104,
+   "h": 358
+  },
+  {
+   "chave": "veiculos/cop-car",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Cop car",
+   "arquivo": "/assets/mundo/veiculos/cop-car.png",
+   "w": 82,
+   "h": 170
+  },
+  {
+   "chave": "veiculos/dementia-limousine",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Dementia limousine",
+   "arquivo": "/assets/mundo/veiculos/dementia-limousine.png",
+   "w": 88,
+   "h": 254
+  },
+  {
+   "chave": "veiculos/dementia",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Dementia",
+   "arquivo": "/assets/mundo/veiculos/dementia.png",
+   "w": 81,
+   "h": 151
+  },
+  {
+   "chave": "veiculos/eddy",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Eddy",
+   "arquivo": "/assets/mundo/veiculos/eddy.png",
+   "w": 83,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/fire-truck",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Fire truck",
+   "arquivo": "/assets/mundo/veiculos/fire-truck.png",
+   "w": 100,
+   "h": 300
+  },
+  {
+   "chave": "veiculos/furore-gt",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Furore gt",
+   "arquivo": "/assets/mundo/veiculos/furore-gt.png",
+   "w": 85,
+   "h": 175
+  },
+  {
+   "chave": "veiculos/g4-bank-van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "G4 bank van",
+   "arquivo": "/assets/mundo/veiculos/g4-bank-van.png",
+   "w": 92,
+   "h": 204
+  },
+  {
+   "chave": "veiculos/garbage-truck",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Garbage truck",
+   "arquivo": "/assets/mundo/veiculos/garbage-truck.png",
+   "w": 95,
+   "h": 249
+  },
+  {
+   "chave": "veiculos/gt-a1",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Gt a1",
+   "arquivo": "/assets/mundo/veiculos/gt-a1.png",
+   "w": 84,
+   "h": 152
+  },
+  {
+   "chave": "veiculos/hachura",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Hachura",
+   "arquivo": "/assets/mundo/veiculos/hachura.png",
+   "w": 84,
+   "h": 171
+  },
+  {
+   "chave": "veiculos/hot-dog-van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Hot dog van",
+   "arquivo": "/assets/mundo/veiculos/hot-dog-van.png",
+   "w": 100,
+   "h": 216
+  },
+  {
+   "chave": "veiculos/ice-cream-van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Ice cream van",
+   "arquivo": "/assets/mundo/veiculos/ice-cream-van.png",
+   "w": 112,
+   "h": 244
+  },
+  {
+   "chave": "veiculos/jagular-xk",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Jagular xk",
+   "arquivo": "/assets/mundo/veiculos/jagular-xk.png",
+   "w": 90,
+   "h": 188
+  },
+  {
+   "chave": "veiculos/jefferson",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Jefferson",
+   "arquivo": "/assets/mundo/veiculos/jefferson.png",
+   "w": 86,
+   "h": 181
+  },
+  {
+   "chave": "veiculos/karma-bus",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Karma bus",
+   "arquivo": "/assets/mundo/veiculos/karma-bus.png",
+   "w": 106,
+   "h": 248
+  },
+  {
+   "chave": "veiculos/land-roamer",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Land roamer",
+   "arquivo": "/assets/mundo/veiculos/land-roamer.png",
+   "w": 84,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/maurice",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Maurice",
+   "arquivo": "/assets/mundo/veiculos/maurice.png",
+   "w": 84,
+   "h": 173
+  },
+  {
+   "chave": "veiculos/medicar",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Medicar",
+   "arquivo": "/assets/mundo/veiculos/medicar.png",
+   "w": 92,
+   "h": 226
+  },
+  {
+   "chave": "veiculos/meteor",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Meteor",
+   "arquivo": "/assets/mundo/veiculos/meteor.png",
+   "w": 88,
+   "h": 184
+  },
+  {
+   "chave": "veiculos/miara",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Miara",
+   "arquivo": "/assets/mundo/veiculos/miara.png",
+   "w": 85,
+   "h": 163
+  },
+  {
+   "chave": "veiculos/michelli-roadster",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Michelli roadster",
+   "arquivo": "/assets/mundo/veiculos/michelli-roadster.png",
+   "w": 81,
+   "h": 174
+  },
+  {
+   "chave": "veiculos/minx",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Minx",
+   "arquivo": "/assets/mundo/veiculos/minx.png",
+   "w": 81,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/morton",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Morton",
+   "arquivo": "/assets/mundo/veiculos/morton.png",
+   "w": 89,
+   "h": 175
+  },
+  {
+   "chave": "veiculos/pacifier",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Pacifier",
+   "arquivo": "/assets/mundo/veiculos/pacifier.png",
+   "w": 119,
+   "h": 219
+  },
+  {
+   "chave": "veiculos/panto",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Panto",
+   "arquivo": "/assets/mundo/veiculos/panto.png",
+   "w": 91,
+   "h": 164
+  },
+  {
+   "chave": "veiculos/pickup",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Pickup",
+   "arquivo": "/assets/mundo/veiculos/pickup.png",
+   "w": 86,
+   "h": 168
+  },
+  {
+   "chave": "veiculos/redneck",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Redneck",
+   "arquivo": "/assets/mundo/veiculos/redneck.png",
+   "w": 84,
+   "h": 155
+  },
+  {
+   "chave": "veiculos/romero",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Romero",
+   "arquivo": "/assets/mundo/veiculos/romero.png",
+   "w": 86,
+   "h": 175
+  },
+  {
+   "chave": "veiculos/rumbler",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Rumbler",
+   "arquivo": "/assets/mundo/veiculos/rumbler.png",
+   "w": 88,
+   "h": 170
+  },
+  {
+   "chave": "veiculos/schmidt",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Schmidt",
+   "arquivo": "/assets/mundo/veiculos/schmidt.png",
+   "w": 80,
+   "h": 143
+  },
+  {
+   "chave": "veiculos/shark",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Shark",
+   "arquivo": "/assets/mundo/veiculos/shark.png",
+   "w": 83,
+   "h": 187
+  },
+  {
+   "chave": "veiculos/special-agent-car",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Special agent car",
+   "arquivo": "/assets/mundo/veiculos/special-agent-car.png",
+   "w": 92,
+   "h": 194
+  },
+  {
+   "chave": "veiculos/sports-limousine",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Sports limousine",
+   "arquivo": "/assets/mundo/veiculos/sports-limousine.png",
+   "w": 81,
+   "h": 304
+  },
+  {
+   "chave": "veiculos/spritzer",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Spritzer",
+   "arquivo": "/assets/mundo/veiculos/spritzer.png",
+   "w": 85,
+   "h": 159
+  },
+  {
+   "chave": "veiculos/stinger",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Stinger",
+   "arquivo": "/assets/mundo/veiculos/stinger.png",
+   "w": 85,
+   "h": 171
+  },
+  {
+   "chave": "veiculos/stretch-limousine",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Stretch limousine",
+   "arquivo": "/assets/mundo/veiculos/stretch-limousine.png",
+   "w": 88,
+   "h": 281
+  },
+  {
+   "chave": "veiculos/swat-van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Swat van",
+   "arquivo": "/assets/mundo/veiculos/swat-van.png",
+   "w": 103,
+   "h": 221
+  },
+  {
+   "chave": "veiculos/t-rex",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "T rex",
+   "arquivo": "/assets/mundo/veiculos/t-rex.png",
+   "w": 89,
+   "h": 175
+  },
+  {
+   "chave": "veiculos/tank",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Tank",
+   "arquivo": "/assets/mundo/veiculos/tank.png",
+   "w": 121,
+   "h": 254
+  },
+  {
+   "chave": "veiculos/taxi-xpress",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Taxi xpress",
+   "arquivo": "/assets/mundo/veiculos/taxi-xpress.png",
+   "w": 101,
+   "h": 170
+  },
+  {
+   "chave": "veiculos/taxi",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Taxi",
+   "arquivo": "/assets/mundo/veiculos/taxi.png",
+   "w": 96,
+   "h": 177
+  },
+  {
+   "chave": "veiculos/trans-am",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Trans am",
+   "arquivo": "/assets/mundo/veiculos/trans-am.png",
+   "w": 82,
+   "h": 167
+  },
+  {
+   "chave": "veiculos/truck-cab-sx",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Truck cab sx",
+   "arquivo": "/assets/mundo/veiculos/truck-cab-sx.png",
+   "w": 88,
+   "h": 169
+  },
+  {
+   "chave": "veiculos/truck-cab",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Truck cab",
+   "arquivo": "/assets/mundo/veiculos/truck-cab.png",
+   "w": 99,
+   "h": 164
+  },
+  {
+   "chave": "veiculos/tv-van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Tv van",
+   "arquivo": "/assets/mundo/veiculos/tv-van.png",
+   "w": 95,
+   "h": 179
+  },
+  {
+   "chave": "veiculos/u-jerk-truck",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "U jerk truck",
+   "arquivo": "/assets/mundo/veiculos/u-jerk-truck.png",
+   "w": 91,
+   "h": 148
+  },
+  {
+   "chave": "veiculos/van",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Van",
+   "arquivo": "/assets/mundo/veiculos/van.png",
+   "w": 96,
+   "h": 201
+  },
+  {
+   "chave": "veiculos/wellard",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Wellard",
+   "arquivo": "/assets/mundo/veiculos/wellard.png",
+   "w": 83,
+   "h": 169
+  },
+  {
+   "chave": "veiculos/z-type",
+   "categoria": "veiculos",
+   "tipo": "veiculo",
+   "nome": "Z type",
+   "arquivo": "/assets/mundo/veiculos/z-type.png",
+   "w": 81,
+   "h": 168
+  },
+  {
+   "chave": "aeronaves/aviao",
+   "categoria": "aeronaves",
+   "tipo": "veiculo",
+   "nome": "Aviao",
+   "arquivo": "/assets/mundo/aeronaves/aviao.png",
+   "w": 216,
+   "h": 197
+  },
+  {
+   "chave": "personagens/barbudo",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Barbudo",
+   "arquivo": "/assets/rpg/chr/barbudo.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-1",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 1",
+   "arquivo": "/assets/rpg/chr/civil-1.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-2",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 2",
+   "arquivo": "/assets/rpg/chr/civil-2.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-3",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 3",
+   "arquivo": "/assets/rpg/chr/civil-3.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-4",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 4",
+   "arquivo": "/assets/rpg/chr/civil-4.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-5",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 5",
+   "arquivo": "/assets/rpg/chr/civil-5.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-6",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 6",
+   "arquivo": "/assets/rpg/chr/civil-6.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-7",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 7",
+   "arquivo": "/assets/rpg/chr/civil-7.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/civil-8",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Civil 8",
+   "arquivo": "/assets/rpg/chr/civil-8.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/enfermeira",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Enfermeira",
+   "arquivo": "/assets/rpg/chr/enfermeira.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/policial",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Policial",
+   "arquivo": "/assets/rpg/chr/policial.png",
+   "w": 256,
+   "h": 448
+  },
+  {
+   "chave": "personagens/policial2",
+   "categoria": "personagens",
+   "tipo": "personagem",
+   "nome": "Policial2",
+   "arquivo": "/assets/rpg/chr/policial2.png",
+   "w": 256,
+   "h": 448
+  }
+ ]
+}

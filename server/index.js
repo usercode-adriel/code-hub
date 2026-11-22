@@ -34,6 +34,7 @@ import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
 import personagens from './personagens.js';
 import godot from './godot.js';
+import mapas from './mapas.js';
 
 load();
 loadLibrary();
@@ -185,6 +186,7 @@ app.use('/api/library', requireAuth, library);
 app.use('/api', api);
 app.use('/api/personagens', requireAuth, personagens);
 app.use('/api/godot', requireAuth, godot);
+app.use('/api/mapas', requireAuth, mapas);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
