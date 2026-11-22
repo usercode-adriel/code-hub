@@ -11,6 +11,7 @@ import { remember, genderize, worldPost } from '../social.js';
 import { geminiJSON } from '../assistant.js';
 import { notify } from '../notify.js';
 import { rnd, pick, chance, clamp, uid, nowIso, DAY, HOUR, MIN, round2, cap, str, fold, shuffle } from './util.js';
+import { logger } from '../log.js';
 
 // ---------------------------------------------------------------- categorias do mapa
 export const PLACE_CATS = {
@@ -394,7 +395,7 @@ export async function sellerChat(ctx, pl, message) {
 Produtos (preços em NXC, a moeda local): ${cat || 'nenhum'}. Cliente: ${userName(ctx)}, já comprou ${cust.purchases} vez(es) aqui.${pl.kind === 'clandestino' ? ' A loja é clandestina: fale pouco, desconfie, só dinheiro vivo.' : ''}
 Responda à mensagem do cliente em 1 a 3 frases, tentando vender, sem inventar produtos ou preços fora da lista. Mensagem: "${str(message, 400)}". JSON: {"resposta":""}`, 500, 0.9);
       text = str(out?.resposta, 500) || null;
-    } catch (err) { console.error('[comércio] IA:', err.message); }
+    } catch (err) { logger.error('[comércio] IA:', err.message); }
   }
   if (!text) {
     const m = fold(message);

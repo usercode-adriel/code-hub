@@ -9,6 +9,7 @@ import { briefing, financeTotals, streak, prefs } from './briefing.js';
 import {
   deliverMessage, aiWrite, focusData, hasCloud, groupMembers, groupTurn, NIAC, PERSONALITY_LABELS, geminiJSON, announceDelivery,
 } from './assistant.js';
+import { logger } from './log.js';
 
 const mine = (coll, uid) => db()[coll].filter((x) => x.userId === uid);
 const brl = (v) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -109,7 +110,7 @@ export async function runRules() {
       r.fired = [...(r.fired || []), ...[].concat(hit.key)].slice(-60);
       r.lastRunAt = now();
       save();
-      await fireRule(user, r, hit.data).catch((e) => console.error('[rotina]', e.message));
+      await fireRule(user, r, hit.data).catch((e) => logger.error('[rotina]', e.message));
     }
   } finally { rulesBusy = false; }
 }
@@ -188,7 +189,7 @@ Responda só JSON: {"itens":[{"taskId":"id da tarefa ou vazio","titulo":"...","i
     if (!items.length) throw new Error('a IA não devolveu itens'); // volta para as regras locais
     return { items: items.sort((a, b) => (a.start || '99').localeCompare(b.start || '99')), text: String(r.dica || '').slice(0, 300), source: 'ia' };
   } catch (err) {
-    console.error('[plano]', err.message);
+    logger.error('[plano]', err.message);
     return { ...planHeuristic(uid), source: 'regras' };
   }
 }
@@ -273,7 +274,7 @@ async function observeGroups(user) {
         await groupTurn(user, conv, bot, members, () => {}, i === 0
           ? `É noite. Comentem o dia do usuário com base nestes dados reais, como amigos num grupo (elogiem, brinquem, deem um conselho): ${day}\n`
           : '');
-      } catch (err) { console.error('[grupo noturno]', err.message); break; }
+      } catch (err) { logger.error('[grupo noturno]', err.message); break; }
     }
     const added = conv.display.length - before;
     if (added > 0) {
@@ -319,10 +320,10 @@ export async function automationTick() {
       if (new Date().getDay() === 0 && hmNow() >= (s.dayCloseTime || '21:30') && m.lastReview !== localDate() && s.weeklyReview !== false) {
         m.lastReview = localDate();
         save();
-        await sendWeeklyReview(user).catch((e) => console.error('[revisão]', e.message));
+        await sendWeeklyReview(user).catch((e) => logger.error('[revisão]', e.message));
       }
-      await observeGroups(user).catch((e) => console.error('[grupo noturno]', e.message));
-      await openCapsules(user).catch((e) => console.error('[cápsula]', e.message));
+      await observeGroups(user).catch((e) => logger.error('[grupo noturno]', e.message));
+      await openCapsules(user).catch((e) => logger.error('[cápsula]', e.message));
     }
   } finally { tickBusy = false; }
 }

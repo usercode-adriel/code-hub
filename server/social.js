@@ -15,6 +15,7 @@ import { single, removeUpload } from './routes/uploads.js';
 import { assistantMode, isCloud, geminiJSON, aiWrite, deliverMessage, createConversation, listConversations } from './assistant.js';
 import { searchWeb, fetchPageText } from './webtools.js';
 import { assignPixelFaces, pixelPrompt, isPixel } from './pixelfaces.js';
+import { logger } from './log.js';
 
 // ---------------------------------------------------------------- utilidades
 const rnd = (n) => Math.floor(Math.random() * n);
@@ -235,18 +236,18 @@ export const userInteractionHooks = [];
 export const personaAddedHooks = [];
 const userById = (uid) => db().users.find((u) => u.id === uid);
 export function fireUserInteraction(user, p, kind) {
-  for (const fn of userInteractionHooks) { try { fn(user, worldOf(user.id), p, kind); } catch (e) { console.error('[rede] interação:', e.message); } }
+  for (const fn of userInteractionHooks) { try { fn(user, worldOf(user.id), p, kind); } catch (e) { logger.error('[rede] interação:', e.message); } }
 }
 
 function addPersona(userId, s, p) {
   s.personas.push(p);
-  for (const fn of personaAddedHooks) { try { fn(userById(userId), worldOf(userId), p); } catch (e) { console.error('[rede] nova pessoa:', e.message); } }
+  for (const fn of personaAddedHooks) { try { fn(userById(userId), worldOf(userId), p); } catch (e) { logger.error('[rede] nova pessoa:', e.message); } }
   // a rede tem limite: quem está há mais tempo sem postar (e não tem laços nem papel no mundo) "sai da rede"
   if (s.personas.length > LIMITS.personas) {
     const removable = s.personas.filter((x) => !x.friend && !x.botId && removalGuards.every((fn) => fn(x))).sort((a, b) => (a.lastPostAt || a.createdAt).localeCompare(b.lastPostAt || b.createdAt));
     for (const x of removable.slice(0, s.personas.length - LIMITS.personas)) {
       removePersona(s, x);
-      for (const fn of personaRemovedHooks) { try { fn(userById(userId), worldOf(userId), x); } catch (e) { console.error('[rede] saída:', e.message); } }
+      for (const fn of personaRemovedHooks) { try { fn(userById(userId), worldOf(userId), x); } catch (e) { logger.error('[rede] saída:', e.message); } }
     }
   }
   faceUp(s);
@@ -467,7 +468,7 @@ export async function socialTick() {
   for (const user of db().users) {
     if (busy.has(user.id)) continue;
     busy.add(user.id);
-    try { await tickUser(user); } catch (err) { console.error('[rede]', err.message); } finally { busy.delete(user.id); }
+    try { await tickUser(user); } catch (err) { logger.error('[rede]', err.message); } finally { busy.delete(user.id); }
   }
 }
 
@@ -492,7 +493,7 @@ async function tickUser(user, { forceAi = false } = {}) {
   } else if (ago(s.lastSpawn) > pace.spawnMin * MIN * (0.6 + Math.random() * 0.8)) {
     s.lastSpawn = now();
     let fresh = [];
-    if (hasCloud()) fresh = await aiPersonas(s, 2).catch((e) => { console.error('[rede] pessoas pela IA:', e.message); return []; });
+    if (hasCloud()) fresh = await aiPersonas(s, 2).catch((e) => { logger.error('[rede] pessoas pela IA:', e.message); return []; });
     if (!fresh.length) fresh = [localPersona(s)];
     for (const p of fresh) {
       addPersona(user.id, s, p);
@@ -528,7 +529,7 @@ async function tickUser(user, { forceAi = false } = {}) {
       try {
         applyAi(user, s, [...due, ...commenters], await aiRound(user, s, due, commenters, targets));
         done = true;
-      } catch (err) { console.error('[rede] IA:', err.message); }
+      } catch (err) { logger.error('[rede] IA:', err.message); }
     }
     if (!done) {
       for (const p of due) {
@@ -920,7 +921,7 @@ function replyLater(user, s, post, userText) {
         const out = await geminiJSON(`Você é ${p.name} (${p.age} anos, ${p.job}, ${p.city}). Jeito de escrever: ${p.voice}. Humor agora: ${p.mood.emotion}${p.mood.reason ? ` (${p.mood.reason})` : ''}.
 No seu post "${post.text}", ${user.name.split(' ')[0]} comentou: "${userText}". Responda o comentário como numa rede social, curto e natural, no seu idioma (${p.lang}). JSON: {"resposta":""}`, 400, 1);
         text = str(out?.resposta, 300);
-      } catch (err) { console.error('[rede] resposta:', err.message); }
+      } catch (err) { logger.error('[rede] resposta:', err.message); }
     }
     if (!text) text = fmt(p, pick(p.lang === 'en' ? ['Haha thanks!', 'Exactly!! 😂', '❤️'] : ['Né?? kkkk', 'Obrigada(o) 💛', 'Exatamente isso!', 'Hahaha você me entende', 'Verdade, pensei nisso também']));
     const cur = net(user.id).posts.find((x) => x.id === post.id);
@@ -948,7 +949,7 @@ router.post('/rede/agora', async (req, res) => {
   for (const p of s.personas.filter((x) => awake(x)).sort(() => Math.random() - 0.5).slice(0, 2)) p.nextPostAt = now();
   if (!busy.has(req.user.id)) {
     busy.add(req.user.id);
-    try { await tickUser(req.user, { forceAi: true }); } catch (err) { console.error('[rede]', err.message); } finally { busy.delete(req.user.id); }
+    try { await tickUser(req.user, { forceAi: true }); } catch (err) { logger.error('[rede]', err.message); } finally { busy.delete(req.user.id); }
   }
   res.json({ ok: true });
 });
@@ -993,7 +994,7 @@ export default router;
 export async function socialStep(user) {
   if (busy.has(user.id)) return;
   busy.add(user.id);
-  try { await tickUser(user); } catch (err) { console.error('[rede]', err.message); } finally { busy.delete(user.id); }
+  try { await tickUser(user); } catch (err) { logger.error('[rede]', err.message); } finally { busy.delete(user.id); }
 }
 
 // ---------------------------------------------------------------- usado pelo mundo vivo

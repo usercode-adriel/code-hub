@@ -1,3 +1,4 @@
+import { logger } from './log.js';
 // Provedores de IA na nuvem com chave de API gratuita: Groq e OpenRouter (formato "OpenAI").
 // O resto do sistema fala o formato do Gemini (contents/parts/functionDeclarations); aqui traduzimos
 // para /chat/completions e de volta, então ferramentas, imagens e respostas em fluxo continuam iguais.
@@ -235,7 +236,7 @@ export async function openaiCall(name, body, write = () => {}, full = false, wan
       }
     } catch (err) {
       lastErr = err;
-      console.error(`[assistente] ${def.label} ${model}: ${err.status || ''} ${err.message}`);
+      logger.error(`[assistente] ${def.label} ${model}: ${err.status || ''} ${err.message}`);
       if ([401, 403].includes(err.status)) throw err;
       if (err.status === 429) await sleep(300);
     }

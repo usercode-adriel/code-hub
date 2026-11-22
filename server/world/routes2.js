@@ -38,6 +38,7 @@ import { listConversations } from '../assistant.js';
 import { restyleFaces, requestImage } from '../social.js';
 import { str, round2, clamp, nowIso, HOUR, cap } from './util.js';
 import { single, removeUpload } from '../routes/uploads.js';
+import { logger } from '../log.js';
 
 const router = express.Router();
 const ctxOf = (req) => ({ user: req.user, uid: req.user.id, w: world(req.user.id), live: true, at: new Date() });
@@ -212,7 +213,7 @@ router.post('/mundo/banco/gerente', (req, res) => {
         const out = await geminiJSON(`Você é ${m.name}, gerente do Banco Nexus em Nexus City (cidade simulada, moeda NXC). Jeito de falar: ${m.voice || 'cordial e profissional'}. Dados REAIS da conta do cliente ${userName(ctx)}: ${facts}.
 Responda em 1 a 3 frases, em português, de forma útil e honesta. Nunca invente aprovação: empréstimos dependem do limite e do score; explique o próximo passo no app (simular empréstimo, Pix, pagar pendências, cartão, cofrinhos). Nunca peça a senha. Mensagem: "${msg}". JSON: {"resposta":""}`, 500, 0.7);
         text = str(out?.resposta, 500) || null;
-      } catch (err) { console.error('[banco] gerente:', err.message); }
+      } catch (err) { logger.error('[banco] gerente:', err.message); }
     }
     if (!text) {
       text = action === 'emprestimos' ? (creditLimit(w) > 0 ? `Seu limite hoje é de ${round2(creditLimit(w)).toLocaleString('pt-BR')} NXC com score ${b.score}. Posso simular para você: abra "Solicitar empréstimo" e escolha valor e parcelas.` : `No momento seu score (${b.score}) não libera crédito. Pagar as pendências em dia e ter renda ajuda a subir.`)
@@ -369,7 +370,7 @@ router.post('/mundo/policia/atendimento', (req, res) => {
         const out = await geminiJSON(`Você é ${duty.p.name}, ${duty.o.rank} da Polícia de Nexus City (cidade simulada), atendendo no balcão da delegacia. Seja educado(a), firme e objetivo(a). Fatos do atendimento: ${facts}.
 Nunca revele investigações sigilosas de outras pessoas. Oriente sobre: registrar ocorrência (botão "Registrar ocorrência"), acompanhar os próprios inquéritos, pagar multa ou fiança (no Banco, em Pendências) e direitos no depoimento. Responda em 1 a 3 frases. Mensagem: "${msg}". JSON: {"resposta":""}`, 500, 0.6);
         text = str(out?.resposta, 500) || null;
-      } catch (err) { console.error('[polícia] atendimento:', err.message); }
+      } catch (err) { logger.error('[polícia] atendimento:', err.message); }
     }
     if (!text) {
       const f = msg.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -528,7 +529,7 @@ router.post('/mundo/lugar/:id/conversar', (req, res) => {
     pl.deskChat ??= []; pl.deskChat.push({ who: 'me', text: msg, at: nowIso() });
     let text = null;
     if (p && aiTake(ctx)) {
-      try { text = str((await geminiJSON(`Você é ${p.name}, ${role} em "${pl.name}", Nexus City (cidade simulada de um jogo, moeda NXC). Jeito de falar: ${p.voice || 'cordial'}. Fatos reais: ${facts}. Responda em 1 a 3 frases úteis, sem inventar números. Mensagem do cliente ${userName(ctx)}: "${msg}". JSON: {"resposta":""}`, 500, 0.7))?.resposta, 500) || null; } catch (err) { console.error('[balcão]', err.message); }
+      try { text = str((await geminiJSON(`Você é ${p.name}, ${role} em "${pl.name}", Nexus City (cidade simulada de um jogo, moeda NXC). Jeito de falar: ${p.voice || 'cordial'}. Fatos reais: ${facts}. Responda em 1 a 3 frases úteis, sem inventar números. Mensagem do cliente ${userName(ctx)}: "${msg}". JSON: {"resposta":""}`, 500, 0.7))?.resposta, 500) || null; } catch (err) { logger.error('[balcão]', err.message); }
     }
     if (!text) text = pl.kind === 'imobiliaria' ? `Temos ${(w.properties || []).filter((x) => !x.ownerId || x.forSale).length} imóveis disponíveis. Veja a lista ao lado e me diga qual te interessa.`
       : pl.kind === 'empregos' ? (u.job ? `Você já trabalha como ${u.job.role}. Se quiser mudar, veja as vagas abertas ao lado.` : 'Vamos te colocar no mercado! Veja as vagas abertas e candidate-se; cursos aumentam suas chances.')

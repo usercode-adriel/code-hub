@@ -2,6 +2,7 @@
 import { db, id, now, save } from './db.js';
 import { removeUpload } from './routes/uploads.js';
 import { ensureRootPage, ensureInDrive, DEFAULT_SETTINGS, systemConfig, seedStudy, THEMES, THEME_REPLACED } from './seed.js';
+import { logger } from './log.js';
 
 const SCHEMA = 4;
 
@@ -93,5 +94,5 @@ export function migrate() {
   if (from < 4) toV4(d);
   d.meta.schema = SCHEMA;
   save();
-  console.log(`» Dados migrados do formato ${from} para ${SCHEMA}`);
+  logger.info(`» Dados migrados do formato ${from} para ${SCHEMA}`);
 }

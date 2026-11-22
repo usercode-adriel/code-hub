@@ -17,6 +17,7 @@ import { notify, emit } from '../notify.js';
 import { db } from '../db.js';
 import { deliverMessage, listConversations } from '../assistant.js';
 import { debit, credit, account } from './bank.js';
+import { logger } from '../log.js';
 
 // ---------------------------------------------------------------- ações registradas pelos módulos
 const ACTIONS = [];
@@ -463,7 +464,7 @@ onHourly((ctx) => {
     if (!chance((AUTONOMY[a.autonomy] || 0.45) * factor)) continue;
     const opts = ACTIONS.map((x) => [x, safeWeight(x, ctx, p)]).filter(([, wt]) => wt > 0);
     const act = weighted(opts);
-    if (act) { try { act.run(ctx, p); } catch (err) { console.error(`[mundo] ação ${act.name}:`, err.message); } }
+    if (act) { try { act.run(ctx, p); } catch (err) { logger.error(`[mundo] ação ${act.name}:`, err.message); } }
   }
 });
 const safeWeight = (x, ctx, p) => { try { return x.weight(ctx, p) || 0; } catch { return 0; } };

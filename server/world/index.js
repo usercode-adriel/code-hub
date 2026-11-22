@@ -24,6 +24,7 @@ import { personById, userChatted, relType, REL_LABEL, requests } from './agents.
 import { companyById } from './economy.js';
 import { socialStep, worldFactHooks } from '../social.js';
 import { flushWorld, loadWorld } from './store.js';
+import { logger } from '../log.js';
 
 const busy = new Set();
 async function step(user) {
@@ -32,7 +33,7 @@ async function step(user) {
   try {
     await socialStep(user);
     await worldTick(user);
-  } catch (err) { console.error('[mundo]', err); } finally { busy.delete(user.id); }
+  } catch (err) { logger.error('[mundo]', err); } finally { busy.delete(user.id); }
 }
 export async function engineTick() { for (const u of db().users) await step(u); }
 
@@ -42,7 +43,7 @@ export function startWorld() {
   started = true;
   loadWorld();
   setTimeout(() => engineTick().catch(() => {}), 6000);
-  setInterval(() => engineTick().catch((e) => console.error('[mundo]', e.message)), Number(process.env.SOCIAL_TICK_MS) || 30 * 1000).unref();
+  setInterval(() => engineTick().catch((e) => logger.error('[mundo]', e.message)), Number(process.env.SOCIAL_TICK_MS) || 30 * 1000).unref();
 }
 export { flushWorld };
 
@@ -52,7 +53,7 @@ export function onUserChat(user, bot) {
   try {
     const w = world(user.id);
     userChatted({ user, uid: user.id, w, live: true, at: new Date() }, bot.personaId);
-  } catch (err) { console.error('[mundo] chat:', err.message); }
+  } catch (err) { logger.error('[mundo] chat:', err.message); }
 }
 
 // O personagem sabe da própria vida na cidade e do que o usuário fez por ele (ou não fez).

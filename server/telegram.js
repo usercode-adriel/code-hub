@@ -8,6 +8,7 @@ import { logEvent } from './notify.js';
 import { CHAT_FILES } from './routes/chatfiles.js';
 import { chat, onDeliver, getConversation, createConversation, assistantMode } from './assistant.js';
 import { confirmAction } from './agent.js';
+import { logger } from './log.js';
 
 const API = () => (process.env.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/$/, '');
 const token = () => process.env.TELEGRAM_BOT_TOKEN || '';
@@ -185,7 +186,7 @@ export async function telegramForward(user, ev, text) {
   try {
     const sent = await send(t.chatId, `${ev.name}:\n${text}`);
     if (sent) remember(user.id, sent.message_id, ev.conversationId, ev.botId);
-  } catch (err) { console.error('[telegram]', err.message); }
+  } catch (err) { logger.error('[telegram]', err.message); }
 }
 onDeliver((user, ev, text) => { telegramForward(user, ev, text); });
 
@@ -198,7 +199,7 @@ export function startTelegram() {
     let offset = db().meta.telegramOffset || 0;
     let backoff = 2000;
     try { telegramState.bot = await call('getMe'); telegramState.error = null; }
-    catch (err) { telegramState.error = err.message; console.error('[telegram]', err.message); }
+    catch (err) { telegramState.error = err.message; logger.error('[telegram]', err.message); }
     telegramState.running = true;
     while (my === loopId && token()) {
       try {
@@ -212,13 +213,13 @@ export function startTelegram() {
           try {
             if (u.message) await handleMessage(u.message);
             else if (u.callback_query) await handleCallback(u.callback_query);
-          } catch (err) { console.error('[telegram] mensagem:', err.message); }
+          } catch (err) { logger.error('[telegram] mensagem:', err.message); }
         }
         if (updates.length) save();
       } catch (err) {
         if (my !== loopId) break;
         telegramState.error = err.message;
-        if (err.code === 401 || err.code === 404) { console.error('[telegram] token inválido'); break; }
+        if (err.code === 401 || err.code === 404) { logger.error('[telegram] token inválido'); break; }
         await new Promise((r) => setTimeout(r, backoff));
         backoff = Math.min(backoff * 2, 60000);
       }

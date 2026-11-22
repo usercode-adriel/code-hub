@@ -4,6 +4,7 @@
 // 2) Lê o .env da pasta de dados, se existir (ex.: HOST=0.0.0.0, ANTHROPIC_API_KEY).
 // 3) Quando há --log-file / LOG_FILE (app iniciado sem terminal), grava os logs em arquivo.
 import fs from 'node:fs';
+import { logger } from './log.js';
 import path from 'node:path';
 import util from 'node:util';
 
@@ -29,5 +30,5 @@ if (process.env.LOG_FILE) {
   const write = (level) => (...args) => out.write(`[${new Date().toISOString()}] ${level} ${util.format(...args)}\n`);
   console.log = write('INFO ');
   console.error = write('ERROR');
-  process.on('uncaughtException', (err) => { console.error(err); setTimeout(() => process.exit(1), 100); });
+  process.on('uncaughtException', (err) => { logger.error(err); setTimeout(() => process.exit(1), 100); });
 }

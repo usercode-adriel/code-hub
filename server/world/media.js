@@ -8,6 +8,7 @@ import { companies, companyById, SECTORS } from './economy.js';
 import { worldPost, remember, genderize } from '../social.js';
 import { geminiJSON } from '../assistant.js';
 import { rnd, pick, chance, clamp, uid, DAY, gauss, cap, shuffle, str, fold, slug } from './util.js';
+import { logger } from '../log.js';
 
 const LIMIT = { articles: 700, threads: 60, comments: 50 };
 // Qual veículo cobre cada assunto
@@ -105,7 +106,7 @@ Reescreva a matéria abaixo de forma jornalística, envolvente e fiel aos FATOS 
 Fatos registrados:\n${facts.join('\n')}\nRascunho:\nTítulo: ${a.title}\n${a.body}
 Responda SÓ com JSON: {"titulo":"","linha_fina":"","corpo":"3 a 5 parágrafos separados por \\n\\n"}`, 1800, 0.7);
     if (out?.corpo) { a.title = str(out.titulo, 180) || a.title; a.lead = str(out.linha_fina, 300) || a.lead; a.body = String(out.corpo).slice(0, 5000); a.ai = true; }
-  } catch (err) { console.error('[mídia] IA:', err.message); }
+  } catch (err) { logger.error('[mídia] IA:', err.message); }
 });
 
 // leitores comentam (amigos defendem, rivais atacam)

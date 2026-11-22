@@ -4,6 +4,7 @@ import webpush from 'web-push';
 import { db, save } from './db.js';
 import { onNotify } from './notify.js';
 import { onDeliver } from './assistant.js';
+import { logger } from './log.js';
 
 function keys() {
   const m = db().meta;
@@ -40,7 +41,7 @@ export async function pushTo(uid, payload) {
       sent++;
     } catch (err) {
       if (err.statusCode === 404 || err.statusCode === 410) removeSubscription(uid, s.endpoint); // inscrição expirada
-      else console.error('[push]', err.statusCode || '', err.message);
+      else logger.error('[push]', err.statusCode || '', err.message);
     }
   }
   return sent;

@@ -30,6 +30,7 @@ import {
   chat, assistantMode, sendProactive, groupMembers, listConversations, getConversation, createConversation, renameConversation, deleteConversation,
 } from './assistant.js';
 import { startScheduler } from './scheduler.js';
+import { logger } from './log.js';
 
 load();
 loadLibrary();
@@ -109,7 +110,7 @@ app.post('/api/assistant/chat', requireAuth, async (req, res) => {
     }
     write({ type: 'done' });
   } catch (err) {
-    console.error('[assistente]', err);
+    logger.error('[assistente]', err);
     write({ type: 'error', text: 'Não consegui responder agora. Tente novamente.' });
   }
   res.end();
@@ -167,7 +168,7 @@ app.post('/api/system/shutdown', (req, res) => {
   const ok = local && given.length === CONTROL_TOKEN.length && crypto.timingSafeEqual(given, Buffer.from(CONTROL_TOKEN));
   if (!ok) return res.status(403).json({ error: 'Proibido' });
   res.json({ ok: true });
-  console.log('» Encerrado pelo atalho "Parar Codeniac".');
+  logger.info('» Encerrado pelo atalho "Parar Codeniac".');
   setTimeout(shutdown, 100);
 });
 
@@ -191,7 +192,7 @@ app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  logger.error(err);
   res.status(err.status || 500).json({ error: err.expose ? err.message : 'Erro interno do servidor' });
 });
 
@@ -204,15 +205,15 @@ let porta = PORT;
 function listen(attempt = 0) {
   porta = PORT + attempt;
   server = app.listen(porta, HOST, () => {
-    try { fs.writeFileSync(PORTA_FILE, String(porta)); } catch (err) { console.error('» Não consegui gravar porta.txt:', err.message); }
-    console.log(`» Codeniac rodando em http://localhost:${porta}${HOST === '0.0.0.0' ? ' (acesso pela rede ligado)' : ''}  (assistente: ${assistantMode()})`);
+    try { fs.writeFileSync(PORTA_FILE, String(porta)); } catch (err) { logger.error('» Não consegui gravar porta.txt:', err.message); }
+    logger.info(`» Codeniac rodando em http://localhost:${porta}${HOST === '0.0.0.0' ? ' (acesso pela rede ligado)' : ''}  (assistente: ${assistantMode()})`);
   });
   server.on('error', (err) => {
     // logo após um reinício a porta pode levar um instante para ser liberada
     if (err.code === 'EADDRINUSE' && process.env.CODENIAC_RESTARTED && attempt < 20) { setTimeout(() => listen(attempt + 1), 500); return; }
-    if (err.code === 'EADDRINUSE' && attempt < 20) { console.log(`» Porta ${porta} ocupada; tentando ${porta + 1}…`); listen(attempt + 1); return; }
-    if (err.code === 'EADDRINUSE') console.error(`» Nenhuma porta livre entre ${PORT} e ${PORT + 20}.`);
-    else console.error(err);
+    if (err.code === 'EADDRINUSE' && attempt < 20) { logger.info(`» Porta ${porta} ocupada; tentando ${porta + 1}…`); listen(attempt + 1); return; }
+    if (err.code === 'EADDRINUSE') logger.error(`» Nenhuma porta livre entre ${PORT} e ${PORT + 20}.`);
+    else logger.error(err);
     process.exit(1);
   });
 }
@@ -223,7 +224,7 @@ startWorld();
 
 function shutdown() {
   saveNow();
-  try { flushWorld(); } catch (err) { console.error(err); }
+  try { flushWorld(); } catch (err) { logger.error(err); }
   saveLibraryNow();
   fs.rmSync(TOKEN_FILE, { force: true });
   fs.rmSync(PORTA_FILE, { force: true });
@@ -235,7 +236,7 @@ function shutdown() {
 const doRestart = () => {
   saveNow();
   saveLibraryNow();
-  try { flushWorld(); } catch (err) { console.error(err); }
+  try { flushWorld(); } catch (err) { logger.error(err); }
   server.close();
   const env = { ...process.env, CODENIAC_RESTARTED: '1' };
   delete env.HOST; // o novo processo relê o .env (acesso pela rede pode ter mudado)

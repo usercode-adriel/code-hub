@@ -7,6 +7,7 @@ import { saveLibraryNow, replaceLibrary, LIBRARY_DB, LIBRARY_DIR } from './libra
 import { db, saveNow, replaceState, DB_FILE, UPLOAD_DIR, DATA_DIR, localDate, now, save } from './db.js';
 import { systemConfig } from './seed.js';
 import { flushWorld, replaceWorld, WORLD_FILE } from './world/store.js';
+import { logger } from './log.js';
 
 export function defaultBackupDir() {
   const oneDrive = process.env.OneDrive || process.env.OneDriveConsumer;
@@ -66,12 +67,12 @@ export function runBackup(reason = 'automático') {
     for (const old of all.slice(cfg.keep || 14)) fs.rmSync(path.join(dir, old.name), { recursive: true, force: true });
     Object.assign(cfg, { lastAt: now(), lastFile: target, lastError: null });
     save();
-    console.log(`» Backup ${reason} salvo em ${target} (${copied} imagem(ns) nova(s))`);
+    logger.info(`» Backup ${reason} salvo em ${target} (${copied} imagem(ns) nova(s))`);
     return { ok: true, dir: target, copied };
   } catch (err) {
     cfg.lastError = `${err.code || ''} ${err.message}`.trim();
     save();
-    console.error('» Falha no backup:', err.message);
+    logger.error('» Falha no backup:', err.message);
     return { ok: false, error: cfg.lastError };
   }
 }

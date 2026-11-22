@@ -6,6 +6,7 @@ import { dailyReminders } from './routes/life.js';
 import { backupIfDue } from './backup.js';
 import { runProactive } from './assistant.js';
 import { automationTick } from './automations.js';
+import { logger } from './log.js';
 
 const hm = (d = new Date()) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -25,12 +26,12 @@ export function tick() {
         notify(u.id, { type: 'system', key: `dayclose:${today}`, title: '🌙 Encerramento do dia', message: 'Que tal registrar como foi o dia? Leva 1 minuto.', link: '#/hoje' });
       }
     } catch (err) {
-      console.error('[agendador]', err.message);
+      logger.error('[agendador]', err.message);
     }
   }
   backupIfDue();
-  runProactive().catch((e) => console.error('[automático]', e.message));
-  automationTick().catch((e) => console.error('[automações]', e.message));
+  runProactive().catch((e) => logger.error('[automático]', e.message));
+  automationTick().catch((e) => logger.error('[automações]', e.message));
 }
 
 export function startScheduler() {

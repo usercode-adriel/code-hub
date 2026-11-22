@@ -1,5 +1,6 @@
 import { db, id, now, save } from './db.js';
 import { hashPassword } from './auth.js';
+import { logger } from './log.js';
 
 export const APP_VERSION = '2.3.0';
 
@@ -316,7 +317,7 @@ export function bootstrap() {
   const d = db();
   if (d.users.length === 0) {
     createUser({ name: 'Codeniac Admin', email: 'admin@codeniac.dev', password: 'codeniac123', role: 'admin' });
-    console.log('» Usuário demo criado: admin@codeniac.dev / codeniac123');
+    logger.info('» Usuário demo criado: admin@codeniac.dev / codeniac123');
   }
   for (const user of d.users) publishPendingUpdates(user);
   save();

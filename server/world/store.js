@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, db, save as saveDb } from '../db.js';
+import { logger } from '../log.js';
 
 export const WORLD_FILE = path.join(DATA_DIR, 'world.json');
 const BAK = `${WORLD_FILE}.bak`;
@@ -21,7 +22,7 @@ export function loadWorld() {
   try {
     if (fs.existsSync(WORLD_FILE)) state = readJson(WORLD_FILE);
   } catch (err) {
-    console.error('» world.json danificado, recuperando da cópia anterior:', err.message);
+    logger.error('» world.json danificado, recuperando da cópia anterior:', err.message);
     try { state = fs.existsSync(BAK) ? readJson(BAK) : {}; } catch { state = {}; }
   }
   // 2.0 guardava a rede dentro do db.json: muda para cá uma única vez

@@ -20,6 +20,7 @@ import { articles, communities, createCommunity, media, CHANNELS, program, searc
 import { net, publicPost } from '../social.js';
 import { geminiJSON } from '../assistant.js';
 import { uid, str, fold, cap, round2, clamp, pick, shuffle, ago, DAY } from './util.js';
+import { logger } from '../log.js';
 
 const router = express.Router();
 const ctxOf = (req) => ({ user: req.user, uid: req.user.id, w: world(req.user.id), live: true, at: new Date() });
@@ -150,7 +151,7 @@ router.post('/mundo/perguntar', async (req, res) => {
     try {
       const out = await geminiJSON(`Você é o arquivista de Codeniac Society (uma cidade simulada). Responda à pergunta usando SOMENTE os registros abaixo, em ordem cronológica, em português, em 1 a 3 parágrafos. Se os registros não bastarem, diga o que se sabe e o que não se sabe.\nPergunta: ${q}\nRegistros:\n${timeline.join('\n')}\nJSON: {"resposta":""}`, 1200, 0.3);
       answer = str(out?.resposta, 3000) || null;
-    } catch (err) { console.error('[arquivo] IA:', err.message); }
+    } catch (err) { logger.error('[arquivo] IA:', err.message); }
   }
   if (!answer) {
     const subject = company?.name || person?.name || 'o assunto';

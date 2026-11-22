@@ -1,5 +1,6 @@
 // Notificações em tempo real (Server-Sent Events) e central de acontecimentos (feed).
 import { db, id, now, save } from './db.js';
+import { logger } from './log.js';
 
 const clients = new Map(); // userId -> Set<res>
 
@@ -28,7 +29,7 @@ export function notify(userId, { type = 'task', title, message, link = null, key
   if (d.notifications.length > 3000) d.notifications.splice(0, d.notifications.length - 3000);
   save();
   emit(userId, 'notification', n);
-  for (const fn of notifyHooks) { try { fn(userId, n); } catch (e) { console.error('[notificação]', e.message); } }
+  for (const fn of notifyHooks) { try { fn(userId, n); } catch (e) { logger.error('[notificação]', e.message); } }
   return n;
 }
 

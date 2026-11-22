@@ -17,6 +17,7 @@ import { toolDeclarations, callTool, memoriesBlock, areasOf, AREAS, devAvailable
 import { briefing, procrastination, financeTotals, indrivePage } from './briefing.js';
 import { searchKB } from './kb.js';
 import { CLOUD_PROVIDERS, CLOUD_NAMES, hasKey, openaiCall, hasOtherMedia } from './providers.js';
+import { logger } from './log.js';
 
 const MODEL = process.env.CODENIAC_AI_MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.CODENIAC_AI_EFFORT || 'low';
@@ -469,7 +470,7 @@ async function partsOfAsync(user, m, budget) {
       parts.push({ inlineData: { mimeType: info.mime, data: fs.readFileSync(info.full).toString('base64') } });
     } else if (info.size <= 1024 * 1024 * 1024) {
       try { parts.push({ fileData: { mimeType: info.mime, fileUri: await geminiUpload(info.full, info.mime, f.name) } }); }
-      catch (err) { console.error('[arquivo]', err.message); parts.push({ text: `[não consegui enviar o arquivo ${f.name}: ${err.message}]` }); }
+      catch (err) { logger.error('[arquivo]', err.message); parts.push({ text: `[não consegui enviar o arquivo ${f.name}: ${err.message}]` }); }
     } else parts.push({ text: `[arquivo grande demais: ${f.name}]` });
   }
   if (m.text) parts.push({ text: m.text });
@@ -500,7 +501,7 @@ async function geminiCall(body, write = () => {}, full = false) {
     try { return await geminiStream(model, body, write, full); }
     catch (err) {
       lastErr = err;
-      console.error(`[assistente] Gemini ${model}: ${err.status || ''} ${err.message}`);
+      logger.error(`[assistente] Gemini ${model}: ${err.status || ''} ${err.message}`);
       // chave inválida ou sem permissão: não adianta trocar de modelo
       if ([401, 403].includes(err.status) || /api key/i.test(err.message)) throw err;
     }
@@ -521,7 +522,7 @@ async function llmCall(body, write = () => {}, full = false, bot = null, meta = 
       return r;
     } catch (err) {
       lastErr = err;
-      console.error(`[assistente] ${CLOUD_PROVIDERS[name].label} falhou: ${err.status || ''} ${err.message}`);
+      logger.error(`[assistente] ${CLOUD_PROVIDERS[name].label} falhou: ${err.status || ''} ${err.message}`);
     }
   }
   throw lastErr;
@@ -588,14 +589,14 @@ async function runGemini(user, conv, text, write, actions = [], extras = {}) {
     const responses = [];
     for (const { functionCall: fc } of r.calls) {
       const out = await callTool(ctx, fc.name, fc.args || {});
-      if (process.env.CODENIAC_DEBUG_TOOLS) console.log('[ferramenta]', fc.name, JSON.stringify(fc.args).slice(0, 200), '->', JSON.stringify(out).slice(0, 200));
+      if (process.env.CODENIAC_DEBUG_TOOLS) logger.info('[ferramenta]', fc.name, JSON.stringify(fc.args).slice(0, 200), '->', JSON.stringify(out).slice(0, 200));
       responses.push({ functionResponse: { ...(fc.id ? { id: fc.id } : {}), name: fc.name, response: out.error ? { erro: out.error } : (out.result || { ok: true }) } });
     }
     body.contents.push({ role: 'user', parts: responses });
     if (answer && !/\s$/.test(answer)) { answer += '\n\n'; write({ type: 'text', text: '\n\n' }); }
   }
   if (MEMORY_HINT.test(norm(text)) && !actions.some((a) => /^Memória/.test(a.summary)) && areasOf(bot).includes('memoria')) {
-    extractMemories(ctx, text).catch((e) => console.error('[memória]', e.message));
+    extractMemories(ctx, text).catch((e) => logger.error('[memória]', e.message));
   }
   if (!answer.trim()) {
     answer = actions.length ? 'Pronto!' : 'Hmm, não consegui responder agora.';
@@ -858,7 +859,7 @@ async function runGroup(user, conv, text, write, auto) {
     try {
       await groupTurn(user, conv, bot, members, write, auto && i === 0 ? 'Puxem um assunto entre vocês (algo do dia do usuário, de interesse dos personagens ou uma brincadeira). ' : '');
     } catch (err) {
-      console.error('[grupo]', err.message);
+      logger.error('[grupo]', err.message);
       write({ type: 'notice', text: err.status === 429 ? 'Cota do Gemini esgotada por agora. Tente de novo em alguns minutos.' : 'O Gemini não respondeu agora.' });
       break;
     }
@@ -928,7 +929,7 @@ ${focusData(user, focus)}
 Escreva UMA mensagem espontânea que você mandaria agora no chat, como alguém que acompanha a vida dele nesse assunto: curta (1 a 3 frases), natural, focando no ponto mais importante (lembrete, alerta, parabéns ou incentivo). Não liste todos os dados e não diga que é automática.` }] }],
     generationConfig: { temperature: 0.95, maxOutputTokens: 2048 },
   };
-  try { return await llmCall(body, () => {}, false, bot); } catch (err) { console.error('[automático]', err.message); return localProactive(user, bot, focus); }
+  try { return await llmCall(body, () => {}, false, bot); } catch (err) { logger.error('[automático]', err.message); return localProactive(user, bot, focus); }
 }
 
 // Entrega uma mensagem de um personagem (ou do Niac, bot = null) sem o usuário pedir.
@@ -956,7 +957,7 @@ export function deliverMessage(user, bot, text, { groupConvId = null, kind = 'au
 // Avisa a tela (balão flutuante) e os canais extras (Telegram, notificação no celular).
 export function announceDelivery(user, ev, text) {
   emit(user.id, 'chat', ev);
-  for (const fn of deliverHooks) { try { fn(user, ev, text); } catch (e) { console.error('[entrega]', e.message); } }
+  for (const fn of deliverHooks) { try { fn(user, ev, text); } catch (e) { logger.error('[entrega]', e.message); } }
 }
 
 // Pede uma resposta em JSON ao Gemini.
@@ -978,7 +979,7 @@ Escreva só a mensagem, natural e no seu jeito, como no WhatsApp. Não diga que 
       generationConfig: { temperature: 0.9, maxOutputTokens: maxTokens },
     }, () => {}, false, bot);
     return out.trim();
-  } catch (err) { console.error('[aiWrite]', err.message); return null; }
+  } catch (err) { logger.error('[aiWrite]', err.message); return null; }
 }
 
 export async function sendProactive(user, bot) {
@@ -1004,7 +1005,7 @@ export async function runProactive() {
       bot.sentSlots = [...(bot.sentSlots || []), ...pending].slice(-20);
       save();
       const user = db().users.find((u) => u.id === bot.userId);
-      if (user) await sendProactive(user, bot).catch((e) => console.error('[automático]', e.message));
+      if (user) await sendProactive(user, bot).catch((e) => logger.error('[automático]', e.message));
     }
   } finally { proactiveBusy = false; }
 }
@@ -1045,18 +1046,18 @@ export async function chat(user, text, convId, write, opts = {}) {
   }
   if (!result && mode === 'ollama') {
     try { result = await runOllama(user, conv, text, write); result.streamed = true; }
-    catch (err) { console.error('[assistente] IA local falhou:', err?.message); refreshOllama(); write({ type: 'notice', text: 'IA local indisponível. Respondendo no modo básico.' }); mode = 'local'; }
+    catch (err) { logger.error('[assistente] IA local falhou:', err?.message); refreshOllama(); write({ type: 'notice', text: 'IA local indisponível. Respondendo no modo básico.' }); mode = 'local'; }
   } else if (!result && isCloud(mode)) {
     try { result = await runGemini(user, conv, text, write, actions, { media, sources }); result.streamed = true; mode = result.provider || mode; }
     catch (err) {
-      console.error('[assistente] IA na nuvem falhou:', err?.message);
+      logger.error('[assistente] IA na nuvem falhou:', err?.message);
       if (!files.length) result = naturalAction(user, text, false);
       write({ type: 'notice', text: err.status === 429 ? 'A cota grátis da IA acabou por agora. Respondo no modo básico até ela voltar.' : 'A IA não respondeu agora. Respondo no modo básico.' });
       mode = 'local';
     }
   } else if (!result && mode === 'claude') {
     try { result = await runClaude(user, conv, text, write); result.streamed = true; }
-    catch (err) { console.error('[assistente] Claude falhou:', err?.message); write({ type: 'notice', text: 'IA indisponível. Respondendo no modo básico.' }); mode = 'local'; }
+    catch (err) { logger.error('[assistente] Claude falhou:', err?.message); write({ type: 'notice', text: 'IA indisponível. Respondendo no modo básico.' }); mode = 'local'; }
   }
   if (!result) {
     const talk = smallTalk(user, text, botOf(user, conv));

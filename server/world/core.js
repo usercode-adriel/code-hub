@@ -10,6 +10,7 @@ import { worldOf, saveWorld } from './store.js';
 import { uid, nowIso, HOUR, MIN, ago, cap, hourKey, dayKey, clamp } from './util.js';
 import { emit } from '../notify.js';
 import { assistantMode, isCloud } from '../assistant.js';
+import { logger } from '../log.js';
 
 export const LIMITS = { events: 6000, queue: 800 };
 export const PACES = {
@@ -82,7 +83,7 @@ export function record(ctx, ev) {
     const keep = w.events.filter((x, i) => x.importance >= 3 || i >= w.events.length - LIMITS.events * 0.8);
     w.events = keep.slice(-LIMITS.events);
   }
-  for (const fn of hooks.event) { try { fn(ctx, e); } catch (err) { console.error('[mundo] reação a evento:', err.message); } }
+  for (const fn of hooks.event) { try { fn(ctx, e); } catch (err) { logger.error('[mundo] reação a evento:', err.message); } }
   if (ctx.live && e.importance >= 2) emit(ctx.uid, 'world', { type: 'event', event: publicEvent(e, w) });
   return e;
 }
@@ -117,7 +118,7 @@ function runQueue(ctx, until) {
     const fn = handlers[item.kind];
     if (!fn) continue;
     const at = new Date(item.at);
-    try { fn({ ...ctx, at }, item.data, item); } catch (err) { console.error(`[mundo] evento programado ${item.kind}:`, err.message); }
+    try { fn({ ...ctx, at }, item.data, item); } catch (err) { logger.error(`[mundo] evento programado ${item.kind}:`, err.message); }
   }
 }
 
@@ -129,7 +130,7 @@ function runUpgrades(base) {
   const pending = upgrades.filter(([n]) => n > schema).sort((a, b) => a[0] - b[0]);
   if (!pending.length) return false;
   const ctx = { ...base, at: new Date() };
-  for (const [n, fn] of pending) { try { fn(ctx); } catch (err) { console.error(`[mundo] atualização ${n}:`, err); } w.core.schema = Math.max(w.core.schema || 1, n); }
+  for (const [n, fn] of pending) { try { fn(ctx); } catch (err) { logger.error(`[mundo] atualização ${n}:`, err); } w.core.schema = Math.max(w.core.schema || 1, n); }
   return true;
 }
 export async function worldTick(user, { live = true } = {}) {
@@ -141,7 +142,7 @@ export async function worldTick(user, { live = true } = {}) {
     if (people < 30) return; // a rede ainda está se formando
     const ctx = { ...base, at: new Date() };
     w.core.genesisAt = nowIso();
-    for (const fn of hooks.genesis) { try { fn(ctx); } catch (err) { console.error('[mundo] gênese:', err); } }
+    for (const fn of hooks.genesis) { try { fn(ctx); } catch (err) { logger.error('[mundo] gênese:', err); } }
     record(ctx, { type: 'genese', cat: 'local', title: 'Codeniac Society começa a ser registrada', text: 'A partir deste momento, tudo o que acontece na cidade passa a fazer parte da história. Pessoas, empresas, partidos e clubes que já existiam aparecem como "da gênese".', importance: 4, origin: 'genese' });
     w.core.lastHour = hourKey();
     w.core.lastDay = dayKey();
@@ -167,15 +168,15 @@ export async function worldTick(user, { live = true } = {}) {
     const dk = dayKey(hourStart);
     if (dk !== w.core.lastDay) {
       w.core.lastDay = dk;
-      for (const fn of hooks.daily) { try { fn(ctx); } catch (err) { console.error('[mundo] rotina diária:', err); } }
+      for (const fn of hooks.daily) { try { fn(ctx); } catch (err) { logger.error('[mundo] rotina diária:', err); } }
     }
-    for (const fn of hooks.hourly) { try { fn(ctx); } catch (err) { console.error('[mundo] rotina de hora:', err); } }
+    for (const fn of hooks.hourly) { try { fn(ctx); } catch (err) { logger.error('[mundo] rotina de hora:', err); } }
     w.core.lastHour = hourKey(hourStart);
   }
   // a cada tick (30 s): fila do agora e reações rápidas
   const ctx = { ...base, at: nowD };
   runQueue(ctx, nowD);
-  for (const fn of hooks.tick) { try { await fn(ctx); } catch (err) { console.error('[mundo] tick:', err.message); } }
+  for (const fn of hooks.tick) { try { await fn(ctx); } catch (err) { logger.error('[mundo] tick:', err.message); } }
   saveWorld();
 }
 
