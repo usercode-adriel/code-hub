@@ -31,6 +31,7 @@ import {
 } from './assistant.js';
 import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
+import { medirPedidos, diagnostico } from './diagnostico.js';
 
 load();
 loadLibrary();
@@ -38,6 +39,11 @@ migrate();
 bootstrap();
 
 const app = express();
+app.use(medirPedidos);
+app.get('/api/diagnostico', requireAuth, (req, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Só para administradores' });
+  res.json(diagnostico());
+});
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = path.join(APP_ROOT, 'public');
 
