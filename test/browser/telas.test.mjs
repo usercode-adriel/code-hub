@@ -93,3 +93,18 @@ test('diagnóstico: administrador vê os números, visitante não', async () => 
   assert.ok(j.memoriaMB.rss > 0 && Array.isArray(j.pedidos), 'dados do diagnóstico');
   await ctx.close();
 });
+
+test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/personagens`);
+  await p.waitForSelector('#pgPrevia', { timeout: 30000 });
+  const antes = await p.evaluate(() => document.querySelector('#pgSemente').textContent);
+  await p.click('#pgSortear'); await p.waitForTimeout(300);
+  assert.notEqual(await p.evaluate(() => document.querySelector('#pgSemente').textContent), antes, 'sortear troca a semente');
+  await p.fill('#pgNome', 'Teste'); await p.click('#pgSalvar');
+  assert.match(await p.evaluate(() => document.querySelector('#pgSalvos').innerText), /Teste/);
+  const visiveis = await p.evaluate(() => { const d = document.querySelector('#pgPrevia').getContext('2d').getImageData(0, 0, 128, 128).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });
+  assert.ok(visiveis > 500, `prévia vazia (${visiveis} pixels)`);
+  assert.deepEqual(p.errosJS, [], 'erros de script no gerador');
+  await ctx.close();
+});
