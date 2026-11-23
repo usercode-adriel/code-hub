@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { esc, toast } from '../ui.js';
 import { PRESETS, GRADE, CATEGORIAS, CAMADAS, MATERIAIS, REQUER } from './presets.js';
 import { criarBiblioteca } from './biblioteca.js';
+import { criarGerador } from './gerador-ui.js';
 import * as M from './montagem.js';
 import * as P from './prefab.js';
 
@@ -48,7 +49,10 @@ function montar(el, est, comps) {
         <button class="btn primary" id="stPrefab" title="Gera uma imagem da estrutura e guarda tudo (pegada, colisões, entradas)">Salvar como prefab</button></span>
     </div>
     <div style="display:grid;grid-template-columns:260px 1fr 290px;gap:10px;margin-top:10px">
-      <aside id="stBiblioteca" style="min-width:0"></aside>
+      <aside style="min-width:0;display:flex;flex-direction:column;gap:6px">
+        <div class="row" style="gap:4px"><button class="btn sm primary" data-esq="lib">Biblioteca</button><button class="btn sm" data-esq="ger" id="stAbaGerar">✨ Gerar (IA)</button></div>
+        <div id="stBiblioteca" style="min-width:0"></div><div id="stGerador" style="display:none;min-width:0;max-height:760px;overflow:auto"></div>
+      </aside>
       <div style="position:relative;min-width:0">
         <canvas id="stTela" style="width:100%;height:600px;display:block;background:#1b1f2a;border-radius:10px;touch-action:none"></canvas>
         <div id="stDica" style="position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:8px;background:rgba(17,24,39,.9);font-size:12px;display:none"></div>
@@ -563,7 +567,15 @@ function montar(el, est, comps) {
   $('#stIABotao').onclick = () => { S.aba = 'ia'; painel(); };
   const auto = setInterval(() => { if (!el.isConnected) { clearInterval(auto); return; } if (S.sujo) salvar(); }, 20000);
 
-  criarBiblioteca($('#stBiblioteca'), { preset: est.preset, aoEscolher: escolher });
+  const bib = criarBiblioteca($('#stBiblioteca'), { preset: est.preset, aoEscolher: escolher });
+  let gerador = null;
+  const trocarEsq = (qual) => {
+    el.querySelectorAll('[data-esq]').forEach((b) => b.classList.toggle('primary', b.dataset.esq === qual));
+    $('#stBiblioteca').style.display = qual === 'lib' ? '' : 'none'; $('#stGerador').style.display = qual === 'ger' ? '' : 'none';
+    // o gerador só carrega (e só fala com o servidor) quando a aba abre
+    if (qual === 'ger' && !gerador) gerador = criarGerador($('#stGerador'), { preset: est.preset, componenteEscolhido: () => bib.ativo(), aoAprovar: (c) => { escolher(c); trocarEsq('lib'); bib.recarregar(); } });
+  };
+  el.querySelectorAll('[data-esq]').forEach((b) => { b.onclick = () => trocarEsq(b.dataset.esq); });
   $('#stIma').classList.toggle('primary', S.snap);
   atualizarBotoes(); caber(); ajustar(); painel(); recalcular();
   $('#stCaixa').__studio = { S, est, compDe, M, P };

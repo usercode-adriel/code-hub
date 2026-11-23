@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import http from 'node:http';
 import { chromium } from 'playwright';
 
 const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -25,7 +26,7 @@ async function esperarSaude() {
 }
 
 before(async () => {
-  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA) }, stdio: 'ignore' });
+  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA), GEMINI_API_KEY: '', GROQ_API_KEY: '', OPENROUTER_API_KEY: '' }, stdio: 'ignore' });
   await esperarSaude();
   browser = await chromium.launch({ args: ['--no-sandbox'], executablePath: process.env.CHROME_PATH || undefined });
 });
@@ -444,6 +445,95 @@ test('structure studio: criar com IA a partir do hub abre a prévia direto', asy
   await p.waitForSelector('#iaOk', { timeout: 25000 });
   assert.equal(await p.evaluate(() => document.querySelector('#stCaixa').__studio.S.previa.lista.length > 5), true);
   assert.deepEqual(p.errosJS, [], 'erros de script');
+  await ctx.close();
+});
+
+// PNG a partir de uma função de pixels (RGBA), para o "modelo de imagem" falso devolver fundo magenta com um objeto no meio
+function pngPixels(w, h, pixel) {
+  const crcTab = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const x of buf) c = crcTab[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const bloco = (tipo, d) => { const t = Buffer.from(tipo); const len = Buffer.alloc(4); len.writeUInt32BE(d.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(Buffer.concat([t, d]))); return Buffer.concat([len, t, d, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
+  const linhas = []; for (let y = 0; y < h; y++) { const l = [0]; for (let x = 0; x < w; x++) l.push(...pixel(x, y)); linhas.push(Buffer.from(l)); }
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), bloco('IHDR', ihdr), bloco('IDAT', zlib.deflateSync(Buffer.concat(linhas))), bloco('IEND', Buffer.alloc(0))]);
+}
+
+test('structure studio: gerador por IA de imagem, com referência, fundo removido e aprovação antes da biblioteca', async () => {
+  // OpenRouter falso: lista de modelos e geração (fundo magenta com um objeto cinza no meio)
+  const recebidos = [];
+  const imagem = pngPixels(96, 96, (x, y) => (x >= 28 && x < 68 && y >= 20 && y < 76 ? [120, 130, 150, 255] : [255, 0, 255, 255]));
+  const falso = http.createServer((req, res) => {
+    let corpo = ''; req.on('data', (d) => { corpo += d; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.endsWith('/models')) return res.end(JSON.stringify({ data: [
+        { id: 'x/so-texto', name: 'Só texto', architecture: { input_modalities: ['text'], output_modalities: ['text'] } },
+        { id: 'x/imagem', name: 'Gerador A', architecture: { input_modalities: ['text', 'image'], output_modalities: ['image', 'text'] } },
+        { id: 'x/imagem-sem-ref', name: 'Gerador B', architecture: { input_modalities: ['text'], output_modalities: ['image'] } }] }));
+      recebidos.push({ auth: req.headers.authorization, corpo: JSON.parse(corpo || '{}') });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'ok', images: [{ type: 'image_url', image_url: { url: `data:image/png;base64,${imagem.toString('base64')}` } }] } }] }));
+    });
+  });
+  await new Promise((ok) => falso.listen(0, '127.0.0.1', ok)); const portaFalsa = falso.address().port;
+  // servidor dedicado, com a chave de teste e o OpenRouter falso (o principal não tem chave)
+  const porta = 4100 + Math.floor(Math.random() * 90); const base = `http://localhost:${porta}`; const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'codeniac-gen-'));
+  const srv = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: pasta, PORT: String(porta), OPENROUTER_API_KEY: 'sk-or-chave-de-teste-1234567890123456', OPENROUTER_API_BASE: `http://127.0.0.1:${portaFalsa}/api/v1`, GEMINI_API_KEY: '', GROQ_API_KEY: '' }, stdio: 'ignore' });
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } }); const p = await ctx.newPage(); const erros = [];
+  p.on('pageerror', (e) => erros.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') erros.push(m.text()); });
+  try {
+    for (let i = 0; i < 80; i++) { try { if ((await fetch(`${base}/api/health`)).ok) break; } catch { /* subindo */ } await new Promise((r) => setTimeout(r, 250)); }
+    await p.goto(`${base}/login.html`);
+    const token = await p.evaluate(async () => { const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@codeniac.dev', password: 'codeniac123' }) }); const t = (await r.json()).token; localStorage.setItem('codeniac.token', t); return t; });
+    const h = { Authorization: `Bearer ${token}` };
+    const est = await (await fetch(`${base}/api/estudio/estruturas`, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Gerador', preset: 'arq25d', tipo: 'loja' }) })).json();
+    await p.goto(`${base}/#/studio?id=${est.id}`); await p.waitForSelector('#stAbaGerar', { timeout: 20000 });
+    await p.click('#stAbaGerar'); await p.waitForSelector('#gModelo', { state: 'visible', timeout: 15000 });
+    // só os modelos que declaram gerar imagem, com o que aceitam de referência
+    const opcoes = await p.locator('#gModelo option').allTextContents(); assert.equal(opcoes.length, 2); assert.ok(opcoes.some((o) => /Gerador A \(referência: sim\)/.test(o)) && opcoes.some((o) => /Gerador B \(referência: não\)/.test(o)));
+    // modelo que não aceita referência bloqueia os botões de referência
+    await p.selectOption('#gModelo', 'x/imagem-sem-ref'); assert.equal(await p.isDisabled('#gAddArq'), true); assert.equal(await p.isDisabled('#gAddComp'), true);
+    await p.selectOption('#gModelo', 'x/imagem'); assert.equal(await p.isDisabled('#gAddArq'), false);
+    // pedido com uma referência de perspectiva enviada
+    await p.fill('#gDesc', 'janela moderna de vidro azul'); await p.selectOption('#gCat', 'fachada'); await p.selectOption('#gSub', 'janela');
+    await p.setInputFiles('#gArq', { name: 'ref.png', mimeType: 'image/png', buffer: pngSolido(32, 32) }); await p.selectOption('[data-papel="0"]', 'perspectiva');
+    await p.click('#gGerar'); await p.waitForSelector('[data-p]', { timeout: 20000 });
+    assert.equal(recebidos.length, 1); assert.equal(recebidos[0].auth, 'Bearer sk-or-chave-de-teste-1234567890123456', 'a chave foi só do servidor para o provedor');
+    const envio = recebidos[0].corpo; assert.equal(envio.model, 'x/imagem'); assert.deepEqual(envio.modalities, ['image', 'text']);
+    assert.equal(envio.messages[0].content.filter((c) => c.type === 'image_url').length, 1, 'a referência seguiu como imagem'); assert.match(envio.messages[0].content[0].text, /Image 1: perspectiva/); assert.match(envio.messages[0].content[0].text, /janela moderna de vidro azul/);
+    // nada entrou na biblioteca ainda; o resultado fica para aprovar, com o fundo já removido na prévia
+    const gerados = async () => (await (await fetch(`${base}/api/estudio/componentes?origem=gerado&limite=20`, { headers: h })).json()).componentes;
+    assert.equal((await gerados()).length, 0, 'antes de aprovar não há componente gerado');
+    await p.waitForFunction(() => /transparência removida/.test(document.querySelector('[data-info]')?.textContent || ''), null, { timeout: 10000 });
+    const prev = await p.evaluate(() => { const c = document.querySelector('[data-prev]'); const x = c.getContext('2d'); return { w: c.width, h: c.height, canto: x.getImageData(0, 0, 1, 1).data[3], centro: x.getImageData(c.width >> 1, c.height >> 1, 1, 1).data[3] }; });
+    assert.ok(prev.w < 96 && prev.h < 96, 'a prévia foi recortada ao objeto'); assert.equal(prev.canto, 0, 'o fundo ficou transparente'); assert.equal(prev.centro, 255, 'o objeto ficou opaco');
+    // aprovar: entra na biblioteca como "gerado", com o PNG transparente, e já fica pronto para colocar
+    await p.fill('[data-nome]', 'Janela azul IA'); await p.click('[data-ok]'); await p.waitForFunction(() => /Colocando/.test(document.querySelector('#stDica')?.textContent || ''), null, { timeout: 10000 });
+    const lista = await gerados(); assert.equal(lista.length, 1); assert.equal(lista[0].nome, 'Janela azul IA'); assert.equal(lista[0].sub, 'janela'); assert.ok(lista[0].tags.includes('ia')); assert.equal(lista[0].geracao.modelo, 'x/imagem');
+    const alfa = await p.evaluate(async (u) => { const im = new Image(); im.src = u; await im.decode(); const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return { canto: x.getImageData(0, 0, 1, 1).data[3], centro: x.getImageData(c.width >> 1, c.height >> 1, 1, 1).data[3] }; }, lista[0].arquivo);
+    assert.deepEqual(alfa, { canto: 0, centro: 255 }, 'o componente aprovado tem transparência de verdade');
+    // rejeitar: gera de novo e descarta; o pendente some e nada entra na biblioteca
+    await p.click('#stAbaGerar'); await p.fill('#gDesc', 'outra janela'); await p.click('#gGerar'); await p.waitForSelector('[data-no]', { timeout: 20000 });
+    await p.click('[data-no]'); await p.waitForFunction(() => document.querySelectorAll('[data-p]').length === 0, null, { timeout: 10000 });
+    assert.equal((await gerados()).length, 1);
+    assert.deepEqual(erros, [], 'erros de script no gerador');
+  } finally {
+    await ctx.close(); falso.close();
+    if (srv.exitCode === null) { const saiu = new Promise((r) => srv.once('exit', r)); srv.kill(); await saiu; } // espera parar de escrever antes de apagar a pasta
+    fs.rmSync(pasta, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
+test('structure studio: sem chave do OpenRouter o gerador explica e não oferece geração', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token')); const h = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const est = await (await fetch(`${BASE}/api/estudio/estruturas`, { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Sem chave', preset: 'arq25d', tipo: 'loja' }) })).json();
+  assert.equal((await (await fetch(`${BASE}/api/estudio/gerador/estado`, { headers: h })).json()).chave, false);
+  await p.goto(`${BASE}/#/studio?id=${est.id}`); await p.waitForSelector('#stAbaGerar', { timeout: 20000 }); await p.click('#stAbaGerar');
+  await p.waitForFunction(() => /ainda não está configurado/.test(document.querySelector('#gAviso')?.textContent || ''), null, { timeout: 10000 });
+  assert.equal(await p.isVisible('#gGerar'), false);
+  const r = await fetch(`${BASE}/api/estudio/gerador/gerar`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: (() => { const f = new FormData(); f.append('descricao', 'janela'); f.append('modelo', 'x'); f.append('categoria', 'fachada'); f.append('sub', 'janela'); f.append('perspectiva', 'arq25d'); f.append('referencias', '[]'); return f; })() });
+  assert.equal(r.status, 400); assert.match((await r.json()).error, /OpenRouter não configurado/);
+  assert.deepEqual(p.errosJS.filter((x) => !/status of 400/.test(x)), [], 'erros de script');
   await ctx.close();
 });
 

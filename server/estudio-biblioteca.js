@@ -101,7 +101,7 @@ export function gravarPng(uid, buf) {
 export const removerPng = (uid, hash) => fs.rmSync(path.join(ARQUIVOS, uid, `${hash}.png`), { force: true });
 
 // adiciona um PNG à biblioteca do usuário; se o mesmo arquivo já está lá, devolve o existente
-export function adicionarComponente(uid, buf, meta) {
+export function adicionarComponente(uid, buf, meta, extras = {}) {
   const dim = lerPng(buf);
   const dados = validarMeta(meta);
   const hash = crypto.createHash('sha256').update(buf).digest('hex');
@@ -115,6 +115,7 @@ export function adicionarComponente(uid, buf, meta) {
     id: `u:${hash.slice(0, 12)}`, ...dados, arquivo: `/estudio-arquivos/${uid}/${hash}.png`, hash, w: dim.w, h: dim.h,
     pivo: { x: 0.5, y: 1 }, area: { w: Math.max(1, Math.ceil(dim.w / GRADE)), h: Math.max(1, Math.ceil(dim.h * 0.3 / GRADE)) },
     colisao: { tipo: 'nenhuma' }, conectores: [], camada: CAMADA_DA_SUB[dados.sub] || 'externo', criado: new Date().toISOString(),
+    ...(extras.geracao ? { geracao: { modelo: String(extras.geracao.modelo || '').slice(0, 80), prompt: String(extras.geracao.prompt || '').slice(0, 300) } } : {}),
   };
   if (!CAMADAS.includes(c.camada)) c.camada = 'externo';
   lista.push(c); gravarIndice(uid, lista);

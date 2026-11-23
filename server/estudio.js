@@ -8,6 +8,7 @@ import { arquivoDe, gravar, lerEstrutura, listarEstruturas, validarEstrutura, re
 import biblioteca from './estudio-biblioteca.js';
 import prefabs from './estudio-prefabs.js';
 import ia from './estudio-ia.js';
+import gerador from './estudio-gerador.js';
 
 export { validarEstrutura, validarInstancias, lerEstrutura, listarEstruturas, gravarEstrutura, idValido } from './estudio-dados.js';
 const router = express.Router();
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use('/componentes', biblioteca);
 router.use('/prefabs', prefabs);
 router.use('/ia', ia);
+router.use('/gerador', gerador);
 
 router.get('/presets', (_req, res) => res.json({ presets: PRESETS, grade: GRADE }));
 
