@@ -193,6 +193,29 @@ test('caixa de ferramentas: segurar move a peça, alças redimensionam pela bord
   await ctx.close();
 });
 
+test('structure studio: hub cria estrutura, editor abre e salva; preset não muda', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/studio`); await p.waitForSelector('#sNovo', { timeout: 30000 });
+  assert.ok((await p.textContent('body')).includes('Game Development Studio'));
+  await p.fill('#sNome', 'Delegacia de teste'); await p.selectOption('#sPreset', 'arq25d'); await p.selectOption('#sTipo', 'delegacia');
+  await p.click('#sNovo'); await p.waitForSelector('#stTela', { timeout: 15000 });
+  assert.ok(await p.isVisible('#stBiblioteca') && await p.isVisible('#stProp'), 'os painéis aparecem');
+  await p.fill('#stNome', 'Delegacia renomeada'); await p.click('#stSalvar'); await p.waitForTimeout(600);
+  assert.match(await p.evaluate(() => document.querySelector('#stEstado').textContent), /Salvo/);
+  // pela API: o preset de câmera não muda depois de criado
+  const r = await p.evaluate(async () => {
+    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` };
+    const lista = (await (await fetch('/api/estudio/estruturas', { headers: h })).json()).estruturas;
+    const e = lista.find((x) => x.nome === 'Delegacia renomeada');
+    const troca = await fetch(`/api/estudio/estruturas/${e.id}`, { method: 'PUT', headers: h, body: JSON.stringify({ preset: 'topo' }) });
+    return { achou: !!e, status: troca.status };
+  });
+  assert.ok(r.achou, 'a estrutura salva aparece na lista'); assert.equal(r.status, 400);
+  // o 400 acima é provocado de propósito; qualquer outro erro conta
+  assert.deepEqual(p.errosJS.filter((e) => !/status of 400/.test(e)), [], 'erros de script no Studio');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);

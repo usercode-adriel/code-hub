@@ -512,6 +512,7 @@ async function mapasTab(box) {
     <p>${ativo ? `Mapa do jogo agora: <b>${esc(ativo.nome)}</b>` : 'O jogo está na cidade padrão.'}</p>
     <div class="row" style="gap:8px;flex-wrap:wrap">
       <a class="btn primary" href="#/criar-mapa">Abrir o editor</a>
+      <a class="btn" href="#/studio">Structure Studio</a>
       ${ativo ? '<button class="btn" id="mVoltar">Voltar à cidade padrão</button>' : ''}
     </div></div>`;
   const v = box.querySelector('#mVoltar');

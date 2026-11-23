@@ -30,7 +30,7 @@ async function listar(el) {
     <div style="display:grid;gap:8px;margin-top:14px">${mapas.map((m) => `<div class="card" style="padding:10px;display:flex;gap:10px;align-items:center;justify-content:space-between">
       <div><b>${esc(m.nome)}</b> ${vida === m.id ? '<span class="chip">Jogo usa este mapa</span>' : ''}<div class="muted" style="font-size:12px">${m.largura}×${m.altura} células · ${m.itens} peças</div></div>
       <div class="row" style="gap:6px"><a class="btn sm" href="#/criar-mapa?id=${m.id}">Editar</a>${vida === m.id ? '' : `<button class="btn sm" data-vida="${m.id}">Usar no jogo</button>`}<button class="btn sm" data-del="${m.id}">Apagar</button></div></div>`).join('') || '<p class="muted">Nenhum mapa ainda. Crie o primeiro aqui.</p>'}</div>
-    <p style="margin-top:12px"><a href="#/configuracoes">← Configurações</a></p></section>`;
+    <p style="margin-top:12px"><a href="#/configuracoes">← Configurações</a> · <a href="#/studio">Structure Studio</a></p></section>`;
   el.querySelector('#mNovo').onclick = async () => {
     const nome = el.querySelector('#mNome').value.trim() || 'Meu mapa';
     const m = await api.post('/mapas', { nome }); location.hash = `#/criar-mapa?id=${m.id}`;

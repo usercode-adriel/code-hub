@@ -28,7 +28,7 @@ const VIEWS = {
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
   livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
   rede: () => import('./views/rede.js'), busca: () => import('./views/busca.js'),
-  personagens: () => import('./views/personagens.js'), 'criar-mapa': () => import('./views/criar-mapa.js'), creditos: () => import('./views/creditos.js'), diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
+  personagens: () => import('./views/personagens.js'), 'criar-mapa': () => import('./views/criar-mapa.js'), studio: () => import('./views/studio.js'), creditos: () => import('./views/creditos.js'), diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
   midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
   empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), mercado: () => import('./views/mercado.js'),

@@ -33,6 +33,7 @@ import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
 import personagens from './personagens.js';
+import estudio from './estudio.js';
 import godot from './godot.js';
 import mapas from './mapas.js';
 
@@ -185,6 +186,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/library', requireAuth, library);
 app.use('/api', api);
 app.use('/api/personagens', requireAuth, personagens);
+app.use('/api/estudio', requireAuth, estudio);
 app.use('/api/godot', requireAuth, godot);
 app.use('/api/mapas', requireAuth, mapas);
 app.use('/api', requireAuth, pages);
