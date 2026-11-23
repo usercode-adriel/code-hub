@@ -19,7 +19,13 @@ CATEGORIAS = {
     'relevo': ('mundo/relevo', 'objeto'),
     'veiculos': ('mundo/veiculos', 'veiculo'),
     'aeronaves': ('mundo/aeronaves', 'veiculo'),
+    '3d': ('mapas/inventario/3d', 'objeto'),
 }
+
+# na categoria 3d, estradas e calçadas são ladrilhos (pintados nas células); prédios são objetos
+def tipo_3d(nome):
+    return 'tile' if nome.startswith(('estrada-', 'calcada-')) else 'objeto'
+
 
 def main():
     itens = []
@@ -30,7 +36,8 @@ def main():
             if not f.endswith('.png'): continue
             nome = f[:-4]
             w, h = Image.open(os.path.join(base, f)).size
-            itens.append({'chave': f'{cat}/{nome}', 'categoria': cat, 'tipo': tipo, 'nome': nome.replace('-', ' ').capitalize(),
+            tp = tipo_3d(nome) if cat == '3d' else tipo
+            itens.append({'chave': f'{cat}/{nome}', 'categoria': cat, 'tipo': tp, 'nome': nome.replace('-', ' ').capitalize(),
                           'arquivo': f'/assets/{pasta}/{f}', 'w': w, 'h': h})
     # terreno base do criador (grama da foto): todo mapa novo começa com ela
     itens.insert(0, {'chave': 'terreno/grama-base', 'categoria': 'terreno', 'tipo': 'tile', 'nome': 'Grama (base)',

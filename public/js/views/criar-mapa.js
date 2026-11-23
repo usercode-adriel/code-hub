@@ -6,7 +6,7 @@ import { esc, toast } from '../ui.js';
 
 const CEL = 32;
 const ROTAS = ['#/mapa', '#/mercado', '#/banco', '#/veiculos', '#/policia', '#/hospital', '#/justica', '#/governo', '#/empregos', '#/diversao', '#/locadora', '#/construtora'];
-const NOMES_CAT = { terreno: 'Terreno', construcoes: 'Construções', objetos: 'Objetos', vegetacao: 'Vegetação', relevo: 'Relevo', veiculos: 'Veículos', aeronaves: 'Aeronaves', personagens: 'Personagens' };
+const NOMES_CAT = { terreno: 'Terreno', construcoes: 'Construções', objetos: 'Objetos', vegetacao: 'Vegetação', relevo: 'Relevo', veiculos: 'Veículos', aeronaves: 'Aeronaves', '3d': '3D', personagens: 'Personagens' };
 const GRAMA = 'terreno/grama-base';
 
 export default async function render(el, parts, params = new URLSearchParams()) {

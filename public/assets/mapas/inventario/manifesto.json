@@ -8,6 +8,7 @@
   "relevo",
   "veiculos",
   "aeronaves",
+  "3d",
   "personagens"
  ],
  "itens": [
@@ -1298,6 +1299,96 @@
    "arquivo": "/assets/mundo/aeronaves/aviao.png",
    "w": 216,
    "h": 197
+  },
+  {
+   "chave": "3d/calcada-curva-1",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada curva 1",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-1.png",
+   "w": 290,
+   "h": 292
+  },
+  {
+   "chave": "3d/calcada-curva-2",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada curva 2",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-2.png",
+   "w": 283,
+   "h": 293
+  },
+  {
+   "chave": "3d/calcada-curva-3",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada curva 3",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-3.png",
+   "w": 290,
+   "h": 271
+  },
+  {
+   "chave": "3d/calcada-curva-4",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada curva 4",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-4.png",
+   "w": 283,
+   "h": 272
+  },
+  {
+   "chave": "3d/calcada-reta-horizontal",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada reta horizontal",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-reta-horizontal.png",
+   "w": 1046,
+   "h": 191
+  },
+  {
+   "chave": "3d/calcada-reta-vertical",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Calcada reta vertical",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-reta-vertical.png",
+   "w": 248,
+   "h": 895
+  },
+  {
+   "chave": "3d/estrada-horizontal",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Estrada horizontal",
+   "arquivo": "/assets/mapas/inventario/3d/estrada-horizontal.png",
+   "w": 991,
+   "h": 305
+  },
+  {
+   "chave": "3d/estrada-vertical",
+   "categoria": "3d",
+   "tipo": "tile",
+   "nome": "Estrada vertical",
+   "arquivo": "/assets/mapas/inventario/3d/estrada-vertical.png",
+   "w": 361,
+   "h": 975
+  },
+  {
+   "chave": "3d/predio-policia-civil",
+   "categoria": "3d",
+   "tipo": "objeto",
+   "nome": "Predio policia civil",
+   "arquivo": "/assets/mapas/inventario/3d/predio-policia-civil.png",
+   "w": 640,
+   "h": 441
+  },
+  {
+   "chave": "3d/predio-vanity-club",
+   "categoria": "3d",
+   "tipo": "objeto",
+   "nome": "Predio vanity club",
+   "arquivo": "/assets/mapas/inventario/3d/predio-vanity-club.png",
+   "w": 640,
+   "h": 397
   },
   {
    "chave": "personagens/barbudo",
