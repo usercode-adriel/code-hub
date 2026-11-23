@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from './db.js';
 import { PRESETS, GRADE } from '../public/js/estudio/presets.js';
+import biblioteca from './estudio-biblioteca.js';
 
 const router = express.Router();
 const PASTA = path.join(DATA_DIR, 'estudio');
@@ -52,6 +53,8 @@ export function validarEstrutura(corpo, base = null) {
   if (componentes.length > MAX_COMPONENTES) throw new Error(`no máximo ${MAX_COMPONENTES} componentes`);
   return { preset: presetId, tipo, grade: GRADE, area: { w, h }, componentes, grupos: Array.isArray(corpo.grupos) ? corpo.grupos : (base?.grupos ?? []), logica: corpo.logica && typeof corpo.logica === 'object' ? corpo.logica : (base?.logica ?? { entradas: [], pegada: null }) };
 }
+
+router.use('/componentes', biblioteca);
 
 router.get('/presets', (_req, res) => res.json({ presets: PRESETS, grade: GRADE }));
 

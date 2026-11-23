@@ -3,7 +3,8 @@
 // encaixe entram nas fases seguintes, sempre dentro desta mesma estrutura.
 import { api } from '../api.js';
 import { esc, toast } from '../ui.js';
-import { PRESETS, GRADE } from './presets.js';
+import { PRESETS, GRADE, CATEGORIAS, REQUER } from './presets.js';
+import { criarBiblioteca } from './biblioteca.js';
 
 export async function abrirEditor(el, id) {
   el.innerHTML = '<section class="card"><p>Carregando a estrutura…</p></section>';
@@ -51,10 +52,27 @@ function montar(el, est) {
     g.restore();
   }
 
-  const painelBiblioteca = el.querySelector('#stBiblioteca');
-  painelBiblioteca.innerHTML = '<div class="muted" style="font-size:13px"><b>Biblioteca</b><p>A biblioteca de componentes chega na próxima etapa.</p></div>';
-  el.querySelector('#stProp').innerHTML = `<b>Propriedades</b><p>Selecione uma peça para editar.</p>
-    <p style="font-size:12px">Câmera: <b>${esc(preset.camera.tipo)}</b> (${preset.camera.inclinacao}°)<br>Grade: ${GRADE} unidades<br>Área: ${est.area.w}×${est.area.h} células</p>`;
+  // painel direito: o componente escolhido na biblioteca (metadados) ou a estrutura
+  function mostrarEstrutura() {
+    el.querySelector('#stProp').innerHTML = `<b>Propriedades</b><p>Escolha um componente na biblioteca para ver os detalhes.</p>
+      <p style="font-size:12px">Câmera: <b>${esc(preset.camera.tipo)}</b> (${preset.camera.inclinacao}°)<br>Grade: ${GRADE} unidades<br>Área: ${est.area.w}×${est.area.h} células</p>`;
+  }
+  function mostrarComponente(c) {
+    if (!c) return mostrarEstrutura();
+    const requer = REQUER[c.sub];
+    el.querySelector('#stProp').innerHTML = `<b>${esc(c.nome)}</b><br><span class="muted">${esc(CATEGORIAS[c.categoria]?.nome || c.categoria)} · ${esc(CATEGORIAS[c.categoria]?.sub[c.sub] || c.sub)}</span>
+      <img src="${esc(c.arquivo)}" alt="${esc(c.nome)}" style="display:block;max-width:100%;max-height:150px;margin:8px auto;background:#111827;border-radius:8px;padding:6px">
+      <table style="font-size:12px;width:100%"><tbody>
+        <tr><td>Perspectiva</td><td>${esc(c.perspectiva)}</td></tr><tr><td>Material</td><td>${esc(c.material)}</td></tr>
+        <tr><td>Origem</td><td>${esc(c.origem)}</td></tr><tr><td>Dimensões</td><td>${c.w}×${c.h} px</td></tr>
+        <tr><td>Área no chão</td><td>${c.area.w}×${c.area.h} células</td></tr><tr><td>Camada</td><td>${esc(c.camada)}</td></tr>
+        <tr><td>Colisão</td><td>${c.colisao?.tipo === 'caixa' ? 'caixa no pé' : 'nenhuma'}</td></tr>
+        <tr><td>Encaixa em</td><td>${requer ? esc(requer.join(', ')) : 'chão (grade)'}</td></tr>
+        <tr><td>Id</td><td style="word-break:break-all">${esc(c.id)}</td></tr></tbody></table>`;
+  }
+  mostrarEstrutura();
+  const biblioteca = criarBiblioteca(el.querySelector('#stBiblioteca'), { preset: est.preset, aoEscolher: mostrarComponente });
+  void biblioteca;
 
   tela.addEventListener('contextmenu', (e) => e.preventDefault());
   tela.addEventListener('pointerdown', (e) => { tela.setPointerCapture(e.pointerId); if (e.button === 1 || e.button === 2 || e.button === 0) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; tela.style.cursor = 'grabbing'; } });
@@ -80,5 +98,7 @@ function montar(el, est) {
     } catch (err) { el.querySelector('#stEstado').textContent = `Não salvou: ${err.message}`; toast('Studio', err.message, 'warning'); return false; }
   }
   el.querySelector('#stSalvar').onclick = salvar;
-  ajustar();
+  // vista inicial: a área inteira cabe na tela
+  const caber = () => { const W = est.area.w * GRADE; const H = est.area.h * GRADE; S.cam.x = W / 2; S.cam.y = H / 2; S.cam.z = Math.max(0.25, Math.min(1.5, (tela.clientWidth - 40) / W, (tela.clientHeight - 40) / H)); };
+  caber(); ajustar();
 }

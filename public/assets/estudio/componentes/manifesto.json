@@ -1,0 +1,2314 @@
+{
+ "versao": 1,
+ "componentes": [
+  {
+   "id": "ex:vegetacao/arbusto-1",
+   "nome": "Arbusto 1",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-1.png",
+   "hash": "f293e248b784d68be98042b8e000852d6ab858e6262f59467f6341bde8d23a26",
+   "w": 30,
+   "h": 33,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 1,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arbusto-2",
+   "nome": "Arbusto 2",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-2.png",
+   "hash": "2dab002e553375185d693133cd2d9a8a273cbec0d4746c15f85032e0832a39e3",
+   "w": 33,
+   "h": 32,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arbusto-3",
+   "nome": "Arbusto 3",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-3.png",
+   "hash": "0feca7c548e9c3cfff088b7780b3d36920ad73aeef474c1838c749e3db570986",
+   "w": 30,
+   "h": 37,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 1,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arbusto-4",
+   "nome": "Arbusto 4",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arbusto-4.png",
+   "hash": "bc3f90d8e4ab07a52a0f08605bb800e241ebd7b1787f0cfa0370201fcca37bf7",
+   "w": 34,
+   "h": 35,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arvore-copa",
+   "nome": "Arvore copa",
+   "categoria": "externo",
+   "sub": "arvore",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arvore-copa.png",
+   "hash": "bb8352350739517ccffce106e5a1566faa63cca89bd1bd0a6ab688b37cad4422",
+   "w": 89,
+   "h": 124,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -9,
+    "y": -19,
+    "w": 18,
+    "h": 19
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arvore-grande",
+   "nome": "Arvore grande",
+   "categoria": "externo",
+   "sub": "arvore",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arvore-grande.png",
+   "hash": "be0f40101cff91607c67568f0cf98adad99f14b0f2beca087424ffa1f30d769b",
+   "w": 105,
+   "h": 144,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -10,
+    "y": -22,
+    "w": 21,
+    "h": 22
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/arvore-pequena",
+   "nome": "Arvore pequena",
+   "categoria": "externo",
+   "sub": "arvore",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/arvore-pequena.png",
+   "hash": "01bf5e94f5c405f704326b7289e11a342ed5e5a098dfd0b0e8d4f8be34735db4",
+   "w": 73,
+   "h": 68,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -7,
+    "y": -10,
+    "w": 15,
+    "h": 10
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/ipe-rosa",
+   "nome": "Ipe rosa",
+   "categoria": "externo",
+   "sub": "arvore",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/ipe-rosa.png",
+   "hash": "f90cfb896b87b3c15e7ff5e9efbff8fa4a50fe520d3f1d4fc0ad5b6d898fae47",
+   "w": 100,
+   "h": 132,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -10,
+    "y": -20,
+    "w": 20,
+    "h": 20
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/moita-alta-2",
+   "nome": "Moita alta 2",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/moita-alta-2.png",
+   "hash": "2831b7c9495a66c5e4a8d6cda0f06df745c06aee34afb798568c9dd2ebe1cc22",
+   "w": 37,
+   "h": 55,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/moita-alta",
+   "nome": "Moita alta",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/moita-alta.png",
+   "hash": "9a3e5ca565945f0a88573fe51b7e42cbe4dcd1cd64ba11576e404be4859dc287",
+   "w": 39,
+   "h": 58,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/moita-flor",
+   "nome": "Moita flor",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/moita-flor.png",
+   "hash": "460106eeafce404810bd9ba26875b318b5da577ca46e2231134fa9a7643430df",
+   "w": 28,
+   "h": 48,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 1,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/palmeira-2",
+   "nome": "Palmeira 2",
+   "categoria": "externo",
+   "sub": "palmeira",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-2.png",
+   "hash": "fad465d7572d336ce861c58f8340dd83dbcc8095b6452db04e0036e8461ca3e0",
+   "w": 67,
+   "h": 135,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -7,
+    "y": -20,
+    "w": 13,
+    "h": 20
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/palmeira-3",
+   "nome": "Palmeira 3",
+   "categoria": "externo",
+   "sub": "palmeira",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-3.png",
+   "hash": "98df4fd80fac3261cf10c39722ee424d76d1c6b2d0c10872c7ca0cbf6b778468",
+   "w": 69,
+   "h": 140,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -7,
+    "y": -21,
+    "w": 14,
+    "h": 21
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/palmeira-alta",
+   "nome": "Palmeira alta",
+   "categoria": "externo",
+   "sub": "palmeira",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/palmeira-alta.png",
+   "hash": "8b96dcf4281e00d92be5fc887b6b90fa42a9352d28f87af1acef06f5b493919c",
+   "w": 73,
+   "h": 156,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -7,
+    "y": -23,
+    "w": 15,
+    "h": 23
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/palmeira",
+   "nome": "Palmeira",
+   "categoria": "externo",
+   "sub": "palmeira",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/palmeira.png",
+   "hash": "4825419fb759b48e1a55f06f0bea59378d94c9413bd00586bbae76636484f670",
+   "w": 66,
+   "h": 123,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -7,
+    "y": -18,
+    "w": 13,
+    "h": 18
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:vegetacao/samambaia",
+   "nome": "Samambaia",
+   "categoria": "externo",
+   "sub": "vegetacao",
+   "perspectiva": "arq25d",
+   "material": "vegetal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/vegetacao/samambaia.png",
+   "hash": "9a2ced38abd914e46f42de3ccf9ebd5ab06c6a789ccc236ed0d0c9f6621fb209",
+   "w": 57,
+   "h": 56,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/banca-mercado-2",
+   "nome": "Banca mercado 2",
+   "categoria": "equipamento",
+   "sub": "equipamento",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/banca-mercado-2.png",
+   "hash": "8402893024f541a9038f6ac65cfd91634837186c8ed7cf280a6cc86433a1203d",
+   "w": 77,
+   "h": 80,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -31,
+    "y": -16,
+    "w": 62,
+    "h": 16
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/banca-mercado",
+   "nome": "Banca mercado",
+   "categoria": "equipamento",
+   "sub": "equipamento",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/banca-mercado.png",
+   "hash": "4600b6c6d23702d9306db0cc445d10cb94a90e37e36f9a60e1699e1141deddf5",
+   "w": 57,
+   "h": 79,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -23,
+    "y": -16,
+    "w": 46,
+    "h": 16
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/banco-jardim",
+   "nome": "Banco jardim",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/banco-jardim.png",
+   "hash": "a9a3907ea4fdd7e8dba4900ba45a8d73cb7cc6726481ad2a36ead0f4e8612f46",
+   "w": 104,
+   "h": 40,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cabine-azul",
+   "nome": "Cabine azul",
+   "categoria": "equipamento",
+   "sub": "equipamento",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cabine-azul.png",
+   "hash": "70e7249abb505da6a2cd25a51fd498ea7fdac978b38d3ceda95651f4702bdbec",
+   "w": 52,
+   "h": 109,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -21,
+    "y": -22,
+    "w": 42,
+    "h": 22
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cabine-vermelha",
+   "nome": "Cabine vermelha",
+   "categoria": "equipamento",
+   "sub": "equipamento",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cabine-vermelha.png",
+   "hash": "6152ae22e89d09c9a6b2fa2a18ddc188f2c4e75d05db4a2d3d70d8abd3d6002d",
+   "w": 48,
+   "h": 108,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -19,
+    "y": -22,
+    "w": 38,
+    "h": 22
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cadeira-praia",
+   "nome": "Cadeira praia",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cadeira-praia.png",
+   "hash": "22057298d4e8cb50a230ad304ba27bfb401741e4793cbc9c58a5cedec35cd397",
+   "w": 32,
+   "h": 38,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 1,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cerca-jardim",
+   "nome": "Cerca jardim",
+   "categoria": "externo",
+   "sub": "cerca",
+   "perspectiva": "arq25d",
+   "material": "madeira",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cerca-jardim.png",
+   "hash": "a91137ec73f08c935be06fe4fc7c1e87b3ab84fe0a6eebf29c03c307472f5218",
+   "w": 108,
+   "h": 39,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -43,
+    "y": -8,
+    "w": 86,
+    "h": 8
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cerca-madeira-2",
+   "nome": "Cerca madeira 2",
+   "categoria": "externo",
+   "sub": "cerca",
+   "perspectiva": "arq25d",
+   "material": "madeira",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cerca-madeira-2.png",
+   "hash": "50de437d6d129cd591c20e3eb21c3ec8ed96a16d38fbcd4e76e53a1d8c5b2acb",
+   "w": 134,
+   "h": 80,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -54,
+    "y": -16,
+    "w": 107,
+    "h": 16
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/cerca-madeira",
+   "nome": "Cerca madeira",
+   "categoria": "externo",
+   "sub": "cerca",
+   "perspectiva": "arq25d",
+   "material": "madeira",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/cerca-madeira.png",
+   "hash": "6cdb0260e99713ba59bf729d4ade1c4523523aa6f976587b9ce89461c887ca78",
+   "w": 135,
+   "h": 100,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -54,
+    "y": -20,
+    "w": 108,
+    "h": 20
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/guarda-sol-2",
+   "nome": "Guarda sol 2",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/guarda-sol-2.png",
+   "hash": "b3688412e6e1349ec27d8a08fef8ad48d9f2dfc5db9c028f0a1fed7bea3562f7",
+   "w": 56,
+   "h": 47,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/guarda-sol",
+   "nome": "Guarda sol",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/guarda-sol.png",
+   "hash": "f62f05ba903f0b5fcc29f8946fd2904fc25f7d5476e07ceba0d7d47ce7eb4ed7",
+   "w": 48,
+   "h": 43,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/piscina",
+   "nome": "Piscina",
+   "categoria": "equipamento",
+   "sub": "equipamento",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/piscina.png",
+   "hash": "fd1ad0427de0358bdaee539c2312dceda4a425127fee28fd03c029277ebed14c",
+   "w": 99,
+   "h": 36,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -40,
+    "y": -7,
+    "w": 79,
+    "h": 7
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/portal-jardim",
+   "nome": "Portal jardim",
+   "categoria": "externo",
+   "sub": "portao",
+   "perspectiva": "arq25d",
+   "material": "madeira",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/portal-jardim.png",
+   "hash": "97429ff514911f23a5f65875dab68374c65092d20660783209a6279853d7d84e",
+   "w": 73,
+   "h": 57,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -29,
+    "y": -11,
+    "w": 58,
+    "h": 11
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/poste-luz-2",
+   "nome": "Poste luz 2",
+   "categoria": "externo",
+   "sub": "poste",
+   "perspectiva": "arq25d",
+   "material": "metal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/poste-luz-2.png",
+   "hash": "ba872f74dd98adea6b8212e9ad22d71c86fc1b7cb8248439cd17a414880ee699",
+   "w": 33,
+   "h": 141,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -13,
+    "y": -28,
+    "w": 26,
+    "h": 28
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/poste-luz",
+   "nome": "Poste luz",
+   "categoria": "externo",
+   "sub": "poste",
+   "perspectiva": "arq25d",
+   "material": "metal",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/poste-luz.png",
+   "hash": "9bf3d922f15647c32332287f3797d1784acd4361f075a231445dde7dfb60245d",
+   "w": 31,
+   "h": 144,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 1,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -12,
+    "y": -29,
+    "w": 25,
+    "h": 29
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/pranchas",
+   "nome": "Pranchas",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/pranchas.png",
+   "hash": "e07b1c2953d4fea91c24591bf909f9c3b7e27d1cee6980887040315e1bdeafd5",
+   "w": 56,
+   "h": 80,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 2,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:objetos/salva-vidas",
+   "nome": "Salva vidas",
+   "categoria": "externo",
+   "sub": "mobiliario",
+   "perspectiva": "arq25d",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/objetos/salva-vidas.png",
+   "hash": "09e56f29f09a7b1b84fa640b585e89f49ef454d42ac470a86b7f6e417f642a1d",
+   "w": 74,
+   "h": 119,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "externo",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/aeroporto",
+   "nome": "Aeroporto",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/aeroporto.png",
+   "hash": "a9d034f6db04914737f2fa0935f41134e14fdb92ec8aaf704498b2057b2c3ab8",
+   "w": 290,
+   "h": 251,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 10,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -128,
+    "y": -216,
+    "w": 255,
+    "h": 186
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/cabana-palha",
+   "nome": "Cabana palha",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/cabana-palha.png",
+   "hash": "d79420a3bcfa636be2605024728bfe481855d47540a2479f6d88d6fc35a7d104",
+   "w": 193,
+   "h": 120,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 7,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -85,
+    "y": -103,
+    "w": 170,
+    "h": 89
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-ardosia",
+   "nome": "Casa ardosia",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-ardosia.png",
+   "hash": "99a562f1c0b0fdac0de1d71ee5090d77af3e500fd35fb03eca96e6e148ce0f19",
+   "w": 193,
+   "h": 147,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 7,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -85,
+    "y": -126,
+    "w": 170,
+    "h": 109
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-azul",
+   "nome": "Casa azul",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-azul.png",
+   "hash": "507ea69a911076b243d0d8568f2c271db87fc493acffd797f61f94a21cad83d1",
+   "w": 191,
+   "h": 178,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -84,
+    "y": -153,
+    "w": 168,
+    "h": 132
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-branca",
+   "nome": "Casa branca",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-branca.png",
+   "hash": "1f2c9d0c0cae282821b85ce6f70c03623a879563a8f08fa3adcba2cbceff2df5",
+   "w": 167,
+   "h": 147,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -73,
+    "y": -126,
+    "w": 147,
+    "h": 109
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-cinza",
+   "nome": "Casa cinza",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-cinza.png",
+   "hash": "e3dd7fa9917a25e735101dce02763c05e75a29201854794b1e24b99b18219b9e",
+   "w": 185,
+   "h": 178,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -81,
+    "y": -153,
+    "w": 163,
+    "h": 132
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-noturna",
+   "nome": "Casa noturna",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-noturna.png",
+   "hash": "f0d5df449990a53200b17adcc4cb8167dcee0be502be175e8b40152bca7d7126",
+   "w": 299,
+   "h": 208,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 10,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -132,
+    "y": -179,
+    "w": 263,
+    "h": 154
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/casa-vermelha",
+   "nome": "Casa vermelha",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/casa-vermelha.png",
+   "hash": "934c2c1bc6c90ae1e77341151f8e18f97434488c1b867d00edd47b0d7bcc4a1a",
+   "w": 187,
+   "h": 171,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -82,
+    "y": -147,
+    "w": 165,
+    "h": 127
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/delegacia",
+   "nome": "Delegacia",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/delegacia.png",
+   "hash": "18923a9312fa6d0ac1ac522053e7bf0b4f5538ca975049ae92260d0cde3fc6af",
+   "w": 276,
+   "h": 205,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 9,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -121,
+    "y": -176,
+    "w": 243,
+    "h": 152
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/farol",
+   "nome": "Farol",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/farol.png",
+   "hash": "1dcb5b1f30d55ebe14f6fe058abf3b1a0d29a80430786d95bdb0d05ff763aae7",
+   "w": 158,
+   "h": 282,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -70,
+    "y": -243,
+    "w": 139,
+    "h": 209
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/hospital",
+   "nome": "Hospital",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/hospital.png",
+   "hash": "de4ea27a99dd16e9c50b3d9f57106f3fc32e40514430818e4810f68f028216a2",
+   "w": 233,
+   "h": 212,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 8,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -103,
+    "y": -182,
+    "w": 205,
+    "h": 157
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/hotel",
+   "nome": "Hotel",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/hotel.png",
+   "hash": "7e15b067a52210cbd91dacbe7a44450a3c3737839d134aa67d58b5eaa6cbb65d",
+   "w": 146,
+   "h": 234,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -64,
+    "y": -201,
+    "w": 128,
+    "h": 173
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/lanchonete",
+   "nome": "Lanchonete",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/lanchonete.png",
+   "hash": "d702e73808966bc2e0c5116feab089dea4c6e660dd5a84ab4d56357436765aab",
+   "w": 264,
+   "h": 206,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 9,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -116,
+    "y": -177,
+    "w": 232,
+    "h": 152
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/mercado-24h",
+   "nome": "Mercado 24h",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/mercado-24h.png",
+   "hash": "18b2f1b2398f4ca7dbd0cfd5a429712fdcf1f10057a0ebe13a5169ba08932f2f",
+   "w": 295,
+   "h": 188,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 10,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -130,
+    "y": -162,
+    "w": 260,
+    "h": 139
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/posto",
+   "nome": "Posto",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/posto.png",
+   "hash": "cae2a677b10f3632510fe3bd63b68d081de5490d9e948e6ec2b68affd515c8b5",
+   "w": 242,
+   "h": 169,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 8,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -106,
+    "y": -145,
+    "w": 213,
+    "h": 125
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/predio-azul-baixo",
+   "nome": "Predio azul baixo",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/predio-azul-baixo.png",
+   "hash": "033d1b470bcfe9e6a1a1714c79db248f894ada5e5c238e25663b79b53c8691be",
+   "w": 162,
+   "h": 153,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -71,
+    "y": -132,
+    "w": 143,
+    "h": 113
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/predio-bege",
+   "nome": "Predio bege",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/predio-bege.png",
+   "hash": "27227375c783003cb541ab0e3b6492e94b30eb4e9f6b4a71f50f1a4e15d2f350",
+   "w": 210,
+   "h": 172,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 7,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -92,
+    "y": -148,
+    "w": 185,
+    "h": 127
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/predio-branco",
+   "nome": "Predio branco",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/predio-branco.png",
+   "hash": "e09ecf15206169be0d9a36c6e32a58a06d1f1fff732a1278caabb1224d7a6301",
+   "w": 174,
+   "h": 235,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 6,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -77,
+    "y": -202,
+    "w": 153,
+    "h": 174
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/predio-laranja",
+   "nome": "Predio laranja",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/predio-laranja.png",
+   "hash": "16151a1f22e669d209e05c2ca5767aec8ba17cfe4ee7110bc4ee1f72208b1bc5",
+   "w": 145,
+   "h": 183,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -64,
+    "y": -157,
+    "w": 128,
+    "h": 135
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/quiosque-palafita",
+   "nome": "Quiosque palafita",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/quiosque-palafita.png",
+   "hash": "174202ad402d32e8a08cdf2f2388761510c7664684c797d086069ae42b6f2b92",
+   "w": 127,
+   "h": 162,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -56,
+    "y": -139,
+    "w": 112,
+    "h": 120
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/sobrado-vermelho",
+   "nome": "Sobrado vermelho",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/sobrado-vermelho.png",
+   "hash": "396fa1292be127ef13b5283c50151e13a753c63ec605301e63c064ed5322ffbb",
+   "w": 235,
+   "h": 167,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 8,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -103,
+    "y": -144,
+    "w": 207,
+    "h": 124
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/torre-cilindrica",
+   "nome": "Torre cilindrica",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/torre-cilindrica.png",
+   "hash": "54cd21c117681c98b7fe720be843fb604f1a64329c6573bf4be11621526357ef",
+   "w": 113,
+   "h": 238,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -50,
+    "y": -205,
+    "w": 99,
+    "h": 176
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:construcoes/torre-vidro",
+   "nome": "Torre vidro",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/construcoes/torre-vidro.png",
+   "hash": "79ddcc6130ac5269dce20305f7a9997ace7d93145fd0ea503333fbbb312a8ce6",
+   "w": 206,
+   "h": 242,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 7,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -91,
+    "y": -208,
+    "w": 181,
+    "h": 179
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-curva-1",
+   "nome": "Calcada curva 1",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-1.png",
+   "hash": "10c69451f5538666484f52d962acfbc2e6a3cbbff8e8fd7bc038683790fa5a5a",
+   "w": 290,
+   "h": 292,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 10,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-curva-2",
+   "nome": "Calcada curva 2",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-2.png",
+   "hash": "b50ce037eb6ff4ec46d5aa1ee4ed1611d2e424150f883d6e5801fbef3353470a",
+   "w": 283,
+   "h": 293,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 9,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-curva-3",
+   "nome": "Calcada curva 3",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-3.png",
+   "hash": "86769855bf38a682982dbd0fda6aa4187c467a82d36c6e4ea6330692300ff043",
+   "w": 290,
+   "h": 271,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 10,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-curva-4",
+   "nome": "Calcada curva 4",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-curva-4.png",
+   "hash": "4cd95bf8015321745b5605d7468a5a22801a6cf4d24ed142c7df55cc127d4e98",
+   "w": 283,
+   "h": 272,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 9,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-reta-horizontal",
+   "nome": "Calcada reta horizontal",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-reta-horizontal.png",
+   "hash": "81da00c2e8c6f318244992cff65fbd6e0552b5a5d360e6879647c542d35b7ac2",
+   "w": 1046,
+   "h": 191,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 33,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/calcada-reta-vertical",
+   "nome": "Calcada reta vertical",
+   "categoria": "externo",
+   "sub": "calcada",
+   "perspectiva": "topo",
+   "material": "pedra",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/calcada-reta-vertical.png",
+   "hash": "33931916fd2c193f5295670bcd51c0fb7c370384fe138633ecae458baffa2d57",
+   "w": 248,
+   "h": 895,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 8,
+    "h": 9
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "solo",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/estrada-horizontal",
+   "nome": "Estrada horizontal",
+   "categoria": "via",
+   "sub": "reta",
+   "perspectiva": "topo",
+   "material": "asfalto",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/estrada-horizontal.png",
+   "hash": "086fcfd2e549ab7b7c163593135b2fd18478daced5292ba4ed221189d29b88ae",
+   "w": 991,
+   "h": 305,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 31,
+    "h": 3
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/estrada-vertical",
+   "nome": "Estrada vertical",
+   "categoria": "via",
+   "sub": "reta",
+   "perspectiva": "topo",
+   "material": "asfalto",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/estrada-vertical.png",
+   "hash": "739e601b5b65f3e611e1beab1b2e2cb94d42d8e8a5c72d39fc17f446d356e3d1",
+   "w": 361,
+   "h": 975,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 12,
+    "h": 10
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/predio-policia-civil",
+   "nome": "Predio policia civil",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/predio-policia-civil.png",
+   "hash": "da2ed638e2290cc2ad77679c14a4eee5cf784bb7e3fe1d85e2da81344807266d",
+   "w": 640,
+   "h": 441,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 20,
+    "h": 5
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -282,
+    "y": -379,
+    "w": 563,
+    "h": 326
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:3d/predio-vanity-club",
+   "nome": "Predio vanity club",
+   "categoria": "construcao",
+   "sub": "referencia",
+   "perspectiva": "arq25d",
+   "material": "misto",
+   "origem": "existente",
+   "arquivo": "/assets/mapas/inventario/3d/predio-vanity-club.png",
+   "hash": "c1b11419a1a674523bd06a31bd28e37697763cd6929c3e5d06c4fa6b7fbff41b",
+   "w": 640,
+   "h": 397,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 20,
+    "h": 4
+   },
+   "colisao": {
+    "tipo": "caixa",
+    "x": -282,
+    "y": -341,
+    "w": 563,
+    "h": 294
+   },
+   "conectores": [],
+   "camada": "base",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/agua",
+   "nome": "Agua",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/agua.png",
+   "hash": "f43955255c12111859dcfb41e28326d4a98b58568de5414b1b618fdce719c44b",
+   "w": 160,
+   "h": 196,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/areia",
+   "nome": "Areia",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/areia.png",
+   "hash": "ad12ee8ba7c9ac2ed1675f03404afe11a24ae8bbbd5632591c584b1a7b2e9c20",
+   "w": 110,
+   "h": 110,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/asfalto",
+   "nome": "Asfalto",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/asfalto.png",
+   "hash": "87929594592c964b56c9bf7a41cf9a1cf8bb166ef075c21e3c8723a32c2bae64",
+   "w": 378,
+   "h": 44,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 12,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/calcada",
+   "nome": "Calcada",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/calcada.png",
+   "hash": "54f6a5e06c9058bbc8f06cd3779b9843d242873573ec632026db5d1904566317",
+   "w": 212,
+   "h": 212,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 7,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/canteiro",
+   "nome": "Canteiro",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/canteiro.png",
+   "hash": "2bc1386b6fb1bf6504b986a55df9e19309553016c0e6f7f68d35615b0dacbbd8",
+   "w": 114,
+   "h": 114,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/grama-clara",
+   "nome": "Grama clara",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/grama-clara.png",
+   "hash": "f8276588c9cd772119d0f3082eed1498b7a637d3bc3937c0066e7e0b74a539d6",
+   "w": 90,
+   "h": 94,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 3,
+    "h": 1
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/grama-flores",
+   "nome": "Grama flores",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/grama-flores.png",
+   "hash": "8436b2829d10845fcbccec48aa93b731c672461a331840eb04f51ec709d7eeb8",
+   "w": 118,
+   "h": 118,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/grama-florida",
+   "nome": "Grama florida",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/grama-florida.png",
+   "hash": "e00d807ccbee0c1f02e6f5463ddc1a020adbc94c89d039ffe595b88b1cc2f2df",
+   "w": 110,
+   "h": 114,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/grama-roxa",
+   "nome": "Grama roxa",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/grama-roxa.png",
+   "hash": "339c4d6b464881b8d75c89b89e01484ee7011452d41dc84e7df71e2ca4b47aca",
+   "w": 110,
+   "h": 114,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/grama",
+   "nome": "Grama",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/grama.png",
+   "hash": "0994c166fc880476cdaf32e9b27c0888eb002abbed00044bf1116e6379528b72",
+   "w": 118,
+   "h": 118,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/mata",
+   "nome": "Mata",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/mata.png",
+   "hash": "e44cc34bf1a9e4db90b12aabd9db03ef96260492888f3f6f9914627e05da44f0",
+   "w": 118,
+   "h": 114,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/pedra",
+   "nome": "Pedra",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/pedra.png",
+   "hash": "c403173545466b286eadaa400b14d9a90ebb12ac68f7a0ef5fe70d22f6a657d3",
+   "w": 156,
+   "h": 204,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 5,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  },
+  {
+   "id": "ex:terreno/terra",
+   "nome": "Terra",
+   "categoria": "material",
+   "sub": "textura",
+   "perspectiva": "ambas",
+   "material": "outro",
+   "origem": "existente",
+   "arquivo": "/assets/mundo/terreno/terra.png",
+   "hash": "1d2282cc810ed2667315c16ef077eb0d350059b642ef59d1323801d6d857ba55",
+   "w": 110,
+   "h": 110,
+   "pivo": {
+    "x": 0.5,
+    "y": 1
+   },
+   "area": {
+    "w": 4,
+    "h": 2
+   },
+   "colisao": {
+    "tipo": "nenhuma"
+   },
+   "conectores": [],
+   "camada": "piso",
+   "tags": []
+  }
+ ]
+}

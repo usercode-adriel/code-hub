@@ -216,6 +216,42 @@ test('structure studio: hub cria estrutura, editor abre e salva; preset não mud
   await ctx.close();
 });
 
+test('structure studio: biblioteca busca, filtra, mostra detalhes e importa sem duplicar', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/studio`); await p.waitForSelector('#sNovo', { timeout: 30000 });
+  await p.selectOption('#sPreset', 'arq25d'); await p.click('#sNovo'); await p.waitForSelector('#bLista [data-id]', { timeout: 15000 });
+  const todos = await p.locator('#bLista [data-id]').count();
+  assert.ok(todos > 10, 'a biblioteca lista componentes');
+  // perspectiva arquitetônica não oferece vias
+  assert.equal(await p.locator('#bCats [data-cat="via"]').count(), 0);
+  // busca por texto
+  await p.fill('#bQ', 'palmeira'); await p.waitForTimeout(500);
+  const achadas = await p.locator('#bLista [data-id]').count();
+  assert.ok(achadas > 0 && achadas < todos, 'a busca reduz a lista');
+  // escolher mostra os detalhes (metadados) no painel direito
+  await p.locator('#bLista [data-id]').first().click();
+  assert.match(await p.textContent('#stProp'), /Perspectiva/); assert.match(await p.textContent('#stProp'), /Encaixa em/);
+  // importar o mesmo PNG duas vezes: a segunda devolve o existente
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8DwnwEJMDGgAapKAQAHnAEE0/XHCwAAAABJRU5ErkJggg==', 'base64');
+  const importar = async (nome) => {
+    await p.click('#bImportar'); await p.waitForSelector('#iArq');
+    await p.setInputFiles('#iArq', { name: 'peca.png', mimeType: 'image/png', buffer: png }); await p.fill('#iNome', nome);
+    await p.selectOption('#iCat', 'fachada'); await p.selectOption('#iSub', 'janela'); await p.click('#iEnviar'); await p.waitForTimeout(700);
+  };
+  await importar('Janela de teste'); await importar('Janela de teste 2');
+  const lista = await p.evaluate(async () => {
+    const h = { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` };
+    return (await (await fetch('/api/estudio/componentes?origem=importado&limite=50', { headers: h })).json()).componentes;
+  });
+  assert.equal(lista.length, 1, 'o mesmo arquivo não duplica na biblioteca');
+  assert.equal(lista[0].hash.length, 64);
+  // o arquivo importado é servido
+  const st = await p.evaluate(async (u) => (await fetch(u)).status, lista[0].arquivo);
+  assert.equal(st, 200);
+  assert.deepEqual(p.errosJS, [], 'erros de script na biblioteca');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);

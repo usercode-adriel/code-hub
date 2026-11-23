@@ -34,6 +34,7 @@ import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
 import personagens from './personagens.js';
 import estudio from './estudio.js';
+import { ARQUIVOS as ESTUDIO_ARQUIVOS } from './estudio-biblioteca.js';
 import godot from './godot.js';
 import mapas from './mapas.js';
 
@@ -201,6 +202,8 @@ app.use('/api/admin', requireAuth, admin);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false }));
+// componentes do Structure Studio importados ou gerados: pastas por usuário, nomes pelo hash do arquivo
+app.use('/estudio-arquivos', express.static(ESTUDIO_ARQUIVOS, { maxAge: '7d', fallthrough: false }));
 app.use(express.static(PUBLIC, { extensions: ['html'] }));
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
 
