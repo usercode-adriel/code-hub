@@ -215,9 +215,13 @@ export function diagnosticar(instancias, area, presetId, compDe) {
   const base = instancias.filter((i) => i.camada === 'base' && compDe(i.comp) && !i.anfitriao);
   for (let a = 0; a < base.length; a++) for (let b = a + 1; b < base.length; b++) {
     if (base[a].grupo && base[a].grupo === base[b].grupo) continue;
-    const pa = pegada(base[a], compDe(base[a].comp)); const pb = pegada(base[b], compDe(base[b].comp));
+    const ca = compDe(base[a].comp); const cb = compDe(base[b].comp);
+    const pa = pegada(base[a], ca); const pb = pegada(base[b], cb);
     const ox = Math.min(pa.x1, pb.x1) - Math.max(pa.x0, pb.x0); const oy = Math.min(pa.y1, pb.y1) - Math.max(pa.y0, pb.y0);
-    if (ox > 6 && oy > 6) add('atravessando', base[b], 'atravessa outra peça estrutural');
+    // andares empilhados não se atravessam: só conta se as alturas também se sobrepõem
+    const za0 = base[a].z || 0; const zb0 = base[b].z || 0;
+    const oz = Math.min(za0 + alturaVisual(base[a], ca), zb0 + alturaVisual(base[b], cb)) - Math.max(za0, zb0);
+    if (ox > 6 && oy > 6 && oz > 2) add('atravessando', base[b], 'atravessa outra peça estrutural');
   }
   return problemas;
 }
@@ -229,6 +233,6 @@ export function normalizarInstancia(i) {
     rot: Math.round((((Number(i.rot) || 0) % 360) + 360) % 360 * 10) / 10, escala: Math.round(limitar(Number(i.escala) || 1, ESCALA_MIN, ESCALA_MAX) * 100) / 100,
     n: Math.round(limitar(Number(i.n) || 1, 1, MODULOS_MAX)), espelho: i.espelho === true, camada: CAMADAS.includes(i.camada) ? i.camada : 'externo',
     zfino: Math.round(limitar(Number(i.zfino) || 0, -999, 999)), grupo: i.grupo ? String(i.grupo).slice(0, 40) : null, anfitriao: i.anfitriao ? String(i.anfitriao).slice(0, 40) : null,
-    cor: /^#[0-9a-f]{6}$/i.test(i.cor || '') ? i.cor : null, material: MATERIAIS.includes(i.material) ? i.material : null, textura: i.textura ? String(i.textura).slice(0, 60) : null, nome: String(i.nome || '').slice(0, 60), colisao: i.colisao === true,
+    cor: /^#[0-9a-f]{6}$/i.test(i.cor || '') ? i.cor : null, material: MATERIAIS.includes(i.material) ? i.material : null, textura: i.textura ? String(i.textura).slice(0, 60) : null, papel: i.papel ? String(i.papel).slice(0, 30) : null, andar: Number.isFinite(Number(i.andar)) && i.andar !== null ? Math.round(limitar(Number(i.andar), 0, 40)) : null, nome: String(i.nome || '').slice(0, 60), colisao: i.colisao === true,
   };
 }

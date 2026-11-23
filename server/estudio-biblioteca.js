@@ -157,7 +157,7 @@ router.delete('/item', async (req, res) => {
   const c = lista.find((x) => x.id === id);
   if (!c) return res.status(404).json({ error: 'Só componentes da sua biblioteca podem ser apagados' });
   // em uso numa estrutura ou num prefab: não apaga (a montagem ficaria com um buraco)
-  const { listarEstruturas } = await import('./estudio.js');
+  const { listarEstruturas } = await import('./estudio-dados.js');
   const uso = listarEstruturas(req.user.id).filter((e) => e.componentes.some((i) => i.comp === id || i.textura === id));
   if (uso.length) return res.status(409).json({ error: `Este componente está em uso em ${uso.length} estrutura(s): ${uso.slice(0, 3).map((e) => e.nome).join(', ')}` });
   gravarIndice(req.user.id, lista.filter((x) => x.id !== id));

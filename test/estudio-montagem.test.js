@@ -146,3 +146,11 @@ test('escalar o anfitrião reencaixa os filhos; clonar e apagar levam os encaixa
   const { restantes, removidos } = removerComFilhos([...todos, ...copias], [w.id]);
   assert.equal(removidos, 3); assert.equal(restantes.length, 3, 'a cópia continua');
 });
+
+test('diagnóstico: andares empilhados não se atravessam, mas paredes na mesma altura sim', () => {
+  const area = { w: 10, h: 10 };
+  const terreo = paredeEm(160, 160); const andar1 = novaInstancia(C.parede, 160, 160, { z: 96 });
+  assert.ok(!diagnosticar([terreo, andar1], area, 'arq25d', compDe).some((p) => p.tipo === 'atravessando'), 'um andar sobre o outro é válido');
+  const dentro = novaInstancia(C.parede, 160, 160, { z: 40 });
+  assert.ok(diagnosticar([terreo, dentro], area, 'arq25d', compDe).some((p) => p.tipo === 'atravessando'), 'paredes que se interpenetram em altura são acusadas');
+});

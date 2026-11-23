@@ -28,6 +28,7 @@ function montar(el, est, comps) {
   const S = {
     cam: { x: 0, y: 0, z: 1 }, grade: true, snap: true, pegadas: false, colisoes: false, sel: new Set(), ativo: null, aba: 'prop',
     ocultos: new Set(), travados: new Set(), pan: null, arrasto: null, faixa: null, fantasma: null, sujo: false, diag: [],
+    previa: null, ia: null, // previa: resultado da IA aguardando aprovação
   };
   const hist = { passado: [], futuro: [] };
   let clip = null;
@@ -43,6 +44,7 @@ function montar(el, est, comps) {
         <button class="btn sm" id="stGrade">Grade</button><button class="btn sm" id="stIma" title="Encaixe na grade fina">Ímã</button>
         <button class="btn sm" id="stPegadas" title="Mostra a área ocupada no chão">Áreas</button><button class="btn sm" id="stColisoes" title="Mostra as caixas de colisão">Colisões</button>
         <button class="btn sm" id="stTelaCheia">⛶ Tela cheia</button>
+        <button class="btn" id="stIABotao" title="Descreva e a IA monta; depois você edita cada peça">✨ Criar com IA</button>
         <button class="btn primary" id="stPrefab" title="Gera uma imagem da estrutura e guarda tudo (pegada, colisões, entradas)">Salvar como prefab</button></span>
     </div>
     <div style="display:grid;grid-template-columns:260px 1fr 290px;gap:10px;margin-top:10px">
@@ -52,7 +54,7 @@ function montar(el, est, comps) {
         <div id="stDica" style="position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:8px;background:rgba(17,24,39,.9);font-size:12px;display:none"></div>
       </div>
       <aside style="min-width:0;display:flex;flex-direction:column;gap:6px">
-        <div class="row" id="stAbas" style="gap:4px"><button class="btn sm" data-aba="prop">Propriedades</button><button class="btn sm" data-aba="camadas">Camadas</button><button class="btn sm" data-aba="verificar" id="stAbaVerificar">Verificar</button></div>
+        <div class="row" id="stAbas" style="gap:4px"><button class="btn sm" data-aba="prop">Propriedades</button><button class="btn sm" data-aba="camadas">Camadas</button><button class="btn sm" data-aba="verificar" id="stAbaVerificar">Verificar</button><button class="btn sm" data-aba="ia" id="stAbaIA">✨ IA</button></div>
         <div id="stProp" class="muted" style="font-size:13px;overflow:auto;max-height:690px"></div>
       </aside>
     </div></section>`;
@@ -79,9 +81,11 @@ function montar(el, est, comps) {
   }
 
   // ---------------------------------------------------------------- geometria da tela
-  const W = () => est.area.w * GRADE; const H = () => est.area.h * GRADE;
+  const areaAtiva = () => (S.previa ? S.previa.area : est.area);
+  const W = () => areaAtiva().w * GRADE; const H = () => areaAtiva().h * GRADE;
   const mundoDe = (e) => { const r = tela.getBoundingClientRect(); return { x: (e.clientX - r.left - r.width / 2) / S.cam.z + S.cam.x, y: (e.clientY - r.top - r.height / 2) / S.cam.z + S.cam.y }; };
-  const visiveis = () => est.componentes.filter((i) => !S.ocultos.has(i.id) && compDe(i.comp));
+  const listaAtiva = () => (S.previa ? S.previa.lista : est.componentes);
+  const visiveis = () => listaAtiva().filter((i) => !S.ocultos.has(i.id) && compDe(i.comp));
   const ctxEncaixe = () => ({ instancias: est.componentes, compDe, passo: S.snap ? M.PASSO : 1, raio: 48 });
   const unico = () => (S.sel.size === 1 ? est.componentes.find((i) => i.id === [...S.sel][0]) : null);
   // quadro da peça: origem no pé (x, y-z), girado; devolve o ponto no sistema local da peça
@@ -140,8 +144,8 @@ function montar(el, est, comps) {
     g.fillStyle = '#242b3a'; g.fillRect(0, 0, W(), H());
     if (S.grade) {
       g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1 / S.cam.z;
-      for (let x = 0; x <= est.area.w; x++) { g.beginPath(); g.moveTo(x * GRADE, 0); g.lineTo(x * GRADE, H()); g.stroke(); }
-      for (let y = 0; y <= est.area.h; y++) { g.beginPath(); g.moveTo(0, y * GRADE); g.lineTo(W(), y * GRADE); g.stroke(); }
+      for (let x = 0; x <= areaAtiva().w; x++) { g.beginPath(); g.moveTo(x * GRADE, 0); g.lineTo(x * GRADE, H()); g.stroke(); }
+      for (let y = 0; y <= areaAtiva().h; y++) { g.beginPath(); g.moveTo(0, y * GRADE); g.lineTo(W(), y * GRADE); g.stroke(); }
     }
     g.strokeStyle = '#f2c94c'; g.lineWidth = 2 / S.cam.z; g.strokeRect(0, 0, W(), H());
     const ordem = M.ordemDeDesenho(visiveis());
@@ -154,9 +158,11 @@ function montar(el, est, comps) {
       if (S.colisoes && i.colisao && c.colisao?.tipo === 'caixa') { const k = c.colisao; g.fillStyle = 'rgba(239,68,68,.28)'; g.strokeStyle = 'rgba(239,68,68,.9)'; g.lineWidth = z; g.fillRect(i.x + k.x * i.escala, i.y + k.y * i.escala, k.w * i.escala, k.h * i.escala); g.strokeRect(i.x + k.x * i.escala, i.y + k.y * i.escala, k.w * i.escala, k.h * i.escala); }
     }
     // marcas de erro (peça flutuando etc.)
-    for (const p of S.diag) if (p.gravidade === 'erro') { const i = est.componentes.find((x) => x.id === p.id); if (!i) continue; g.fillStyle = '#ef4444'; g.beginPath(); g.arc(i.x, i.y - (i.z || 0) - 4 * z, 6 * z, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff'; g.font = `bold ${9 * z}px sans-serif`; g.textAlign = 'center'; g.fillText('!', i.x, i.y - (i.z || 0) - 1 * z); }
+    if (!S.previa) for (const p of S.diag) if (p.gravidade === 'erro') { const i = est.componentes.find((x) => x.id === p.id); if (!i) continue; g.fillStyle = '#ef4444'; g.beginPath(); g.arc(i.x, i.y - (i.z || 0) - 4 * z, 6 * z, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff'; g.font = `bold ${9 * z}px sans-serif`; g.textAlign = 'center'; g.fillText('!', i.x, i.y - (i.z || 0) - 1 * z); }
+    // prévia da IA: peças que mudaram ou foram criadas ficam contornadas em verde
+    if (S.previa) for (const id of S.previa.mudadas) { const i = S.previa.lista.find((x) => x.id === id); if (!i || !compDe(i.comp)) continue; const { w, h } = caixa(i); g.save(); const pp = eixo(i); g.translate(pp.x, pp.y); g.rotate(rad(pp.rot)); g.strokeStyle = 'rgba(34,197,94,.9)'; g.lineWidth = 1.5 * z; g.strokeRect(-w / 2, -h, w, h); g.restore(); }
     // seleção
-    for (const id of S.sel) {
+    if (!S.previa) for (const id of S.sel) {
       const i = est.componentes.find((x) => x.id === id); if (!i || !compDe(i.comp)) continue;
       const { w, h } = caixa(i);
       g.save(); const p = eixo(i); g.translate(p.x, p.y); g.rotate(rad(p.rot));
@@ -171,7 +177,7 @@ function montar(el, est, comps) {
     }
     // pré-visualização de colocação, com o encaixe calculado (verde = encaixa, vermelho = não)
     const f = S.fantasma;
-    if (f && S.ativo) {
+    if (f && S.ativo && !S.previa) {
       const tpl = { ...M.novaInstancia(S.ativo, f.x, f.y, { z: f.z || 0 }), anfitriao: f.anfitriao };
       desenharInstancia(tpl, f.ok ? 0.75 : 0.35);
       const c = S.ativo; const w = M.larguraVisual(tpl, c); const h = M.alturaVisual(tpl, c);
@@ -251,6 +257,7 @@ function montar(el, est, comps) {
     const box = $('#stProp');
     if (S.aba === 'camadas') return painelCamadas(box);
     if (S.aba === 'verificar') return painelVerificar(box);
+    if (S.aba === 'ia') return painelIA(box);
     if (S.sel.size > 1) return painelMulti(box);
     const um = unico();
     if (!um) {
@@ -342,12 +349,67 @@ function montar(el, est, comps) {
     box.querySelectorAll('[data-prob]').forEach((d) => { d.onclick = () => { S.sel = new Set([d.dataset.prob]); S.aba = 'prop'; painel(); desenhar(); }; });
   }
 
+  // ---------------------------------------------------------------- IA: criar e editar, sempre com prévia aprovada pelo usuário
+  const resumoPrevia = (r) => Object.entries(r.resumo || {}).map(([k, n]) => `${n} ${CATEGORIAS_SUB[k] || k}`).join(', ');
+  const CATEGORIAS_SUB = Object.assign({}, ...Object.values(CATEGORIAS).map((c) => c.sub));
+  async function abrirPrevia(dados, modo) {
+    const faltam = [...new Set(dados.componentes.map((i) => i.comp))].filter((id) => !compDe(id));
+    await Promise.all(faltam.map(async (u) => { try { comps.set(u, await api.get(`/estudio/componentes/item?id=${encodeURIComponent(u)}`)); } catch { /* o diagnóstico acusa */ } }));
+    S.previa = { lista: dados.componentes, area: dados.area, mudadas: new Set(modo === 'editar' ? dados.mudadas : dados.componentes.map((i) => i.id)), via: dados.via, avisos: dados.avisos || [], faltando: dados.faltando || [], resumo: modo === 'montar' ? dados.resumo : null, resumoEdicao: modo === 'editar' ? dados.resumo : null, modo, ops: dados.ops };
+    S.sel = new Set(); S.ativo = null; atualizarDica();
+    if (modo === 'montar') caber();
+    S.aba = 'ia'; painel(); desenhar();
+  }
+  function aceitarPrevia() {
+    const p = S.previa; if (!p) return;
+    registrar(); est.componentes = p.lista; est.area = p.area; S.previa = null; S.sel = new Set();
+    marcar(); caber(); desenhar(); painel(); toast('IA', 'Montagem aplicada: cada peça continua editável.', 'success');
+  }
+  function descartarPrevia() { S.previa = null; caber(); desenhar(); painel(); }
+  async function pedirIA(tipo, texto, soSelecao) {
+    const estado = $('#iaEstado'); if (estado) estado.textContent = 'Pensando…';
+    try {
+      const dados = tipo === 'montar'
+        ? await api.post('/estudio/ia/montar', { estruturaId: est.id, descricao: texto })
+        : await api.post('/estudio/ia/editar', { estruturaId: est.id, instrucao: texto, componentes: est.componentes, selecao: soSelecao ? [...S.sel] : [] });
+      await abrirPrevia(dados, tipo);
+    } catch (err) { if (estado) estado.textContent = ''; toast('IA', err.message, 'warning'); }
+  }
+  function painelIA(box) {
+    const p = S.previa;
+    if (p) {
+      box.innerHTML = `<b>Prévia da IA</b> <span class="chip" style="font-size:10px">${p.via === 'ia' ? 'IA' : 'modo local'}</span>
+        <p style="font-size:12px;margin:6px 0">${p.modo === 'montar' ? `Montagem nova: ${esc(resumoPrevia(p))}.` : `${p.mudadas.size} peça(s) mudada(s) (em verde).`}${p.modo === 'montar' && est.componentes.length ? ' <b>Vai substituir o que está montado.</b>' : ''}</p>
+        ${p.resumoEdicao?.length ? `<div style="font-size:12px">${p.resumoEdicao.slice(0, 6).map((r) => `• ${esc(r.mudou)}`).join('<br>')}${p.resumoEdicao.length > 6 ? `<br>…e mais ${p.resumoEdicao.length - 6}` : ''}</div>` : ''}
+        ${p.faltando.length ? `<p style="font-size:12px;color:#f59e0b">Faltam na biblioteca: ${esc(p.faltando.join(', '))}. Gere ou importe esses componentes para uma montagem completa.</p>` : ''}
+        ${p.avisos.length ? `<div style="font-size:12px;color:#f59e0b">${p.avisos.slice(0, 5).map((a) => `⚠ ${esc(a)}`).join('<br>')}</div>` : ''}
+        <div class="row" style="gap:6px;margin-top:10px"><button class="btn primary" id="iaOk">Aceitar</button><button class="btn" id="iaNo">Descartar</button></div>
+        <p class="muted" style="font-size:11px;margin-top:6px">Nada é salvo até você aceitar. Depois, cada peça pode ser editada à mão.</p>`;
+      box.querySelector('#iaOk').onclick = aceitarPrevia; box.querySelector('#iaNo').onclick = descartarPrevia; return;
+    }
+    const temSel = S.sel.size > 0;
+    box.innerHTML = `<b>Criar com IA</b> <span class="chip" style="font-size:10px" id="iaModo">…</span>
+      <label style="display:block;margin-top:8px">Descreva a estrutura<textarea class="input" id="iaDesc" rows="5" maxlength="800" placeholder="Ex.: shopping moderno de médio porte, fachada de vidro azul, entrada centralizada, estacionamento frontal para 40 veículos, palmeiras e equipamentos no telhado"></textarea></label>
+      <div class="row" style="gap:6px;margin-top:6px"><button class="btn primary" id="iaMontar">Montar</button></div>
+      ${est.componentes.length ? '<p class="muted" style="font-size:11px">Montar substitui o que está na área (você vê a prévia antes).</p>' : ''}
+      <div style="margin-top:14px"><b>Editar com IA</b></div>
+      <label style="display:block;margin-top:6px">O que mudar<input class="input" id="iaInstr" maxlength="300" placeholder="Troque todas as janelas por vidro azul"></label>
+      <label style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px"><input type="checkbox" id="iaSel" ${temSel ? 'checked' : ''} ${temSel ? '' : 'disabled'}> Só nas ${S.sel.size || ''} peça(s) selecionada(s)</label>
+      <div class="row" style="gap:6px;margin-top:6px"><button class="btn" id="iaEditar" ${est.componentes.length ? '' : 'disabled'}>Aplicar</button></div>
+      <p class="muted" style="font-size:11px;margin-top:6px">Exemplos: "aumente a entrada", "adicione mais dois andares", "substitua o telhado por uma cobertura metálica", "amplie o estacionamento", "adicione uma garagem lateral".</p>
+      <div class="muted" id="iaEstado" style="font-size:12px;margin-top:6px"></div>`;
+    if (S.ia === null) api.get('/estudio/ia/estado').then((r) => { S.ia = r.ia; if ($('#iaModo')) $('#iaModo').textContent = S.ia ? 'IA conectada' : 'modo local'; }).catch(() => {}); else $('#iaModo').textContent = S.ia ? 'IA conectada' : 'modo local';
+    box.querySelector('#iaMontar').onclick = () => { const t = box.querySelector('#iaDesc').value.trim(); if (!t) { toast('IA', 'Descreva o que quer montar.', 'warning'); return; } pedirIA('montar', t); };
+    box.querySelector('#iaEditar').onclick = () => { const t = box.querySelector('#iaInstr').value.trim(); if (!t) { toast('IA', 'Diga o que quer mudar.', 'warning'); return; } pedirIA('editar', t, box.querySelector('#iaSel')?.checked); };
+  }
+
   // ---------------------------------------------------------------- mouse
   tela.addEventListener('contextmenu', (e) => e.preventDefault());
   const cantos = (i) => { const { w, h } = caixa(i); return [[-w / 2, -h], [w / 2, -h], [-w / 2, 0], [w / 2, 0]]; };
   tela.addEventListener('pointerdown', (e) => {
     tela.setPointerCapture(e.pointerId); const q = mundoDe(e);
     if (e.button === 1 || e.button === 2) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; tela.style.cursor = 'grabbing'; return; }
+    if (S.previa) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; tela.style.cursor = 'grabbing'; return; }
     if (S.ativo) { colocar(q); return; }
     const um = unico();
     if (um) {
@@ -498,10 +560,14 @@ function montar(el, est, comps) {
     } catch (err) { $('#stEstado').textContent = 'Prefab não gerado'; toast('Prefab', err.message, 'warning'); }
   }
   $('#stPrefab').onclick = salvarPrefab;
+  $('#stIABotao').onclick = () => { S.aba = 'ia'; painel(); };
   const auto = setInterval(() => { if (!el.isConnected) { clearInterval(auto); return; } if (S.sujo) salvar(); }, 20000);
 
   criarBiblioteca($('#stBiblioteca'), { preset: est.preset, aoEscolher: escolher });
   $('#stIma').classList.toggle('primary', S.snap);
   atualizarBotoes(); caber(); ajustar(); painel(); recalcular();
-  $('#stCaixa').__studio = { S, est, compDe, M, P }; // para os testes de navegador
+  $('#stCaixa').__studio = { S, est, compDe, M, P };
+  // vindo do hub com uma descrição: a IA já monta a prévia
+  const inicial = sessionStorage.getItem(`studio.ia.${est.id}`);
+  if (inicial) { sessionStorage.removeItem(`studio.ia.${est.id}`); S.aba = 'ia'; painel(); const d = $('#iaDesc'); if (d) d.value = inicial; pedirIA('montar', inicial); } // para os testes de navegador
 }

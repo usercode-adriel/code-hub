@@ -33,6 +33,10 @@ async function hub(el) {
         <label>Tipo<select class="input" id="sTipo"></select></label>
         <button class="btn primary" id="sNovo">Nova estrutura</button>
       </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+        <label style="flex:1;min-width:260px">Ou descreva e deixe a IA montar<input class="input" id="sIA" maxlength="300" placeholder="Ex.: delegacia pequena com estacionamento para 10 veículos e palmeiras"></label>
+        <button class="btn" id="sNovoIA">✨ Criar com IA</button>
+      </div>
       <p class="muted" id="sDesc" style="font-size:12px;margin-top:6px"></p>
       <div style="display:grid;gap:8px;margin-top:14px">${lista.map((e) => `<div class="card" style="padding:10px;display:flex;gap:10px;align-items:center;justify-content:space-between">
         <div><b>${esc(e.nome)}</b> <span class="chip">${esc(PRESETS[e.preset]?.nome || e.preset)}</span> ${e.prefab ? `<span class="chip">Prefab v${e.prefab.versao}</span>` : ''}${e.variacaoDe ? '<span class="chip">Variação</span>' : ''}
@@ -54,6 +58,13 @@ async function hub(el) {
     el.querySelector('#sDesc').textContent = p.descricao;
   };
   preset.onchange = atualizar; atualizar();
+  el.querySelector('#sNovoIA').onclick = async () => {
+    const desc = el.querySelector('#sIA').value.trim(); if (!desc) { toast('Studio', 'Descreva a estrutura para a IA.', 'warning'); return; }
+    try {
+      const e = await api.post('/estudio/estruturas', { nome: el.querySelector('#sNome').value.trim() || desc.slice(0, 40), preset: preset.value, tipo: tipo.value });
+      sessionStorage.setItem(`studio.ia.${e.id}`, desc); location.hash = `#/studio?id=${e.id}`;
+    } catch (err) { toast('Studio', err.message, 'warning'); }
+  };
   el.querySelector('#sNovo').onclick = async () => {
     try {
       const e = await api.post('/estudio/estruturas', { nome: el.querySelector('#sNome').value.trim() || 'Nova estrutura', preset: preset.value, tipo: tipo.value });

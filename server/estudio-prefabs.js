@@ -10,7 +10,7 @@ import { DATA_DIR } from './db.js';
 import { diagnosticar } from '../public/js/estudio/montagem.js';
 import { montarPrefab } from '../public/js/estudio/prefab.js';
 import { componentePorId, gravarPng, removerPng, componentesDoUsuario } from './estudio-biblioteca.js';
-import { lerEstrutura, gravarEstrutura, idValido } from './estudio.js';
+import { lerEstrutura, gravarEstrutura, idValido } from './estudio-dados.js';
 
 const router = express.Router();
 const pastaDe = (uid) => path.join(DATA_DIR, 'estudio', uid, 'prefabs');

@@ -385,6 +385,68 @@ test('structure studio: salva como prefab, duplica, cria variação, exporta e p
   await ctx.close();
 });
 
+test('structure studio: IA monta a prévia, usuário aprova, edita por instrução e a montagem segue editável', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token'));
+  const h = { Authorization: `Bearer ${token}` }; const hj = { ...h, 'Content-Type': 'application/json' };
+  const importar = async (nome, sub, categoria, w, hh, cor, material = 'concreto') => {
+    const fd = new FormData(); fd.append('imagem', new Blob([pngSolido(w, hh, cor)], { type: 'image/png' }), `${nome}.png`);
+    for (const [k, v] of Object.entries({ nome, categoria, sub, perspectiva: 'arq25d', material, origem: 'gerado' })) fd.append(k, v);
+    await fetch(`${BASE}/api/estudio/componentes`, { method: 'POST', headers: h, body: fd });
+  };
+  await importar('Parede ia', 'parede', 'estrutura', 128, 96, [160, 150, 140, 255]); await importar('Janela ia', 'janela', 'fachada', 32, 32, [80, 150, 210, 255], 'vidro');
+  await importar('Porta ia', 'porta', 'fachada', 48, 72, [90, 60, 40, 255]); await importar('Telhado ia', 'telhado-plano', 'cobertura', 128, 40, [120, 90, 80, 255]);
+  await importar('Palmeira ia', 'palmeira', 'externo', 60, 120, [40, 140, 60, 255], 'vegetal'); await importar('Vaga ia', 'vaga', 'estacionamento', 40, 64, [70, 70, 80, 255], 'asfalto');
+  const est = await (await fetch(`${BASE}/api/estudio/estruturas`, { method: 'POST', headers: hj, body: JSON.stringify({ nome: 'Casa por IA', preset: 'arq25d', tipo: 'casa' }) })).json();
+  await p.goto(`${BASE}/#/studio?id=${est.id}`); await p.waitForSelector('#stIABotao', { timeout: 20000 });
+  const estado = () => p.evaluate(() => { const s = document.querySelector('#stCaixa').__studio; return { n: s.est.componentes.length, subs: s.est.componentes.map((i) => s.compDe(i.comp)?.sub), previa: !!s.S.previa, nPrevia: s.S.previa?.lista.length || 0 }; });
+  // 1) pedir uma montagem: aparece a prévia, nada muda na estrutura até aprovar
+  await p.click('#stIABotao'); await p.waitForSelector('#iaDesc');
+  assert.match(await p.textContent('#iaModo').then((t) => t || '').catch(() => ''), /./);
+  await p.fill('#iaDesc', 'Casa pequena de 2 andares com palmeiras e estacionamento para 6 veículos'); await p.click('#iaMontar');
+  await p.waitForSelector('#iaOk', { timeout: 20000 });
+  let e = await estado(); assert.equal(e.previa, true); assert.equal(e.n, 0, 'a estrutura só muda quando o usuário aceita'); assert.ok(e.nPrevia > 10);
+  assert.match(await p.textContent('#stProp'), /Prévia da IA/);
+  // 2) descartar não muda nada; pedir de novo e aceitar
+  await p.click('#iaNo'); e = await estado(); assert.deepEqual([e.previa, e.n], [false, 0]);
+  await p.click('#stIABotao'); await p.fill('#iaDesc', 'Casa pequena de 2 andares com palmeiras e estacionamento para 6 veículos'); await p.click('#iaMontar'); await p.waitForSelector('#iaOk', { timeout: 20000 });
+  await p.click('#iaOk'); await p.waitForTimeout(300);
+  e = await estado(); assert.equal(e.previa, false); assert.ok(e.n > 10, 'a montagem foi aplicada');
+  assert.equal(e.subs.filter((s) => s === 'parede').length, 2, 'um bloco de parede por andar'); assert.equal(e.subs.filter((s) => s === 'porta').length, 1);
+  assert.ok(e.subs.includes('telhado-plano') && e.subs.includes('palmeira') && e.subs.includes('vaga'));
+  // 3) é uma montagem de peças individuais: dá para selecionar e a verificação está limpa
+  await p.click('[data-aba="verificar"]'); await p.waitForTimeout(450); assert.match(await p.textContent('#stProp'), /Nenhum problema/);
+  await p.click('[data-aba="camadas"]'); assert.ok(await p.locator('[data-linha]').count() > 10, 'cada peça aparece na lista de camadas');
+  // 4) editar por instrução: mais dois andares, só o necessário muda
+  const antes = await p.evaluate(() => JSON.parse(JSON.stringify(document.querySelector('#stCaixa').__studio.est.componentes)));
+  await p.click('#stAbaIA'); await p.fill('#iaInstr', 'Adicione mais dois andares.'); await p.click('#iaEditar'); await p.waitForSelector('#iaOk', { timeout: 20000 });
+  await p.click('#iaOk'); await p.waitForTimeout(300);
+  const depois = await p.evaluate(() => JSON.parse(JSON.stringify(document.querySelector('#stCaixa').__studio.est.componentes)));
+  const soTerreo = antes.filter((i) => (i.z || 0) === 0 && i.papel === 'parede');
+  assert.equal(depois.filter((i) => i.papel === 'parede').length, antes.filter((i) => i.papel === 'parede').length + 2);
+  assert.ok(soTerreo.every((w) => JSON.stringify(depois.find((d) => d.id === w.id)) === JSON.stringify(w)), 'o térreo não foi tocado');
+  // 5) desfazer (Ctrl+Z) volta ao estado anterior à edição
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(250);
+  assert.equal((await estado()).n, antes.length);
+  // 6) salvar passa na validação do servidor
+  await p.click('#stSalvar'); await p.waitForTimeout(800); assert.match(await p.textContent('#stEstado'), /Salvo/);
+  // 7) pedido sem sentido não inventa nada
+  await p.click('#stAbaIA'); await p.fill('#iaInstr', 'bom dia'); await p.click('#iaEditar'); await p.waitForTimeout(800);
+  assert.equal((await estado()).previa, false);
+  assert.deepEqual(p.errosJS.filter((x) => !/status of 400/.test(x)), [], 'erros de script na IA');
+  await ctx.close();
+});
+
+test('structure studio: criar com IA a partir do hub abre a prévia direto', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/studio`); await p.waitForSelector('#sNovoIA', { timeout: 20000 });
+  await p.fill('#sIA', 'Casa com 2 andares e palmeiras'); await p.click('#sNovoIA');
+  await p.waitForSelector('#iaOk', { timeout: 25000 });
+  assert.equal(await p.evaluate(() => document.querySelector('#stCaixa').__studio.S.previa.lista.length > 5), true);
+  assert.deepEqual(p.errosJS, [], 'erros de script');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);
