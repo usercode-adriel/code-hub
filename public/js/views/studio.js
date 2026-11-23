@@ -14,8 +14,8 @@ export default async function render(el, parts, params = new URLSearchParams()) 
 }
 
 async function hub(el) {
-  let lista = [];
-  try { lista = (await api.get('/estudio/estruturas')).estruturas; } catch (err) { el.innerHTML = `<section class="card"><p>${esc(err.message)}</p></section>`; return; }
+  let lista = []; let prefabs = [];
+  try { [lista, prefabs] = await Promise.all([api.get('/estudio/estruturas').then((r) => r.estruturas), api.get('/estudio/prefabs').then((r) => r.prefabs)]); } catch (err) { el.innerHTML = `<section class="card"><p>${esc(err.message)}</p></section>`; return; }
   el.innerHTML = `<section class="card" style="padding:14px">
     <h3 class="title">Game Development Studio</h3>
     <p class="muted">Ferramentas para criar o mundo do jogo.</p>
@@ -35,9 +35,17 @@ async function hub(el) {
       </div>
       <p class="muted" id="sDesc" style="font-size:12px;margin-top:6px"></p>
       <div style="display:grid;gap:8px;margin-top:14px">${lista.map((e) => `<div class="card" style="padding:10px;display:flex;gap:10px;align-items:center;justify-content:space-between">
-        <div><b>${esc(e.nome)}</b> <span class="chip">${esc(PRESETS[e.preset]?.nome || e.preset)}</span> ${e.prefab ? '<span class="chip">Prefab</span>' : ''}
+        <div><b>${esc(e.nome)}</b> <span class="chip">${esc(PRESETS[e.preset]?.nome || e.preset)}</span> ${e.prefab ? `<span class="chip">Prefab v${e.prefab.versao}</span>` : ''}${e.variacaoDe ? '<span class="chip">Variação</span>' : ''}
         <div class="muted" style="font-size:12px">${esc(e.tipo)} · ${e.area.w}×${e.area.h} células · ${e.componentes} componentes</div></div>
-        <div class="row" style="gap:6px"><a class="btn sm" href="#/studio?id=${e.id}">Editar</a><button class="btn sm" data-del="${e.id}">Apagar</button></div></div>`).join('') || '<p class="muted">Nenhuma estrutura ainda. Crie a primeira acima.</p>'}</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><a class="btn sm" href="#/studio?id=${e.id}">Editar</a><button class="btn sm" data-dup="${e.id}">Duplicar</button><button class="btn sm" data-var="${e.id}">Criar variação</button><button class="btn sm" data-del="${e.id}">Apagar</button></div></div>`).join('') || '<p class="muted">Nenhuma estrutura ainda. Crie a primeira acima.</p>'}</div>
+    </section>
+    <section class="card" style="padding:14px;margin-top:12px">
+      <h3 class="title">Prefabs</h3>
+      <p class="muted" style="font-size:12px">Estruturas prontas para o jogo: imagem, área ocupada, colisões e entradas.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:8px">${prefabs.map((p) => `<div class="card" style="padding:8px;display:flex;gap:8px;align-items:center">
+        <img src="${esc(p.arquivo)}" alt="${esc(p.nome)}" loading="lazy" style="width:72px;height:56px;object-fit:contain;background:#111827;border-radius:8px">
+        <div style="flex:1;min-width:0"><b>${esc(p.nome)}</b> <span class="chip">v${p.versao}</span><div class="muted" style="font-size:12px">${p.pegada.w}×${p.pegada.d} · ${p.entradas} entrada(s) · ${p.colisoes} colisão(ões)</div></div>
+        <button class="btn sm" data-exp="${p.id}">Exportar</button><button class="btn sm" data-delp="${p.id}">Apagar</button></div>`).join('') || '<p class="muted">Nenhum prefab ainda. Abra uma estrutura e use "Salvar como prefab".</p>'}</div>
     </section>`;
   const preset = el.querySelector('#sPreset'); const tipo = el.querySelector('#sTipo');
   const atualizar = () => {
@@ -52,5 +60,16 @@ async function hub(el) {
       location.hash = `#/studio?id=${e.id}`;
     } catch (err) { toast('Studio', err.message, 'warning'); }
   };
+  const copiar = (id, variacao) => async () => { try { const e = await api.post(`/estudio/estruturas/${id}/duplicar`, { variacao }); toast('Studio', variacao ? 'Variação criada.' : 'Estrutura duplicada.', 'success'); location.hash = `#/studio?id=${e.id}`; } catch (err) { toast('Studio', err.message, 'warning'); } };
+  el.querySelectorAll('[data-dup]').forEach((b) => { b.onclick = copiar(b.dataset.dup, false); });
+  el.querySelectorAll('[data-var]').forEach((b) => { b.onclick = copiar(b.dataset.var, true); });
+  el.querySelectorAll('[data-exp]').forEach((b) => { b.onclick = async () => {
+    try {
+      const pacote = await api.get(`/estudio/prefabs/${b.dataset.exp}/exportar`);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(pacote)], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = `${pacote.prefab.nome.replace(/[^\w.-]+/g, '-')}.prefab.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) { toast('Studio', err.message, 'warning'); }
+  }; });
+  el.querySelectorAll('[data-delp]').forEach((b) => { b.onclick = async () => { if (!confirm('Apagar este prefab? A estrutura original continua.')) return; await api.del(`/estudio/prefabs/${b.dataset.delp}`); hub(el); }; });
   el.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { if (!confirm('Apagar esta estrutura?')) return; await api.del(`/estudio/estruturas/${b.dataset.del}`); hub(el); }; });
 }

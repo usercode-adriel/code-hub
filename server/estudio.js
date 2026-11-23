@@ -9,6 +9,7 @@ import { DATA_DIR } from './db.js';
 import { PRESETS, GRADE, REQUER, compativelComPreset } from '../public/js/estudio/presets.js';
 import { normalizarInstancia } from '../public/js/estudio/montagem.js';
 import biblioteca, { componentePorId } from './estudio-biblioteca.js';
+import prefabs from './estudio-prefabs.js';
 
 const router = express.Router();
 const PASTA = path.join(DATA_DIR, 'estudio');
@@ -20,6 +21,7 @@ const pastaDe = (uid) => path.join(PASTA, uid, 'estruturas');
 const arquivoDe = (uid, id) => path.join(pastaDe(uid), `${id}.json`);
 export const idValido = (id) => /^[a-f0-9-]{36}$/.test(String(id));
 
+export function gravarEstrutura(uid, e) { gravar(uid, e); }
 function gravar(uid, e) {
   fs.mkdirSync(pastaDe(uid), { recursive: true });
   const tmp = `${arquivoDe(uid, e.id)}.tmp`;
@@ -36,7 +38,7 @@ export function listarEstruturas(uid) {
   return fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => lerEstrutura(uid, f.slice(0, -5))).filter(Boolean);
 }
 
-const resumo = (e) => ({ id: e.id, nome: e.nome, preset: e.preset, tipo: e.tipo, area: e.area, componentes: e.componentes.length, atualizado: e.atualizado, prefab: e.prefab || null });
+const resumo = (e) => ({ id: e.id, nome: e.nome, preset: e.preset, tipo: e.tipo, area: e.area, componentes: e.componentes.length, atualizado: e.atualizado, prefab: e.prefab || null, variacaoDe: e.variacaoDe || null });
 
 // cada instância precisa apontar para um componente que existe, ser da perspectiva do preset e, se for peça de encaixe,
 // ter um anfitrião compatível na própria estrutura (nada flutuando); ids são únicos
@@ -83,6 +85,7 @@ export function validarEstrutura(corpo, base = null, uid = null) {
 }
 
 router.use('/componentes', biblioteca);
+router.use('/prefabs', prefabs);
 
 router.get('/presets', (_req, res) => res.json({ presets: PRESETS, grade: GRADE }));
 
@@ -114,6 +117,19 @@ router.put('/estruturas/:id', (req, res) => {
   const e = { ...base, ...dados, nome: String(req.body?.nome ?? base.nome).trim().slice(0, 60) || base.nome, atualizado: new Date().toISOString() };
   gravar(req.user.id, e);
   res.json(e);
+});
+
+// duplicar uma estrutura; com variacao:true marca de qual ela deriva (para criar versões de um mesmo projeto)
+router.post('/estruturas/:id/duplicar', (req, res) => {
+  const base = lerEstrutura(req.user.id, req.params.id);
+  if (!base) return res.status(404).json({ error: 'Estrutura não encontrada' });
+  const variacao = req.body?.variacao === true;
+  const { prefab, ...resto } = base; // o prefab é da original: a cópia gera o seu quando for salva
+  const agora = new Date().toISOString();
+  const nome = String(req.body?.nome || `${base.nome} ${variacao ? '(variação)' : '(cópia)'}`).trim().slice(0, 60);
+  const e = { ...resto, id: crypto.randomUUID(), nome, versao: 1, ...(variacao ? { variacaoDe: base.variacaoDe || base.id } : {}), criado: agora, atualizado: agora };
+  gravar(req.user.id, e);
+  res.status(201).json(e);
 });
 
 router.delete('/estruturas/:id', (req, res) => {

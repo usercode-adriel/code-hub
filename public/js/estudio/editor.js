@@ -5,6 +5,7 @@ import { esc, toast } from '../ui.js';
 import { PRESETS, GRADE, CATEGORIAS, CAMADAS, MATERIAIS, REQUER } from './presets.js';
 import { criarBiblioteca } from './biblioteca.js';
 import * as M from './montagem.js';
+import * as P from './prefab.js';
 
 const HIST_MAX = 80;
 const rad = (g) => g * Math.PI / 180;
@@ -41,7 +42,8 @@ function montar(el, est, comps) {
         <button class="btn sm" id="stDesfazer" title="Ctrl+Z">↶ Desfazer</button><button class="btn sm" id="stRefazer" title="Ctrl+Y">↷ Refazer</button>
         <button class="btn sm" id="stGrade">Grade</button><button class="btn sm" id="stIma" title="Encaixe na grade fina">Ímã</button>
         <button class="btn sm" id="stPegadas" title="Mostra a área ocupada no chão">Áreas</button><button class="btn sm" id="stColisoes" title="Mostra as caixas de colisão">Colisões</button>
-        <button class="btn sm" id="stTelaCheia">⛶ Tela cheia</button></span>
+        <button class="btn sm" id="stTelaCheia">⛶ Tela cheia</button>
+        <button class="btn primary" id="stPrefab" title="Gera uma imagem da estrutura e guarda tudo (pegada, colisões, entradas)">Salvar como prefab</button></span>
     </div>
     <div style="display:grid;grid-template-columns:260px 1fr 290px;gap:10px;margin-top:10px">
       <aside id="stBiblioteca" style="min-width:0"></aside>
@@ -103,15 +105,32 @@ function montar(el, est, comps) {
   window.addEventListener('resize', aoRedimensionar);
   const caber = () => { S.cam.x = W() / 2; S.cam.y = H() / 2; S.cam.z = Math.max(0.25, Math.min(1.5, (tela.clientWidth - 40) / W(), (tela.clientHeight - 40) / (H() + 60))); };
 
-  function desenharInstancia(i, alpha = 1) {
+  function desenharInstancia(i, alpha = 1, x = g) { // x: contexto de desenho (a tela ou a imagem do prefab)
     const c = compDe(i.comp); if (!c) return;
     const f = fonte(c, i); const w = c.w * i.escala; const h = c.h * i.escala; const n = M.eModular(c) ? Math.max(1, i.n || 1) : 1;
-    g.save(); g.translate(i.x, i.y - (i.z || 0)); g.rotate(rad(i.rot || 0)); if (i.espelho) g.scale(-1, 1); g.globalAlpha = alpha;
+    x.save(); x.translate(i.x, i.y - (i.z || 0)); x.rotate(rad(i.rot || 0)); if (i.espelho) x.scale(-1, 1); x.globalAlpha = alpha;
     for (let k = 0; k < n; k++) {
       const dx = -w * n / 2 + k * w;
-      if (f) g.drawImage(f, dx, -h, w + (k < n - 1 ? 0.6 : 0), h); else { g.fillStyle = '#334155'; g.fillRect(dx, -h, w, h); }
+      if (f) x.drawImage(f, dx, -h, w + (k < n - 1 ? 0.6 : 0), h); else { x.fillStyle = '#334155'; x.fillRect(dx, -h, w, h); }
     }
-    g.restore();
+    x.restore();
+  }
+
+  // ---------------------------------------------------------------- prefab: assa a estrutura numa imagem PNG com fundo transparente
+  async function garantirImagens() {
+    const arqs = new Set();
+    for (const i of est.componentes) { const c = compDe(i.comp); if (c) arqs.add(c.arquivo); const t = i.textura && compDe(i.textura); if (t) arqs.add(t.arquivo); }
+    await Promise.all([...arqs].map((a) => new Promise((ok) => { const im = imagem(a); if (im.complete && im.naturalWidth) return ok(); im.addEventListener('load', ok, { once: true }); im.addEventListener('error', ok, { once: true }); })));
+  }
+  async function assar() {
+    await garantirImagens();
+    const lim = P.limitesDe(est.componentes, compDe);
+    if (!lim) throw new Error('a estrutura está vazia');
+    if (lim.w > P.MAX_IMAGEM || lim.h > P.MAX_IMAGEM) throw new Error(`a estrutura passa de ${P.MAX_IMAGEM} px`);
+    const cv = document.createElement('canvas'); cv.width = lim.w; cv.height = lim.h;
+    const x = cv.getContext('2d'); x.translate(-lim.x0, -lim.y0);
+    for (const i of M.ordemDeDesenho(est.componentes)) desenharInstancia(i, 1, x);
+    return new Promise((ok, falha) => cv.toBlob((b) => (b ? ok(b) : falha(new Error('não consegui gerar a imagem'))), 'image/png'));
   }
 
   function desenhar() {
@@ -458,15 +477,31 @@ function montar(el, est, comps) {
       $('#stEstado').textContent = 'Salvando…';
       const r = await api.put(`/estudio/estruturas/${est.id}`, { nome: $('#stNome').value, componentes: est.componentes, area: est.area });
       est.atualizado = r.atualizado; S.sujo = false;
+      if (!S.arrasto) est.componentes = r.componentes; // os valores normalizados pelo servidor: o prefab usa exatamente estes
       $('#stEstado').textContent = `Salvo às ${new Date(r.atualizado).toLocaleTimeString('pt-BR')}`;
       return true;
     } catch (err) { $('#stEstado').textContent = `Não salvou: ${err.message}`; toast('Studio', err.message, 'warning'); return false; }
   }
   $('#stSalvar').onclick = salvar;
+  async function salvarPrefab() {
+    if (!est.componentes.length) { toast('Prefab', 'Monte algo antes de criar o prefab.', 'warning'); return; }
+    if (!(await salvar())) return;
+    if (S.diag.some((d) => d.gravidade === 'erro')) { S.aba = 'verificar'; painel(); toast('Prefab', 'Corrija os erros da montagem antes de criar o prefab.', 'warning'); return; }
+    try {
+      $('#stEstado').textContent = 'Gerando o prefab…';
+      const blob = await assar();
+      const fd = new FormData(); fd.append('imagem', blob, 'prefab.png'); fd.append('estruturaId', est.id); fd.append('nome', $('#stNome').value);
+      const r = await api.post('/estudio/prefabs', fd);
+      est.prefab = { id: r.id, versao: r.versao };
+      $('#stEstado').textContent = `Prefab v${r.versao} salvo`;
+      toast('Prefab', `"${r.nome}" v${r.versao}: área ${r.pegada.w}×${r.pegada.d}, ${r.entradas.length} entrada(s), ${r.colisoes.length} colisão(ões).`, 'success');
+    } catch (err) { $('#stEstado').textContent = 'Prefab não gerado'; toast('Prefab', err.message, 'warning'); }
+  }
+  $('#stPrefab').onclick = salvarPrefab;
   const auto = setInterval(() => { if (!el.isConnected) { clearInterval(auto); return; } if (S.sujo) salvar(); }, 20000);
 
   criarBiblioteca($('#stBiblioteca'), { preset: est.preset, aoEscolher: escolher });
   $('#stIma').classList.toggle('primary', S.snap);
   atualizarBotoes(); caber(); ajustar(); painel(); recalcular();
-  $('#stCaixa').__studio = { S, est, compDe, M }; // para os testes de navegador
+  $('#stCaixa').__studio = { S, est, compDe, M, P }; // para os testes de navegador
 }

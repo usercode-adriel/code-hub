@@ -89,6 +89,17 @@ export function validarMeta(m) {
   return { categoria, sub, perspectiva, material, origem, nome, tags };
 }
 
+// grava um PNG pelo hash (uma vez só) e devolve { hash, arquivo, w, h }; usado por componentes e prefabs
+export function gravarPng(uid, buf) {
+  const dim = lerPng(buf);
+  const hash = crypto.createHash('sha256').update(buf).digest('hex');
+  fs.mkdirSync(path.join(ARQUIVOS, uid), { recursive: true });
+  const destino = path.join(ARQUIVOS, uid, `${hash}.png`);
+  if (!fs.existsSync(destino)) fs.writeFileSync(destino, buf);
+  return { hash, arquivo: `/estudio-arquivos/${uid}/${hash}.png`, w: dim.w, h: dim.h };
+}
+export const removerPng = (uid, hash) => fs.rmSync(path.join(ARQUIVOS, uid, `${hash}.png`), { force: true });
+
 // adiciona um PNG à biblioteca do usuário; se o mesmo arquivo já está lá, devolve o existente
 export function adicionarComponente(uid, buf, meta) {
   const dim = lerPng(buf);
@@ -140,11 +151,15 @@ router.post('/', receber, (req, res) => {
   catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-router.delete('/item', (req, res) => {
+router.delete('/item', async (req, res) => {
   const id = String(req.query.id || '');
   const lista = componentesDoUsuario(req.user.id);
   const c = lista.find((x) => x.id === id);
   if (!c) return res.status(404).json({ error: 'Só componentes da sua biblioteca podem ser apagados' });
+  // em uso numa estrutura ou num prefab: não apaga (a montagem ficaria com um buraco)
+  const { listarEstruturas } = await import('./estudio.js');
+  const uso = listarEstruturas(req.user.id).filter((e) => e.componentes.some((i) => i.comp === id || i.textura === id));
+  if (uso.length) return res.status(409).json({ error: `Este componente está em uso em ${uso.length} estrutura(s): ${uso.slice(0, 3).map((e) => e.nome).join(', ')}` });
   gravarIndice(req.user.id, lista.filter((x) => x.id !== id));
   // o arquivo só sai do disco se nenhum outro componente o usa
   if (!lista.some((x) => x.id !== id && x.hash === c.hash)) fs.rmSync(path.join(ARQUIVOS, req.user.id, `${c.hash}.png`), { force: true });

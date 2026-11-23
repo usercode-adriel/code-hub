@@ -336,6 +336,55 @@ test('structure studio: monta parede, encaixa janela e telhado, recusa peça flu
   await ctx.close();
 });
 
+test('structure studio: salva como prefab, duplica, cria variação, exporta e protege componente em uso', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token'));
+  const h = { Authorization: `Bearer ${token}` }; const hj = { ...h, 'Content-Type': 'application/json' };
+  const importar = async (nome, sub, categoria, w, hh, cor) => {
+    const fd = new FormData(); fd.append('imagem', new Blob([pngSolido(w, hh, cor)], { type: 'image/png' }), `${nome}.png`);
+    for (const [k, v] of Object.entries({ nome, categoria, sub, perspectiva: 'arq25d', material: 'concreto', origem: 'importado' })) fd.append(k, v);
+    const r = await (await fetch(`${BASE}/api/estudio/componentes`, { method: 'POST', headers: h, body: fd })).json(); return r.componente;
+  };
+  const parede = await importar('Parede prefab', 'parede', 'estrutura', 160, 96, [150, 140, 130, 255]);
+  const porta = await importar('Porta prefab', 'porta', 'fachada', 40, 64, [90, 60, 40, 255]);
+  const telhado = await importar('Telhado prefab', 'telhado-plano', 'cobertura', 160, 40, [110, 80, 70, 255]);
+  const est = await (await fetch(`${BASE}/api/estudio/estruturas`, { method: 'POST', headers: hj, body: JSON.stringify({ nome: 'Delegacia prefab', preset: 'arq25d', tipo: 'delegacia' }) })).json();
+  const w = { id: 'w1', comp: parede.id, x: 320, y: 320, camada: 'base', colisao: false };
+  const itens = [w, { id: 'p1', comp: porta.id, x: 320, y: 320, camada: 'fachada', anfitriao: 'w1', nome: 'Entrada' }, { id: 't1', comp: telhado.id, x: 320, y: 320, z: 96, camada: 'cobertura', anfitriao: 'w1' }];
+  const salvo = await fetch(`${BASE}/api/estudio/estruturas/${est.id}`, { method: 'PUT', headers: hj, body: JSON.stringify({ componentes: itens }) });
+  assert.equal(salvo.status, 200, 'a estrutura montada é aceita');
+
+  // o botão gera a imagem no navegador e o servidor recalcula o resto
+  await p.goto(`${BASE}/#/studio?id=${est.id}`); await p.waitForSelector('#stPrefab', { timeout: 20000 }); await p.waitForTimeout(800);
+  await p.click('#stPrefab'); await p.waitForFunction(() => /Prefab v1 salvo/.test(document.querySelector('#stEstado').textContent), null, { timeout: 15000 });
+  const lista = (await (await fetch(`${BASE}/api/estudio/prefabs`, { headers: h })).json()).prefabs;
+  assert.equal(lista.length, 1); const pre = await (await fetch(`${BASE}/api/estudio/prefabs/${lista[0].id}`, { headers: h })).json();
+  assert.equal(pre.versao, 1); assert.equal(pre.entradas.length, 1, 'a porta virou entrada'); assert.equal(pre.entradas[0].nome, 'Entrada');
+  assert.equal(pre.pegada.w, 160); assert.equal(pre.componentes.length, 3, 'os componentes ficam preservados');
+  assert.equal(pre.imagem.w, 160); assert.equal(pre.imagem.h, 136, 'a altura inclui o telhado em cima da parede');
+  assert.equal((await fetch(`${BASE}${pre.arquivo}`)).status, 200, 'a imagem do prefab é servida');
+  // salvar de novo atualiza o mesmo prefab (versão 2), sem duplicar
+  await p.click('#stPrefab'); await p.waitForFunction(() => /Prefab v2 salvo/.test(document.querySelector('#stEstado').textContent), null, { timeout: 15000 });
+  assert.equal((await (await fetch(`${BASE}/api/estudio/prefabs`, { headers: h })).json()).prefabs.length, 1);
+
+  // duplicar e variação (pela API, que o hub usa): a cópia não herda o prefab; a variação lembra a origem
+  const dup = await (await fetch(`${BASE}/api/estudio/estruturas/${est.id}/duplicar`, { method: 'POST', headers: hj, body: JSON.stringify({}) })).json();
+  assert.equal(dup.componentes.length, 3); assert.notEqual(dup.id, est.id); assert.equal(dup.prefab, undefined); assert.match(dup.nome, /cópia/);
+  const vari = await (await fetch(`${BASE}/api/estudio/estruturas/${est.id}/duplicar`, { method: 'POST', headers: hj, body: JSON.stringify({ variacao: true }) })).json();
+  assert.equal(vari.variacaoDe, est.id);
+  // exportar traz o prefab e a imagem
+  const pacote = await (await fetch(`${BASE}/api/estudio/prefabs/${pre.id}/exportar`, { headers: h })).json();
+  assert.equal(pacote.formato, 'codeniac-prefab'); assert.ok(pacote.imagemBase64.length > 100);
+  // componente em uso não pode ser apagado
+  const del = await fetch(`${BASE}/api/estudio/componentes/item?id=${encodeURIComponent(parede.id)}`, { method: 'DELETE', headers: h });
+  assert.equal(del.status, 409);
+  // o hub lista os prefabs e as estruturas com os botões novos
+  await p.goto(`${BASE}/#/studio`); await p.waitForSelector('[data-dup]', { timeout: 15000 });
+  assert.ok(await p.locator('[data-var]').count() >= 1); assert.ok(await p.locator('[data-exp]').count() >= 1);
+  assert.deepEqual(p.errosJS.filter((x) => !/status of (400|409)/.test(x)), [], 'erros de script no prefab');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);
