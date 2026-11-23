@@ -157,6 +157,42 @@ test('modelagem: gira, espelha, escala e desfaz; criar mapa já vira o do jogo',
   await ctx.close();
 });
 
+test('caixa de ferramentas: segurar move a peça, alças redimensionam pela borda, barra de opções aparece', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/criar-mapa`); await p.waitForSelector('#mNovo', { timeout: 30000 });
+  await p.click('#mNovo'); await p.waitForSelector('#eTela', { timeout: 15000 });
+  await p.click('#ePaleta [data-chave]'); await p.waitForTimeout(300);
+  const t = await p.locator('#eTela').boundingBox();
+  const cx = t.x + t.width / 2 + 120, cy = t.y + t.height / 2 + 60;
+  await p.mouse.click(cx, cy); await p.waitForTimeout(200);
+  assert.ok(await p.isVisible('#eBarra'), 'a barra de opções aparece ao colocar a peça');
+  const x0 = Number(await p.inputValue('#pX')); const y0 = Number(await p.inputValue('#pY'));
+  // segurar o botão esquerdo sobre a peça e arrastar: ela se move sem escolher Selecionar
+  await p.mouse.move(cx, cy); await p.mouse.down(); await p.mouse.move(cx + 60, cy + 20, { steps: 6 }); await p.mouse.up();
+  await p.waitForTimeout(150);
+  assert.ok(Number(await p.inputValue('#pX')) > x0 + 20, 'a peça seguiu o mouse ao segurar');
+  // alça da borda direita (meio): arrastar para fora aumenta a largura, a borda esquerda fica parada
+  // (a página pode ter rolado ao clicar: a posição da tela é lida de novo)
+  const box2 = await p.locator('#eTela').boundingBox();
+  const w0 = Number(await p.inputValue('#pL')); const h0 = Number(await p.inputValue('#pA'));
+  const px = Number(await p.inputValue('#pX')); const py = Number(await p.inputValue('#pY'));
+  // câmera inicial: centro do mapa de 40×30 células, zoom 0,8
+  const paraTela = (wx, wy) => ({ x: box2.x + box2.width / 2 + (wx - 640) * 0.8, y: box2.y + box2.height / 2 + (wy - 480) * 0.8 });
+  const alca = paraTela(px + w0 / 2, py - h0 / 2);
+  await p.mouse.move(alca.x, alca.y); await p.mouse.down();
+  await p.mouse.move(alca.x + 40, alca.y, { steps: 5 }); await p.mouse.up();
+  await p.waitForTimeout(150);
+  assert.ok(Number(await p.inputValue('#pL')) > w0 + 25, 'a borda direita alargou a peça');
+  // botão direito sobre área vazia: mão para mover o mapa (cursor grabbing enquanto segura)
+  // (ponto livre: a caixa de ferramentas cobre a esquerda da tela)
+  await p.mouse.move(t.x + t.width - 60, t.y + t.height - 60); await p.mouse.down({ button: 'right' });
+  await p.mouse.move(t.x + t.width - 90, t.y + t.height - 70, { steps: 4 });
+  assert.equal(await p.evaluate(() => document.querySelector('#eTela').style.cursor), 'grabbing');
+  await p.mouse.up({ button: 'right' });
+  assert.deepEqual(p.errosJS, [], 'erros de script no editor');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);

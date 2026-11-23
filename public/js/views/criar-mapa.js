@@ -65,6 +65,15 @@ function editor(el, mapa, itens) {
     <div style="display:grid;grid-template-columns:1fr 270px;gap:10px;margin-top:10px">
       <div id="eArea" style="position:relative;min-width:0">
         <canvas id="eTela" style="width:100%;height:560px;display:block;background:#1b1f2a;border-radius:10px;touch-action:none"></canvas>
+        <div id="eBarra" style="position:absolute;display:none;gap:4px;align-items:center;padding:4px;background:rgba(17,24,39,.96);border:1px solid #334155;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.45);z-index:3;white-space:nowrap">
+          <button class="btn sm" data-b="dup" title="Duplicar (Ctrl+D)">Duplicar</button>
+          <button class="btn sm" data-b="cop" title="Copiar (Ctrl+C)">Copiar</button>
+          <button class="btn sm" data-b="tras" title="Enviar para trás ([)">▼ Camada</button>
+          <button class="btn sm" data-b="frente" title="Trazer para frente (])">▲ Camada</button>
+          <button class="btn sm" data-b="gira" title="Girar 90° (R)">↻ 90°</button>
+          <button class="btn sm" data-b="esp" title="Espelhar (F)">⇋</button>
+          <button class="btn sm" data-b="apaga" title="Apagar (Delete)">Apagar</button>
+        </div>
         <div id="eFerr" style="position:absolute;left:8px;top:8px;width:270px;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:rgba(17,24,39,.95);border:1px solid #334155;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:2">
           <div id="eFerrAlca" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;cursor:move;user-select:none;border-bottom:1px solid #334155">
             <b style="font-size:13px">Caixa de ferramentas</b><button class="btn sm" id="eFerrMin" title="Recolher">–</button></div>
@@ -139,6 +148,44 @@ function editor(el, mapa, itens) {
     return { x: p.x + lx * Math.cos(t) - ly * Math.sin(t), y: p.y + lx * Math.sin(t) + ly * Math.cos(t) };
   }
   const distancia = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  // alças de redimensionar: (kx, ky) com kx, ky em {-1, 0, 1}; (0, 0) não é alça. Oposta = (-kx, -ky) fica parada.
+  const ALCAS = [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1]];
+  // posição local de uma alça: base do item em y=0, topo em y=-h, x centrado
+  const posAlca = ([kx, ky], w, h) => ({ x: kx * w / 2, y: -h / 2 + ky * h / 2 });
+  // redimensiona pela alça, com a alça oposta presa no lugar: a peça cresce ou encolhe a partir dela
+  function redimensionar(p, a, q) {
+    const it = porChave.get(p.chave);
+    const e0 = a.base.escala; const w0 = it.w * e0; const h0 = it.h * e0;
+    const [kx, ky] = a.alca; const op = [-kx, -ky];
+    const alcaPos = posAlca(a.alca, w0, h0); const opPos = posAlca(op, w0, h0);
+    const v = { x: alcaPos.x - opPos.x, y: alcaPos.y - opPos.y };
+    // ponto do mouse no quadro da peça, na orientação original
+    const l = localDe({ x: a.base.x, y: a.base.y, rot: a.base.rot }, q);
+    const d = { x: l.x - opPos.x, y: l.y - opPos.y };
+    let sc;
+    if (kx && ky) sc = (d.x * v.x + d.y * v.y) / (v.x * v.x + v.y * v.y); // canto: proporção pela diagonal
+    else if (kx) sc = d.x / v.x;                                         // borda lateral
+    else sc = d.y / v.y;                                                 // borda de cima ou de baixo
+    const novaEscala = Math.min(5, Math.max(0.1, e0 * sc));
+    const s2 = novaEscala / e0;
+    // a alça oposta fica no mesmo ponto do mundo
+    const ancora = mundoDe({ x: a.base.x, y: a.base.y, rot: a.base.rot }, opPos.x, opPos.y);
+    const r = mundoDe({ x: 0, y: 0, rot: a.base.rot }, opPos.x * s2, opPos.y * s2);
+    p.escala = novaEscala; p.x = limitar(ancora.x - r.x, m.largura * CEL); p.y = limitar(ancora.y - r.y, m.altura * CEL);
+  }
+  // barra de opções: fica acima da peça selecionada, dentro da área de desenho
+  function atualizarBarra() {
+    const barra = el.querySelector('#eBarra'); const p = sel();
+    if (!p || S.arrastando?.tipo === 'escalar') { barra.style.display = 'none'; return; }
+    const { h } = dimensoes(p);
+    const cw = tela.clientWidth; const ch = tela.clientHeight;
+    const sx = cw / 2 + (p.x - S.cam.x) * S.cam.z; const sy = ch / 2 + (p.y - h - S.cam.y) * S.cam.z;
+    barra.style.display = 'flex';
+    const bw = barra.offsetWidth; const bh = barra.offsetHeight;
+    barra.style.left = Math.max(4, Math.min(cw - bw - 4, sx - bw / 2)) + 'px';
+    barra.style.top = Math.max(4, Math.min(ch - bh - 4, sy - bh - 58 * S.cam.z)) + 'px';
+  }
+
   // peças por camada (z), a de cima primeiro para o clique; empate: a última colocada fica por cima
   const porCamada = () => m.itens.map((p, i) => ({ p, i })).sort((a, b) => (a.p.z || 0) - (b.p.z || 0) || a.i - b.i).map((x) => x.p);
   function itemNoPonto(q) {
@@ -173,7 +220,7 @@ function editor(el, mapa, itens) {
       if (im.complete && im.naturalWidth) g.drawImage(im, -w / 2, -h, w, h); else { g.fillStyle = '#c084fc'; g.fillRect(-8, -8, 16, 16); }
       g.restore();
     }
-    // seleção: contorno e alças (girar no topo, redimensionar no canto)
+    // seleção: contorno, alça de girar no topo e 8 alças nas bordas e cantos (redimensionam pela borda)
     const p = sel();
     if (p) {
       const { w, h } = dimensoes(p); const z = zoomHandle();
@@ -181,9 +228,11 @@ function editor(el, mapa, itens) {
       g.strokeStyle = '#f2c94c'; g.lineWidth = 2 * z; g.strokeRect(-w / 2, -h, w, h);
       g.beginPath(); g.moveTo(0, -h); g.lineTo(0, -h - 30 * z); g.stroke();
       g.beginPath(); g.arc(0, -h - 30 * z, 6 * z, 0, Math.PI * 2); g.fillStyle = '#f2c94c'; g.fill();
-      g.fillStyle = '#f2c94c'; g.fillRect(w / 2 - 5 * z, -5 * z, 10 * z, 10 * z);
+      g.fillStyle = '#fff'; g.strokeStyle = '#111827'; g.lineWidth = 1 * z;
+      for (const k of ALCAS) { const ps = posAlca(k, w, h); g.fillRect(ps.x - 5 * z, ps.y - 5 * z, 10 * z, 10 * z); g.strokeRect(ps.x - 5 * z, ps.y - 5 * z, 10 * z, 10 * z); }
       g.restore();
     }
+    atualizarBarra();
     g.restore();
   }
 
@@ -369,41 +418,49 @@ function editor(el, mapa, itens) {
   tela.addEventListener('pointerdown', (e) => {
     tela.setPointerCapture(e.pointerId);
     const q = mundoDeTela(e.clientX, e.clientY); S.mouse = q;
-    if (e.button === 2) { // segurar o botão direito numa peça move a peça
-      const alvo = itemNoPonto(q);
-      if (alvo) { S.sel = alvo.id; registrar(); S.arrastando = { tipo: 'mover', id: alvo.id, dx: q.x - alvo.x, dy: q.y - alvo.y }; mostrarProp(); desenhar(); return; }
-    }
-    if (e.button === 1 || e.button === 2) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; return; }
     const p = sel();
-    // alças da peça selecionada: girar (topo) e redimensionar (canto)
-    if (p && (S.ferr === 'mover' || S.ferr === 'item')) {
+    const umaFerramentaDeEdicao = S.ferr !== 'pintar' && S.ferr !== 'apagar';
+    // alças da peça selecionada: girar (topo) e redimensionar (bordas e cantos)
+    if (p && umaFerramentaDeEdicao && (e.button === 0 || e.button === 2)) {
       const { w, h } = dimensoes(p); const z = zoomHandle();
-      if (distancia(q, mundoDe(p, 0, -h - 30 * z)) <= 10 * z) { registrar(); S.arrastando = { tipo: 'girar', id: p.id }; return; }
-      if (distancia(q, mundoDe(p, w / 2, 0)) <= 10 * z) { registrar(); S.arrastando = { tipo: 'escalar', id: p.id }; return; }
+      const base = { x: p.x, y: p.y, rot: p.rot || 0, escala: p.escala || 1 };
+      if (distancia(q, mundoDe(p, 0, -h - 30 * z)) <= 10 * z) { S.arrastando = { tipo: 'girar', id: p.id, reg: false }; return; }
+      const alca = ALCAS.find((k) => distancia(q, mundoDe(p, posAlca(k, w, h).x, posAlca(k, w, h).y)) <= 9 * z);
+      if (alca) { S.arrastando = { tipo: 'escalar', id: p.id, alca, base, reg: false }; return; }
     }
+    // peça debaixo do cursor: segurar move (botão esquerdo nas ferramentas Colocar e Selecionar; botão direito em qualquer uma)
+    const alvo = itemNoPonto(q);
+    if (alvo && umaFerramentaDeEdicao && (e.button === 2 || (e.button === 0 && (S.ferr === 'item' || S.ferr === 'mover')))) {
+      S.sel = alvo.id; S.arrastando = { tipo: 'mover', id: alvo.id, dx: q.x - alvo.x, dy: q.y - alvo.y, reg: false };
+      tela.style.cursor = 'move'; mostrarProp(); desenhar(); return;
+    }
+    // botão do meio, ou direito em área vazia: mão para mover o mapa
+    if (e.button === 1 || e.button === 2) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; tela.style.cursor = 'grabbing'; return; }
     aplicarFerramenta(q, true); desenhar();
   });
   tela.addEventListener('pointermove', (e) => {
     if (S.pan) { S.cam.x = S.pan.cx - (e.clientX - S.pan.x) / S.cam.z; S.cam.y = S.pan.cy - (e.clientY - S.pan.y) / S.cam.z; desenhar(); return; }
     const q = mundoDeTela(e.clientX, e.clientY); S.mouse = q;
+    if (e.buttons === 0) { // só o cursor: mostra o que o clique vai fazer
+      tela.style.cursor = itemNoPonto(q) ? 'move' : 'default';
+      return;
+    }
     if (e.buttons !== 1 && e.buttons !== 2) return;
     if (S.arrastando) {
       const a = S.arrastando; const p = m.itens.find((x) => x.id === a.id); if (!p) return;
+      if (!a.reg) { registrar(); a.reg = true; } // a primeira mudança guarda o estado anterior no Desfazer
       if (a.tipo === 'mover') { const [x, y] = encaixe(q.x - a.dx, q.y - a.dy); p.x = limitar(x, m.largura * CEL); p.y = limitar(y, m.altura * CEL); }
       else if (a.tipo === 'girar') {
         let ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI + 90; ang = (ang % 360 + 360) % 360;
         if (S.snap || e.shiftKey) ang = Math.round(ang / 15) * 15;
         p.rot = Math.round((ang % 360) * 10) / 10;
-      } else if (a.tipo === 'escalar') {
-        const l = localDe(p, q); const it = porChave.get(p.chave);
-        p.escala = Math.min(5, Math.max(0.1, Math.max(4, 2 * Math.abs(l.x)) / it.w));
-      }
+      } else if (a.tipo === 'escalar') redimensionar(p, a, q);
       marcar(); desenhar(); mostrarProp(); return;
     }
     if (S.ferr === 'pintar' || S.ferr === 'apagar') aplicarFerramenta(q, false);
     desenhar();
   });
-  tela.addEventListener('pointerup', () => { S.pan = null; S.arrastando = null; });
+  tela.addEventListener('pointerup', () => { S.pan = null; S.arrastando = null; tela.style.cursor = 'default'; desenhar(); });
   tela.addEventListener('wheel', (e) => { e.preventDefault(); S.cam.z = Math.max(0.25, Math.min(3, S.cam.z * (e.deltaY < 0 ? 1.1 : 0.9))); desenhar(); }, { passive: false });
   el.querySelectorAll('[data-ferr]').forEach((b) => { b.onclick = () => { S.ferr = b.dataset.ferr; el.querySelectorAll('[data-ferr]').forEach((x) => x.classList.toggle('primary', x === b)); }; });
   el.querySelectorAll('[data-cat]').forEach((b) => { b.onclick = () => { S.cat = b.dataset.cat; paleta(); }; });
@@ -446,6 +503,11 @@ function editor(el, mapa, itens) {
   window.addEventListener('keydown', teclas);
   el.querySelector('#eIma').classList.toggle('primary', S.snap);
   atualizarBotoes();
+  el.querySelectorAll('#eBarra [data-b]').forEach((b) => { b.onclick = () => {
+    const p = sel(); if (!p) return;
+    const acao = { dup: () => duplicar(p), cop: () => copiar(p), tras: () => camada(p, -1), frente: () => camada(p, 1), gira: () => girar(p, 90), esp: () => espelhar(p), apaga: () => apagar(p) }[b.dataset.b];
+    acao();
+  }; });
   paleta(); mostrarProp(); ajustar();
   setInterval(() => { if (el.isConnected && S.sujo) salvar(); }, 20000);
 }
