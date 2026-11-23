@@ -52,35 +52,71 @@ function editor(el, mapa, itens) {
   const hist = { passado: [], futuro: [] };
   let clip = null;
 
-  el.innerHTML = `<section class="card" style="padding:12px">
+  el.innerHTML = `<section class="card" id="eCaixa" style="padding:12px">
     <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
       <a href="#/criar-mapa">← Mapas</a>
       <input class="input" id="eNome" value="${esc(m.nome)}" maxlength="60" style="max-width:220px">
       <button class="btn" id="eSalvar">Salvar</button><span id="eEstado" class="muted" style="font-size:12px"></span>
       <span style="margin-left:auto" class="row"><button class="btn sm" id="eDesfazer" title="Ctrl+Z">↶ Desfazer</button><button class="btn sm" id="eRefazer" title="Ctrl+Y">↷ Refazer</button>
       <button class="btn sm" id="eGrade">Grade</button><button class="btn sm" id="eIma" title="Encaixa as peças na grade fina">Ímã</button>
+      <button class="btn sm" id="eTelaCheia" title="Ocupa a janela inteira">⛶ Tela cheia</button>
       <button class="btn primary" id="eVida">Usar no jogo ▶</button></span>
     </div>
-    <div style="display:grid;grid-template-columns:260px 1fr 270px;gap:10px;margin-top:10px;min-height:560px">
-      <div>
-        <div class="row" id="eCats" style="gap:4px;flex-wrap:wrap">${Object.keys(NOMES_CAT).map((c) => `<button class="btn sm" data-cat="${c}">${NOMES_CAT[c]}</button>`).join('')}</div>
-        <div id="ePaleta" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;max-height:440px;overflow:auto"></div>
-        <div class="row" style="gap:4px;margin-top:8px;flex-wrap:wrap">
-          <button class="btn sm" data-ferr="item">Colocar</button><button class="btn sm" data-ferr="pintar">Pintar chão</button>
-          <button class="btn sm" data-ferr="mover">Selecionar</button><button class="btn sm" data-ferr="apagar">Apagar</button></div>
-        <div class="row" style="gap:4px;margin-top:8px;flex-wrap:wrap"><span class="muted" style="font-size:12px;width:100%">Expandir:</span>
-          <button class="btn sm" data-exp="esq">← Esq.</button><button class="btn sm" data-exp="dir">Dir. →</button><button class="btn sm" data-exp="cima">↑ Cima</button><button class="btn sm" data-exp="baixo">Baixo ↓</button></div>
+    <div style="display:grid;grid-template-columns:1fr 270px;gap:10px;margin-top:10px">
+      <div id="eArea" style="position:relative;min-width:0">
+        <canvas id="eTela" style="width:100%;height:560px;display:block;background:#1b1f2a;border-radius:10px;touch-action:none"></canvas>
+        <div id="eFerr" style="position:absolute;left:8px;top:8px;width:270px;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:rgba(17,24,39,.95);border:1px solid #334155;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:2">
+          <div id="eFerrAlca" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;cursor:move;user-select:none;border-bottom:1px solid #334155">
+            <b style="font-size:13px">Caixa de ferramentas</b><button class="btn sm" id="eFerrMin" title="Recolher">–</button></div>
+          <div id="eFerrCorpo" style="padding:8px;overflow:auto">
+            <div class="row" id="eCats" style="gap:4px;flex-wrap:wrap">${Object.keys(NOMES_CAT).map((c) => `<button class="btn sm" data-cat="${c}">${NOMES_CAT[c]}</button>`).join('')}</div>
+            <div id="ePaleta" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;max-height:260px;overflow:auto"></div>
+            <div class="row" style="gap:4px;margin-top:8px;flex-wrap:wrap">
+              <button class="btn sm" data-ferr="item">Colocar</button><button class="btn sm" data-ferr="pintar">Pintar chão</button>
+              <button class="btn sm" data-ferr="mover">Selecionar</button><button class="btn sm" data-ferr="apagar">Apagar</button></div>
+            <div class="row" style="gap:4px;margin-top:8px;flex-wrap:wrap"><span class="muted" style="font-size:12px;width:100%">Expandir terreno:</span>
+              <button class="btn sm" data-exp="esq">← Esq.</button><button class="btn sm" data-exp="dir">Dir. →</button><button class="btn sm" data-exp="cima">↑ Cima</button><button class="btn sm" data-exp="baixo">Baixo ↓</button></div>
+          </div>
+        </div>
       </div>
-      <canvas id="eTela" style="width:100%;height:560px;background:#1b1f2a;border-radius:10px;touch-action:none"></canvas>
-      <div id="eProp" class="muted" style="font-size:13px;overflow:auto;max-height:600px"></div>
+      <div id="eProp" class="muted" style="font-size:13px;overflow:auto;max-height:720px"></div>
     </div>
-    <p class="muted" style="font-size:12px;margin-top:8px">Clique para colocar ou pintar. Com <b>Selecionar</b>, clique numa peça: a alça amarela no topo gira, a do canto redimensiona, e arrastar move. Botão do meio ou direito move a visão; a roda dá zoom.</p>
+    <p class="muted" style="font-size:12px;margin-top:8px">Clique para colocar ou pintar. Com <b>Selecionar</b>, clique numa peça: a alça amarela no topo gira, a do canto redimensiona. <b>Segure o botão direito sobre uma peça para movê-la</b>; o botão direito em área vazia ou o do meio move a visão. A roda dá zoom.</p>
   </section>`;
 
   const tela = el.querySelector('#eTela'); const g = tela.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   function ajustar() { tela.width = tela.clientWidth * dpr; tela.height = tela.clientHeight * dpr; desenhar(); }
   const aoRedimensionar = () => { if (!el.isConnected) return; ajustar(); };
+  // caixa de ferramentas: arrasta pelo cabeçalho, recolhe com o botão –
+  const caixaF = el.querySelector('#eFerr');
+  let arrastoCaixa = null;
+  el.querySelector('#eFerrAlca').addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    const r = caixaF.getBoundingClientRect(); arrastoCaixa = { dx: e.clientX - r.left, dy: e.clientY - r.top }; e.currentTarget.setPointerCapture(e.pointerId);
+  });
+  el.querySelector('#eFerrAlca').addEventListener('pointermove', (e) => {
+    if (!arrastoCaixa) return;
+    const area = el.querySelector('#eArea').getBoundingClientRect();
+    caixaF.style.left = Math.max(0, Math.min(area.width - 60, e.clientX - arrastoCaixa.dx - area.left)) + 'px';
+    caixaF.style.top = Math.max(0, Math.min(area.height - 40, e.clientY - arrastoCaixa.dy - area.top)) + 'px';
+  });
+  el.querySelector('#eFerrAlca').addEventListener('pointerup', () => { arrastoCaixa = null; });
+  el.querySelector('#eFerrMin').onclick = () => {
+    const corpo = el.querySelector('#eFerrCorpo'); const fechada = corpo.style.display === 'none';
+    corpo.style.display = fechada ? '' : 'none'; el.querySelector('#eFerrMin').textContent = fechada ? '–' : '+';
+  };
+  // tela cheia: a seção ocupa a janela; a tela de desenho acompanha
+  el.querySelector('#eTelaCheia').onclick = () => {
+    const cheia = el.querySelector('#eCaixa').dataset.cheia !== '1';
+    const caixa = el.querySelector('#eCaixa');
+    caixa.dataset.cheia = cheia ? '1' : '';
+    Object.assign(caixa.style, cheia ? { position: 'fixed', inset: '0', zIndex: '500', margin: '0', borderRadius: '0', overflow: 'auto', background: '#0f131c' } : { position: '', inset: '', zIndex: '', margin: '', borderRadius: '', overflow: '', background: '' });
+    el.querySelector('#eTela').style.height = cheia ? 'calc(100vh - 150px)' : '560px';
+    el.querySelector('#eProp').style.maxHeight = cheia ? 'calc(100vh - 150px)' : '720px';
+    el.querySelector('#eTelaCheia').textContent = cheia ? '⛶ Sair da tela cheia' : '⛶ Tela cheia';
+    requestAnimationFrame(ajustar);
+  };
   window.addEventListener('resize', aoRedimensionar);
 
   const mundoDeTela = (sx, sy) => { const r = tela.getBoundingClientRect(); return { x: (sx - r.left - r.width / 2) / S.cam.z + S.cam.x, y: (sy - r.top - r.height / 2) / S.cam.z + S.cam.y }; };
@@ -332,8 +368,12 @@ function editor(el, mapa, itens) {
   tela.addEventListener('contextmenu', (e) => e.preventDefault());
   tela.addEventListener('pointerdown', (e) => {
     tela.setPointerCapture(e.pointerId);
-    if (e.button === 1 || e.button === 2) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; return; }
     const q = mundoDeTela(e.clientX, e.clientY); S.mouse = q;
+    if (e.button === 2) { // segurar o botão direito numa peça move a peça
+      const alvo = itemNoPonto(q);
+      if (alvo) { S.sel = alvo.id; registrar(); S.arrastando = { tipo: 'mover', id: alvo.id, dx: q.x - alvo.x, dy: q.y - alvo.y }; mostrarProp(); desenhar(); return; }
+    }
+    if (e.button === 1 || e.button === 2) { S.pan = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y }; return; }
     const p = sel();
     // alças da peça selecionada: girar (topo) e redimensionar (canto)
     if (p && (S.ferr === 'mover' || S.ferr === 'item')) {
@@ -346,7 +386,7 @@ function editor(el, mapa, itens) {
   tela.addEventListener('pointermove', (e) => {
     if (S.pan) { S.cam.x = S.pan.cx - (e.clientX - S.pan.x) / S.cam.z; S.cam.y = S.pan.cy - (e.clientY - S.pan.y) / S.cam.z; desenhar(); return; }
     const q = mundoDeTela(e.clientX, e.clientY); S.mouse = q;
-    if (e.buttons !== 1) return;
+    if (e.buttons !== 1 && e.buttons !== 2) return;
     if (S.arrastando) {
       const a = S.arrastando; const p = m.itens.find((x) => x.id === a.id); if (!p) return;
       if (a.tipo === 'mover') { const [x, y] = encaixe(q.x - a.dx, q.y - a.dy); p.x = limitar(x, m.largura * CEL); p.y = limitar(y, m.altura * CEL); }
