@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 // Raiz do app calculada a partir deste arquivo: funciona mesmo iniciado por atalho/instalador.
@@ -36,9 +37,52 @@ const EMPTY = () => ({
 let state = null;
 let timer = null;
 
+// Lê um JSON tolerando BOM (arquivo salvo pelo Bloco de Notas/PowerShell). Lança erro se estiver danificado.
+function lerJson(file) {
+  const txt = fs.readFileSync(file, 'utf8').replace(/^﻿/, '');
+  return JSON.parse(txt);
+}
+
+// Backups automáticos (ver backup.js): procurados nos mesmos lugares padrão, do mais recente para o mais antigo.
+function candidatosDeRecuperacao() {
+  const lista = [];
+  const add = (f) => { try { if (fs.existsSync(f)) lista.push({ f, t: fs.statSync(f).mtimeMs }); } catch { /* ignora */ } };
+  add(`${DB_FILE}.bak`);
+  add(`${DB_FILE}.tmp`);
+  try { for (const n of fs.readdirSync(DATA_DIR)) if (/^db\.antes-.*\.json$/.test(n)) add(path.join(DATA_DIR, n)); } catch { /* sem pasta */ }
+  const bases = [process.env.OneDrive, process.env.OneDriveConsumer, path.join(os.homedir(), 'Documents'), os.homedir()].filter(Boolean);
+  for (const b of new Set(bases)) {
+    const dir = path.join(b, 'Codeniac-Backups');
+    try { for (const n of fs.readdirSync(dir)) if (/^\d{4}-\d{2}-\d{2}_\d{4}$/.test(n)) add(path.join(dir, n, 'db.json')); } catch { /* sem backups aí */ }
+  }
+  return lista.sort((a, b) => b.t - a.t).map((x) => x.f);
+}
+
+// Lê o banco; se estiver danificado, guarda uma cópia e recupera do backup válido mais recente, em vez de não abrir.
+function lerBanco() {
+  if (fs.existsSync(DB_FILE)) {
+    try { return lerJson(DB_FILE); } catch (err) {
+      const copia = path.join(DATA_DIR, `db.corrompido-${Date.now()}.json`);
+      try { fs.copyFileSync(DB_FILE, copia); } catch { /* segue */ }
+      console.error(`» db.json danificado (${err.message}). Cópia guardada em ${copia}. Procurando backup…`);
+    }
+  } else if (!fs.existsSync(`${DB_FILE}.bak`)) return null;
+  for (const f of candidatosDeRecuperacao()) {
+    try {
+      const dados = lerJson(f);
+      console.error(`» Banco recuperado de ${f}`);
+      fs.copyFileSync(f, DB_FILE);
+      return dados;
+    } catch { /* tenta o próximo */ }
+  }
+  console.error('» Nenhum backup válido encontrado: o Codeniac abre com um banco novo (a cópia danificada foi guardada).');
+  return null;
+}
+
 export function load() {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  state = fs.existsSync(DB_FILE) ? { ...EMPTY(), ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) } : EMPTY();
+  const dados = lerBanco();
+  state = dados ? { ...EMPTY(), ...dados } : EMPTY();
   for (const c of USER_COLLECTIONS) state[c] ??= [];
   state.userMeta ??= {};
   state.social ??= {};
@@ -57,9 +101,13 @@ export function db() {
   return state;
 }
 
+// Grava no temporário, força a ida ao disco (fsync) e só então troca; o arquivo anterior fica em db.json.bak.
+// Assim uma queda de energia não deixa o db.json cheio de zeros, e sempre há uma cópia boa ao lado.
 function flush() {
   const tmp = `${DB_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(state));
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeSync(fd, JSON.stringify(state)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  if (fs.existsSync(DB_FILE)) { try { fs.copyFileSync(DB_FILE, `${DB_FILE}.bak`); } catch { /* segue sem .bak */ } }
   fs.renameSync(tmp, DB_FILE);
 }
 
