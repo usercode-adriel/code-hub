@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR, APP_ROOT, db, save } from './db.js';
+import { listarPrefabs } from './estudio-prefabs.js';
 
 const router = express.Router();
 const CELULA = 32;
@@ -22,6 +23,18 @@ function inventario() {
     inventarioCache = new Map(m.itens.map((i) => [i.chave, i]));
   }
   return inventarioCache;
+}
+
+// Estruturas do Structure Studio (prefabs) entram no inventário do usuário como itens agrupados da categoria "estruturas":
+// imagem única, e junto os dados de lógica (colisões, entradas, vagas) que o conversor do jogo usa.
+const itemDePrefab = (p) => ({
+  chave: `estruturas/${p.id}`, categoria: 'estruturas', tipo: 'estrutura', nome: p.nome, arquivo: p.arquivo, w: p.imagem.w, h: p.imagem.h,
+  estrutura: { prefabId: p.id, estruturaId: p.estruturaId, versao: p.versao, pegada: p.pegada, colisoes: p.colisoes, entradas: p.entradas, derivada: p.logica?.derivada || {} },
+});
+export function inventarioDoUsuario(uid) {
+  const inv = new Map(inventario());
+  for (const p of listarPrefabs(uid)) { const it = itemDePrefab(p); inv.set(it.chave, it); }
+  return inv;
 }
 
 const pastaDe = (uid) => path.join(PASTA, uid);
@@ -42,11 +55,11 @@ function gravarMapa(uid, m) {
 }
 
 // valida e normaliza um mapa vindo do cliente; lança erro com a mensagem para o usuário
-function validar(corpo, base) {
+function validar(corpo, base, uid) {
   const largura = Math.trunc(Number(corpo.largura ?? base.largura));
   const altura = Math.trunc(Number(corpo.altura ?? base.altura));
   if (!(largura >= 4 && largura <= MAX_CELULAS && altura >= 4 && altura <= MAX_CELULAS)) throw new Error(`o mapa tem de ter de 4 a ${MAX_CELULAS} células de lado`);
-  const inv = inventario();
+  const inv = inventarioDoUsuario(uid);
   const celulas = {};
   for (const [k, v] of Object.entries(corpo.celulas ?? base.celulas ?? {})) {
     const [x, y] = k.split(',').map(Number);
@@ -79,7 +92,7 @@ function validar(corpo, base) {
 }
 
 router.get('/inventario', (req, res) => {
-  res.json({ itens: [...inventario().values()] });
+  res.json({ itens: [...inventarioDoUsuario(req.user.id).values()] });
 });
 
 router.get('/', (req, res) => {
@@ -109,7 +122,7 @@ router.put('/:id', (req, res) => {
   const base = lerMapa(req.user.id, req.params.id);
   if (!base) return res.status(404).json({ error: 'Mapa não encontrado' });
   let novo;
-  try { novo = validar(req.body || {}, base); } catch (err) { return res.status(400).json({ error: err.message }); }
+  try { novo = validar(req.body || {}, base, req.user.id); } catch (err) { return res.status(400).json({ error: err.message }); }
   const m = { ...base, ...novo, nome: String(req.body?.nome ?? base.nome).trim().slice(0, 60) || base.nome, atualizado: new Date().toISOString() };
   gravarMapa(req.user.id, m);
   res.json(m);
@@ -144,6 +157,13 @@ export function mapaAtivoDoUsuario(uid) {
   const u = db().users.find((x) => x.id === uid);
   return u?.mapaVida ? lerMapa(uid, u.mapaVida) : null;
 }
-export function inventarioServidor() {
-  return inventario();
+export function inventarioServidor(uid) {
+  return uid ? inventarioDoUsuario(uid) : inventario();
+}
+
+// mapas do usuário que usam um item do inventário (por exemplo uma estrutura); impede apagar o que está em uso
+export function mapasQueUsam(uid, chave) {
+  const dir = pastaDe(uid);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => lerMapa(uid, f.slice(0, -5))).filter((m) => m && m.itens.some((i) => i.chave === chave)).map((m) => m.nome);
 }

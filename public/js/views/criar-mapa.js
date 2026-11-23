@@ -7,7 +7,7 @@ import { esc, toast } from '../ui.js';
 
 const CEL = 32;
 const ROTAS = ['#/mapa', '#/mercado', '#/banco', '#/veiculos', '#/policia', '#/hospital', '#/justica', '#/governo', '#/empregos', '#/diversao', '#/locadora', '#/construtora'];
-const NOMES_CAT = { terreno: 'Terreno', construcoes: 'Construções', objetos: 'Objetos', vegetacao: 'Vegetação', relevo: 'Relevo', veiculos: 'Veículos', aeronaves: 'Aeronaves', '3d': '3D', personagens: 'Personagens' };
+const NOMES_CAT = { terreno: 'Terreno', construcoes: 'Construções', objetos: 'Objetos', vegetacao: 'Vegetação', relevo: 'Relevo', veiculos: 'Veículos', aeronaves: 'Aeronaves', '3d': '3D', estruturas: 'Estruturas', personagens: 'Personagens' };
 const GRAMA = 'terreno/grama-base';
 const PASSO = 8;      // com o ímã ligado, as peças encaixam a cada 8 unidades
 const HIST_MAX = 80;  // quantas ações cabem no Desfazer
@@ -330,8 +330,13 @@ function editor(el, mapa, itens) {
     const { it, w, h } = dimensoes(p);
     const pct = Math.round((p.escala || 1) * 100);
     const rot = Math.round((p.rot || 0) * 10) / 10;
-    const estab = it.categoria === 'construcoes' || it.categoria === 'objetos';
-    box.innerHTML = `<b>${esc(it.nome)}</b> <span class="muted">· ${esc(NOMES_CAT[it.categoria] || it.categoria)}</span>
+    const estab = it.categoria === 'construcoes' || it.categoria === 'objetos' || it.categoria === 'estruturas';
+    // estrutura do Structure Studio: peça agrupada; os detalhes e a edição vêm do prefab
+    const est = it.categoria === 'estruturas' ? it.estrutura : null;
+    const infoEstrutura = est ? `<div class="card" style="padding:8px;margin-top:8px;font-size:12px"><b>Estrutura agrupada</b> (prefab v${est.versao})<br>Área ocupada ${est.pegada?.w ?? '?'}×${est.pegada?.d ?? '?'} · ${est.entradas?.length || 0} entrada(s) · ${est.colisoes?.length || 0} colisão(ões) · ${est.derivada?.vagas?.length || 0} vaga(s)
+      <div style="margin-top:6px"><a class="btn sm" href="#/studio?id=${esc(est.estruturaId)}">Editar no Studio</a></div>
+      <div class="muted" style="margin-top:4px">No jogo a estrutura não gira nem espelha (a imagem tem perspectiva fixa). Ao salvar o prefab de novo, todos os mapas já usam a versão nova.</div></div>` : '';
+    box.innerHTML = `<b>${esc(it.nome)}</b> <span class="muted">· ${esc(NOMES_CAT[it.categoria] || it.categoria)}</span>${infoEstrutura}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
         <label>X<input class="input" id="pX" type="number" value="${Math.round(p.x)}"></label>
         <label>Y<input class="input" id="pY" type="number" value="${Math.round(p.y)}"></label>
@@ -383,6 +388,7 @@ function editor(el, mapa, itens) {
 
   function paleta() {
     const lista = itens.filter((i) => i.categoria === S.cat);
+    if (S.cat === 'estruturas' && !lista.length) { el.querySelector('#ePaleta').innerHTML = '<p class="muted" style="grid-column:1/-1;font-size:12px">Nenhuma estrutura ainda. Monte uma no <a href="#/studio">Structure Studio</a> e use "Salvar como prefab": ela aparece aqui.</p>'; el.querySelectorAll('[data-cat]').forEach((b) => b.classList.toggle('primary', b.dataset.cat === S.cat)); return; }
     el.querySelector('#ePaleta').innerHTML = lista.map((i) => `<button data-chave="${esc(i.chave)}" title="${esc(i.nome)}" style="border:2px solid ${S.chave === i.chave ? '#f2c94c' : 'transparent'};background:#111827;border-radius:8px;padding:4px;cursor:pointer;height:72px;display:flex;align-items:center;justify-content:center"><img src="${esc(i.arquivo)}" style="max-width:100%;max-height:64px;image-rendering:pixelated"></button>`).join('');
     el.querySelectorAll('#ePaleta [data-chave]').forEach((b) => { b.onclick = () => { S.chave = b.dataset.chave; if (porChave.get(S.chave).categoria === 'terreno') S.ferr = 'pintar'; el.querySelectorAll('[data-ferr]').forEach((x) => x.classList.toggle('primary', x.dataset.ferr === S.ferr)); paleta(); }; });
     el.querySelectorAll('[data-cat]').forEach((b) => b.classList.toggle('primary', b.dataset.cat === S.cat));

@@ -1,11 +1,19 @@
 // STRUCTURE STUDIO: prefab (módulo puro, sem DOM). Calcula, a partir de uma estrutura montada, tudo o que o prefab preserva:
 // imagem (limites), área ocupada no chão, colisões, pontos de entrada, materiais e a lista de componentes (para editar depois).
 // O servidor recalcula isto da estrutura salva: o cliente só envia a imagem "assada" (PNG), nunca os números.
-// Coordenadas da pegada, das colisões e das entradas são relativas ao PIVÔ do prefab: centro da base da pegada.
+// Coordenadas da pegada, das colisões, das entradas e da lógica derivada são relativas ao PIVÔ do prefab: o centro da base da
+// IMAGEM (a mesma convenção dos itens do Map Editor: pé da peça). Assim o prefab entra no mapa sem nenhum caso especial.
+// A aparência (imagem, componentes) fica separada da lógica de interação (bloco "logica").
 import { larguraVisual, alturaVisual, pegada, ordemDeDesenho } from './montagem.js';
+
+const GRADE_MIN = 16;
 
 export const MAX_IMAGEM = 4096;
 const ENTRADA_SUBS = new Set(['porta', 'entrada-saida', 'portao']);
+const VAGA_SUBS = new Set(['vaga', 'vaga-acessivel']);
+const CAMINHAVEL_SUBS = new Set(['calcada', 'jardim', 'canteiro']);   // onde os pedestres podem andar (preparado para os NPCs)
+const CIRCULACAO_SUBS = new Set(['faixa-circulacao', 'reta', 'curva', 'cruzamento', 'rotatoria', 'entrada-saida', 'ciclovia']); // onde os veículos circulam
+const CONEXAO_SUBS = new Set(['escada', 'rampa']);                   // ligações entre alturas (elevadores entram quando a biblioteca os tiver)
 const rad = (g) => g * Math.PI / 180;
 
 // retângulo desenhado de uma peça (com rotação e altura z), em coordenadas do mundo: os 4 cantos
@@ -43,7 +51,7 @@ export function montarPrefab(est, compDe) {
   if (!lim || lim.w < 4 || lim.h < 4) throw new Error('a estrutura não tem tamanho');
   if (lim.w > MAX_IMAGEM || lim.h > MAX_IMAGEM) throw new Error(`a estrutura passa de ${MAX_IMAGEM} px e não cabe numa imagem de prefab`);
   const p = pegadaTotal(lista, compDe);
-  const pivo = { x: (p.x0 + p.x1) / 2, y: p.y1 };
+  const pivo = { x: (lim.x0 + lim.x1) / 2, y: lim.y1 }; // centro da base da imagem
   const rel = (x, y) => ({ x: Math.round((x - pivo.x) * 10) / 10, y: Math.round((y - pivo.y) * 10) / 10 });
 
   // colisões: caixa de cada componente com colisão ligada (a caixa do componente, na escala e no lugar da peça)
@@ -63,15 +71,28 @@ export function montarPrefab(est, compDe) {
   }
   for (const m of est.logica?.entradas || []) if (Number.isFinite(m.x) && Number.isFinite(m.y)) entradas.push({ id: String(m.id || `manual-${entradas.length}`), tipo: 'manual', nome: String(m.nome || '').slice(0, 60), x: Math.round(m.x), y: Math.round(m.y) });
 
+  // lógica derivada: vagas de estacionamento (uma por módulo), áreas caminháveis e de circulação, escadas e rampas.
+  // Fica só como dado: o jogo usa o que já sabe usar (colisões, entradas, vagas) e o resto espera as simulações futuras.
+  const retangulo = (i, c) => { const q = pegada(i, c); return { ...rel(q.x0, q.y0), w: Math.round(q.w), h: Math.round(q.d) }; };
+  const vagas = []; const caminhavel = []; const circulacao = []; const conexoes = [];
+  for (const i of lista) {
+    const c = compDe(i.comp);
+    if (VAGA_SUBS.has(c.sub)) {
+      const n = Math.max(1, i.n || 1); const larg = c.w * i.escala; const prof = Math.max(GRADE_MIN, c.area.h * 32 * i.escala);
+      for (let k = 0; k < n; k++) vagas.push({ peca: i.id, acessivel: c.sub === 'vaga-acessivel', ...rel(i.x - (larg * n) / 2 + k * larg + larg / 2, i.y), w: Math.round(larg), h: Math.round(prof) });
+    } else if (CAMINHAVEL_SUBS.has(c.sub)) caminhavel.push({ peca: i.id, ...retangulo(i, c) });
+    else if (CIRCULACAO_SUBS.has(c.sub)) circulacao.push({ peca: i.id, ...retangulo(i, c) });
+    else if (CONEXAO_SUBS.has(c.sub)) conexoes.push({ peca: i.id, tipo: c.sub, ...rel(i.x, i.y), z: Math.round(i.z || 0) });
+  }
   const materiais = [...new Set(lista.map((i) => i.material || compDe(i.comp).material))].sort();
   const camadas = [...new Set(lista.map((i) => i.camada))];
   return {
     versao: 1, preset: est.preset, tipo: est.tipo,
-    imagem: { w: lim.w, h: lim.h, origem: { x: lim.x0, y: lim.y0 }, pivo: { x: (pivo.x - lim.x0) / lim.w, y: (pivo.y - lim.y0) / lim.h } },
+    imagem: { w: lim.w, h: lim.h, origem: { x: lim.x0, y: lim.y0 }, pivo: { x: (pivo.x - lim.x0) / lim.w, y: 1 } },
     pegada: { ...rel(p.x0, p.y0), w: Math.round(p.x1 - p.x0), d: Math.round(p.y1 - p.y0) },
     colisoes, entradas,
     componentes: ordemDeDesenho(lista).map((i) => ({ ...i })),
     metadados: { total: lista.length, materiais, camadas, grupos: new Set(lista.filter((i) => i.grupo).map((i) => i.grupo)).size },
-    logica: { ...(est.logica || {}), entradas: est.logica?.entradas || [] },
+    logica: { ...(est.logica || {}), entradas: est.logica?.entradas || [], derivada: { vagas, caminhavel, circulacao, conexoes } },
   };
 }

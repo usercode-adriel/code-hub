@@ -53,7 +53,7 @@ export function loadAssets() {
     const loadExtra = (k) => {
       if (img[`extra/${k}`]) return Promise.resolve(true);
       if (pend.has(k)) return pend.get(k);
-      const p = new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[`extra/${k}`] = i; img[`bld/x:${k}`] = i; ok(true); }; i.onerror = () => ok(false); i.src = `/assets/rpg/extra/${k}.png`; });
+      const p = new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => { img[`extra/${k}`] = i; img[`bld/x:${k}`] = i; ok(true); }; i.onerror = () => ok(false); i.src = k.startsWith('estudio/') ? `/estudio-arquivos/${k.slice(8)}.png` : `/assets/rpg/extra/${k}.png`; }); // estudio/…: estruturas do Structure Studio
       pend.set(k, p); return p;
     };
     // carrega o que falta; devolve true se algo novo chegou (aí os blocos do mapa precisam ser redesenhados)

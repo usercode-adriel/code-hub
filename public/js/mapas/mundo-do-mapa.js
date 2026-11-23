@@ -40,11 +40,33 @@ export function mundoDoMapa(mapa, inventario) {
     for (let j = y * CELULA / CS; j < (y + 1) * CELULA / CS; j++) mask.fill(m.mascara, j * mw + x * CELULA / CS, j * mw + (x + 1) * CELULA / CS);
   }
   const blds = []; const props = []; const pois = []; const planeSpots = []; const personagens = [];
+  const vagasEstruturas = []; const estruturas = []; // estruturas do Structure Studio (prefabs) colocadas no mapa
   const marcarSolido = (x0, y0, w, h) => {
     const i0 = Math.max(0, Math.floor(x0 / CS)); const i1 = Math.min(mw, Math.ceil((x0 + w) / CS));
     const j0 = Math.max(0, Math.floor(y0 / CS)); const j1 = Math.min(mh, Math.ceil((y0 + h) / CS));
     for (let j = j0; j < j1; j++) mask.fill(SOLIDO, j * mw + i0, j * mw + i1);
   };
+  // ESTRUTURA (prefab do Structure Studio): uma imagem única, desenhada como um edifício do jogo; o pivô é o centro da base da imagem.
+  // A lógica vem do próprio prefab: colisões (ou a pegada inteira), entrada e vagas de estacionamento. A rotação não vale
+  // (a imagem é uma miniatura pré-renderizada com perspectiva fixa): o espelho e o giro livre ficam só no Map Editor.
+  function estrutura(p, it, e, w, h) {
+    const info = it.estrutura || {};
+    const chaveImg = String(it.arquivo || '').replace(/^\/estudio-arquivos\//, '').replace(/\.png$/, '');
+    blds.push({ kind: 'sprite', spr: `x:estudio/${chaveImg}`, x: p.x - w / 2, y: p.y - h, w, h, floors: Math.max(1, Math.round(h / 24)), i: blds.length, estrutura: p.id });
+    const caixas = info.colisoes?.length ? info.colisoes.map((c) => ({ x: c.x, y: c.y, w: c.w, h: c.h })) : (info.pegada ? [{ x: info.pegada.x, y: info.pegada.y, w: info.pegada.w, h: info.pegada.d }] : []);
+    for (const c of caixas) marcarSolido(p.x + c.x * e, p.y + c.y * e, c.w * e, c.h * e);
+    if (p.dados?.nome || p.dados?.rota) {
+      const ent = info.entradas?.[0];
+      pois.push({ id: p.id, label: p.dados.nome || it.nome, at: ent ? [Math.round(p.x + ent.x * e), Math.round(p.y + ent.y * e + 14)] : [Math.round(p.x), Math.round(p.y + 14)], route: p.dados.rota || '#/mapa', icon: 'building' });
+    }
+    const d = info.derivada || {};
+    for (const v of d.vagas || []) vagasEstruturas.push([Math.round(p.x + v.x * e), Math.round(p.y + (v.y - v.h / 2) * e), -Math.PI / 2]);
+    // dados para as simulações futuras (NPCs, estacionamento, rotas), já em coordenadas do mundo
+    const abs = (r) => ({ x: Math.round(p.x + r.x * e), y: Math.round(p.y + r.y * e), w: Math.round(r.w * e), h: Math.round(r.h * e) });
+    estruturas.push({ id: p.id, prefab: info.prefabId, nome: p.dados?.nome || it.nome, x: p.x, y: p.y,
+      entradas: (info.entradas || []).map((n) => ({ ...n, x: Math.round(p.x + n.x * e), y: Math.round(p.y + n.y * e) })),
+      caminhavel: (d.caminhavel || []).map(abs), circulacao: (d.circulacao || []).map(abs), conexoes: (d.conexoes || []).map((c) => ({ ...c, x: Math.round(p.x + c.x * e), y: Math.round(p.y + c.y * e) })) });
+  }
   for (const p of mapa.itens || []) {
     const it = inventario.get(p.chave); if (!it) continue;
     // o tamanho que o criador definiu (escala) vale para o jogo; o espelho ainda não é desenhado pelo motor
@@ -58,6 +80,7 @@ export function mundoDoMapa(mapa, inventario) {
       if (it.categoria === 'aeronaves') planeSpots.push([p.x, p.y, -Math.PI / 2]);
       continue;
     }
+    if (it.categoria === 'estruturas') { estrutura(p, it, e, w, h); continue; }
     // (x, y) é o pé do item (centro horizontal da base), como no editor
     const rot = Math.round(((p.rot || 0) % 360 + 360) % 360 / 90) % 4;
     const ww = rot % 2 ? h : w; const hh = rot % 2 ? w : h;
@@ -85,12 +108,13 @@ export function mundoDoMapa(mapa, inventario) {
   const cx = W / 2; const cy = H / 2;
   if (planeSpots.length < 2) { planeSpots.push([cx - 60, cy, -Math.PI / 2], [cx + 60, cy, -Math.PI / 2]); }
   const spots = Array.from({ length: 8 }, (_, i) => [cx - 140 + i * 40, cy + 70, -Math.PI / 2]);
+  for (const v of vagasEstruturas.slice(0, 40)) spots.push(v); // as vagas dos estacionamentos montados no Studio também recebem carros
   return {
     name: mapa.nome || 'Meu mapa', W, H, CS, mw, mh, mask, heights: new Uint8Array(mw * mh), ox: 0, oy: 0,
     bounds: { x0: 0, y0: 0, x1: W, y1: H }, coast: null, core: { w: W, h: H }, stubs: [], ground,
     blds, props, decals: [], lamps: [], pois, regions: [{ name: mapa.nome || 'Meu mapa', rect: [0, 0, W, H] }],
     bridges: [], driveways: [], fence: [], airport: null, runwayLights: [], spots, rentSpot: null, planeSpots,
-    aurora: { blitz: [], area: [0, 0, W, H] }, personagens,
+    aurora: { blitz: [], area: [0, 0, W, H] }, personagens, estruturas,
     R: { w: W, h: H, nodes, roads, lights, smartLights: [], lots: [], pois, regions: [{ name: mapa.nome || 'Meu mapa', rect: [0, 0, W, H] }], radars: [] },
     segs, lines, nodeInfo,
   };

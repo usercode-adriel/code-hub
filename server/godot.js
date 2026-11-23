@@ -7,7 +7,7 @@ import { mapaAtivoDoUsuario, inventarioServidor } from './mapas.js';
 const router = express.Router();
 function exportar(uid) {
   const mapa = mapaAtivoDoUsuario(uid) || { nome: 'Mapa vazio', largura: 40, altura: 30, celulas: {}, itens: [] };
-  const c = mundoDoMapa(mapa, inventarioServidor());
+  const c = mundoDoMapa(mapa, inventarioServidor(uid));
   const arred = (v) => Math.round(v * 10) / 10;
   return {
     versao: 1,

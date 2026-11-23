@@ -49,7 +49,7 @@ async function hub(el) {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:8px">${prefabs.map((p) => `<div class="card" style="padding:8px;display:flex;gap:8px;align-items:center">
         <img src="${esc(p.arquivo)}" alt="${esc(p.nome)}" loading="lazy" style="width:72px;height:56px;object-fit:contain;background:#111827;border-radius:8px">
         <div style="flex:1;min-width:0"><b>${esc(p.nome)}</b> <span class="chip">v${p.versao}</span><div class="muted" style="font-size:12px">${p.pegada.w}×${p.pegada.d} · ${p.entradas} entrada(s) · ${p.colisoes} colisão(ões)</div></div>
-        <button class="btn sm" data-exp="${p.id}">Exportar</button><button class="btn sm" data-delp="${p.id}">Apagar</button></div>`).join('') || '<p class="muted">Nenhum prefab ainda. Abra uma estrutura e use "Salvar como prefab".</p>'}</div>
+        <a class="btn sm" href="#/criar-mapa" title="Abre o Criar mapa: a estrutura está na aba Estruturas">Usar no mapa</a><button class="btn sm" data-exp="${p.id}">Exportar</button><button class="btn sm" data-delp="${p.id}">Apagar</button></div>`).join('') || '<p class="muted">Nenhum prefab ainda. Abra uma estrutura e use "Salvar como prefab".</p>'}</div>
     </section>`;
   const preset = el.querySelector('#sPreset'); const tipo = el.querySelector('#sTipo');
   const atualizar = () => {
@@ -81,6 +81,6 @@ async function hub(el) {
       const a = document.createElement('a'); a.href = url; a.download = `${pacote.prefab.nome.replace(/[^\w.-]+/g, '-')}.prefab.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) { toast('Studio', err.message, 'warning'); }
   }; });
-  el.querySelectorAll('[data-delp]').forEach((b) => { b.onclick = async () => { if (!confirm('Apagar este prefab? A estrutura original continua.')) return; await api.del(`/estudio/prefabs/${b.dataset.delp}`); hub(el); }; });
+  el.querySelectorAll('[data-delp]').forEach((b) => { b.onclick = async () => { if (!confirm('Apagar este prefab? A estrutura original continua.')) return; try { await api.del(`/estudio/prefabs/${b.dataset.delp}`); hub(el); } catch (err) { toast('Studio', err.message, 'warning'); } }; });
   el.querySelectorAll('[data-del]').forEach((b) => { b.onclick = async () => { if (!confirm('Apagar esta estrutura?')) return; await api.del(`/estudio/estruturas/${b.dataset.del}`); hub(el); }; });
 }

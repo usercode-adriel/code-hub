@@ -537,6 +537,60 @@ test('structure studio: sem chave do OpenRouter o gerador explica e não oferece
   await ctx.close();
 });
 
+test('structure studio: prefab aparece no Map Editor como estrutura agrupada e funciona no jogo (imagem, colisão, entrada)', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token')); const h = { Authorization: `Bearer ${token}` }; const hj = { ...h, 'Content-Type': 'application/json' };
+  const importar = async (nome, sub, categoria, w, hh, cor) => {
+    const fd = new FormData(); fd.append('imagem', new Blob([pngSolido(w, hh, cor)], { type: 'image/png' }), `${nome}.png`);
+    for (const [k, v] of Object.entries({ nome, categoria, sub, perspectiva: 'arq25d', material: 'concreto', origem: 'importado' })) fd.append(k, v);
+    return (await (await fetch(`${BASE}/api/estudio/componentes`, { method: 'POST', headers: h, body: fd })).json()).componente;
+  };
+  const parede = await importar('Parede mapa', 'parede', 'estrutura', 160, 96, [150, 140, 130, 255]); const porta = await importar('Porta mapa', 'porta', 'fachada', 40, 64, [90, 60, 40, 255]);
+  const telhado = await importar('Telhado mapa', 'telhado-plano', 'cobertura', 160, 40, [110, 80, 70, 255]);
+  const est = await (await fetch(`${BASE}/api/estudio/estruturas`, { method: 'POST', headers: hj, body: JSON.stringify({ nome: 'Delegacia do mapa', preset: 'arq25d', tipo: 'delegacia' }) })).json();
+  const itens = [{ id: 'w1', comp: parede.id, x: 320, y: 320, camada: 'base' }, { id: 'p1', comp: porta.id, x: 320, y: 320, camada: 'fachada', anfitriao: 'w1', nome: 'Entrada' }, { id: 't1', comp: telhado.id, x: 320, y: 320, z: 96, camada: 'cobertura', anfitriao: 'w1' }];
+  assert.equal((await fetch(`${BASE}/api/estudio/estruturas/${est.id}`, { method: 'PUT', headers: hj, body: JSON.stringify({ componentes: itens }) })).status, 200);
+  await p.goto(`${BASE}/#/studio?id=${est.id}`); await p.waitForSelector('#stPrefab', { timeout: 20000 }); await p.waitForTimeout(800);
+  await p.click('#stPrefab'); await p.waitForFunction(() => /Prefab v1 salvo/.test(document.querySelector('#stEstado').textContent), null, { timeout: 15000 });
+  const pre = (await (await fetch(`${BASE}/api/estudio/prefabs`, { headers: h })).json()).prefabs[0];
+  const prefab = await (await fetch(`${BASE}/api/estudio/prefabs/${pre.id}`, { headers: h })).json();
+  assert.deepEqual(prefab.imagem.pivo, { x: 0.5, y: 1 }, 'pivô no centro da base da imagem');
+
+  // o inventário do Map Editor traz a estrutura, só para o dono
+  const inv = (await (await fetch(`${BASE}/api/mapas/inventario`, { headers: h })).json()).itens;
+  const item = inv.find((i) => i.chave === `estruturas/${prefab.id}`); assert.ok(item, 'a estrutura está no inventário do mapa');
+  assert.deepEqual([item.categoria, item.w, item.h], ['estruturas', prefab.imagem.w, prefab.imagem.h]); assert.equal(item.estrutura.estruturaId, est.id);
+  // mapa com a estrutura: aceito; estrutura inexistente: recusada
+  const mapa = await (await fetch(`${BASE}/api/mapas`, { method: 'POST', headers: hj, body: JSON.stringify({ nome: 'Mapa com estrutura' }) })).json();
+  const colocar = (chave) => fetch(`${BASE}/api/mapas/${mapa.id}`, { method: 'PUT', headers: hj, body: JSON.stringify({ itens: [{ id: 's1', chave, x: 640, y: 560, dados: { nome: 'Delegacia Central', rota: '#/policia' } }] }) });
+  assert.equal((await colocar('estruturas/00000000-0000-0000-0000-000000000000')).status, 400);
+  assert.equal((await colocar(`estruturas/${prefab.id}`)).status, 200);
+  // em uso num mapa: o prefab não pode ser apagado
+  const delUso = await fetch(`${BASE}/api/estudio/prefabs/${prefab.id}`, { method: 'DELETE', headers: h }); assert.equal(delUso.status, 409); assert.match((await delUso.json()).error, /em uso/);
+
+  // Map Editor: aba Estruturas com a peça; selecionar mostra os dados e o atalho para o Studio
+  await p.goto(`${BASE}/#/criar-mapa?id=${mapa.id}`); await p.waitForSelector('#eTela', { timeout: 20000 });
+  await p.click('[data-cat="estruturas"]'); await p.waitForSelector(`#ePaleta [data-chave="estruturas/${prefab.id}"]`, { timeout: 10000 });
+  await p.click('[data-ferr="mover"]');
+  const t = await p.locator('#eTela').boundingBox();
+  await p.mouse.click(t.x + t.width / 2, t.y + t.height / 2); await p.waitForTimeout(250); // o item está no centro do mapa (640, 560 → vista inicial)
+  assert.match(await p.textContent('#eProp'), /Estrutura agrupada/, 'clicar na estrutura a seleciona como uma peça só');
+  assert.equal(await p.locator(`#eProp a[href="#/studio?id=${est.id}"]`).count(), 1, 'atalho para editar a estrutura no Studio');
+
+  // jogo: a estrutura aparece como edifício, a imagem é carregada sob demanda, há colisão e ponto de interesse
+  await p.goto(`${BASE}/#/mapa`); await p.waitForFunction(() => window.__d2?.city, null, { timeout: 60000 }); await p.waitForTimeout(1200);
+  // centro do corpo da estrutura no mundo: o item está em (640, 560) e a pegada é relativa ao pivô
+  const corpo = { x: 640 + prefab.pegada.x + prefab.pegada.w / 2, y: 560 + prefab.pegada.y + prefab.pegada.d / 2 };
+  const jogo = await p.evaluate((c0) => { const c = __d2.city; const b = c.blds.find((x) => x.estrutura); return { spr: b?.spr, solido: c.mask[Math.floor(c0.y / c.CS) * c.mw + Math.floor(c0.x / c.CS)] === 0, poi: c.pois.find((x) => x.label === 'Delegacia Central')?.route, estruturas: c.estruturas?.length }; }, corpo);
+  assert.match(jogo.spr, /^x:estudio\//); assert.equal(jogo.poi, '#/policia'); assert.equal(jogo.estruturas, 1); assert.equal(jogo.solido, true, 'o corpo da estrutura é sólido no jogo');
+  assert.ok(p.falhas.every((f) => !/estudio-arquivos/.test(f)), `a imagem da estrutura carregou: ${p.falhas.join(' | ')}`);
+  // sem uso, o prefab pode ser apagado
+  await fetch(`${BASE}/api/mapas/${mapa.id}`, { method: 'PUT', headers: hj, body: JSON.stringify({ itens: [] }) });
+  assert.equal((await fetch(`${BASE}/api/estudio/prefabs/${prefab.id}`, { method: 'DELETE', headers: h })).status, 200);
+  assert.deepEqual(p.errosJS.filter((x) => !/status of (400|409)/.test(x)), [], 'erros de script');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);

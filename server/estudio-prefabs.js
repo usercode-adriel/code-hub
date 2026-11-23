@@ -86,9 +86,13 @@ router.post('/', receber, (req, res) => {
   res.status(antigo ? 200 : 201).json(p);
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const uid = req.user.id; const p = lerPrefab(uid, req.params.id);
   if (!p) return res.status(404).json({ error: 'Prefab não encontrado' });
+  // em uso num mapa: não apaga (o mapa ficaria com uma peça sem imagem)
+  const { mapasQueUsam } = await import('./mapas.js');
+  const uso = mapasQueUsam(uid, `estruturas/${p.id}`);
+  if (uso.length) return res.status(409).json({ error: `Este prefab está em uso em ${uso.length} mapa(s): ${uso.slice(0, 3).join(', ')}` });
   fs.rmSync(arquivoDe(uid, p.id), { force: true });
   liberarImagem(uid, p.arquivoHash, p.id);
   const est = lerEstrutura(uid, p.estruturaId); if (est && est.prefab?.id === p.id) { const { prefab, ...resto } = est; gravarEstrutura(uid, resto); }

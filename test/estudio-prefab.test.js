@@ -25,12 +25,13 @@ test('prefab: imagem cobre todas as peças, com a altura das que estão empilhad
   assert.ok(lim.y1 >= 330, 'inclui o pé da palmeira');
   const p = montarPrefab(est, compDe);
   assert.equal(p.imagem.w, lim.w); assert.equal(p.imagem.h, lim.h);
-  assert.ok(p.imagem.pivo.x > 0 && p.imagem.pivo.x < 1 && p.imagem.pivo.y > 0 && p.imagem.pivo.y <= 1, 'pivô dentro da imagem');
+  assert.ok(Math.abs(p.imagem.pivo.x - 0.5) < 1e-9 && p.imagem.pivo.y === 1, 'pivô no centro da base da imagem (convenção do Map Editor)');
 });
 
 test('prefab: pegada, colisões e entradas são relativas ao pivô', () => {
   const p = montarPrefab(montagem(), compDe);
   assert.equal(p.pegada.w >= 128, true, 'a pegada cobre a parede');
+  assert.ok(p.pegada.y + p.pegada.d <= 0.0001, 'a pegada termina na base da imagem ou acima dela (y relativo ao pivô)');
   assert.equal(p.entradas.length, 1); assert.equal(p.entradas[0].tipo, 'porta'); assert.equal(p.entradas[0].nome, 'Entrada principal');
   assert.ok(Math.abs(p.entradas[0].x) < 80, 'a porta fica perto do pivô (relativa)');
   assert.equal(p.colisoes.length, 2, 'parede e palmeira têm colisão');
@@ -53,4 +54,17 @@ test('prefab: recusa estrutura vazia, componente sumido e imagem grande demais',
   assert.throws(() => montarPrefab(est, compDe), /biblioteca/);
   const enorme = novaInstancia(C.parede, 100, 100, { n: 24, escala: 4 });
   assert.throws(() => montarPrefab({ preset: 'arq25d', tipo: 'loja', componentes: [enorme] }, compDe), new RegExp(String(MAX_IMAGEM)));
+});
+
+test('prefab: lógica derivada (vagas, caminhável, circulação, conexões) separada da aparência, relativa ao pivô', () => {
+  const vaga = { ...comp('vaga', 'vaga', 40, 64, { camada: 'solo' }), area: { w: 2, h: 2 } }; /* 2 células de fundo = 64 px */ const calcada = comp('calcada', 'calcada', 96, 32, { camada: 'solo' }); const escada = comp('escada', 'escada', 32, 48, { camada: 'externo' }); const faixa = comp('faixa', 'faixa-circulacao', 128, 32, { camada: 'solo' });
+  const kit = { ...C, vaga, calcada, escada, faixa }; const cd = (id) => kit[id];
+  const est = montagem();
+  est.componentes.push(novaInstancia(vaga, 200, 420, { n: 3 }), novaInstancia(calcada, 200, 340), novaInstancia(faixa, 200, 380), novaInstancia(escada, 120, 330, { z: 8 }));
+  const p = montarPrefab(est, cd); const d = p.logica.derivada;
+  assert.equal(d.vagas.length, 3, 'uma vaga por módulo'); assert.ok(d.vagas.every((v) => v.w === 40 && v.h === 64));
+  assert.deepEqual(d.vagas.map((v) => v.x), [d.vagas[0].x, d.vagas[0].x + 40, d.vagas[0].x + 80], 'vagas lado a lado, uma depois da outra');
+  assert.equal(d.caminhavel.length, 1); assert.equal(d.circulacao.length, 1); assert.equal(d.conexoes.length, 1); assert.equal(d.conexoes[0].tipo, 'escada'); assert.equal(d.conexoes[0].z, 8);
+  assert.equal(p.componentes.length, est.componentes.length, 'a aparência (componentes) continua inteira, separada da lógica');
+  const sem = montarPrefab(montagem(), cd).logica.derivada; assert.deepEqual([sem.vagas.length, sem.caminhavel.length, sem.circulacao.length, sem.conexoes.length], [0, 0, 0, 0]);
 });
