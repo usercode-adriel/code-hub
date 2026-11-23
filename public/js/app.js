@@ -28,6 +28,7 @@ const VIEWS = {
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
   livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
   rede: () => import('./views/rede.js'), busca: () => import('./views/busca.js'),
+  gamecode: () => import('./views/gamecode.js'), personagem3d: () => import('./views/personagem3d.js'),
   personagens: () => import('./views/personagens.js'), 'criar-mapa': () => import('./views/criar-mapa.js'), studio: () => import('./views/studio.js'), creditos: () => import('./views/creditos.js'), diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
   midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
@@ -40,10 +41,10 @@ const VIEWS = {
 // atalhos da barra lateral que abrem telas existentes
 const ALIAS = { loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
-const WORLD = new Set(['locadora', 'construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
+const WORLD = new Set(['gamecode', 'personagem3d', 'locadora', 'construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { locadora: 'centro', construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { gamecode: 'gamecode', personagem3d: 'gamecode', locadora: 'centro', construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'centro';
@@ -447,8 +448,11 @@ async function route() {
     const el = document.createElement('div');
     el.className = 'view';
     view.replaceChildren(el);
-    cleanup = await mod.default(el, parts.slice(1), new URLSearchParams(query));
-    if (seq === routeSeq) animateView(el);
+    const limpar = await mod.default(el, parts.slice(1), new URLSearchParams(query));
+    // o usuário pode ter saído desta tela enquanto ela carregava: quem terminou tarde já não tem dono, então limpa agora
+    if (seq !== routeSeq) { if (typeof limpar === 'function') { try { limpar(); } catch { /* ignore */ } } return; }
+    cleanup = limpar;
+    animateView(el);
   } catch (err) {
     console.error(err);
     if (seq === routeSeq) view.innerHTML = `<div class="empty-state"><b>Não foi possível abrir esta tela</b><p>${esc(err.message)}</p></div>`;

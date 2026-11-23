@@ -61,7 +61,7 @@ test('login do administrador padrão funciona', async () => {
 
 test('telas principais carregam sem erro de script e sem arquivo faltando', async () => {
   const { p, ctx } = await paginaLogada();
-  for (const rota of ['#/', '#/mapa', '#/veiculos', '#/configuracoes', '#/chat', '#/diagnostico']) {
+  for (const rota of ['#/', '#/mapa', '#/gamecode', '#/personagem3d', '#/veiculos', '#/configuracoes', '#/chat', '#/diagnostico']) {
     await p.goto(`${BASE}/${rota}`); await p.waitForTimeout(3000);
     const n = await p.evaluate(() => document.querySelectorAll('*').length);
     assert.ok(n > 300, `tela ${rota} parece vazia (${n} elementos)`);
@@ -588,6 +588,34 @@ test('structure studio: prefab aparece no Map Editor como estrutura agrupada e f
   await fetch(`${BASE}/api/mapas/${mapa.id}`, { method: 'PUT', headers: hj, body: JSON.stringify({ itens: [] }) });
   assert.equal((await fetch(`${BASE}/api/estudio/prefabs/${prefab.id}`, { method: 'DELETE', headers: h })).status, 200);
   assert.deepEqual(p.errosJS.filter((x) => !/status of (400|409)/.test(x)), [], 'erros de script');
+  await ctx.close();
+});
+
+test('gamecode: a barra lateral tem Gamecode (não Mapa); a tela lista os mapas salvos com editar, jogar e excluir', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token')); const h = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const a = await (await fetch(`${BASE}/api/mapas`, { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Mapa para jogar' }) })).json();
+  const b = await (await fetch(`${BASE}/api/mapas`, { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Mapa para excluir' }) })).json();
+  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('a[href="#/gamecode"]', { timeout: 20000 });
+  assert.equal(await p.locator('a[href="#/mapa"]').count(), 0, 'o item Mapa saiu da barra lateral');
+  assert.match(await p.textContent('a[href="#/gamecode"]'), /Gamecode/);
+  await p.click('a[href="#/gamecode"]'); await p.waitForSelector('[data-jogar]', { timeout: 15000 });
+  assert.ok(await p.locator(`a[href="#/criar-mapa?id=${a.id}"]`).count() === 1, 'botão Editar');
+  assert.ok(await p.locator('[data-excluir]').count() >= 2, 'botão Excluir');
+  // Jogar: marca o mapa como o do jogo e abre o mapa
+  await p.click(`[data-jogar="${a.id}"]`); await p.waitForFunction(() => location.hash === '#/mapa', null, { timeout: 15000 });
+  const vida = await (await fetch(`${BASE}/api/mapas`, { headers: h })).json();
+  assert.equal(vida.vida, a.id, 'o mapa jogado virou o mapa do jogo');
+  // Excluir: some da lista e do servidor
+  await p.goto(`${BASE}/#/gamecode`); await p.waitForSelector(`[data-excluir="${b.id}"]`, { timeout: 15000 });
+  p.once('dialog', (d) => d.accept());
+  await p.click(`[data-excluir="${b.id}"]`); await p.waitForFunction((id) => !document.querySelector(`[data-excluir="${id}"]`), b.id, { timeout: 15000 });
+  const depois = await (await fetch(`${BASE}/api/mapas`, { headers: h })).json();
+  assert.ok(!depois.mapas.some((m) => m.id === b.id), 'o mapa excluído sumiu do servidor');
+  // sprite 3D: a tela abre com o caminho de produção
+  await p.goto(`${BASE}/#/personagem3d`); await p.waitForSelector('#p3Conjuntos', { timeout: 15000 });
+  assert.match(await p.textContent('#p3Conjuntos'), /Nenhum conjunto de textura 3D/);
+  assert.deepEqual(p.errosJS, [], 'erros de script no gamecode');
   await ctx.close();
 });
 

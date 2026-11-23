@@ -10,6 +10,11 @@ router.get('/', (req, res) => {
   res.json({ personagens: req.user.personagens || [] });
 });
 
+// conjuntos de textura 3D (mesmos quadros do pixel, só a textura muda). Ainda não há conjuntos no projeto: a lista é vazia.
+router.get('/texturas3d', (_req, res) => {
+  res.json({ conjuntos: [] });
+});
+
 router.put('/', (req, res) => {
   const lista = req.body?.personagens;
   if (!Array.isArray(lista)) return res.status(400).json({ error: 'personagens precisa ser uma lista' });

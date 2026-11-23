@@ -8,7 +8,7 @@ import { esc, initials } from './ui.js';
 
 // barra lateral da cidade (ordem pedida) + lugares da cidade
 export const CITY_NAV = [
-  ['centro', 'Início', 'home', '#8b7bff'], ['mapa', 'Mapa', 'map', '#38bdf8'], ['vida', 'Minha Vida', 'user', '#f472b6'],
+  ['centro', 'Início', 'home', '#8b7bff'], ['gamecode', 'Gamecode', 'code', '#38bdf8'], ['vida', 'Minha Vida', 'user', '#f472b6'],
   ['inventario', 'Inventário', 'layers', '#c084fc'], ['mercado', 'Loja', 'cart', '#fb923c'], ['empregos', 'Empregos', 'briefcase', '#facc15'],
   ['veiculos', 'Veículos', 'car', '#60a5fa'], ['propriedades', 'Propriedades', 'building', '#34d399'], ['construtora', 'Construtora', 'layers', '#f59e0b'], ['empresas', 'Economia', 'trending', '#4ade80'],
   ['organizacoes', 'Organizações', 'users', '#a78bfa'], ['assistente', 'Chat', 'chat', '#22d3ee'], ['settings', 'Configurações', 'settings', '#94a3b8'],
@@ -101,7 +101,7 @@ setInterval(tickClock, 1500);
 export function renderBottom(cur) {
   const lit = LIT[cur] || cur;
   const b = (k, l, ic) => `<a class="cx-bn ${lit === k ? 'on' : ''}" href="#/${k}">${icon(ic, 21)}<span>${l}</span></a>`;
-  document.getElementById('bottomNav').innerHTML = `${b('centro', 'Início', 'home')}${b('mapa', 'Mapa', 'map')}
+  document.getElementById('bottomNav').innerHTML = `${b('centro', 'Início', 'home')}${b('gamecode', 'Gamecode', 'code')}
     <button class="cx-bn-phone" data-dev="phone" aria-label="Abrir celular">${icon('phone', 24)}</button>
     ${b('mercado', 'Loja', 'cart')}<button class="cx-bn" id="bnMenu">${icon('menu', 21)}<span>Mais</span></button>`;
 }
