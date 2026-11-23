@@ -69,7 +69,11 @@ function validar(corpo, base) {
       if (p.dados.nome != null) dados.nome = String(p.dados.nome).slice(0, 60);
       if (p.dados.rota != null) dados.rota = String(p.dados.rota).slice(0, 80);
     }
-    return { id: String(p.id || crypto.randomUUID()).slice(0, 40), chave: it.chave, x: Math.round(x), y: Math.round(y), rot: Number(p.rot) || 0, dados };
+    // rot em graus (qualquer ângulo), escala (0,1 a 5), espelho horizontal e camada (z: quem fica na frente)
+    const rot = ((Number(p.rot) || 0) % 360 + 360) % 360;
+    const escala = Math.min(5, Math.max(0.1, Number(p.escala) || 1));
+    const z = Math.min(999, Math.max(-999, Math.trunc(Number(p.z)) || 0));
+    return { id: String(p.id || crypto.randomUUID()).slice(0, 40), chave: it.chave, x: Math.round(x), y: Math.round(y), rot: Math.round(rot * 10) / 10, escala: Math.round(escala * 100) / 100, espelho: p.espelho === true, z, dados };
   });
   return { largura, altura, celulas, itens };
 }
@@ -89,6 +93,9 @@ router.post('/', (req, res) => {
   const nome = String(req.body?.nome ?? '').trim().slice(0, 60) || 'Meu mapa';
   const m = { id: crypto.randomUUID(), nome, largura: 40, altura: 30, celulas: {}, itens: [], criado: new Date().toISOString(), atualizado: new Date().toISOString() };
   gravarMapa(req.user.id, m);
+  // o mapa criado já vira o mapa do jogo: não precisa apertar Vida para jogar
+  const u = db().users.find((x) => x.id === req.user.id);
+  if (u) { u.mapaVida = m.id; save(); }
   res.status(201).json(m);
 });
 

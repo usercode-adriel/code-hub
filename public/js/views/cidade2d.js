@@ -71,7 +71,12 @@ export default async function render(el, params = new URLSearchParams()) {
   if (!alive) return;
   await new Promise((r) => setTimeout(r, 0));
   let reforma = state.reforma || null;
-  const city = await mundoAtivo(); // o mapa marcado em "Vida" (ou um mapa vazio)
+  const city = await mundoAtivo(); // o mapa marcado em "Vida"
+  if (!city) { // sem mapa: o jogo não abre; o usuário fica nas configurações, em Criar mapa
+    toast('Sem mapa', 'Crie o seu mapa em Criar mapa para o jogo abrir.', 'info');
+    location.hash = '#/configuracoes/mapas';
+    return;
+  }
   const world = buildGraph(city.R);
   const syncWorld = () => Object.assign(world, { mask: city.mask, heights: city.heights, cs: CS, mw: city.mw, ox: city.ox, oy: city.oy, bounds: city.bounds, pois: city.pois, regions: city.regions, radars: city.R.radars, obst: buildObst(city.props) });
   syncWorld();
@@ -246,7 +251,7 @@ export default async function render(el, params = new URLSearchParams()) {
   let reconstrucao = 0; // só vale a reconstrução mais recente (uma antiga pode terminar depois)
   async function rebuildCity(rf, rect, full) {
     const t0 = performance.now(); const minha = ++reconstrucao;
-    const nova = await mundoAtivo(); if (minha !== reconstrucao) return;
+    const nova = await mundoAtivo(); if (minha !== reconstrucao || !nova) return;
     Object.assign(city, nova); syncWorld();
     R.reset({ rect, coast: full }); perf.rebuild = Math.round(performance.now() - t0);
     assets.ensure(extrasOf(city)).then((got) => { if (got) R.reset({ rect, coast: false }); });

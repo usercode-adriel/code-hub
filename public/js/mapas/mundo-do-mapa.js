@@ -47,7 +47,9 @@ export function mundoDoMapa(mapa, inventario) {
   };
   for (const p of mapa.itens || []) {
     const it = inventario.get(p.chave); if (!it) continue;
-    const w = it.w; const h = it.h;
+    // o tamanho que o criador definiu (escala) vale para o jogo; o espelho ainda não é desenhado pelo motor
+    const e = Number(p.escala) > 0 ? Number(p.escala) : 1;
+    const w = it.w * e; const h = it.h * e;
     if (it.categoria === 'personagens') { // personagens colocados no mapa andam pelas calçadas (sprite chr/<nome>)
       personagens.push({ id: p.id, nome: p.dados?.nome || it.nome, spr: 'chr/' + it.chave.replace(/^personagens\//, ''), x: p.x, y: p.y });
       continue;

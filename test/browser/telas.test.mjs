@@ -127,6 +127,36 @@ test('criar mapa: o editor abre, aceita peça do inventário e salva', async () 
   await ctx.close();
 });
 
+test('modelagem: gira, espelha, escala e desfaz; criar mapa já vira o do jogo', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/criar-mapa`); await p.waitForSelector('#mNovo', { timeout: 30000 });
+  await p.click('#mNovo'); await p.waitForSelector('#eTela', { timeout: 15000 });
+  // coloca uma peça no centro e confere o painel
+  await p.click('#ePaleta [data-chave]'); await p.waitForTimeout(300);
+  const tela = await p.locator('#eTela').boundingBox();
+  await p.mouse.click(tela.x + tela.width / 2, tela.y + tela.height / 2); await p.waitForTimeout(200);
+  assert.ok(await p.isVisible('#pRm'), 'o painel da peça aparece ao colocar');
+  await p.click('#pRp'); await p.click('#pEsp');
+  await p.fill('#pL', '200'); await p.dispatchEvent('#pL', 'change'); await p.waitForTimeout(150);
+  const antes = await p.evaluate(() => document.querySelector('#pR').value);
+  assert.equal(antes, '90', 'rotação em 90 graus');
+  assert.match(await p.evaluate(() => document.querySelector('#pEV').textContent), /%/);
+  // desfazer: largura, depois espelho, depois a rotação (cada ação é um passo)
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(150);
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(150);
+  assert.ok(!(await p.textContent('#eProp')).includes('Espelhado'), 'o espelho foi desfeito');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(150);
+  assert.equal(await p.evaluate(() => document.querySelector('#pR').value), '0', 'a rotação foi desfeita');
+  await p.click('#eSalvar'); await p.waitForTimeout(600);
+  assert.match(await p.evaluate(() => document.querySelector('#eEstado').textContent), /Salvo/);
+  // o mapa criado já é o do jogo: a Vida está ativa na lista
+  await p.goto(`${BASE}/#/settings/mapas`); await p.waitForSelector('a[href="#/criar-mapa"]', { timeout: 30000 });
+  await p.click('a[href="#/criar-mapa"]'); await p.waitForSelector('#mNovo', { timeout: 15000 });
+  assert.ok((await p.textContent('body')).includes('Jogo usa este mapa'), 'o mapa criado vira o do jogo');
+  assert.deepEqual(p.errosJS, [], 'erros de script no editor');
+  await ctx.close();
+});
+
 test('gerador de personagens: sorteia, troca peça, salva e mostra a prévia', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/personagens`);
