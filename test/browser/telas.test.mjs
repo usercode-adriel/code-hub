@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { chromium } from 'playwright';
 
 const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -228,9 +229,9 @@ test('structure studio: biblioteca busca, filtra, mostra detalhes e importa sem 
   await p.fill('#bQ', 'palmeira'); await p.waitForTimeout(500);
   const achadas = await p.locator('#bLista [data-id]').count();
   assert.ok(achadas > 0 && achadas < todos, 'a busca reduz a lista');
-  // escolher mostra os detalhes (metadados) no painel direito
+  // escolher um componente arma a colocação (o painel avisa onde ele encaixa)
   await p.locator('#bLista [data-id]').first().click();
-  assert.match(await p.textContent('#stProp'), /Perspectiva/); assert.match(await p.textContent('#stProp'), /Encaixa em/);
+  assert.match(await p.textContent('#stDica'), /Colocando/);
   // importar o mesmo PNG duas vezes: a segunda devolve o existente
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8DwnwEJMDGgAapKAQAHnAEE0/XHCwAAAABJRU5ErkJggg==', 'base64');
   const importar = async (nome) => {
@@ -249,6 +250,89 @@ test('structure studio: biblioteca busca, filtra, mostra detalhes e importa sem 
   const st = await p.evaluate(async (u) => (await fetch(u)).status, lista[0].arquivo);
   assert.equal(st, 200);
   assert.deepEqual(p.errosJS, [], 'erros de script na biblioteca');
+  await ctx.close();
+});
+
+// PNG sólido (RGBA) para montar um kit de teste sem depender de arte
+function pngSolido(w, h, [r, g, b, a] = [120, 130, 150, 255]) {
+  const crcTab = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const x of buf) c = crcTab[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const bloco = (tipo, dados) => { const t = Buffer.from(tipo); const len = Buffer.alloc(4); len.writeUInt32BE(dados.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(Buffer.concat([t, dados]))); return Buffer.concat([len, t, dados, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
+  const linha = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => [r, g, b, a]).flat())]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), bloco('IHDR', ihdr), bloco('IDAT', zlib.deflateSync(Buffer.concat(Array.from({ length: h }, () => linha)))), bloco('IEND', Buffer.alloc(0))]);
+}
+
+test('structure studio: monta parede, encaixa janela e telhado, recusa peça flutuando, move com filhos, desfaz e salva', async () => {
+  const { p, ctx } = await paginaLogada();
+  const token = await p.evaluate(() => localStorage.getItem('codeniac.token'));
+  const h = { Authorization: `Bearer ${token}` };
+  // kit mínimo de teste na biblioteca do usuário
+  const importar = async (nome, sub, categoria, w, hh, cor) => {
+    const fd = new FormData(); fd.append('imagem', new Blob([pngSolido(w, hh, cor)], { type: 'image/png' }), `${nome}.png`);
+    for (const [k, v] of Object.entries({ nome, categoria, sub, perspectiva: 'arq25d', material: 'concreto', origem: 'importado' })) fd.append(k, v);
+    const r = await fetch(`${BASE}/api/estudio/componentes`, { method: 'POST', headers: h, body: fd }); assert.equal(r.status, 201, `importar ${nome}`);
+  };
+  await importar('Parede kit', 'parede', 'estrutura', 128, 96, [150, 140, 130, 255]);
+  await importar('Janela kit', 'janela', 'fachada', 32, 32, [90, 160, 220, 255]);
+  await importar('Telhado kit', 'telhado-plano', 'cobertura', 128, 40, [110, 80, 70, 255]);
+  const est = await (await fetch(`${BASE}/api/estudio/estruturas`, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Montagem de teste', preset: 'arq25d', tipo: 'loja' }) })).json();
+  await p.goto(`${BASE}/#/studio?id=${est.id}`); await p.waitForSelector('#bLista [data-id]', { timeout: 20000 });
+  const estado = () => p.evaluate(() => { const s = document.querySelector('#stCaixa').__studio; return { n: s.est.componentes.length, comps: JSON.parse(JSON.stringify(s.est.componentes)), cam: { ...s.S.cam } }; });
+  // a página rola ao clicar na biblioteca: a posição da tela é lida de novo a cada uso
+  const paraTela = async (x, y, cam) => { const t = await p.locator('#stTela').boundingBox(); return { x: t.x + t.width / 2 + (x - cam.x) * cam.z, y: t.y + t.height / 2 + (y - cam.y) * cam.z }; };
+  const escolher = async (nome) => { await p.fill('#bQ', nome); await p.waitForTimeout(450); await p.locator('#bLista [data-id]').first().click(); await p.waitForTimeout(100); };
+  const cam = (await estado()).cam;
+
+  // 1) parede no chão da área (encaixa na grade fina)
+  await escolher('Parede kit');
+  const pw = await paraTela(320, 400, cam); await p.mouse.move(pw.x, pw.y); await p.mouse.click(pw.x, pw.y); await p.waitForTimeout(150);
+  let e = await estado(); assert.equal(e.n, 1); const parede = e.comps[0];
+  assert.equal(parede.x % 8, 0, 'na grade fina'); assert.equal(parede.y % 8, 0);
+
+  // 2) janela longe de qualquer parede não pode flutuar
+  await escolher('Janela kit');
+  const longe = await paraTela(80, 90, cam); await p.mouse.move(longe.x, longe.y); await p.mouse.click(longe.x, longe.y); await p.waitForTimeout(150);
+  assert.equal((await estado()).n, 1, 'a janela solta fora de uma parede foi recusada');
+
+  // 3) janela perto da parede encaixa na face, dentro dela
+  const perto = await paraTela(parede.x + 10, parede.y + 12, cam); await p.mouse.move(perto.x, perto.y); await p.mouse.click(perto.x, perto.y); await p.waitForTimeout(150);
+  e = await estado(); assert.equal(e.n, 2); const janela = e.comps[1];
+  assert.equal(janela.anfitriao, parede.id, 'encaixada na parede'); assert.equal(janela.y, parede.y, 'no plano da fachada');
+  assert.ok(janela.x - 16 >= parede.x - 64 && janela.x + 16 <= parede.x + 64, 'dentro da parede');
+
+  // 4) telhado sobe até o topo da parede
+  await p.keyboard.press('Escape'); await escolher('Telhado kit');
+  const topo = await paraTela(parede.x, parede.y, cam); await p.mouse.move(topo.x, topo.y); await p.mouse.click(topo.x, topo.y); await p.waitForTimeout(150);
+  e = await estado(); assert.equal(e.n, 3); const telhado = e.comps[2];
+  assert.equal(telhado.anfitriao, parede.id); assert.equal(telhado.z, 96, 'no topo da parede (96 px)');
+
+  // 5) a verificação não acha problema
+  await p.keyboard.press('Escape'); await p.click('[data-aba="verificar"]'); await p.waitForTimeout(450);
+  assert.match(await p.textContent('#stProp'), /Nenhum problema/);
+
+  // 6) arrastar a parede leva a janela e o telhado juntos
+  await p.click('[data-aba="prop"]');
+  const base = await paraTela(parede.x - 40, parede.y - 10, cam); // área da parede fora da janela e do telhado
+  await p.mouse.move(base.x, base.y); await p.mouse.down(); await p.mouse.move(base.x + 48 * cam.z, base.y + 32 * cam.z, { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(200);
+  e = await estado();
+  const dx = e.comps[0].x - parede.x; const dy = e.comps[0].y - parede.y;
+  assert.ok(dx > 0 && dy > 0, 'a parede se moveu');
+  assert.equal(e.comps[1].x - janela.x, dx, 'a janela acompanha'); assert.equal(e.comps[2].y - telhado.y, dy, 'o telhado acompanha');
+
+  // 7) desfazer devolve tudo
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(200);
+  e = await estado(); assert.deepEqual([e.comps[0].x, e.comps[0].y, e.comps[1].x, e.comps[2].y], [parede.x, parede.y, janela.x, telhado.y], 'desfez o movimento de todos');
+
+  // 8) salvar passa na validação do servidor e volta igual
+  await p.click('#stSalvar'); await p.waitForTimeout(700);
+  assert.match(await p.textContent('#stEstado'), /Salvo/);
+  const salvo = await (await fetch(`${BASE}/api/estudio/estruturas/${est.id}`, { headers: h })).json();
+  assert.equal(salvo.componentes.length, 3); assert.equal(salvo.componentes[1].anfitriao, parede.id);
+  // o servidor também recusa janela sem anfitrião
+  const ruim = await fetch(`${BASE}/api/estudio/estruturas/${est.id}`, { method: 'PUT', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ componentes: [{ ...salvo.componentes[1], anfitriao: null }] }) });
+  assert.equal(ruim.status, 400);
+  assert.deepEqual(p.errosJS.filter((x) => !/status of 400/.test(x)), [], 'erros de script no editor');
   await ctx.close();
 });
 
