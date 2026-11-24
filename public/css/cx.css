@@ -901,3 +901,24 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .d2.jailed .d2-jail { top: auto; bottom: 18px; }
 .d2.jailed .d2-mini, .d2.jailed .d2-prompt, .d2.jailed .d2-wanted, .d2.jailed .d2-sky, .d2.jailed .d2-air, .d2.jailed .d2-dash, .d2.jailed .d2-help { display: none !important; }
 .d2-jail .jl-m { font-size: 12px; color: #e2e8f0; }
+
+/* TECH AO VIVO (painel da tela inicial): apresentadores, fala e manchetes reais */
+.tv-live .tv-voz { margin-left: auto; font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); background: transparent; color: inherit; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+.tv-live .tv-voz.on { background: #22c55e22; border-color: #22c55e; color: #86efac; }
+.tv-live .lv2-h h3 { white-space: nowrap; }
+.tv-palco { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.tv-apres { display: flex; gap: 18px; justify-content: center; align-items: flex-end; }
+.tv-pessoa { display: grid; justify-items: center; gap: 2px; opacity: .5; transition: opacity .3s, transform .3s; }
+.tv-pessoa.fala { opacity: 1; transform: translateY(-4px); }
+.tv-pessoa b { font-size: 12px; }
+.tv-rosto { display: block; width: 96px; height: 96px; background-repeat: no-repeat; background-size: 384px 672px; background-position: 0 -192px; image-rendering: pixelated; } /* quadro 64×64 em escala 1,5; linha 2 = de frente, coluna 0 = parado */
+.tv-fala { background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 12px; min-height: 84px; font-size: 14px; line-height: 1.4; }
+.tv-fala small { color: #94a3b8; }
+.tv-fala p { margin: 4px 0; }
+.tv-fala a { font-size: 12px; color: #7dd3fc; }
+.tv-fontes { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 8px; }
+.tv-fontes .chip.off { opacity: .45; }
+.tv-lista .lv2-row.atual { background: rgba(56,189,248,.08); }
+.tv-item { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; width: 100%; }
+.tv-thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; background: #0f172a; display: grid; place-items: center; }
+.tv-semimg { color: #64748b; }

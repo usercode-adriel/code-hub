@@ -15,7 +15,12 @@ const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..',
 const PORTA = 3900 + Math.floor(Math.random() * 90);
 const BASE = `http://localhost:${PORTA}`;
 const dados = fs.mkdtempSync(path.join(os.tmpdir(), 'codeniac-teste-'));
-let servidor; let browser;
+let servidor; let browser; let feedFalso;
+// feed RSS local: as manchetes do teste vêm daqui (nada de rede externa)
+const RSS_TESTE = `<?xml version="1.0"?><rss><channel>
+  <item><title>Apps de notas com IA chegam ao Brasil</title><link>https://noticias.exemplo/ia-notas</link><description>Ferramenta transcreve reuniões.</description><pubDate>Mon, 23 Nov 2026 10:00:00 GMT</pubDate></item>
+  <item><title>Protótipo de robô de cozinha</title><link>https://noticias.exemplo/robo</link><description>Apresentado na feira.</description><pubDate>Mon, 23 Nov 2026 09:00:00 GMT</pubDate></item>
+</channel></rss>`;
 
 async function esperarSaude() {
   for (let i = 0; i < 80; i++) {
@@ -26,13 +31,16 @@ async function esperarSaude() {
 }
 
 before(async () => {
-  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA), GEMINI_API_KEY: '', GROQ_API_KEY: '', OPENROUTER_API_KEY: '' }, stdio: 'ignore' });
+  feedFalso = http.createServer((req, res) => { res.setHeader('Content-Type', 'application/rss+xml'); res.end(RSS_TESTE); });
+  await new Promise((ok) => feedFalso.listen(0, '127.0.0.1', ok));
+  const feedUrl = `http://127.0.0.1:${feedFalso.address().port}/feed.xml`;
+  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA), TECH_FEEDS: `Noticias Exemplo|${feedUrl}`, GEMINI_API_KEY: '', GROQ_API_KEY: '', OPENROUTER_API_KEY: '' }, stdio: 'ignore' });
   await esperarSaude();
   browser = await chromium.launch({ args: ['--no-sandbox'], executablePath: process.env.CHROME_PATH || undefined });
 });
 
 after(async () => {
-  await browser?.close();
+  await browser?.close(); feedFalso?.close();
   if (servidor && servidor.exitCode === null) { const saiu = new Promise((r) => servidor.once('exit', r)); servidor.kill(); await saiu; }
   fs.rmSync(dados, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
@@ -597,7 +605,7 @@ test('gamecode: a barra lateral tem Gamecode (não Mapa); a tela lista os mapas 
   const a = await (await fetch(`${BASE}/api/mapas`, { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Mapa para jogar' }) })).json();
   const b = await (await fetch(`${BASE}/api/mapas`, { method: 'POST', headers: h, body: JSON.stringify({ nome: 'Mapa para excluir' }) })).json();
   await p.goto(`${BASE}/#/centro`); await p.waitForSelector('a[href="#/gamecode"]', { timeout: 20000 });
-  assert.equal(await p.locator('a[href="#/mapa"]').count(), 0, 'o item Mapa saiu da barra lateral');
+  assert.equal(await p.evaluate(() => [...document.querySelectorAll('a')].filter((a) => a.getAttribute('href') === '#/mapa' && a.textContent.trim() === 'Mapa').length), 0, 'o item Mapa saiu da barra lateral');
   assert.match(await p.textContent('a[href="#/gamecode"]'), /Gamecode/);
   await p.click('a[href="#/gamecode"]'); await p.waitForSelector('[data-jogar]', { timeout: 15000 });
   assert.ok(await p.locator(`a[href="#/criar-mapa?id=${a.id}"]`).count() === 1, 'botão Editar');
@@ -616,6 +624,22 @@ test('gamecode: a barra lateral tem Gamecode (não Mapa); a tela lista os mapas 
   await p.goto(`${BASE}/#/personagem3d`); await p.waitForSelector('#p3Conjuntos', { timeout: 15000 });
   assert.match(await p.textContent('#p3Conjuntos'), /Nenhum conjunto de textura 3D/);
   assert.deepEqual(p.errosJS, [], 'erros de script no gamecode');
+  await ctx.close();
+});
+
+test('tech ao vivo: a tela inicial mostra manchetes reais (com fonte), os apresentadores e o botão Narrar; sem o painel da cidade', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('#hxLive .tv-palco', { timeout: 30000 });
+  await p.waitForFunction(() => /Apps de notas com IA/.test(document.querySelector('#hxLive')?.textContent || ''), null, { timeout: 15000 });
+  const live = await p.textContent('#hxLive');
+  assert.match(live, /Tech ao vivo/); assert.match(live, /Protótipo de robô de cozinha/);
+  assert.equal(await p.locator('#hxLive .tv-pessoa').count(), 2, 'dois apresentadores');
+  assert.ok(!/Live da Cidade/.test(await p.textContent('body')), 'o painel da cidade saiu da tela inicial');
+  assert.match(await p.textContent('#tvFala'), /Manchete da Noticias Exemplo: Apps de notas com IA/, 'a fala é a manchete real, com a fonte');
+  assert.equal(await p.locator('#hxLive a[href="https://noticias.exemplo/ia-notas"]').count() >= 1, true, 'link para a notícia completa');
+  await p.click('#tvVoz'); assert.equal(await p.getAttribute('#tvVoz', 'aria-pressed'), 'true');
+  await p.click('#tvVoz'); assert.equal(await p.getAttribute('#tvVoz', 'aria-pressed'), 'false');
+  assert.deepEqual(p.errosJS, [], 'erros de script na tela inicial');
   await ctx.close();
 });
 

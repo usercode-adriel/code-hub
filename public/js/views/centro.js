@@ -4,7 +4,7 @@
 import { on, store } from '../store.js';
 import { nascendo, face, nx, pct, spark, evRow, bindEntities, CAT_COLOR, api, esc, timeAgo, icon, modal } from '../world/wui.js';
 import { cityMap } from '../world/citymap.js';
-import { livePanel } from '../world/live.js';
+import { liveTech } from '../world/live-tech.js';
 import { cityNow, setCityClock } from '../chrome.js';
 
 const QUICK = [
@@ -72,7 +72,7 @@ export default async function render(el) {
         <div class="hx-slist">${d.social.slice(0, 4).map((p) => `<a class="hx-post" href="#/social">${p.me ? face({ me: true }, 34) : `<span data-person="${esc(p.author?.id)}">${face(p.author, 34)}</span>`}<div><b>${esc(p.me ? 'Você' : p.author?.name || '')}</b><p>${esc((p.text || '').slice(0, 110))}</p><small>${esc(timeAgo(p.at))}</small></div></a>`).join('') || '<p class="cx-mut">Ninguém postou ainda.</p>'}</div></section>
     </div>`;
     stopLive?.();
-    stopLive = livePanel(body.querySelector('#hxLive'), { scope: 'cidade', title: 'Live da Cidade', art: '/assets/pixel/scene-cidade.png', n: 12 });
+    stopLive = liveTech(body.querySelector('#hxLive'), { titulo: 'Tech ao vivo' });
     body.querySelectorAll('[data-mf]').forEach((b) => {
       b.onclick = () => {
         body.querySelectorAll('[data-mf]').forEach((x) => x.classList.toggle('on', x === b));
