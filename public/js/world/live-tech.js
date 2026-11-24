@@ -4,15 +4,14 @@ import { api } from '../api.js';
 import { icon } from '../icons.js';
 import { esc, timeAgo, speak } from '../ui.js';
 
-// apresentadores: sprites reais do jogo (folha 256×448, quadro de frente = linha 2, coluna 0)
-const APRESENTADORES = [
-  { nome: 'Bia', sprite: '/assets/rpg/chr/enfermeira.png', cor: '#f472b6' },
-  { nome: 'Caio', sprite: '/assets/rpg/chr/civil-1.png', cor: '#38bdf8' },
-];
+// apresentadores: as fotos de perfil dos personagens da cidade (as mesmas do painel de ao vivo de antes)
+const APRESENTADORES = [{ nome: '—', foto: null, cor: '#6c4cf5' }, { nome: '—', foto: null, cor: '#38bdf8' }];
 const INTERVALO_MS = 9000;
 const ATUALIZA_MS = 5 * 60 * 1000;
 
-const rosto = (a) => `<span class="tv-rosto" style="background-image:url('${a.sprite}')" title="${esc(a.nome)}"></span>`;
+const rosto = (a) => (a.foto
+  ? `<img class="tv-foto" src="${esc(a.foto)}" alt="${esc(a.nome)}" loading="lazy">`
+  : `<span class="tv-foto tv-ini" style="--c:${esc(a.cor)}">${esc((a.nome || '?')[0])}</span>`);
 const falaDe = (n) => {
   const base = `Manchete da ${n.fonte}: ${n.titulo}.`;
   const resumo = (n.resumo || '').split(/(?<=[.!?])\s/)[0];
@@ -32,6 +31,16 @@ export function liveTech(host, { titulo = 'Tech ao vivo' } = {}) {
   const $ = (s) => host.querySelector(s);
   let alive = true; let itens = []; let idx = 0; let timer = null; let refresco = null; let narrar = false;
   const pessoas = [...host.querySelectorAll('.tv-pessoa')];
+  // quem apresenta: duas pessoas da cidade com foto de perfil (se não houver, iniciais)
+  async function apresentadores() {
+    try {
+      const r = await api.get('/mundo/ao-vivo?scope=cidade&n=30');
+      const com = []; const vistos = new Set();
+      for (const x of r.items || []) { const w = x.who; if (!w?.name || w.me || vistos.has(w.name)) continue; vistos.add(w.name); com.push({ nome: w.name, foto: w.avatar || null, cor: w.color || '#6c4cf5' }); if (com.length === 2) break; }
+      com.forEach((a, k) => { APRESENTADORES[k] = { ...APRESENTADORES[k], ...a }; });
+      pessoas.forEach((el, k) => { el.innerHTML = `${rosto(APRESENTADORES[k])}<b>${esc(APRESENTADORES[k].nome)}</b>`; });
+    } catch { /* sem pessoas: mantém as iniciais */ }
+  }
 
   function falar() {
     if (!alive || !itens.length) return;
@@ -63,7 +72,7 @@ export function liveTech(host, { titulo = 'Tech ao vivo' } = {}) {
     narrar = !narrar; e.currentTarget.setAttribute('aria-pressed', String(narrar)); e.currentTarget.classList.toggle('on', narrar);
     if (narrar) falar(); else if ('speechSynthesis' in window) speechSynthesis.cancel();
   };
-  carregar();
+  carregar(); apresentadores();
   refresco = setInterval(carregar, ATUALIZA_MS);
 
   return () => {

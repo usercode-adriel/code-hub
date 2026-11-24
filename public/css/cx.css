@@ -911,7 +911,6 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .tv-pessoa { display: grid; justify-items: center; gap: 2px; opacity: .5; transition: opacity .3s, transform .3s; }
 .tv-pessoa.fala { opacity: 1; transform: translateY(-4px); }
 .tv-pessoa b { font-size: 12px; }
-.tv-rosto { display: block; width: 96px; height: 96px; background-repeat: no-repeat; background-size: 384px 672px; background-position: 0 -192px; image-rendering: pixelated; } /* quadro 64×64 em escala 1,5; linha 2 = de frente, coluna 0 = parado */
 .tv-fala { background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 12px; min-height: 84px; font-size: 14px; line-height: 1.4; }
 .tv-fala small { color: #94a3b8; }
 .tv-fala p { margin: 4px 0; }
@@ -922,3 +921,5 @@ body[data-route="mapa"] .cx-main.content { padding: 0 !important; overflow: hidd
 .tv-item { display: flex; gap: 10px; align-items: center; text-decoration: none; color: inherit; width: 100%; }
 .tv-thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; background: #0f172a; display: grid; place-items: center; }
 .tv-semimg { color: #64748b; }
+.tv-foto { display: block; width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,.18); }
+.tv-ini { display: grid; place-items: center; background: var(--c, #6c4cf5); color: #fff; font-weight: 700; font-size: 22px; }
