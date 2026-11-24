@@ -1,0 +1,6 @@
+html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; font-family: ui-monospace, Menlo, Consolas, monospace; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; image-rendering: pixelated; }
+.hud { position: fixed; top: 8px; left: 8px; padding: 6px 10px; background: rgba(8, 12, 24, .72); color: #cfe3ff; font-size: 12px; line-height: 1.5; border-radius: 6px; pointer-events: none; }
+.hud-help { opacity: .6; margin-top: 4px; }
+.fatal { position: fixed; inset: 0; margin: 0; padding: 24px; color: #fecaca; background: #1f1020; white-space: pre-wrap; }

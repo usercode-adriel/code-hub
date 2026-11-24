@@ -8,7 +8,11 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test \"test/*.test.js\"",
-    "test:browser": "node --test test/browser/*.test.mjs"
+    "test:browser": "node --test test/browser/*.test.mjs",
+    "jogo:dev": "vite --config game/vite.config.ts",
+    "jogo:build": "tsc -p game/tsconfig.json && vite build --config game/vite.config.ts",
+    "jogo:test": "vitest run --config game/vite.config.ts",
+    "jogo:e2e": "node --test game/e2e/*.test.mjs"
   },
   "engines": {
     "node": ">=20.12"
@@ -23,6 +27,15 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "playwright": "^1.63.0"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "pixi.js": "^8.23.0",
+    "playwright": "^1.63.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }
