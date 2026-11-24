@@ -12,13 +12,20 @@ trap 'rm -rf -- "$WORK"' EXIT
 APP="$WORK/app"
 mkdir -p "$APP/node" "$OUT"
 
+# 0) jogo (Gamecode): compila public/jogo/ com as devDependencies; o instalador leva só o resultado
+(cd "$ROOT" && npm run -s jogo:build)
+# dependências de produção em pasta separada: o jogo compilado não precisa de vite/pixi/typescript no instalador
+PROD="$WORK/prod"; mkdir -p "$PROD"
+cp "$ROOT/package.json" "$ROOT/package-lock.json" "$PROD/"
+(cd "$PROD" && npm ci --omit=dev --silent)
+
 # 1) programa
 cp -r "$ROOT/server" "$APP/"
 cp "$ROOT/package.json" "$APP/"
 # public e node_modules têm milhares de arquivos: vão em zips (sem compressão, para extrair rápido) e o instalador os extrai.
 # Isso também contorna o limite do compilador NSIS com muitos arquivos numa mesma pasta.
 (cd "$ROOT/public" && zip -q -0 -r "$APP/payload-public.zip" .)
-(cd "$ROOT" && zip -q -0 -r "$APP/payload-node_modules.zip" node_modules)
+(cd "$PROD" && zip -q -0 -r "$APP/payload-node_modules.zip" node_modules)
 cp "$NODE_EXE" "$APP/node/node.exe"
 cp "$HERE/codeniac.ico" "$APP/"
 python3 "$HERE/vbs-ascii.py" "$HERE/Codeniac.vbs" "$APP/Codeniac.vbs"
