@@ -935,7 +935,11 @@ Escreva UMA mensagem espontânea que você mandaria agora no chat, como alguém 
 // Entrega uma mensagem de um personagem (ou do Niac, bot = null) sem o usuário pedir.
 const deliverHooks = [];
 export const onDeliver = (fn) => deliverHooks.push(fn);
+// O chat não recebe mais mensagens automáticas (de personagens, rotinas, revisões ou grupos): quem pergunta é o usuário.
+// A função continua existindo para não quebrar quem a chama, mas não entrega nada.
+export const MENSAGENS_AUTOMATICAS = false;
 export function deliverMessage(user, bot, text, { groupConvId = null, kind = 'auto' } = {}) {
+  if (!MENSAGENS_AUTOMATICAS) return null;
   const st = store(user.id);
   let conv;
   if (groupConvId) conv = st.conversations.find((c) => c.id === groupConvId);

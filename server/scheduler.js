@@ -4,7 +4,6 @@ import { notify } from './notify.js';
 import { briefing, prefs } from './briefing.js';
 import { dailyReminders } from './routes/life.js';
 import { backupIfDue } from './backup.js';
-import { runProactive } from './assistant.js';
 import { automationTick } from './automations.js';
 import { logger } from './log.js';
 
@@ -30,7 +29,6 @@ export function tick() {
     }
   }
   backupIfDue();
-  runProactive().catch((e) => logger.error('[automático]', e.message));
   automationTick().catch((e) => logger.error('[automações]', e.message));
 }
 

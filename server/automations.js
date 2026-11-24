@@ -322,7 +322,6 @@ export async function automationTick() {
         save();
         await sendWeeklyReview(user).catch((e) => logger.error('[revisão]', e.message));
       }
-      await observeGroups(user).catch((e) => logger.error('[grupo noturno]', e.message));
       await openCapsules(user).catch((e) => logger.error('[cápsula]', e.message));
     }
   } finally { tickBusy = false; }

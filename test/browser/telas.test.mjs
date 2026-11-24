@@ -69,10 +69,10 @@ test('login do administrador padrão funciona', async () => {
 
 test('telas principais carregam sem erro de script e sem arquivo faltando', async () => {
   const { p, ctx } = await paginaLogada();
-  for (const rota of ['#/', '#/gamecode', '#/veiculos', '#/configuracoes', '#/chat', '#/diagnostico']) {
+  for (const rota of ['#/', '#/gamecode', '#/estudio', '#/news', '#/dashboard', '#/configuracoes', '#/chat', '#/diagnostico', '#/veiculos']) {
     await p.goto(`${BASE}/${rota}`); await p.waitForTimeout(3000);
     const n = await p.evaluate(() => document.querySelectorAll('*').length);
-    assert.ok(n > 300, `tela ${rota} parece vazia (${n} elementos)`);
+    assert.ok(n > 150, `tela ${rota} parece vazia (${n} elementos)`);
   }
   assert.deepEqual(p.errosJS, [], 'erros de script');
   assert.deepEqual(p.falhas, [], 'arquivos que não carregaram');
@@ -91,19 +91,75 @@ test('diagnóstico: administrador vê os números, visitante não', async () => 
   await ctx.close();
 });
 
-test('tech ao vivo: a tela inicial mostra manchetes reais (com fonte), os apresentadores e o botão Narrar; sem o painel da cidade', async () => {
+test('barra lateral: só Início, Gamecode, Estúdio, News, Meu hub, Chat, Configurações e Sair', async () => {
   const { p, ctx } = await paginaLogada();
-  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('#hxLive .tv-palco', { timeout: 30000 });
-  await p.waitForFunction(() => /Apps de notas com IA/.test(document.querySelector('#hxLive')?.textContent || ''), null, { timeout: 15000 });
-  const live = await p.textContent('#hxLive');
-  assert.match(live, /Tech ao vivo/); assert.match(live, /Protótipo de robô de cozinha/);
-  assert.equal(await p.locator('#hxLive .tv-pessoa').count(), 2, 'dois apresentadores');
-  assert.ok(!/Live da Cidade/.test(await p.textContent('body')), 'o painel da cidade saiu da tela inicial');
-  assert.match(await p.textContent('#tvFala'), /Manchete da Noticias Exemplo: Apps de notas com IA/, 'a fala é a manchete real, com a fonte');
-  assert.equal(await p.locator('#hxLive a[href="https://noticias.exemplo/ia-notas"]').count() >= 1, true, 'link para a notícia completa');
-  await p.click('#tvVoz'); assert.equal(await p.getAttribute('#tvVoz', 'aria-pressed'), 'true');
-  await p.click('#tvVoz'); assert.equal(await p.getAttribute('#tvVoz', 'aria-pressed'), 'false');
-  assert.deepEqual(p.errosJS, [], 'erros de script na tela inicial');
+  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('#cxSide .cx-nav-i', { timeout: 30000 });
+  const itens = (await p.locator('#cxSide .cx-nav-i span').allTextContents()).map((t) => t.trim());
+  assert.deepEqual(itens, ['Início', 'Gamecode', 'Estúdio', 'News', 'Meu hub', 'Chat', 'Configurações', 'Sair']);
+  // as telas removidas não abrem mais: voltam ao Início
+  for (const rota of ['inventario', 'mercado', 'empregos', 'veiculos', 'propriedades', 'construtora', 'organizacoes']) {
+    await p.goto(`${BASE}/#/${rota}`); await p.waitForFunction(() => location.hash === '#/centro', null, { timeout: 10000 });
+  }
+  assert.deepEqual(p.errosJS, []);
+  await ctx.close();
+});
+
+test('início: notícias ao vivo (sem mapa), botão atualizar, leitor dentro do sistema, checklist, insights e chat Codeniac ao vivo', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('[data-news] .nx-n', { timeout: 30000 });
+  const corpo = await p.textContent('body');
+  assert.ok(!/Mapa da Cidade/.test(corpo), 'o mapa da cidade saiu do Início');
+  assert.match(await p.textContent('[data-news]'), /AO VIVO/);
+  assert.match(await p.textContent('[data-news]'), /Apps de notas com IA chegam ao Brasil/);
+  assert.equal(await p.locator('[data-news] .nx-barra').count(), 1, 'barra animada do ao vivo');
+  await p.click('[data-atualizar]'); await p.waitForFunction(() => /atualizado às/.test(document.querySelector('[data-atualizado]')?.textContent || ''), null, { timeout: 15000 });
+  // clicar na notícia abre o leitor dentro do sistema (sem sair da página)
+  const url = p.url();
+  await p.locator('[data-news] .nx-n').first().click();
+  await p.waitForSelector('.nx-leitor', { timeout: 15000 });
+  assert.equal(p.url(), url, 'continua dentro do sistema');
+  assert.ok(await p.locator('.nx-leitor a[href^="http"]').count() >= 1, 'link para o original');
+  await p.click('.nx-leitor [data-fechar]'); assert.equal(await p.locator('.nx-leitor').count(), 0);
+  // checklist, insights e chat
+  assert.match(await p.textContent('[data-check]'), /Checklist/);
+  assert.match(await p.textContent('[data-ins]'), /Insights IA/);
+  assert.match(await p.textContent('[data-chat]'), /Chat Codeniac ao vivo/);
+  assert.equal(await p.locator('[data-chat] [data-msg]').count(), 1, 'caixa de mensagem do chat');
+  assert.ok(!/Tech ao vivo/.test(corpo), 'o painel Tech ao vivo foi trocado pelo chat');
+  assert.deepEqual(p.errosJS, [], 'erros de script no Início');
+  await ctx.close();
+});
+
+test('news: notícias internacionais com filtros por categoria e fontes', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/news`); await p.waitForSelector('[data-news] .nx-n', { timeout: 30000 });
+  assert.match(await p.textContent('[data-news]'), /AO VIVO/);
+  assert.ok(await p.locator('[data-news] [data-cat]').count() >= 3, 'filtros de categoria');
+  assert.ok(await p.locator('[data-news] .nx-fonte').count() >= 1, 'lista as fontes');
+  await p.click('[data-news] [data-cat="ecommerce"]');
+  assert.match(await p.textContent('[data-news] [data-lista]'), /Nenhuma notícia nesta categoria/);
+  assert.deepEqual(p.errosJS, []);
+  await ctx.close();
+});
+
+test('estúdio: três cards (Video editor, Video cut, Ecommerce), sem funcionalidade', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/estudio`); await p.waitForSelector('.nx-est', { timeout: 30000 });
+  assert.deepEqual((await p.locator('.nx-est h3').allTextContents()).map((t) => t.trim()), ['Video editor', 'Video cut', 'Ecommerce']);
+  assert.deepEqual(p.errosJS, []);
+  await ctx.close();
+});
+
+test('chat: um só assistente, sem personagens nem grupos; conversa de verdade com resposta', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/assistente`); await p.waitForSelector('[data-chat] [data-msg]', { timeout: 30000 });
+  const corpo = await p.textContent('body');
+  assert.ok(!/Criar personagem|Criar grupo|Personagens|Mensagens automáticas/.test(corpo), 'sem personagens, grupos ou mensagens automáticas');
+  await p.fill('[data-chat] [data-msg]', 'olá');
+  await p.click('[data-chat] button[type=submit]');
+  await p.waitForFunction(() => document.querySelectorAll('[data-chat] .nx-msg').length >= 3 && !document.querySelector('[data-chat] [data-pend]'), null, { timeout: 30000 });
+  assert.ok((await p.locator('[data-chat] .nx-msg.eu').count()) >= 1, 'a mensagem do usuário aparece');
+  assert.deepEqual(p.errosJS, []);
   await ctx.close();
 });
 

@@ -6,30 +6,16 @@ import { store } from './store.js';
 import { icon } from './icons.js';
 import { esc, initials } from './ui.js';
 
-// barra lateral da cidade (ordem pedida) + lugares da cidade
+// barra lateral única (ordem pedida). "Sair" é um botão e aparece no fim, abaixo destes itens.
 export const CITY_NAV = [
-  ['centro', 'Início', 'home', '#8b7bff'], ['gamecode', 'Gamecode', 'code', '#38bdf8'], ['vida', 'Minha Vida', 'user', '#f472b6'],
-  ['inventario', 'Inventário', 'layers', '#c084fc'], ['mercado', 'Loja', 'cart', '#fb923c'], ['empregos', 'Empregos', 'briefcase', '#facc15'],
-  ['veiculos', 'Veículos', 'car', '#60a5fa'], ['propriedades', 'Propriedades', 'building', '#34d399'], ['construtora', 'Construtora', 'layers', '#f59e0b'], ['empresas', 'Economia', 'trending', '#4ade80'],
-  ['organizacoes', 'Organizações', 'users', '#a78bfa'], ['assistente', 'Chat', 'chat', '#22d3ee'], ['settings', 'Configurações', 'settings', '#94a3b8'],
+  ['centro', 'Início', 'home', '#8b7bff'], ['gamecode', 'Gamecode', 'code', '#38bdf8'], ['estudio', 'Estúdio', 'film', '#f472b6'],
+  ['news', 'News', 'news', '#fb7185'], ['dashboard', 'Meu hub', 'dashboard', '#a78bfa'], ['assistente', 'Chat', 'chat', '#22d3ee'],
+  ['settings', 'Configurações', 'settings', '#94a3b8'],
 ];
-export const CITY_PLACES = [
-  ['banco', 'Banco Nexus', 'wallet', '#a78bfa'], ['locadora', 'Locadora de carros', 'car', '#ef4444'], ['policia', 'Delegacia', 'shield', '#60a5fa'], ['hospital', 'Hospital', 'hospital', '#f87171'],
-  ['justica', 'Fórum', 'scale', '#fbbf24'], ['governo', 'Prefeitura', 'flag', '#34d399'], ['midia', 'Notícias', 'news', '#fb7185'],
-  ['social', 'Social', 'users', '#60a5fa'], ['internet', 'Internet', 'globe', '#22d3ee'], ['acontecimentos', 'Acontecimentos', 'zap', '#facc15'],
-  ['cidade', 'Desenvolvimento', 'pin', '#4ade80'], ['diversao', 'Diversão', 'play', '#f472b6'], ['arquivo', 'Arquivo', 'book', '#94a3b8'], ['controle', 'Controle da IA', 'cpu', '#94a3b8'],
-];
-// o hub pessoal (aparece no lugar da cidade quando você entra pelo perfil)
-export const HUB_NAV = [
-  ['profile', 'Meu perfil', 'user', '#f472b6'], ['dashboard', 'Meu hub', 'dashboard', '#8b7bff'], ['hoje', 'Hoje', 'sun', '#facc15'],
-  ['tasks', 'Tarefas', 'tasks', '#4ade80'], ['financeiro', 'Financeiro', 'wallet', '#34d399'], ['garagem', 'Garagem', 'car', '#60a5fa'],
-  ['estudos', 'Estudos', 'school', '#fb923c'], ['livros', 'Livros', 'book', '#c084fc'], ['diario', 'Diário', 'feather', '#f9a8d4'],
-  ['decisoes', 'Decisões', 'scale', '#fbbf24'], ['automacoes', 'Automações', 'zap', '#22d3ee'], ['rede', 'Rede', 'users', '#a78bfa'],
-  ['notifications', 'Notificações', 'bell', '#f87171'], ['achievements', 'Conquistas', 'trophy', '#facc15'],
-];
-export const HUB_ROUTES = new Set(['profile', 'dashboard', 'hoje', 'atividade', 'tasks', 'financeiro', 'garagem', 'estudos', 'livros', 'diario', 'decisoes', 'automacoes', 'rede', 'notifications', 'achievements', 'project', 'busca']);
+// as telas do hub pessoal (tarefas, finanças, livros...) continuam existindo e acendem "Meu hub"
+export const HUB_ROUTES = new Set(['dashboard', 'hoje', 'atividade', 'tasks', 'financeiro', 'garagem', 'estudos', 'livros', 'diario', 'decisoes', 'automacoes', 'rede', 'notifications', 'achievements', 'project', 'busca']);
 // telas que acendem outro item do menu
-const LIT = { banco: 'banco', economia: 'empresas', atividade: 'dashboard', busca: 'dashboard', project: 'dashboard' };
+const LIT = { profile: 'settings', diagnostico: 'settings', creditos: 'settings' };
 
 const pxOf = (seed) => { let h = 0; for (const c of String(seed || 'eu')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `/assets/px/p${String(h % 123).padStart(3, '0')}.png`; };
 export const myAvatar = () => store.user?.avatar || pxOf(store.user?.id || store.user?.name);
@@ -48,19 +34,15 @@ export function setCityClock(c) { if (c?.speed) { CLK.speed = c.speed; CLK.ancho
 const fmt = (v) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
 export function renderSide(cur) {
-  const hub = HUB_ROUTES.has(cur);
-  const lit = LIT[cur] || cur;
+  const lit = LIT[cur] || (HUB_ROUTES.has(cur) ? 'dashboard' : cur);
   const item = ([k, l, ic, c]) => `<a href="#/${k}" class="cx-nav-i ${k === lit ? 'on' : ''}" style="--ic:${c}">${icon(ic, 19)}<span>${esc(l)}</span><i class="cx-badge" data-badge="${k}"></i></a>`;
-  const projects = (store.projects || []).map((p) => `<a href="#/project/${esc(p.slug)}" class="cx-nav-i ${location.hash.startsWith(`#/project/${p.slug}`) ? 'on' : ''}" style="--ic:${esc(p.color)}">${icon(p.icon, 17)}<span>${esc(p.name)}</span></a>`).join('');
   document.getElementById('cxSide').innerHTML = `
-    <a class="cx-logo" href="#/centro" aria-label="Codeniac Society — início">
+    <a class="cx-logo" href="#/centro" aria-label="Codeniac — início">
       <img src="/assets/pixel/skyline.png" alt="" class="cx-logo-art"><b>CODENIAC</b><small>SOCIETY</small></a>
-    ${hub ? `<a class="cx-back" href="#/centro">${icon('globe', 16)}<span>Voltar para a cidade</span></a>` : ''}
-    <nav class="cx-nav" aria-label="${hub ? 'Meu hub' : 'Cidade'}">
-      ${hub ? `<span class="cx-nav-t">Meu hub</span>${HUB_NAV.map(item).join('')}${projects ? `<span class="cx-nav-t">Projetos</span>${projects}` : ''}`
-    : `${CITY_NAV.map(item).join('')}<details class="cx-more" ${CITY_PLACES.some(([k]) => k === lit) ? 'open' : ''}><summary><span class="cx-nav-t">Lugares da cidade</span>${icon('more', 14)}</summary>${CITY_PLACES.map(item).join('')}</details>`}
-    </nav>
-    <div class="cx-alive" id="cxAlive"><i class="cx-dot"></i><div><b>Cidade ativa</b><small id="cxOnline">${status.data?.born ? `${status.data.online} de ${status.data.population} na rua agora` : 'conectando…'}</small></div><img src="/assets/pixel/skyline.png" alt=""></div>`;
+    <nav class="cx-nav" aria-label="Menu">
+      ${CITY_NAV.map(item).join('')}
+      <button type="button" class="cx-nav-i cx-sair" data-act="logout" style="--ic:#f87171">${icon('logout', 19)}<span>Sair</span></button>
+    </nav>`;
   paintBadges();
 }
 
@@ -99,11 +81,10 @@ function tickClock() { const c = document.getElementById('cxClock'); if (c) { co
 setInterval(tickClock, 1500);
 
 export function renderBottom(cur) {
-  const lit = LIT[cur] || cur;
+  const lit = LIT[cur] || (HUB_ROUTES.has(cur) ? 'dashboard' : cur);
   const b = (k, l, ic) => `<a class="cx-bn ${lit === k ? 'on' : ''}" href="#/${k}">${icon(ic, 21)}<span>${l}</span></a>`;
   document.getElementById('bottomNav').innerHTML = `${b('centro', 'Início', 'home')}${b('gamecode', 'Gamecode', 'code')}
-    <button class="cx-bn-phone" data-dev="phone" aria-label="Abrir celular">${icon('phone', 24)}</button>
-    ${b('mercado', 'Loja', 'cart')}<button class="cx-bn" id="bnMenu">${icon('menu', 21)}<span>Mais</span></button>`;
+    ${b('news', 'News', 'news')}${b('assistente', 'Chat', 'chat')}<button class="cx-bn" id="bnMenu">${icon('menu', 21)}<span>Mais</span></button>`;
 }
 
 // dados vivos da moldura (saldo, nível, população na rua, celular equipado)

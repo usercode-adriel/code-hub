@@ -7,7 +7,7 @@ import { $, $$, esc, avatar, chatMd, toast, timeAgo, notifIcon, modal, brl, toda
 import { openProjectModal } from './components.js';
 import { animateView } from './fx.js';
 import { TOOL_LABEL, botAvatar, bindDictation, COMMANDS, MODE_LABEL } from './chatui.js';
-import { renderSide, renderTop, renderDevices, renderBottom, refreshStatus, paintBadges, HUB_ROUTES, CITY_NAV, CITY_PLACES, HUB_NAV } from './chrome.js';
+import { renderSide, renderTop, renderDevices, renderBottom, refreshStatus, paintBadges, HUB_ROUTES, CITY_NAV } from './chrome.js';
 import { bindDevices } from './devices.js';
 
 if (!auth.token) location.replace('/login');
@@ -21,7 +21,7 @@ export const NAV_KEYS = NAV.flatMap(([, items]) => items.map(([k, l]) => [k, l])
 
 // Telas que saíram do menu continuam funcionando pelo endereço, pelos links e pela busca.
 const VIEWS = {
-  hoje: () => import('./views/hoje.js'), dashboard: () => import('./views/dashboard.js'), assistente: () => import('./views/assistant.js'),
+  hoje: () => import('./views/hoje.js'), dashboard: () => import('./views/dashboard.js'), assistente: () => import('./views/chat.js'), news: () => import('./views/news.js'), estudio: () => import('./views/estudio.js'),
   atividade: () => import('./views/atividade.js'), tasks: () => import('./views/tasks.js'), garagem: () => import('./views/garagem.js'),
   financeiro: () => import('./views/financeiro.js'), estudos: () => import('./views/estudos.js'), diario: () => import('./views/diario.js'),
   decisoes: () => import('./views/decisoes.js'), notifications: () => import('./views/notifications.js'), achievements: () => import('./views/achievements.js'),
@@ -31,16 +31,13 @@ const VIEWS = {
     diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), gamecode: () => import('./views/gamecode.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
   midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
-  empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), mercado: () => import('./views/mercado.js'),
-  inventario: () => import('./views/inventario.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'),
-  organizacoes: () => import('./views/organizacoes.js'), acontecimentos: () => import('./views/acontecimentos.js'), cidade: () => import('./views/cidade.js'),
-  hospital: () => import('./views/hospital.js'), empregos: () => import('./views/empregos.js'), propriedades: () => import('./views/propriedades.js'),
-  veiculos: () => import('./views/veiculos.js'), vida: () => import('./views/vida.js'), construtora: () => import('./views/construtora.js'), locadora: () => import('./views/locadora.js'),
+  empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), policia: () => import('./views/policia.js'), justica: () => import('./views/justica.js'), acontecimentos: () => import('./views/acontecimentos.js'), cidade: () => import('./views/cidade.js'),
+  hospital: () => import('./views/hospital.js'), vida: () => import('./views/vida.js'), locadora: () => import('./views/locadora.js'),
 };
 // atalhos da barra lateral que abrem telas existentes
-const ALIAS = { mapa: '#/gamecode', studio: '#/gamecode', personagens: '#/gamecode', 'criar-mapa': '#/gamecode', personagem3d: '#/gamecode', loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
+const ALIAS = { mapa: '#/gamecode', studio: '#/estudio', personagens: '#/gamecode', 'criar-mapa': '#/gamecode', personagem3d: '#/gamecode', loja: '#/centro', mercado: '#/centro', inventario: '#/centro', empregos: '#/centro', veiculos: '#/centro', propriedades: '#/centro', construtora: '#/centro', organizacoes: '#/centro', chat: '#/assistente', inicio: '#/centro' };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
-const WORLD = new Set(['gamecode', 'locadora', 'construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
+const WORLD = new Set(['gamecode', 'news', 'estudio', 'assistente', 'locadora', 'hospital', 'vida', 'centro', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'policia', 'justica', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
 const NAV_OF = { gamecode: 'gamecode', locadora: 'centro', construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
@@ -57,6 +54,7 @@ function greeting() {
 function renderSidebar() {
   const cur = currentRoute();
   renderSide(cur);
+  document.querySelector('#cxSide [data-act="logout"]')?.addEventListener('click', logout);
   renderBottom(cur);
   const m = $('#bnMenu'); if (m) m.onclick = () => openSheet();
 }
@@ -84,17 +82,13 @@ function openSheet() {
   sheet.className = 'sheet-back cx-sheet';
   const it = ([k, l, ic, c]) => `<a class="sheet-item" href="#/${k}"><span style="--ic:${c}">${icon(ic, 20)}</span>${esc(l)}</a>`;
   sheet.innerHTML = `<div class="sheet" role="dialog" aria-label="Menu"><div class="sheet-grip"></div>
-    <h6>Cidade</h6><div class="sheet-grid">${CITY_NAV.map(it).join('')}</div>
-    <h6>Lugares da cidade</h6><div class="sheet-grid">${CITY_PLACES.map(it).join('')}</div>
-    <h6>Meu hub (pessoal)</h6><div class="sheet-grid">${HUB_NAV.map(it).join('')}
-      <button class="sheet-item" data-act="bot"><span>${botAvatar(30)}</span>${esc(store.settings.assistantName || 'Assistente')}</button></div>
+    <div class="sheet-grid">${CITY_NAV.map(it).join('')}</div>
     <div class="sheet-foot"><a class="btn sm outline" href="#/profile">${icon('user', 13)} Perfil</a><button class="btn sm outline" data-act="logout">${icon('logout', 13)} Sair</button></div></div>`;
   document.body.append(sheet);
   requestAnimationFrame(() => sheet.classList.add('open'));
   sheet.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (e.target === sheet || e.target.closest('a')) closeSheet();
-    if (act === 'bot') { closeSheet(); toggleAssistant(); }
     if (act === 'logout') logout();
   });
 }
