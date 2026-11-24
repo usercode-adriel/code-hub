@@ -106,3 +106,17 @@ test('tech ao vivo: a tela inicial mostra manchetes reais (com fonte), os aprese
   assert.deepEqual(p.errosJS, [], 'erros de script na tela inicial');
   await ctx.close();
 });
+
+test('gamecode: painel no estilo Xbox lista os jogos do catálogo; clicar abre o jogo e Voltar fecha', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.goto(`${BASE}/#/gamecode`); await p.waitForSelector('.gc-card', { timeout: 30000 });
+  const cards = await p.locator('.gc-card').count();
+  assert.ok(cards >= 1, 'o catálogo tem ao menos um jogo');
+  await p.locator('.gc-hero').click();
+  await p.waitForSelector('.gc-play iframe', { timeout: 15000 });
+  assert.equal(await p.getAttribute('.gc-play iframe', 'src'), '/jogo/');
+  await p.click('#gcVoltar');
+  assert.equal(await p.locator('.gc-play').count(), 0, 'Voltar fecha o jogo');
+  assert.deepEqual(p.errosJS, [], 'erros de script no Gamecode');
+  await ctx.close();
+});
