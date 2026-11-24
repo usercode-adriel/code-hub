@@ -5,5 +5,3 @@ dist/
 .env
 __pycache__/
 
-# Jogo compilado (gerado por npm run jogo:build)
-public/jogo/
