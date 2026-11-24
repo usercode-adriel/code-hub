@@ -244,8 +244,15 @@ function localFiles() {
   return out;
 }
 
+// a atualização segue sempre a branch padrão do repositório (main), para não depender de um campo salvo que pode estar antigo
+async function updateRef() {
+  const r = await gh(repoPath());
+  return r.default_branch || 'main';
+}
+
 export async function updateStatus() {
-  const remote = (await tree()).filter((f) => inScope(f.path) && !DENY.test(f.path));
+  const ref = await updateRef();
+  const remote = (await tree(ref)).filter((f) => inScope(f.path) && !DENY.test(f.path));
   const local = localFiles();
   const changes = [];
   for (const f of remote) {
@@ -264,7 +271,7 @@ export async function updateStatus() {
       depsChanged = JSON.stringify(remoteDeps, Object.keys(remoteDeps).sort()) !== JSON.stringify(localDeps, Object.keys(localDeps).sort());
     } catch { depsChanged = true; }
   }
-  return { changes: changes.sort((a, b) => a.path.localeCompare(b.path)), depsChanged, branch: ghConfig().branch };
+  return { changes: changes.sort((a, b) => a.path.localeCompare(b.path)), depsChanged, branch: ref };
 }
 
 const backupsRoot = () => path.join(DATA_DIR, 'app-backups');
