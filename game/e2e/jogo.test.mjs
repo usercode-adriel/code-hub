@@ -5,14 +5,16 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
 const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const PORTA = 3800 + Math.floor(Math.random() * 90);
 const BASE = `http://localhost:${PORTA}`;
-const dados = fs.mkdtempSync(path.join(os.tmpdir(), 'codeniac-jogo-'));
+// dados do servidor de teste ficam dentro do projeto (pasta ignorada pelo git), nunca fora dele
+const DADOS_RAIZ = path.join(RAIZ, '.tmp-testes');
+fs.mkdirSync(DADOS_RAIZ, { recursive: true });
+const dados = fs.mkdtempSync(path.join(DADOS_RAIZ, 'jogo-'));
 const SAIDA = process.env.JOGO_E2E_SAIDA || null; // pasta opcional para as capturas de tela
 let servidor; let browser;
 

@@ -228,7 +228,7 @@ export async function openPrs() {
 
 // ---------- atualizar este computador ----------
 const gitSha = (buf) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${buf.length}\0`), buf])).digest('hex');
-const inScope = (p) => /^(server|public)\//.test(p) || p === 'package.json';
+const inScope = (p) => /^(server|public|game)\//.test(p) || p === 'package.json';
 function localFiles() {
   const out = new Map();
   const walk = (dir, rel) => {
@@ -238,7 +238,7 @@ function localFiles() {
       else out.set(r, gitSha(fs.readFileSync(path.join(dir, e.name))));
     }
   };
-  walk(path.join(APP_ROOT, 'server'), 'server'); walk(path.join(APP_ROOT, 'public'), 'public');
+  walk(path.join(APP_ROOT, 'server'), 'server'); walk(path.join(APP_ROOT, 'public'), 'public'); walk(path.join(APP_ROOT, 'game'), 'game');
   const pkg = path.join(APP_ROOT, 'package.json');
   if (fs.existsSync(pkg)) out.set('package.json', gitSha(fs.readFileSync(pkg)));
   return out;

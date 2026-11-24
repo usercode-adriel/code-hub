@@ -5,3 +5,6 @@ dist/
 .env
 __pycache__/
 
+
+# dados temporários dos testes (ficam dentro do projeto)
+.tmp-testes/
