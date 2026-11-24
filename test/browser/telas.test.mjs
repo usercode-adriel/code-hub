@@ -107,16 +107,19 @@ test('tech ao vivo: a tela inicial mostra manchetes reais (com fonte), os aprese
   await ctx.close();
 });
 
-test('gamecode: painel no estilo Xbox lista os jogos do catálogo; clicar abre o jogo e Voltar fecha', async () => {
+test('gamecode: clicar em Gamecode na barra lateral abre o painel; clicar no cartão abre o jogo de verdade', async () => {
   const { p, ctx } = await paginaLogada();
-  await p.goto(`${BASE}/#/gamecode`); await p.waitForSelector('.gc-card', { timeout: 30000 });
-  const cards = await p.locator('.gc-card').count();
-  assert.ok(cards >= 1, 'o catálogo tem ao menos um jogo');
-  await p.locator('.gc-hero').click();
-  await p.waitForSelector('.gc-play iframe', { timeout: 15000 });
-  assert.equal(await p.getAttribute('.gc-play iframe', 'src'), '/jogo/');
+  await p.goto(`${BASE}/#/centro`); await p.waitForSelector('a.cx-nav-i[href="#/gamecode"]', { timeout: 30000 });
+  await p.click('a.cx-nav-i[href="#/gamecode"]');
+  await p.waitForSelector('.gc-xb', { timeout: 15000 });
+  assert.ok((await p.locator('.gc-card').count()) >= 1, 'o painel tem o cartão do jogo');
+  assert.equal(await p.locator('.gc-play').count(), 0, 'o jogo só abre depois do clique no cartão');
+  await p.locator('.gc-card').first().click();
+  const jogo = p.frameLocator('.gc-play iframe');
+  await jogo.locator('canvas').waitFor({ timeout: 30000 });
+  await jogo.locator('[data-testid=hud]').waitFor({ timeout: 30000 });
   await p.click('#gcVoltar');
   assert.equal(await p.locator('.gc-play').count(), 0, 'Voltar fecha o jogo');
-  assert.deepEqual(p.errosJS, [], 'erros de script no Gamecode');
+  assert.deepEqual(p.errosJS, [], 'erros de script');
   await ctx.close();
 });
