@@ -28,8 +28,7 @@ const VIEWS = {
   profile: () => import('./views/profile.js'), settings: () => import('./views/settings.js'), project: () => import('./views/project.js'),
   livros: () => import('./views/livros.js'), automacoes: () => import('./views/automacoes.js'),
   rede: () => import('./views/rede.js'), busca: () => import('./views/busca.js'),
-  gamecode: () => import('./views/gamecode.js'), personagem3d: () => import('./views/personagem3d.js'),
-  personagens: () => import('./views/personagens.js'), 'criar-mapa': () => import('./views/criar-mapa.js'), studio: () => import('./views/studio.js'), creditos: () => import('./views/creditos.js'), diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), mapa: () => import('./views/mapa.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
+    diagnostico: () => import('./views/diagnostico.js'), centro: () => import('./views/centro.js'), gamecode: () => import('./views/gamecode.js'), social: () => import('./views/social.js'), internet: () => import('./views/internet.js'),
   midia: () => import('./views/midia.js'), governo: () => import('./views/governo.js'), economia: () => import('./views/economia.js'), arquivo: () => import('./views/arquivo.js'),
   controle: () => import('./views/controle.js'), diversao: () => import('./views/diversao.js'),
   empresas: () => import('./views/economia.js'), banco: () => import('./views/banco.js'), mercado: () => import('./views/mercado.js'),
@@ -39,12 +38,12 @@ const VIEWS = {
   veiculos: () => import('./views/veiculos.js'), vida: () => import('./views/vida.js'), construtora: () => import('./views/construtora.js'), locadora: () => import('./views/locadora.js'),
 };
 // atalhos da barra lateral que abrem telas existentes
-const ALIAS = { loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
+const ALIAS = { mapa: '#/gamecode', studio: '#/gamecode', personagens: '#/gamecode', 'criar-mapa': '#/gamecode', personagem3d: '#/gamecode', loja: '#/mercado', chat: '#/assistente', inicio: '#/centro' };
 // telas da Codeniac Digital Society: ocupam a tela inteira com a barra de navegação própria
-const WORLD = new Set(['gamecode', 'personagem3d', 'locadora', 'construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'mapa', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
+const WORLD = new Set(['gamecode', 'locadora', 'construtora', 'hospital', 'empregos', 'propriedades', 'veiculos', 'vida', 'centro', 'social', 'internet', 'midia', 'governo', 'empresas', 'arquivo', 'controle', 'diversao', 'banco', 'mercado', 'inventario', 'policia', 'justica', 'organizacoes', 'acontecimentos', 'cidade']);
 const FULL_PAGE = new Set(['assistente', 'diario']);
 // item do menu que fica aceso em cada tela
-const NAV_OF = { gamecode: 'gamecode', personagem3d: 'gamecode', locadora: 'centro', construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', mapa: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
+const NAV_OF = { gamecode: 'gamecode', locadora: 'centro', construtora: 'centro', empresas: 'centro', banco: 'centro', mercado: 'centro', inventario: 'centro', policia: 'centro', justica: 'centro', organizacoes: 'centro', acontecimentos: 'centro', cidade: 'centro', social: 'centro', internet: 'centro', midia: 'centro', governo: 'centro', economia: 'centro', arquivo: 'centro', controle: 'centro', diversao: 'centro', busca: 'dashboard', garagem: 'financeiro', hoje: 'dashboard', atividade: 'dashboard', decisoes: 'dashboard', diario: 'dashboard', profile: 'settings' };
 
 // ---------- Moldura: trilho de ícones, trilho direito, barra superior, barra do celular ----------
 const currentRoute = () => (location.hash.slice(2).split('?')[0].split('/')[0]) || 'centro';

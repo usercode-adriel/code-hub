@@ -8,8 +8,6 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test \"test/*.test.js\"",
-    "assets": "python3 tools/assets/atlas.py",
-    "assets:validar": "python3 tools/assets/atlas.py --so-validar",
     "test:browser": "node --test test/browser/*.test.mjs"
   },
   "engines": {

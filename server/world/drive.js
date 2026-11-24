@@ -13,7 +13,7 @@ import { injure, treat } from './injuries.js';
 import * as C from './crimes.js';
 import { photo } from './flights.js';
 import { worldPost } from '../social.js';
-import { MAX_BOUNDS as BOUNDS } from '../../public/js/mapas/limites.js';
+import { MAX_BOUNDS as BOUNDS } from './limites.js';
 import { cnhOf, detentionOf } from './blitz.js';
 
 export const MAP = { v: 'v4', w: 4096, h: 2816 }; // v4: cidade refeita (vagas salvas no traçado antigo são descartadas)

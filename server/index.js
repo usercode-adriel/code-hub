@@ -32,12 +32,7 @@ import {
 import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
-import personagens from './personagens.js';
-import estudio from './estudio.js';
 import techNews from './tech-news.js';
-import { ARQUIVOS as ESTUDIO_ARQUIVOS } from './estudio-biblioteca.js';
-import godot from './godot.js';
-import mapas from './mapas.js';
 
 load();
 loadLibrary();
@@ -187,11 +182,7 @@ app.post('/api/system/shutdown', (req, res) => {
 app.use('/api/ai', aiRoutes);
 app.use('/api/library', requireAuth, library);
 app.use('/api', api);
-app.use('/api/personagens', requireAuth, personagens);
-app.use('/api/estudio', requireAuth, estudio);
 app.use('/api/tech-news', requireAuth, techNews);
-app.use('/api/godot', requireAuth, godot);
-app.use('/api/mapas', requireAuth, mapas);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
@@ -205,7 +196,6 @@ app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota não encontra
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false }));
 // componentes do Structure Studio importados ou gerados: pastas por usuário, nomes pelo hash do arquivo
-app.use('/estudio-arquivos', express.static(ESTUDIO_ARQUIVOS, { maxAge: '7d', fallthrough: false }));
 app.use(express.static(PUBLIC, { extensions: ['html'] }));
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
 

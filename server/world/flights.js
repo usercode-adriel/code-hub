@@ -6,7 +6,7 @@ import { onTick, record, services } from './core.js';
 import { residents, agentOf } from './agents.js';
 import { worldPost, genderize } from '../social.js';
 import { gameNow, cityHour, SPEED } from './clock.js';
-import { SCHEDULE } from '../../public/js/drive/sky.js';
+import { SCHEDULE } from './sky.js';
 
 const HOUR = 3600000; const DAY = 24 * HOUR; const TZ = -3 * HOUR;
 const dayOf = (g) => Math.floor((g + TZ) / DAY);
