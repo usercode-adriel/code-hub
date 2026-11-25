@@ -33,6 +33,8 @@ import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
 import techNews from './tech-news.js';
+import './commerce/ferramentas.js';
+import commerce from './commerce/rotas.js';
 
 load();
 loadLibrary();
@@ -183,6 +185,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/library', requireAuth, library);
 app.use('/api', api);
 app.use('/api/tech-news', requireAuth, techNews);
+app.use('/api/commerce', requireAuth, commerce);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);
