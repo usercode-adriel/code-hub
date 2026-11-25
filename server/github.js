@@ -28,9 +28,29 @@ export function checkPath(p) {
   return clean;
 }
 
+// Falha de rede passageira (DNS, conexão derrubada, tempo esgotado) é comum: tenta até 3 vezes, só em pedidos de leitura,
+// e, se não der, explica o motivo em vez de mostrar só "fetch failed".
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+export async function fetchGitHub(url, opts, { tentativas = 3, pausa = 800 } = {}) {
+  const leitura = !opts.method || opts.method === 'GET';
+  let ultimo;
+  for (let k = 1; k <= (leitura ? tentativas : 1); k++) {
+    try {
+      const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(30000) });
+      if (res.status >= 500 && leitura && k < tentativas) { await esperar(pausa * k); continue; }
+      return res;
+    } catch (err) {
+      ultimo = err;
+      if (k < tentativas && leitura) await esperar(pausa * k);
+    }
+  }
+  const motivo = ultimo?.cause?.code || ultimo?.cause?.message || ultimo?.name || 'sem detalhe';
+  throw new Error(`Sem conexão com o GitHub (${motivo}). Verifique a internet deste computador e tente de novo.`);
+}
+
 async function gh(route, { method = 'GET', body, token = ghToken(), raw = false } = {}) {
-  const res = await fetch(`${API()}${route}`, {
-    method, signal: AbortSignal.timeout(30000),
+  const res = await fetchGitHub(`${API()}${route}`, {
+    method,
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'Codeniac', ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
