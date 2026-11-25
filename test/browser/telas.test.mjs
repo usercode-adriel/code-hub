@@ -184,19 +184,36 @@ test('chat: um só assistente, sem personagens nem grupos; conversa de verdade c
   await ctx.close();
 });
 
-test('gamecode: clicar em Gamecode na barra lateral abre o painel; clicar no cartão abre o jogo de verdade', async () => {
+test('gamecode: painel no estilo PS5 (abas, linha de jogos, Store, cartões); clicar no jogo abre o jogo de verdade', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/centro`); await p.waitForSelector('a.cx-nav-i[href="#/gamecode"]', { timeout: 30000 });
   await p.click('a.cx-nav-i[href="#/gamecode"]');
-  await p.waitForSelector('.gc-xb', { timeout: 15000 });
-  assert.ok((await p.locator('.gc-card').count()) >= 1, 'o painel tem o cartão do jogo');
-  assert.equal(await p.locator('.gc-play').count(), 0, 'o jogo só abre depois do clique no cartão');
-  await p.locator('.gc-card').first().click();
+  await p.waitForSelector('.gc-ps5 .gc-tile', { timeout: 15000 });
+  assert.deepEqual((await p.locator('.gc-tabs button').allTextContents()).map((t) => t.trim()), ['Games', 'Store']);
+  assert.ok((await p.locator('.gc-tile').count()) >= 2, 'tile da Store e do jogo');
+  const painel = await p.textContent('[data-paineis]');
+  for (const t of [/Armazenamento/, /Controle/, /Tempo de jogo/, /Atividade recente/, /Conquistas/, /Novo na Store/, /Em desenvolvimento/]) assert.match(painel, t);
+  assert.equal(await p.locator('.gc-play').count(), 0, 'o jogo só abre depois do clique');
+  // setas movem o foco entre os tiles e trocam o destaque
+  await p.keyboard.press('ArrowLeft');
+  assert.match(await p.textContent('[data-titulo]'), /Codeniac Store/);
+  await p.keyboard.press('ArrowRight');
+  assert.match(await p.textContent('[data-titulo]'), /Codeniac Open World/);
+  // Store: lista o jogo instalado e o que está em desenvolvimento
+  await p.click('[data-aba="store"]'); await p.waitForSelector('.gc-item');
+  assert.match(await p.textContent('[data-pg="store"]'), /INSTALADO/); assert.match(await p.textContent('[data-pg="store"]'), /EM BREVE/);
+  await p.click('[data-aba="games"]');
+  await p.click('[data-acao]');
   const jogo = p.frameLocator('.gc-play iframe');
   await jogo.locator('canvas').waitFor({ timeout: 30000 });
   await jogo.locator('[data-testid=hud]').waitFor({ timeout: 30000 });
+  await p.waitForTimeout(3500);
   await p.click('#gcVoltar');
   assert.equal(await p.locator('.gc-play').count(), 0, 'Voltar fecha o jogo');
+  // a partida jogada entra nas estatísticas e na atividade recente
+  const stats = JSON.parse(await p.evaluate(() => localStorage.getItem('codeniac.gamecode.stats')));
+  assert.equal(stats.jogos['codeniac-open-world'].vezes, 1);
+  assert.match(await p.textContent('[data-paineis]'), /Codeniac Open World/);
   assert.deepEqual(p.errosJS, [], 'erros de script');
   await ctx.close();
 });
