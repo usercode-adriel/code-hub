@@ -12,7 +12,10 @@
     "jogo:dev": "vite --config game/vite.config.ts",
     "jogo:build": "tsc -p game/tsconfig.json && vite build --config game/vite.config.ts",
     "jogo:test": "vitest run --config game/vite.config.ts",
-    "jogo:e2e": "node --test game/e2e/*.test.mjs"
+    "jogo:e2e": "node --test game/e2e/*.test.mjs",
+    "office:dev": "vite --config game/vite.office.config.ts",
+    "office:build": "tsc -p game/tsconfig.json && vite build --config game/vite.office.config.ts",
+    "office:e2e": "node --test --test-concurrency=1 game/e2e/escritorio.test.mjs"
   },
   "engines": {
     "node": ">=20.12"

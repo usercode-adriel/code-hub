@@ -10,5 +10,5 @@ export default defineConfig({
   plugins: [react()],
   build: { outDir: fileURLToPath(new URL('../public/jogo', import.meta.url)), emptyOutDir: true, sourcemap: true },
   server: { port: 5173, proxy: { '/api': 'http://localhost:3000' } },
-  test: { include: ['tests/**/*.test.ts'], environment: 'node' },
+  test: { include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'], environment: 'node' },
 });
