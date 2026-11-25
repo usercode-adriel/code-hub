@@ -40,7 +40,7 @@ export function montarNoticias(host, { compacto = false, limite = 0, titulo = 'N
     carregando = true;
     const btn = $('[data-atualizar]');
     btn.disabled = true; btn.classList.add('gira'); $('[data-barra]').classList.remove('pausa');
-    try { dados = await api.get(`/tech-news${forcar ? '?forcar=1' : ''}`); desenhar(); }
+    try { dados = await api.get(`/tech-news${forcar ? '?forcar=1' : ''}`); desenhar(); host.dispatchEvent(new CustomEvent('nx-dados', { bubbles: true, detail: dados })); }
     catch (err) { $('[data-atualizado]').textContent = 'sem conexão'; if (!dados) $('[data-lista]').innerHTML = `<div class="nx-vazio">Não consegui carregar as notícias: ${esc(err.message)}</div>`; $('[data-barra]').classList.add('pausa'); }
     finally { carregando = false; btn.disabled = false; btn.classList.remove('gira'); }
   }
@@ -101,4 +101,84 @@ export function montarInsights(host, { titulo = 'Insights IA' } = {}) {
   carregar();
   const t = setInterval(carregar, ATUALIZA_MS);
   return () => { vivo = false; clearInterval(t); };
+}
+
+// ---------- Carrossel automático e personalizável ----------
+const CFG_KEY = 'codeniac.newsCarrossel';
+const CFG_PADRAO = { auto: true, seg: 6, max: 6, cats: null };
+const lerCfg = () => { try { return { ...CFG_PADRAO, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}') }; } catch { return { ...CFG_PADRAO }; } };
+
+/** Carrossel de destaques: troca sozinho, pausa com o mouse, e o usuário escolhe categorias, velocidade e quantidade. */
+export function montarCarrossel(host) {
+  let cfg = lerCfg(); let dados = null; let itens = []; let i = 0; let timer = null; let pausado = false;
+  host.innerHTML = `<header><h3>Destaques</h3><span class="nx-vivo"><i></i>AO VIVO</span>
+      <span class="nx-esq"><button type="button" class="nx-btn" data-config aria-expanded="false">${icon('settings', 14)} Personalizar</button></span></header>
+    <div class="nx-conf" data-painel hidden></div>
+    <div class="nx-car" data-car tabindex="0" aria-roledescription="carrossel" aria-label="Destaques das notícias">
+      <div class="nx-car-trilho" data-trilho></div>
+      <button type="button" class="nx-car-seta esq" data-prev aria-label="Anterior">${icon('chevLeft', 20)}</button>
+      <button type="button" class="nx-car-seta dir" data-next aria-label="Próxima">${icon('chevRight', 20)}</button>
+      <div class="nx-car-pontos" data-pontos></div></div>`;
+  const $ = (s2) => host.querySelector(s2);
+  const salvar = () => localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+
+  const iniciar = () => { clearInterval(timer); if (cfg.auto && itens.length > 1) timer = setInterval(() => { if (!pausado && !document.hidden) ir(i + 1); }, Math.max(1, Number(cfg.seg) || 6) * 1000); };
+  function ir(n) {
+    if (!itens.length) return;
+    i = (n + itens.length) % itens.length;
+    $('[data-trilho]').style.transform = `translateX(-${i * 100}%)`;
+    host.querySelectorAll('[data-ponto]').forEach((b, k) => { b.classList.toggle('on', k === i); b.setAttribute('aria-current', k === i ? 'true' : 'false'); });
+    host.querySelectorAll('.nx-slide').forEach((sl, k) => sl.setAttribute('aria-hidden', k === i ? 'false' : 'true'));
+  }
+  function desenhar() {
+    const cats = dados?.categorias || {};
+    const base = (dados?.itens || []).filter((n) => !cfg.cats || cfg.cats.includes(n.categoria));
+    itens = base.slice(0, Number(cfg.max) || 6);
+    $('[data-trilho]').innerHTML = itens.length ? itens.map((n) => `<article class="nx-slide" style="${n.imagem ? `background-image:linear-gradient(180deg, rgba(8,10,40,.15), rgba(8,10,40,.92)), url('${esc(n.imagem)}')` : ''}">
+        <div class="nx-slide-in"><span class="nx-cat">${esc(cats[n.categoria] || n.categoria)}</span><h2>${esc(n.titulo)}</h2>
+          <p>${esc((n.resumo || '').slice(0, 170))}</p><small>${esc(n.fonte)}${n.publicado ? ` · ${esc(timeAgo(n.publicado))}` : ''}</small>
+          <button type="button" class="nx-btn pri" data-ler="${esc(n.id)}">Ler aqui ${icon('chevRight', 12)}</button></div></article>`).join('')
+      : '<article class="nx-slide"><div class="nx-slide-in"><h2>Sem destaques agora</h2><p>Ajuste as categorias em Personalizar ou atualize as notícias.</p></div></article>';
+    $('[data-pontos]').innerHTML = itens.map((_, k) => `<button type="button" data-ponto="${k}" aria-label="Destaque ${k + 1}"></button>`).join('');
+    $('[data-prev]').hidden = $('[data-next]').hidden = itens.length < 2;
+    if (i >= itens.length) i = 0;
+    ir(i); iniciar();
+  }
+  function painel() {
+    const cats = dados?.categorias || {};
+    $('[data-painel]').innerHTML = `<div class="nx-conf-g"><b>Categorias</b>${Object.entries(cats).map(([k, l]) => `<label><input type="checkbox" data-cc="${esc(k)}" ${!cfg.cats || cfg.cats.includes(k) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div>
+      <div class="nx-conf-g"><b>Troca automática</b><label><input type="checkbox" data-auto ${cfg.auto ? 'checked' : ''}> Ligada</label>
+        <label>a cada <select data-seg>${[4, 6, 10, 15].map((v) => `<option value="${v}" ${Number(cfg.seg) === v ? 'selected' : ''}>${v} s</option>`).join('')}</select></label></div>
+      <div class="nx-conf-g"><b>Quantidade</b><label><select data-max>${[4, 6, 8, 10].map((v) => `<option value="${v}" ${Number(cfg.max) === v ? 'selected' : ''}>${v} destaques</option>`).join('')}</select></label></div>`;
+  }
+  host.addEventListener('click', (e) => {
+    if (e.target.closest('[data-prev]')) { ir(i - 1); iniciar(); return; }
+    if (e.target.closest('[data-next]')) { ir(i + 1); iniciar(); return; }
+    const pt = e.target.closest('[data-ponto]'); if (pt) { ir(Number(pt.dataset.ponto)); iniciar(); return; }
+    const ler = e.target.closest('[data-ler]'); if (ler && dados) { abrirLeitor(dados.itens.find((x) => x.id === ler.dataset.ler)); return; }
+    const c = e.target.closest('[data-config]');
+    if (c) { const p = $('[data-painel]'); p.hidden = !p.hidden; c.setAttribute('aria-expanded', String(!p.hidden)); if (!p.hidden) painel(); }
+  });
+  host.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.matches('[data-cc]')) {
+      const marcadas = [...host.querySelectorAll('[data-cc]')].filter((x) => x.checked).map((x) => x.dataset.cc);
+      const todas = Object.keys(dados?.categorias || {});
+      cfg.cats = marcadas.length && marcadas.length < todas.length ? marcadas : null;
+      if (!marcadas.length) { t.checked = true; }
+    }
+    if (t.matches('[data-auto]')) cfg.auto = t.checked;
+    if (t.matches('[data-seg]')) cfg.seg = Number(t.value);
+    if (t.matches('[data-max]')) cfg.max = Number(t.value);
+    salvar(); desenhar();
+  });
+  const car = $('[data-car]');
+  car.addEventListener('mouseenter', () => { pausado = true; }); car.addEventListener('mouseleave', () => { pausado = false; });
+  car.addEventListener('focusin', () => { pausado = true; }); car.addEventListener('focusout', () => { pausado = false; });
+  car.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { ir(i + 1); iniciar(); } if (e.key === 'ArrowLeft') { ir(i - 1); iniciar(); } });
+  desenhar();
+  return {
+    atualizar(d) { dados = d; desenhar(); },
+    destruir() { clearInterval(timer); },
+  };
 }

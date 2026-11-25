@@ -102,3 +102,24 @@
 /* botão "Sair" da barra lateral: mesmo visual dos itens de menu */
 button.cx-nav-i { background: transparent; border: 0; width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 button.cx-nav-i:hover { background: rgba(248, 113, 113, .14); }
+
+/* carrossel de destaques (News) */
+.nx-car { position: relative; overflow: hidden; border-radius: 14px; background: var(--cx-bg2); outline: none; }
+.nx-car:focus-visible { box-shadow: 0 0 0 2px var(--cx-violet); }
+.nx-car-trilho { display: flex; transition: transform .6s ease; }
+.nx-slide { flex: 0 0 100%; min-height: 300px; background: linear-gradient(135deg, #20286f, #5b2fa8) center / cover no-repeat; display: flex; align-items: flex-end; box-sizing: border-box; }
+.nx-slide-in { padding: 24px 64px 44px; max-width: 760px; display: grid; gap: 8px; justify-items: start; }
+.nx-slide h2 { margin: 0; font-size: 28px; line-height: 1.2; text-shadow: 0 2px 12px rgba(0, 0, 0, .5); }
+.nx-slide p { margin: 0; color: var(--cx-text2); font-size: 14.5px; }
+.nx-slide small { color: var(--cx-mut); }
+.nx-car-seta { position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(8, 10, 40, .6); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.nx-car-seta:hover { background: var(--cx-violet); }
+.nx-car-seta.esq { left: 10px; } .nx-car-seta.dir { right: 10px; }
+.nx-car-pontos { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; gap: 7px; }
+.nx-car-pontos button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .4); cursor: pointer; padding: 0; }
+.nx-car-pontos button.on { background: #fff; width: 24px; border-radius: 6px; }
+.nx-conf { display: flex; gap: 22px; flex-wrap: wrap; background: var(--cx-bg2); border: 1px solid var(--cx-line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; }
+.nx-conf[hidden] { display: none; }
+.nx-conf-g { display: grid; gap: 6px; align-content: start; }
+.nx-conf-g label { display: flex; align-items: center; gap: 6px; }
+.nx-conf select { background: var(--cx-card); color: var(--cx-text); border: 1px solid var(--cx-line2); border-radius: 8px; padding: 3px 6px; }

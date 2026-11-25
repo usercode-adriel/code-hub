@@ -142,6 +142,27 @@ test('news: notícias internacionais com filtros por categoria e fontes', async 
   await ctx.close();
 });
 
+test('news: carrossel de destaques troca sozinho, pausa com o mouse, é personalizável e abre a matéria', async () => {
+  const { p, ctx } = await paginaLogada();
+  await p.addInitScript(() => localStorage.setItem('codeniac.newsCarrossel', JSON.stringify({ auto: true, seg: 1, max: 6, cats: null })));
+  await p.goto(`${BASE}/#/news`); await p.waitForSelector('[data-car] .nx-slide', { timeout: 30000 });
+  await p.waitForFunction(() => document.querySelectorAll('[data-car] [data-ponto]').length >= 2, null, { timeout: 15000 });
+  const ativo = () => p.evaluate(() => [...document.querySelectorAll('[data-car] [data-ponto]')].findIndex((b) => b.classList.contains('on')));
+  await p.mouse.move(5, 5);
+  const a0 = await ativo();
+  await p.waitForFunction((n) => [...document.querySelectorAll('[data-car] [data-ponto]')].findIndex((b) => b.classList.contains('on')) !== n, a0, { timeout: 6000 });
+  // com o mouse em cima, pausa
+  await p.hover('[data-car] [data-car]'); const a1 = await ativo(); await p.waitForTimeout(2500);
+  assert.equal(await ativo(), a1, 'pausa com o mouse em cima');
+  // personalizar: desligar a troca automática fica salvo
+  await p.click('[data-car] [data-config]'); await p.uncheck('[data-car] [data-auto]');
+  assert.equal(JSON.parse(await p.evaluate(() => localStorage.getItem('codeniac.newsCarrossel'))).auto, false, 'a escolha fica salva');
+  await p.click('[data-car] .nx-slide[aria-hidden="false"] [data-ler]');
+  await p.waitForSelector('.nx-leitor', { timeout: 15000 });
+  assert.deepEqual(p.errosJS, []);
+  await ctx.close();
+});
+
 test('estúdio: três cards (Video editor, Video cut, Ecommerce), sem funcionalidade', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/estudio`); await p.waitForSelector('.nx-est', { timeout: 30000 });
