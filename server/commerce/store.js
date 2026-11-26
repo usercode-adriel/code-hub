@@ -2,7 +2,7 @@
 // com versão de esquema para migrações futuras. Cada usuário só enxerga os próprios dados.
 import { db, save, id, now } from '../db.js';
 
-export const SCHEMA = 1;
+export const SCHEMA = 2;
 const vazio = () => ({
   schema: SCHEMA,
   layouts: [], layoutAtivo: null,        // escritório: mapas salvos (Office Builder)
@@ -15,6 +15,11 @@ const vazio = () => ({
   conectores: {},                        // estado de cada marketplace
   importacoes: [],                       // histórico de importações de relatório
   auditoria: [],                         // quem fez o quê
+  ordens: [],                            // ordens do chefe (linguagem natural) e seu andamento
+  mensagens: [],                         // comunicação interna entre os agentes (nuvens de diálogo e histórico)
+  documentos: [],                        // roteiros, propostas e relatórios gerados pelos agentes (com classificação da informação)
+  estoque: { itens: [], movimentos: [] },// controle de estoque da Sala de Estoque e Logística
+  equipeConfig: { maxTurnos: 8, balaoSegundos: 7, limiteChamadasDia: 80, uso: { data: '', chamadas: 0 } },
 });
 
 export function area(userId) {

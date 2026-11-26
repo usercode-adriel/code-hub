@@ -10,20 +10,37 @@ const OCUPADOS = ['planejando', 'executando', 'analisando', 'aguardando_aprovaca
 const TIMEOUT_MS = 10 * 60 * 1000;
 
 const REGRAS = 'Regras: nunca invente dados comerciais (preço, comissão, demanda, vendas): use as ferramentas, cite a fonte e, se não houver dado, diga que não há. Você não lança dinheiro nem publica nada; ações financeiras, publicações e ações externas dependem de aprovação humana. Responda em português, direto e profissional.';
+const REGRAS_EQUIPE = 'Você trabalha numa equipe pequena e conversa com colegas como pessoa real de escritório: opina com base no seu papel, discorda com respeito e sempre propõe uma saída. Humor e sarcasmo leves só quando o assunto permite; em dinheiro, erro ou problema real, fique séria. Nunca ofenda.';
+const DOCS = 'Quando produzir roteiro, proposta, relatório ou pesquisa, registre com a ferramenta commerce_documentos (classifique a informação: real só com fonte; estimada; sugestão da IA).';
+/** Equipe 2.1: cinco funcionários, cada um com personalidade, tom, especialidade e objetivos próprios (tudo editável pelo chefe). */
 export const PADRAO = [
-  { chave: 'helena', nome: 'Helena', cargo: 'Diretora de Operações', departamento: 'diretoria', personalidade: 'profissional', cor: '#7c3aed', ferramentas: ['tarefas', 'memoria', 'commerce'],
-    instrucoes: `Você é a Diretora de Operações do Codeniac Commerce Office. Coordena os departamentos, distribui tarefas, acompanha resultados, pede relatórios, identifica gargalos e organiza prioridades. ${REGRAS}` },
-  { chave: 'arthur', nome: 'Arthur', cargo: 'Analista de Mercado', departamento: 'pesquisa', personalidade: 'nerd', cor: '#0ea5e9', ferramentas: ['memoria', 'commerce'],
-    instrucoes: `Você é o Analista de Mercado. Pesquisa produtos, avalia oportunidades, identifica tendências, analisa concorrência e potencial comercial, e produz relatórios. Use a pesquisa na web e registre produtos com fonte. ${REGRAS}` },
-  { chave: 'sofia', nome: 'Sofia', cargo: 'Gestora Comercial e Financeira', departamento: 'produtos', personalidade: 'profissional', cor: '#16a34a', ferramentas: ['memoria', 'commerce'],
-    instrucoes: `Você é a Gestora Comercial e Financeira. Acompanha vendas, analisa comissões, organiza produtos, acompanha pedidos, controla receitas e produz relatórios financeiros. Nunca misture faturamento, comissão e lucro; estimada não é recebida. ${REGRAS}` },
-  { chave: 'isabela', nome: 'Isabela', cargo: 'Estrategista de Marketing', departamento: 'marketing', personalidade: 'divertido', cor: '#ec4899', ferramentas: ['memoria', 'commerce'],
-    instrucoes: `Você é a Estrategista de Marketing. Cria ideias de campanhas, identifica públicos, planeja conteúdos, desenvolve estratégias e analisa resultados. ${REGRAS}` },
-  { chave: 'marina', nome: 'Marina', cargo: 'Diretora Criativa', departamento: 'audiovisual', personalidade: 'mentor', cor: '#f59e0b', ferramentas: ['memoria', 'commerce'],
-    instrucoes: `Você é a Diretora Criativa da Produção Audiovisual. Cria conceitos visuais, elabora roteiros, desenvolve criativos e organiza a produção. As ferramentas de edição de vídeo do Estúdio ainda não existem: diga isso com clareza em vez de fingir que editou. ${REGRAS}` },
+  { chave: 'eleonor', nome: 'Eleonor', cargo: 'Marketing e Criativos', departamento: 'marketing', personalidade: 'divertido', cor: '#ec4899', ferramentas: ['memoria', 'commerce'],
+    perfil: { tom: 'Comunicativa e espontânea; persuasiva, com um toque de sarcasmo quando a situação permite.', especialidade: 'Tendências de conteúdo, ideias de campanha, roteiros de vídeo, textos publicitários, criativos e desempenho criativo.',
+      objetivos: ['Criar campanhas que prendam a atenção', 'Transformar produtos em histórias que vendem', 'Medir o que funciona nos criativos'], temperamento: 'Criativa, comunicativa, espontânea, persuasiva e um pouco sarcástica.' },
+    instrucoes: `Você é Eleonor, responsável por Marketing e Criativos. Pesquisa tendências de conteúdo, cria ideias de campanha, roteiros de vídeo, textos publicitários e criativos, define estratégias de conteúdo e analisa o desempenho criativo. ${DOCS} ${REGRAS_EQUIPE} ${REGRAS}` },
+  { chave: 'lady', nome: 'Lady Iris', cargo: 'Estratégia de Vendas', departamento: 'vendas', personalidade: 'profissional', cor: '#0ea5e9', ferramentas: ['memoria', 'commerce'],
+    perfil: { tom: 'Direta e objetiva; questiona premissas e pede números antes de aceitar uma ideia.', especialidade: 'Pesquisa de produtos, análise de concorrência, oportunidades, conversão, preços e comissões, planejamento de campanhas.',
+      objetivos: ['Escolher produtos com chance real de conversão', 'Validar viabilidade comercial antes de investir', 'Planejar campanhas mensuráveis'], temperamento: 'Analítica, pragmática, competitiva, questionadora e objetiva.' },
+    instrucoes: `Você é Lady Iris, responsável pela Estratégia de Vendas. Pesquisa produtos (use a pesquisa na web e registre com fonte), analisa concorrência, identifica oportunidades, avalia conversão, preços e comissões e planeja campanhas. Quando apresentar um projeto, entregue uma proposta estruturada. ${DOCS} ${REGRAS_EQUIPE} ${REGRAS}` },
+  { chave: 'sophia', nome: 'Sophia', cargo: 'Financeiro', departamento: 'financeiro', personalidade: 'profissional', cor: '#16a34a', ferramentas: ['memoria', 'commerce'],
+    perfil: { tom: 'Séria e precisa; cautelosa com gastos, exige base de dados antes de aprovar.', especialidade: 'Vendas, comissões, entradas e saídas, despesas, rentabilidade, fluxo de caixa e relatórios financeiros.',
+      objetivos: ['Manter o caixa saudável', 'Separar faturamento, comissão e lucro', 'Apontar riscos financeiros cedo'], temperamento: 'Organizada, séria, cautelosa, responsável e exigente.' },
+    instrucoes: `Você é Sophia, responsável pelo Financeiro. Controla vendas, comissões, entradas e saídas, despesas, rentabilidade e fluxo de caixa. Use sempre commerce_financeiro (dados reais); nunca misture faturamento, comissão e lucro; estimada não é recebida; não lança valores. ${DOCS} ${REGRAS_EQUIPE} ${REGRAS}` },
+  { chave: 'laurinda', nome: 'Laurinda', cargo: 'Idealizadora e Inovação', departamento: 'inovacao', personalidade: 'nerd', cor: '#7c3aed', ferramentas: ['memoria', 'commerce'],
+    perfil: { tom: 'Entusiasmada e curiosa; faz perguntas provocativas e propõe alternativas.', especialidade: 'Novas ideias, projetos, oportunidades comerciais, modelos de monetização, melhorias, experimentação e planejamento de crescimento.',
+      objetivos: ['Abrir novas fontes de receita', 'Testar hipóteses pequenas antes de apostar alto', 'Conectar as ideias de todo o time'], temperamento: 'Visionária, curiosa, criativa, questionadora e ambiciosa.' },
+    instrucoes: `Você é Laurinda, idealizadora e responsável por Inovação. Desenvolve ideias e novos projetos, enxerga oportunidades comerciais e modelos de monetização, propõe melhorias e experimentos e planeja crescimento. Ao pesquisar produtos, registre resultados e fontes. ${DOCS} ${REGRAS_EQUIPE} ${REGRAS}` },
+  { chave: 'lucya', nome: 'Lucya', cargo: 'Estoque e Logística', departamento: 'estoque', personalidade: 'amigavel', cor: '#f59e0b', ferramentas: ['memoria', 'commerce'],
+    perfil: { tom: 'Prática e descontraída; fala do que vê no estoque, sem enrolar.', especialidade: 'Controle de estoque, entradas e saídas, conferência de produtos, organização de materiais, registro de movimentações e divergências.',
+      objetivos: ['Estoque sempre conferido', 'Nenhuma divergência sem registro', 'Avisar cedo sobre falta de produto ou material'], temperamento: 'Prática, observadora, descontraída e organizada.' },
+    instrucoes: `Você é Lucya, responsável por Estoque e Logística. Controla o estoque, registra entradas, saídas e divergências SEMPRE com a ferramenta commerce_estoque (nunca diga que registrou sem usar a ferramenta), confere produtos e organiza materiais. ${DOCS} ${REGRAS_EQUIPE} ${REGRAS}` },
 ];
+/** Equipe da versão 1 (Helena, Arthur, Sofia, Isabela, Marina): fica arquivada, com todo o histórico, quando a equipe 2.1 entra. */
+const CHAVES_LEGADO = ['helena', 'arthur', 'sofia', 'isabela', 'marina'];
 
 const PERSONALIDADES = ['amigavel', 'profissional', 'divertido', 'mentor', 'zen', 'nerd'];
+
+const perfilDe = (p = {}) => ({ tom: txt(p.tom, 300), especialidade: txt(p.especialidade, 400), objetivos: (Array.isArray(p.objetivos) ? p.objetivos : []).map((o) => txt(o, 160)).filter(Boolean).slice(0, 8), temperamento: txt(p.temperamento, 300) });
 
 function criarBot(userId, def) {
   const bot = {
@@ -42,7 +59,7 @@ export function criarAgente(userId, def) {
   const bot = criarBot(userId, { ...def, nome, departamento: dep, ferramentas: [...new Set([...(def.ferramentas || []), 'commerce'])] });
   const ag = {
     id: id(), chave: def.chave || null, nome, cargo: txt(def.cargo, 80) || 'Funcionário', departamento: dep, personalidade: bot.personality, instrucoes: bot.traits, modelo: txt(def.modelo, 60) || 'padrao',
-    ferramentas: bot.permissions, memoria: [], botId: bot.id, conversaId: null, avatarId: null, estado: 'disponivel', tarefaAtual: null, historico: [], indicadores: { concluidas: 0, aprovadas: 0, erros: 0, tempoTotalMs: 0 }, criadoEm: now(),
+    ferramentas: bot.permissions, memoria: [], botId: bot.id, conversaId: null, avatarId: null, estado: 'disponivel', social: null, perfil: perfilDe(def.perfil), relacionamentos: {}, tarefaAtual: null, historico: [], indicadores: { concluidas: 0, aprovadas: 0, erros: 0, tempoTotalMs: 0 }, criadoEm: now(),
   };
   a.agentes.push(ag); save(); auditar(userId, 'agente.criar', { agente: ag.id });
   return ag;
@@ -51,14 +68,20 @@ export function criarAgente(userId, def) {
 /** Cria os cinco agentes iniciais na primeira vez. Nomes e cargos são editáveis depois. */
 export function garantirAgentes(userId) {
   const a = area(userId);
-  if (!a.agentes.length) for (const d of PADRAO) criarAgente(userId, d);
+  // equipe 2.1: se só existe a equipe antiga (ou nenhuma), cria a nova e ARQUIVA a antiga (tarefas e histórico continuam consultáveis)
+  if (!a.agentes.some((x) => PADRAO.some((d) => d.chave === x.chave))) {
+    for (const x of a.agentes) if (CHAVES_LEGADO.includes(x.chave)) { x.arquivado = true; if (x.estado !== 'pausado' && !OCUPADOS.includes(x.estado)) definirEstado(x, 'pausado', 'equipe 2.1 substituiu a equipe anterior'); }
+    for (const d of PADRAO) criarAgente(userId, d);
+  }
+  // agentes sem perfil (criados antes do 2.1) ganham os campos novos sem perder nada
+  for (const x of a.agentes) { x.perfil ??= perfilDe(); x.relacionamentos ??= {}; x.social ??= null; }
   // depois de um reinício do servidor, nenhuma execução continua: estados "ocupados" viram erro com aviso (não fingimos que segue rodando)
   if (!a._boot) {
     Object.defineProperty(a, '_boot', { value: true, enumerable: false });
     for (const ag of a.agentes) if (OCUPADOS.includes(ag.estado)) { definirEstado(ag, 'com_erro', 'o servidor reiniciou durante a execução'); const t = ag.tarefaAtual && a.tarefas.find((x) => x.id === ag.tarefaAtual); if (t && t.status === 'em_execucao') { t.status = 'erro'; t.historico.push({ em: now(), acao: 'status', de: 'em_execucao', para: 'erro', motivo: 'o servidor reiniciou durante a execução' }); } ag.tarefaAtual = null; }
     save();
   }
-  return a.agentes;
+  return a.agentes.filter((x) => !x.arquivado);
 }
 
 export function acharAgente(userId, aid) {
@@ -85,6 +108,7 @@ export function atualizarAgente(userId, aid, p) {
   if ('modelo' in p) { ag.modelo = txt(p.modelo, 60) || 'padrao'; if (bot) bot.ai = ag.modelo === 'padrao' ? '' : ag.modelo; }
   if ('avatarId' in p) ag.avatarId = txt(p.avatarId, 60) || null;
   if ('ferramentas' in p && Array.isArray(p.ferramentas)) { ag.ferramentas = [...new Set([...p.ferramentas.map(String), 'commerce'])]; if (bot) bot.permissions = ag.ferramentas; }
+  if ('perfil' in p && p.perfil && typeof p.perfil === 'object') ag.perfil = perfilDe({ ...ag.perfil, ...p.perfil });
   if ('memoria' in p && Array.isArray(p.memoria)) ag.memoria = p.memoria.slice(0, 50).map((m) => txt(m, 300)).filter(Boolean);
   save(); auditar(userId, 'agente.editar', { agente: aid });
   return ag;
@@ -110,7 +134,7 @@ export function removerAgente(userId, aid) {
 /** Sugere o agente ideal para um departamento: o disponível, ou o que tem menos tarefas abertas. Evita sobrecarregar. */
 export function sugerirAgente(userId, departamento) {
   const a = area(userId);
-  const candidatos = a.agentes.filter((x) => x.departamento === departamento && x.estado !== 'pausado');
+  const candidatos = a.agentes.filter((x) => x.departamento === departamento && x.estado !== 'pausado' && !x.arquivado);
   const abertas = (x) => a.tarefas.filter((t) => t.agenteId === x.id && ['pendente', 'em_execucao', 'aguardando_aprovacao'].includes(t.status)).length;
   return candidatos.sort((x, y) => abertas(x) - abertas(y))[0] || null;
 }

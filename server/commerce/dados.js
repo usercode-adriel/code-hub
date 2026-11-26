@@ -6,6 +6,7 @@ import { PLATAFORMAS } from './finance.js';
 export const DEPARTAMENTOS = {
   diretoria: 'Diretoria', pesquisa: 'Pesquisa e Inteligência Comercial', produtos: 'Produtos e Marketplace', marketing: 'Marketing e Criatividade',
   audiovisual: 'Estúdio Audiovisual', financeiro: 'Financeiro', reunioes: 'Sala de Reuniões', convivencia: 'Área de Convivência',
+  vendas: 'Estratégia de Vendas', inovacao: 'Inovação', estoque: 'Estoque e Logística', escritorio: 'Escritório Central',
 };
 
 // ---------- tarefas ----------

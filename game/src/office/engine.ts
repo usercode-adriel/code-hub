@@ -11,13 +11,13 @@ import { Grade } from './grade';
 import { celulaEm, centroCelula, direcaoDe, gridParaTela, limitesDoMapa, type Direcao } from './iso';
 import { dentro, indice, type Layout, type ObjetoLayout, type PersonagemLayout } from './modelo';
 import { CAMADA, corpoIso, ordenarIso, type CorpoIso } from './profundidade';
-import { ESTADOS_DE_TRABALHO, escolherAnimacao, estadoParaAnimacao, quadroEm, type EstadoAnim, type SheetDef } from './animacoes';
+import { ESTADOS_DE_TRABALHO, ESTADOS_SENTADOS, escolherAnimacao, estadoParaAnimacao, quadroEm, type AtividadeSocial, type EstadoAnim, type SheetDef } from './animacoes';
 import { Texturas } from './texturas';
 import type { AlvoSelecao, Modo, OfficeEventos } from './eventos';
 import { ALTURA_PAREDE } from './arte/chao';
 import type { PixelImage } from '../assets/pixel';
 
-export interface AgenteInfo { id: string; chave: string; nome: string; cargo: string; departamento: string; estado: string; avatarId?: string | null; tarefaAtual?: string | null }
+export interface AgenteInfo { id: string; chave: string; nome: string; cargo: string; departamento: string; estado: string; avatarId?: string | null; tarefaAtual?: string | null; estadoSocial?: AtividadeSocial; desde?: string | null }
 export interface AssetInfo { id: string; nome: string; largura: number; altura: number; escala: number; ancora: { x: number; y: number }; colisao: { solida: boolean; larguraTiles: number; profundidadeTiles: number }; camada: string }
 
 export const COR_ESTADO: Record<string, number> = { disponivel: 0x2fd27a, aguardando: 0x94a3b8, planejando: 0xa78bfa, executando: 0x38bdf8, analisando: 0x22d3ee, aguardando_aprovacao: 0xf7c948, concluido: 0x4ade80, com_erro: 0xff4d5e, pausado: 0x64748b };
@@ -27,7 +27,7 @@ interface EntObjeto { id: string; o: ObjetoLayout; t: TipoObjeto; sprite: Sprite
 interface EntParede { sprite: Sprite; corpo: CorpoIso }
 interface EntPessoa {
   id: string; p: PersonagemLayout; agenteId: string | null; x: number; y: number; dir: Direcao; caminho: Celula[]; sprite: Sprite; rotulo: Text; ponto: Graphics;
-  sheet: { base: unknown; def: SheetDef } | null; sheetKey: string; noPosto: boolean; corpo: CorpoIso; sentado: boolean; nome: string; indo: 'posto' | 'usuario' | null;
+  sheet: { base: unknown; def: SheetDef } | null; sheetKey: string; noPosto: boolean; corpo: CorpoIso; sentado: boolean; nome: string; indo: 'posto' | 'usuario' | 'assento' | null; reuniao: boolean;
 }
 
 export class OfficeEngine {
@@ -46,6 +46,8 @@ export class OfficeEngine {
 
   private readonly mundo = new Container(); private readonly fundo = new Graphics(); private readonly pisos = new Container(); private readonly sombras = new Container(); private readonly entidades = new Container();
   private readonly efeitos = new Container(); readonly interativo = new Container();
+  /** Posição na tela (relativa ao canvas) logo acima da cabeça de cada agente: usada pelas nuvens de diálogo. Atualizada a cada quadro. */
+  readonly ancoras = new Map<string, { x: number; y: number }>();
   private readonly hoverG = new Graphics(); private readonly selG = new Graphics(); readonly fantasma = new Graphics(); readonly grade_ = new Graphics();
   private objetos: EntObjeto[] = []; private paredes: EntParede[] = []; private pessoas: EntPessoa[] = [];
   private camadasVisiveis: Record<string, boolean> = {};
@@ -192,7 +194,7 @@ export class OfficeEngine {
       const ponto = new Graphics();
       this.entidades.addChild(sprite); this.efeitos.addChild(rotulo); this.efeitos.addChild(ponto);
       const ag = p.agenteId ? this.agentes.get(p.agenteId) : null;
-      this.pessoas.push({ id: p.id, p, agenteId: p.agenteId ?? null, x: ant?.x ?? p.x + 0.5, y: ant?.y ?? p.y + 0.5, dir: ant?.dir ?? p.dir ?? 'SE', caminho: ant?.caminho ?? [], sprite, rotulo, ponto, sheet: null, sheetKey: '', noPosto: ant?.noPosto ?? false, corpo: corpoIso(`p:${p.id}`, 0, 0, 0.2, 0.2, 44, CAMADA.personagem), sentado: false, nome: ag?.nome ?? p.id, indo: ant?.indo ?? null });
+      this.pessoas.push({ id: p.id, p, agenteId: p.agenteId ?? null, x: ant?.x ?? p.x + 0.5, y: ant?.y ?? p.y + 0.5, dir: ant?.dir ?? p.dir ?? 'SE', caminho: ant?.caminho ?? [], sprite, rotulo, ponto, sheet: null, sheetKey: '', noPosto: ant?.noPosto ?? false, corpo: corpoIso(`p:${p.id}`, 0, 0, 0.2, 0.2, 44, CAMADA.personagem), sentado: false, nome: ag?.nome ?? p.id, indo: ant?.indo ?? null, reuniao: ant?.reuniao ?? false });
     }
     this.sujoProfundidade = true; this.aplicarVisibilidade();
   }
@@ -212,15 +214,31 @@ export class OfficeEngine {
   // ---------- agentes e personagens ----------
   setAgentes(lista: AgenteInfo[], sheets: SheetDef[] = []): void {
     this.agentes = new Map(lista.map((a) => [a.id, a])); this.sheetsImportadas = new Map(sheets.map((s) => [s.id, s]));
+    // reunião REAL: só quando a ordem do chefe tem uma discussão coletiva em andamento (o servidor marca os participantes)
+    const emReuniao = lista.filter((a) => a.estadoSocial === 'reunido').length >= 2;
     for (const p of this.pessoas) {
       const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; if (!ag) continue;
       p.nome = ag.nome;
-      if (ESTADOS_DE_TRABALHO.includes(ag.estado) && !p.noPosto && p.indo !== 'posto') this.irAoPosto(p);
+      const participa = emReuniao && (ag.estadoSocial === 'reunido' || ag.estadoSocial === 'conversando');
+      if (participa) { if (!p.reuniao) { p.reuniao = true; this.irAoAssento(p); } }
+      else if (p.reuniao) { p.reuniao = false; if (p.indo === 'assento') p.indo = null; p.caminho = []; this.irAoPosto(p, true); }       // a reunião acabou: volta ao posto
+      else if (ESTADOS_DE_TRABALHO.includes(ag.estado) && !p.noPosto && p.indo !== 'posto') this.irAoPosto(p);
     }
   }
-  private estacaoDe(agenteId: string | null) { return agenteId ? this.layout.estacoes.find((e) => e.agenteId === agenteId && e.pontoTrabalho) ?? null : null; }
-  private irAoPosto(p: EntPessoa): void {
-    const e = this.estacaoDe(p.agenteId); if (!e?.pontoTrabalho) return;
+  private estacaoDe(agenteId: string | null) { return agenteId ? this.layout.estacoes.find((e) => e.agenteId === agenteId && e.pontoTrabalho && e.ferramenta !== 'assento') ?? null : null; }
+  private assentoDe(agenteId: string | null) { return agenteId ? this.layout.estacoes.find((e) => e.agenteId === agenteId && e.pontoTrabalho && e.ferramenta === 'assento') ?? null : null; }
+  private irAoAssento(p: EntPessoa): void {
+    const e = this.assentoDe(p.agenteId); if (!e?.pontoTrabalho) return; const alvo = e.pontoTrabalho; const origem = { x: Math.floor(p.x), y: Math.floor(p.y) };
+    p.noPosto = false;
+    if (origem.x === alvo.x && origem.y === alvo.y) { this.chegouAoAssento(p); return; }
+    const rota = acharCaminho(this.grade, origem, alvo, { aproximar: true }); if (rota && rota.length) { p.caminho = rota; p.indo = 'assento'; } else this.chegouAoAssento(p);
+  }
+  private chegouAoAssento(p: EntPessoa): void {
+    p.indo = null; p.x = Math.floor(p.x) + 0.5; p.y = Math.floor(p.y) + 0.5;
+    const mesa = this.layout.objetos.find((o) => o.tipo === 'mesa-reuniao'); if (mesa) { const t = objetoPorTipo('mesa-reuniao')!; const cx = mesa.x + t.largura / 2; const cy = mesa.y + t.profundidade / 2; p.dir = direcaoDe(Math.sign(cx - p.x) * (Math.abs(cx - p.x) > 0.6 ? 1 : 0), Math.sign(cy - p.y) * (Math.abs(cy - p.y) > 0.6 ? 1 : 0), p.dir); }
+  }
+  private irAoPosto(p: EntPessoa, forcar = false): void {
+    const e = this.estacaoDe(p.agenteId); if (!e?.pontoTrabalho) return; void forcar;
     const origem = { x: Math.floor(p.x), y: Math.floor(p.y) }; const alvo = e.pontoTrabalho;
     if (origem.x === alvo.x && origem.y === alvo.y) { this.chegouAoPosto(p); return; }
     const rota = acharCaminho(this.grade, origem, alvo, { aproximar: true });
@@ -379,7 +397,7 @@ export class OfficeEngine {
       const alvo = p.caminho[0]; const tx = alvo.x + 0.5; const ty = alvo.y + 0.5; const dx = tx - p.x; const dy = ty - p.y; const dist = Math.hypot(dx, dy);
       const vel = VELOCIDADE * (this.sheetDe(p)?.def.velocidade ?? 1) * dt;
       p.dir = direcaoDe(Math.round(Math.sign(dx) * (Math.abs(dx) > 0.01 ? 1 : 0)), Math.round(Math.sign(dy) * (Math.abs(dy) > 0.01 ? 1 : 0)), p.dir);
-      if (dist <= vel) { p.x = tx; p.y = ty; p.caminho.shift(); if (!p.caminho.length) { if (p.indo === 'posto') this.chegouAoPosto(p); else p.indo = null; } }
+      if (dist <= vel) { p.x = tx; p.y = ty; p.caminho.shift(); if (!p.caminho.length) { if (p.indo === 'posto') this.chegouAoPosto(p); else if (p.indo === 'assento') this.chegouAoAssento(p); else p.indo = null; } }
       else { p.x += (dx / dist) * vel; p.y += (dy / dist) * vel; }
       this.sujoProfundidade = true;
     }
@@ -396,9 +414,11 @@ export class OfficeEngine {
   }
 
   private estadoAnimacao(p: EntPessoa): EstadoAnim {
-    const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const movendo = p.caminho.length > 0;
-    const base = estadoParaAnimacao(ag?.estado ?? 'disponivel', { noPosto: p.noPosto, movendo });
-    if (base === 'idle' && this.naCadeira(p)) return 'sitting';
+    const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const movendo = p.caminho.length > 0; const social = ag?.estadoSocial ?? null;
+    const sentadoAgora = !movendo && this.naCadeira(p);
+    const ocioso = ag?.desde ? Math.max(0, Date.now() - Date.parse(ag.desde)) : 0;
+    const base = estadoParaAnimacao(ag?.estado ?? 'disponivel', { noPosto: p.noPosto, movendo, social, naReuniao: sentadoAgora && (social === 'conversando' || social === 'reunido'), ociosoMs: sentadoAgora ? ocioso : 0 });
+    if (base === 'idle' && sentadoAgora) return 'sitting';
     return base;
   }
   private naCadeira(p: EntPessoa): boolean { const cx = Math.floor(p.x); const cy = Math.floor(p.y); return this.objetos.some((o) => o.t.sentavel && o.o.x === cx && o.o.y === cy); }
@@ -413,9 +433,10 @@ export class OfficeEngine {
         const anim = escolherAnimacao(s.def, estado, p.dir);
         if (anim) { p.sprite.texture = this.texturas.quadro(s as never, anim.linha, quadroEm(anim, this.tempo)); p.sprite.scale.set(s.def.escala); p.sprite.anchor.set(s.def.ancora.x, s.def.ancora.y); }
       }
-      p.sentado = estado === 'sitting' || estado === 'typing' || estado === 'working';
+      p.sentado = ESTADOS_SENTADOS.includes(estado);
       const t = gridParaTela(p.x, p.y, p.sentado ? 8 : 0); p.sprite.position.set(Math.round(t.x), Math.round(t.y));
       p.rotulo.text = p.nome; p.rotulo.position.set(Math.round(t.x), Math.round(t.y) - 52 * (p.sprite.scale.y || 1));
+      if (p.agenteId) this.ancoras.set(p.agenteId, { x: Math.round(t.x) * off + this.mundo.position.x, y: (Math.round(t.y) - 52 * (p.sprite.scale.y || 1) - 22) * off + this.mundo.position.y });
       const cor = COR_ESTADO[ag?.estado ?? 'disponivel'] ?? 0x2fd27a; p.ponto.clear().circle(Math.round(t.x), Math.round(t.y) - 52 * (p.sprite.scale.y || 1) - 18, 4).fill(cor).stroke({ width: 1.5, color: 0x10142b });
       const grade = { x: p.x, y: p.y };
       p.corpo = corpoIso(`p:${p.id}`, grade.x - 0.12, grade.y - 0.12, 0.24, 0.24, 44, CAMADA.personagem);

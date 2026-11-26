@@ -18,7 +18,7 @@ let servidor; let browser;
 
 before(async () => {
   assert.ok(fs.existsSync(path.join(RAIZ, 'public/escritorio/index.html')), 'rode npm run office:build antes');
-  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA), AI_PROVIDER: 'local', GEMINI_API_KEY: '', ANTHROPIC_API_KEY: '' }, stdio: 'ignore' });
+  servidor = spawn(process.execPath, ['server/index.js'], { cwd: RAIZ, env: { ...process.env, DATA_DIR: dados, PORT: String(PORTA), AI_PROVIDER: 'local', GEMINI_API_KEY: '', ANTHROPIC_API_KEY: '', CODENIAC_TESTE_IA_FALSA: '1', CODENIAC_TESTE_IA_ATRASO: '900' }, stdio: 'ignore' });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(`${BASE}/api/health`)).ok) break; } catch { /* subindo */ } await new Promise((r) => setTimeout(r, 250)); }
   browser = await chromium.launch({ args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'], executablePath: process.env.CHROME_PATH || undefined });
 });
@@ -66,12 +66,13 @@ async function clicarPessoa(p, id) {
 }
 const painel = (p) => p.locator('.o-lateral-corpo');
 
-test('o escritório carrega: layout completo, 8 departamentos, 5 funcionários reais, sem erros', async () => {
+test('o escritório carrega: DUAS salas (Estoque e Escritório Central), 5 funcionários reais, sem erros', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  const r = await p.evaluate(() => { const o = window.__office; return { objetos: o.layout.objetos.length, paredes: o.layout.paredes.length, deps: o.layout.departamentos.length, pessoas: o.listaPessoas().length, sprites: o.totalSprites }; });
-  assert.ok(r.objetos > 80 && r.paredes > 100 && r.deps === 8 && r.pessoas === 5 && r.sprites > 200, JSON.stringify(r));
+  const r = await p.evaluate(() => { const o = window.__office; return { objetos: o.layout.objetos.length, paredes: o.layout.paredes.length, deps: o.layout.departamentos.map((d) => d.chave), pessoas: o.listaPessoas().length, sprites: o.totalSprites, versao: o.layout.meta?.padrao }; });
+  assert.ok(r.objetos > 120 && r.paredes > 40 && r.pessoas === 5 && r.sprites > 150, JSON.stringify(r)); assert.deepEqual(r.deps, ['estoque', 'escritorio']); assert.equal(r.versao, '2.1');
   assert.equal(await p.locator('.o-av').count(), 5);
-  assert.match(await painel(p).textContent(), /Helena[\s\S]*Arthur[\s\S]*Sofia[\s\S]*Isabela[\s\S]*Marina/);
+  assert.match(await painel(p).textContent(), /Eleonor[\s\S]*Lady Iris[\s\S]*Sophia[\s\S]*Laurinda[\s\S]*Lucya/);
+  await p.waitForSelector('[data-testid="caixa-chefe"]'); assert.equal(await p.locator('[data-testid="caixa-chefe"] input').isEnabled(), true);
   if (SAIDA) await p.screenshot({ path: path.join(SAIDA, 'office-1-inicio.png') });
   assert.deepEqual(p.erros, []); await ctx.close();
 });
@@ -91,20 +92,21 @@ test('câmera: zoom em passos pelos botões e pela roda, arrasto move a câmera,
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
-test('clicar em personagem abre o perfil; clicar no chão do departamento abre o painel do departamento', async () => {
+test('clicar em personagem abre o perfil (sem chat direto); clicar no chão da sala abre o painel da sala', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  await clicarPessoa(p, 'pers-arthur');
-  await p.waitForFunction(() => /Analista de Mercado/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 8000 });
-  const t = await painel(p).textContent(); assert.match(t, /Arthur/); assert.match(t, /Atribuir tarefa/); assert.match(t, /Conversar com Arthur/);
+  await clicarPessoa(p, 'pers-lady');
+  await p.waitForFunction(() => /Estratégia de Vendas/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 8000 });
+  const t = await painel(p).textContent(); assert.match(t, /Lady Iris/); assert.match(t, /Atribuir tarefa/); assert.match(t, /Personalidade e perfil/); assert.match(t, /Analítica, pragmática/); assert.match(t, /Relacionamentos profissionais/);
+  assert.doesNotMatch(t, /Conversar com Lady/, 'o chefe não conversa individualmente com os funcionários');
   await p.evaluate(() => window.__office.selecionar({ tipo: 'nenhum' }));
-  await clicarCelula(p, 18, 6);                                           // piso da Pesquisa, sem móvel
-  await p.waitForFunction(() => /Pesquisa e Inteligência Comercial/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 8000 });
+  await clicarCelula(p, 18, 7);                                           // piso do Escritório Central, sem móvel
+  await p.waitForFunction(() => /Escritório Central/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 8000 });
   assert.match(await painel(p).textContent(), /funcionários/); assert.deepEqual(p.erros, []); await ctx.close();
 });
 
-test('objetos abrem as ferramentas reais: computador, painéis, mesa de reuniões, marketplace, estante, câmera', async () => {
+test('objetos abrem as ferramentas reais: monitores, painéis, mesa e quadro branco, marketplace, estante, estoque', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  const casos = [['pc-sofia', /Gestora Comercial e Financeira/], ['pf-fin', /Dados reais[\s\S]*Dados de teste/], ['mr-sala', /Nova reunião/], ['mkt-1', /Verificação de elegibilidade|Nada é simulado/], ['est-pesq-1', /Importar|Biblioteca/], ['pp-prod', /Novo produto/], ['imp-fin', /Importar relatório/], ['cam-av', /Editor de Vídeo[\s\S]*pendentes|ferramentas pendentes/], ['edi-av', /ferramentas pendentes/], ['ref-mkt-1', /Nova campanha/]];
+  const casos = [['mon-sophia', /Sophia/], ['pf-esc', /Dados reais[\s\S]*Dados de teste/], ['mr-1', /Histórico de conversas/], ['qb-1', /Histórico de conversas/], ['mkt-esc', /Verificação de elegibilidade|Nada é simulado/], ['est-liv', /Importar|Biblioteca/], ['pprod-esc', /Novo produto/], ['imp2-esc', /Importar relatório/], ['pe-2', /Estoque e Logística[\s\S]*Cadastrar item/], ['mon-lucya', /Estoque e Logística[\s\S]*Cadastrar item/]];
   for (const [id, rx] of casos) {
     const pt = await pontoObjeto(p, id); await p.mouse.click(pt.x, pt.y);
     await p.waitForFunction((src) => new RegExp(src).test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), rx.source, { timeout: 8000 }).catch(async () => { throw new Error(`objeto ${id}: painel não abriu (${(await painel(p).textContent()).slice(0, 120)})`); });
@@ -112,42 +114,47 @@ test('objetos abrem as ferramentas reais: computador, painéis, mesa de reuniõe
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
-test('movimentação: clicar no chão manda o funcionário selecionado andar por caminhos válidos, atravessando portas, sem atravessar móveis nem paredes', async () => {
+test('movimentação: clicar no chão manda a funcionária andar por caminhos válidos, atravessando a porta entre as salas, sem atravessar móveis nem paredes', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  await clicarPessoa(p, 'pers-helena');
-  await p.evaluate(() => { window.__amostras = []; window.__t = setInterval(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-helena'); window.__amostras.push([q.x, q.y]); }, 40); });
-  await clicarCelula(p, 25, 22);                                          // Área de Convivência
-  await p.waitForFunction(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-helena'); return Math.hypot(q.x - 25.5, q.y - 22.5) < 0.2 && !q.caminho.length; }, null, { timeout: 45000 });
-  const r = await p.evaluate(() => { clearInterval(window.__t); const o = window.__office; const g = o.grade; return { n: window.__amostras.length, invalidas: window.__amostras.filter(([x, y]) => !g.livre(Math.floor(x), Math.floor(y))).length, atravessouPorta: window.__amostras.some(([x, y]) => Math.floor(y) === 10 || Math.floor(y) === 19 || Math.floor(x) === 11) }; });
-  assert.ok(r.n > 20, 'andou de verdade'); assert.equal(r.invalidas, 0, 'nunca pisou em célula bloqueada'); assert.ok(r.atravessouPorta, 'passou por portas/corredor');
+  await clicarPessoa(p, 'pers-lucya');
+  await p.evaluate(() => { window.__amostras = []; window.__t = setInterval(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-lucya'); window.__amostras.push([q.x, q.y]); }, 40); });
+  await clicarCelula(p, 24, 13);                                          // do Estoque até a Área de Convivência do Escritório
+  await p.waitForFunction(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-lucya'); return Math.hypot(q.x - 24.5, q.y - 13.5) < 0.2 && !q.caminho.length; }, null, { timeout: 60000 });
+  const r = await p.evaluate(() => { clearInterval(window.__t); const o = window.__office; const g = o.grade; return { n: window.__amostras.length, invalidas: window.__amostras.filter(([x, y]) => !g.livre(Math.floor(x), Math.floor(y))).length, atravessouPorta: window.__amostras.some(([x, y]) => Math.floor(x) === 12 && Math.floor(y) === 7) }; });
+  assert.ok(r.n > 20, 'andou de verdade'); assert.equal(r.invalidas, 0, 'nunca pisou em célula bloqueada'); assert.ok(r.atravessouPorta, 'passou pela porta entre as salas');
   // destino bloqueado (em cima de uma mesa): aproxima, sem atravessar
-  await clicarPessoa(p, 'pers-helena'); await clicarCelula(p, 3, 3);
-  await p.waitForFunction(() => !window.__office.pessoas.find((x) => x.id === 'pers-helena').caminho.length, null, { timeout: 45000 });
-  const fim = await p.evaluate(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-helena'); return window.__office.grade.livre(Math.floor(q.x), Math.floor(q.y)); }); assert.equal(fim, true);
+  await clicarPessoa(p, 'pers-lucya'); await clicarCelula(p, 14, 4);
+  await p.waitForFunction(() => !window.__office.pessoas.find((x) => x.id === 'pers-lucya').caminho.length, null, { timeout: 60000 });
+  const fim = await p.evaluate(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-lucya'); return window.__office.grade.livre(Math.floor(q.x), Math.floor(q.y)); }); assert.equal(fim, true);
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
-test('o personagem reflete o estado REAL do agente: ao executar, vai ao posto e digita; com erro, mostra erro; sem trabalho, não encena', async () => {
+test('o personagem reflete o estado REAL do agente: ao executar, vai ao posto e digita; com erro, mostra erro; estados sociais; sem trabalho, não encena', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  // quieto (disponível): ninguém anda sozinho
   const parado = await p.evaluate(async () => { const o = window.__office; const a = o.listaPessoas().map((x) => `${x.x},${x.y}`); await new Promise((r) => setTimeout(r, 1500)); return JSON.stringify(a) === JSON.stringify(o.listaPessoas().map((x) => `${x.x},${x.y}`)); });
   assert.ok(parado, 'sem tarefa, ninguém se mexe sozinho');
-  // tira a Isabela do posto e finge, no NAVEGADOR, a resposta do servidor "executando" (o estado real vem de /agentes)
-  await clicarPessoa(p, 'pers-isabela'); await clicarCelula(p, 8, 14);
-  await p.waitForFunction(() => !window.__office.pessoas.find((x) => x.id === 'pers-isabela').caminho.length, null, { timeout: 30000 });
-  await p.route('**/api/commerce/agentes', async (rota) => { const r = await rota.fetch(); const j = await r.json(); for (const a of j) if (a.chave === 'isabela') a.estado = 'executando'; await rota.fulfill({ response: r, json: j }); });
-  await p.waitForFunction(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-isabela'); return q.noPosto && Math.floor(q.x) === 3 && Math.floor(q.y) === 13; }, null, { timeout: 45000 });
-  const anim = await p.evaluate(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-isabela'); return o.estadoAnimacao(q); }); assert.equal(anim, 'typing');
-  await p.unroute('**/api/commerce/agentes');
-  await p.route('**/api/commerce/agentes', async (rota) => { const r = await rota.fetch(); const j = await r.json(); for (const a of j) if (a.chave === 'isabela') a.estado = 'com_erro'; await rota.fulfill({ response: r, json: j }); });
-  await p.waitForFunction(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-isabela')) === 'error'; }, null, { timeout: 15000 });
+  // tira a Sophia do posto e altera, no NAVEGADOR, a resposta do servidor (o estado real vem de /equipe)
+  await clicarPessoa(p, 'pers-sophia'); await clicarCelula(p, 14, 7);
+  await p.waitForFunction(() => !window.__office.pessoas.find((x) => x.id === 'pers-sophia').caminho.length, null, { timeout: 30000 });
+  const mudar = (campos) => p.route('**/api/commerce/equipe', async (rota) => { const r = await rota.fetch(); const j = await r.json(); for (const a of j.agentes) if (a.chave === 'sophia') Object.assign(a, campos); await rota.fulfill({ response: r, json: j }); });
+  await mudar({ estado: 'executando' });
+  await p.waitForFunction(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-sophia'); return q.noPosto && Math.floor(q.x) === 14 && Math.floor(q.y) === 10; }, null, { timeout: 45000 });
+  assert.equal(await p.evaluate(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-sophia')); }), 'typing');
+  await p.unroute('**/api/commerce/equipe'); await mudar({ estado: 'com_erro' });
+  await p.waitForFunction(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-sophia')) === 'error'; }, null, { timeout: 15000 });
   assert.match(await p.locator('.o-agentes-mini').innerHTML(), /vermelho/);
+  await p.unroute('**/api/commerce/equipe'); await mudar({ estado: 'disponivel', estadoSocial: 'preocupado' });
+  await p.waitForFunction(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-sophia')) === 'worried'; }, null, { timeout: 15000 });
+  await p.unroute('**/api/commerce/equipe'); await mudar({ estado: 'disponivel', estadoSocial: 'comemorando' });
+  await p.waitForFunction(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-sophia')) === 'celebrating'; }, null, { timeout: 15000 });
+  await p.unroute('**/api/commerce/equipe'); await mudar({ estado: 'disponivel', estadoDesde: new Date(Date.now() - 20 * 60000).toISOString() });
+  await p.waitForFunction(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-sophia')) === 'resting'; }, null, { timeout: 15000 });
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
 test('tarefas: criar, não duplicar, e despachar sem IA configurada mostra o erro real sem alterar a tarefa', async () => {
   const { p, ctx } = await abrir(); await esperarEscritorio(p);
-  await aba(p, 'Agentes'); await painel(p).locator('button', { hasText: 'Arthur' }).first().click();
+  await aba(p, 'Agentes'); await painel(p).locator('button', { hasText: 'Lady Iris' }).first().click();
   await painel(p).getByPlaceholder(/Pesquisar 5 fones/).fill('Pesquisar fones bluetooth');
   await painel(p).getByRole('button', { name: 'Criar e executar agora' }).click();
   await p.waitForFunction(() => /Nenhuma IA está configurada/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 10000 });
@@ -212,16 +219,16 @@ test('Office Builder: colocar objeto com validação, desfazer/refazer, pintar p
   assert.match(await p.locator('.o-barra-constr').textContent(), /não salvas/);
   // piso
   await p.getByRole('button', { name: '🟫 Piso' }).click(); await p.locator('.o-chip', { hasText: 'Madeira' }).first().click();
-  await clicarCelula(p, 15, 22); const piso = await p.evaluate(() => window.__office.layout.piso[22 * 34 + 15]); assert.equal(piso, 'madeira');
+  await clicarCelula(p, 26, 12); const piso = await p.evaluate(() => window.__office.layout.piso[12 * 34 + 26]); assert.equal(piso, 'madeira');
   // computador só sobre mesa
   await p.locator('.o-ferramentas button', { hasText: 'Objeto' }).click(); await p.locator('.o-grade-lib button', { hasText: 'Computador' }).first().click();
-  await clicarCelula(p, 20, 6); await p.waitForFunction(() => /Precisa ficar sobre uma mesa/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
+  await clicarCelula(p, 19, 7); await p.waitForFunction(() => /Precisa ficar sobre uma mesa/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
   // salvar
   await p.getByRole('button', { name: 'Salvar layout' }).first().click(); await p.waitForFunction(() => /Layout salvo/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 10000 });
   assert.match(await p.locator('.o-nome-layout').textContent(), /v2/);
   await p.reload(); await esperarEscritorio(p);
   assert.equal(await p.evaluate(() => window.__office.layout.objetos.length), n0 + 1, 'o objeto colocado persistiu');
-  assert.equal(await p.evaluate(() => window.__office.layout.piso[22 * 34 + 15]), 'madeira');
+  assert.equal(await p.evaluate(() => window.__office.layout.piso[12 * 34 + 26]), 'madeira');
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
@@ -231,17 +238,17 @@ test('Office Builder: paredes, portas e colisão alteram a navegação de verdad
   const caminho = (de, para) => p.evaluate(([a, b]) => { const o = window.__office; return o.camaminho ? null : null; }, [de, para]);
   void caminho;
   // colisão manual numa célula do corredor muda a grade
-  await p.getByRole('button', { name: '⛔ Colisão' }).click(); await clicarCelula(p, 6, 9);
-  assert.equal(await p.evaluate(() => window.__office.grade.livre(6, 9)), false); assert.equal(await p.evaluate(() => window.__office.layout.colisoes.length), 1);
-  await p.keyboard.press('Control+z'); assert.equal(await p.evaluate(() => window.__office.grade.livre(6, 9)), true);
+  await p.getByRole('button', { name: '⛔ Colisão' }).click(); await clicarCelula(p, 16, 7);
+  assert.equal(await p.evaluate(() => window.__office.grade.livre(16, 7)), false); assert.equal(await p.evaluate(() => window.__office.layout.colisoes.length), 1);
+  await p.keyboard.press('Control+z'); assert.equal(await p.evaluate(() => window.__office.grade.livre(16, 7)), true);
   // parede + porta
   const w0 = await p.evaluate(() => window.__office.layout.paredes.length);
-  await p.getByRole('button', { name: '🧱 Parede' }).click(); const c = cel(18, 7); const pt = await pontoMundo(p, c.x, c.y - 8); await p.mouse.click(pt.x, pt.y);
+  await p.getByRole('button', { name: '🧱 Parede' }).click(); const c = cel(16, 7); const pt = await pontoMundo(p, c.x, c.y - 8); await p.mouse.click(pt.x, pt.y);
   assert.ok((await p.evaluate(() => window.__office.layout.paredes.length)) >= w0 + 1, 'parede criada');
-  // seleciona o computador do Arthur e vê a estação ligada por id
-  await p.getByRole('button', { name: '🖱 Selecionar / mover' }).click(); const pc = await pontoObjeto(p, 'pc-arthur'); await p.mouse.click(pc.x, pc.y);
+  // seleciona o monitor da Eleonor e vê a estação ligada por id
+  await p.getByRole('button', { name: '🖱 Selecionar / mover' }).click(); const pc = await pontoObjeto(p, 'mon-eleonor'); await p.mouse.click(pc.x, pc.y);
   await p.waitForFunction(() => /Estação \(liga o objeto a uma função real\)/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 8000 });
-  const est = await p.evaluate(() => window.__office.layout.estacoes.find((e) => e.objetoId === 'pc-arthur')); assert.ok(est.agenteId && est.pontoTrabalho, JSON.stringify(est));
+  const est = await p.evaluate(() => window.__office.layout.estacoes.find((e) => e.objetoId === 'mon-eleonor')); assert.ok(est.agenteId && est.pontoTrabalho, JSON.stringify(est));
   // visualização: painéis somem (há alterações não salvas: o app pergunta antes de sair da edição)
   p.once('dialog', (d) => d.accept());
   await p.getByRole('button', { name: 'Visualização' }).click(); await p.waitForFunction(() => !document.querySelector('.o-lateral'), null, { timeout: 5000 });
@@ -290,13 +297,13 @@ test('personagens: importa spritesheet, define quadros e animações por estado,
   const a2 = painel(p).locator('.o-anim').nth(1); await a2.locator('input').first().fill('digitando'); await a2.locator('select').first().selectOption('typing'); await a2.locator('.o-campo', { hasText: /^Linha/ }).locator('input').fill('1'); await a2.locator('.o-campo', { hasText: /^Quadros/ }).locator('input').fill('0,1,2,3');
   await painel(p).getByRole('button', { name: 'Criar personagem' }).click(); await p.waitForFunction(() => /Personagem salvo/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
   const ag0 = await p.evaluate(async () => (await (await fetch('/api/commerce/agentes', { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } })).json())[0]);
-  await painel(p).locator('.o-item', { hasText: 'Helena' }).locator('select').selectOption({ index: 1 });
-  await p.waitForFunction(() => /Aparência de Helena atualizada/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
-  await p.waitForFunction(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-helena'); o.sheetDe(q); return q.sheetKey.startsWith('imp:'); }, null, { timeout: 15000 });
+  await painel(p).locator('.o-item', { hasText: 'Eleonor' }).locator('select').selectOption({ index: 1 });
+  await p.waitForFunction(() => /Aparência de Eleonor atualizada/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
+  await p.waitForFunction(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-eleonor'); o.sheetDe(q); return q.sheetKey.startsWith('imp:'); }, null, { timeout: 15000 });
   const ag1 = await p.evaluate(async () => (await (await fetch('/api/commerce/agentes', { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } })).json())[0]);
   assert.equal(ag1.nome, ag0.nome); assert.equal(ag1.cargo, ag0.cargo); assert.equal(ag1.botId, ag0.botId); assert.notEqual(ag1.avatarId, null);
-  await painel(p).locator('.o-item', { hasText: 'Helena' }).locator('select').selectOption('');   // volta ao provisório
-  await p.waitForFunction(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-helena'); o.sheetDe(q); return q.sheetKey.startsWith('proc:'); }, null, { timeout: 15000 });
+  await painel(p).locator('.o-item', { hasText: 'Eleonor' }).locator('select').selectOption('');   // volta ao provisório
+  await p.waitForFunction(() => { const o = window.__office; const q = o.pessoas.find((x) => x.id === 'pers-eleonor'); o.sheetDe(q); return q.sheetKey.startsWith('proc:'); }, null, { timeout: 15000 });
   assert.deepEqual(p.erros, []); await ctx.close();
 });
 
@@ -315,5 +322,57 @@ test('desempenho: poucos sprites por quadro, custo de CPU baixo e FPS aceitável
   const m = await p.evaluate(async () => { const o = window.__office; let n = 0; const t0 = performance.now(); await new Promise((res) => { const f = () => { n++; if (performance.now() - t0 > 2000) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }); const heap = performance.memory?.usedJSHeapSize ?? 0; return { fps: n / ((performance.now() - t0) / 1000), sprites: o.totalSprites, heapMb: Math.round(heap / 1048576) }; });
   console.log(`# desempenho do escritório: ${m.fps.toFixed(0)} FPS (WebGL por software), ${m.sprites} sprites, heap ${m.heapMb} MB`);
   assert.ok(m.fps >= 12, `FPS: ${m.fps}`); assert.ok(m.sprites < 2500, `sprites: ${m.sprites}`); if (m.heapMb) assert.ok(m.heapMb < 300, `heap ${m.heapMb} MB`);
+  assert.deepEqual(p.erros, []); await ctx.close();
+});
+
+const apiGet = (p, rota) => p.evaluate(async (r) => (await fetch(`/api/commerce${r}`, { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } })).json(), rota);
+
+test('TESTE DE ACEITAÇÃO 2.1: o chefe dá UMA ordem, a equipe se reúne, conversa por nuvens de diálogo, executa tarefas reais e tudo persiste (IA SIMULADA só para testar a orquestração)', async () => {
+  const { p, ctx } = await abrir(); await esperarEscritorio(p); await p.waitForSelector('[data-testid="caixa-chefe"]');
+  await p.evaluate(() => window.__office.camera.ajustar());
+  const ordem = 'Equipe, quero encontrar um produto com potencial de venda no TikTok Shop, desenvolver uma campanha e analisar a rentabilidade.';
+  await p.fill('[data-testid="caixa-chefe"] input', ordem); await p.getByRole('button', { name: 'Dar ordem' }).click();
+  // 1) ordem recebida: a caixa trava e mostra as etapas; não há chat individual com ninguém
+  await p.waitForSelector('.o-chefe-etapas', { timeout: 10000 }); assert.equal(await p.locator('[data-testid="caixa-chefe"] input').isDisabled(), true);
+  // 2) a equipe se reúne na mesa (assentos) e as nuvens de diálogo aparecem sobre os personagens certos, dentro da tela e sem se sobrepor
+  await p.waitForFunction(() => window.__office.listaPessoas().length && window.__office.pessoas.filter((q) => q.reuniao).length >= 3 && window.__office.pessoas.filter((q) => q.reuniao).every((q) => !q.caminho.length), null, { timeout: 40000 });
+  const anims = await p.evaluate(() => window.__office.pessoas.filter((q) => q.reuniao).map((q) => window.__office.estadoAnimacao(q))); assert.ok(anims.every((a) => ['meeting', 'meeting-talking'].includes(a)), JSON.stringify(anims));
+  await p.waitForFunction(() => document.querySelectorAll('[data-testid="balao"]').length >= 2, null, { timeout: 40000 });
+  const geo = await p.evaluate(() => { const c = window.__office.app.canvas.getBoundingClientRect(); const r = [...document.querySelectorAll('[data-testid="balao"]')].map((e) => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, t: e.dataset.tipo, agente: e.dataset.agente }; }); return { c: { x: c.x, y: c.y, w: c.width, h: c.height }, r }; });
+  for (const b of geo.r) { assert.ok(b.x >= geo.c.x - 1 && b.y >= geo.c.y - 1 && b.x + b.w <= geo.c.x + geo.c.w + 1 && b.y + b.h <= geo.c.y + geo.c.h + 1, `balão fora da tela: ${JSON.stringify(b)}`); }
+  for (let i = 0; i < geo.r.length; i++) for (let j = i + 1; j < geo.r.length; j++) { const a = geo.r[i]; const b = geo.r[j]; assert.ok(a.x + a.w <= b.x + 1 || b.x + b.w <= a.x + 1 || a.y + a.h <= b.y + 1 || b.y + b.h <= a.y + 1, `balões sobrepostos: ${JSON.stringify([a, b])}`); }
+  if (SAIDA) await p.screenshot({ path: path.join(SAIDA, 'office-2-reuniao.png') });
+  // 3) a reunião termina, todos voltam ao posto e a ordem chega a "Aguardando aprovação" com tarefas REAIS
+  await p.waitForFunction(() => /Aguardando aprovação/.test(document.querySelector('.o-chefe')?.textContent ?? '') && !window.__office.pessoas.some((q) => q.reuniao), null, { timeout: 120000 }).catch(() => {});
+  await p.waitForFunction(async () => (await (await fetch('/api/commerce/ordens', { headers: { Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` } })).json())[0]?.status === 'aguardando_aprovacao', null, { timeout: 120000 });
+  const ordens = await apiGet(p, '/ordens'); const o = ordens[0];
+  assert.equal(o.responsaveis.length, 4); assert.ok(o.turnos >= 4 && o.turnos <= 8); assert.equal(o.tarefas.length, 4); assert.ok(o.tarefas.every((t) => t.status === 'aguardando_aprovacao')); assert.equal(o.teste, true, 'marcada como execução de teste');
+  assert.equal(await p.evaluate(() => window.__office.pessoas.filter((q) => q.reuniao).length), 0, 'a reunião acabou');
+  // 4) resultados reais registrados (documentos, produto de teste identificado, análise financeira com fonte) e conversas persistidas
+  const docs = await apiGet(p, '/documentos'); assert.ok(docs.length >= 4); assert.ok(docs.some((d) => d.tipo === 'proposta' && d.estrutura)); assert.ok(docs.some((d) => d.classificacao === 'real' && d.fontes.length), 'análise financeira baseada em dado real com fonte'); assert.ok(docs.filter((d) => d.classificacao === 'simulada').length >= 3);
+  const prods = await apiGet(p, '/produtos'); assert.ok(prods.some((x) => /TESTE/.test(x.origem)));
+  const msgs = await apiGet(p, '/mensagens'); assert.ok(msgs.some((m) => m.tipo === 'discordancia') && msgs.some((m) => m.tipo === 'conclusao') && msgs[0].tipo === 'ordem');
+  // 5) o chefe aprova os resultados e a ordem conclui; depois de recarregar, tudo continua lá e as nuvens NÃO reaparecem
+  await aba(p, 'Equipe'); await p.waitForFunction(() => /Aguardando aprovação/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 15000 });
+  for (const t of o.tarefas) await p.evaluate(async (id) => fetch(`/api/commerce/tarefas/${id}/revisar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('codeniac.token')}` }, body: JSON.stringify({ aprovar: true }) }), t.id);
+  assert.equal((await apiGet(p, '/ordens'))[0].status, 'concluida');
+  await p.reload(); await esperarEscritorio(p); await aba(p, 'Conversas');
+  await p.waitForFunction(() => /Simulada \(teste\)/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? '') && /discordancia/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 15000 });
+  assert.match(await painel(p).textContent(), /Equipe, quero encontrar um produto/); assert.equal(await p.locator('[data-testid="balao"]').count(), 0, 'o histórico não vira nuvem de novo');
+  await aba(p, 'Documentos'); await p.waitForFunction(() => /Análise financeira/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 15000 });
+  assert.deepEqual(p.erros, []); await ctx.close();
+});
+
+test('Estoque: Lucya/chefe lançam movimentos reais; saída acima do saldo é recusada; divergência registra esperado × contado; tudo persiste', async () => {
+  const { p, ctx } = await abrir(); await esperarEscritorio(p); await aba(p, 'Estoque');
+  await painel(p).locator('.o-campo', { hasText: /^Nome/ }).locator('input').fill('Caixa M'); await painel(p).locator('.o-campo', { hasText: /^Saldo inicial/ }).locator('input').fill('10'); await painel(p).getByRole('button', { name: 'Cadastrar', exact: true }).click();
+  await p.waitForFunction(() => /Item cadastrado/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
+  await painel(p).locator('.o-campo', { hasText: /^Item/ }).locator('select').selectOption({ index: 1 }); await painel(p).locator('.o-campo', { hasText: /^Tipo/ }).locator('select').selectOption('saida');
+  await painel(p).locator('.o-campo', { hasText: /^Quantidade/ }).locator('input').fill('99'); await painel(p).getByRole('button', { name: 'Registrar', exact: true }).click();
+  await p.waitForFunction(() => /maior que o saldo/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
+  await painel(p).locator('.o-campo', { hasText: /^Quantidade/ }).locator('input').fill('4'); await painel(p).getByRole('button', { name: 'Registrar', exact: true }).click();
+  await p.waitForFunction(() => /Movimento registrado/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 8000 });
+  const e = await apiGet(p, '/estoque'); assert.equal(e.itens[0].quantidade, 6); assert.equal(e.movimentos.length, 2);
+  await p.reload(); await esperarEscritorio(p); await aba(p, 'Estoque'); await p.waitForFunction(() => /Caixa M/.test(document.querySelector('.o-lateral-corpo')?.textContent ?? ''), null, { timeout: 10000 });
   assert.deepEqual(p.erros, []); await ctx.close();
 });

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { api, conversar, type Agente, type Tarefa } from './api';
+import { useState } from 'react';
+import { api, type Agente, type Tarefa } from './api';
 import { Botao, Campo, Cartao, DEPARTAMENTOS, ESTADO_ROTULO, Entrada, Etiqueta, Seletor, Texto, Vazio, corEstado, erroTexto, quando } from './kit';
 
 /** Perfil do funcionário de IA: estado real, tarefa atual, histórico, conversa e atribuição de tarefas. */
-export function PainelAgente({ agente, tarefas, aoMudar, aviso }: { agente: Agente; tarefas: Tarefa[]; aoMudar: () => void; aviso: (t: string) => void }) {
+export function PainelAgente({ agente, tarefas, aoMudar, aviso, abrirConversas }: { agente: Agente; tarefas: Tarefa[]; aoMudar: () => void; aviso: (t: string) => void; abrirConversas?: (agenteId: string) => void }) {
   const minhas = tarefas.filter((t) => t.agenteId === agente.id);
   const atual = minhas.find((t) => t.id === agente.tarefaAtual) ?? minhas.find((t) => t.status === 'em_execucao');
   const [editando, setEditando] = useState(false);
@@ -28,7 +28,20 @@ export function PainelAgente({ agente, tarefas, aoMudar, aviso }: { agente: Agen
       <Cartao titulo="Tarefas deste agente">
         {minhas.length ? minhas.slice(0, 12).map((t) => <LinhaTarefa key={t.id} t={t} aoMudar={aoMudar} aviso={aviso} />) : <Vazio>Sem tarefas ainda.</Vazio>}
       </Cartao>
-      <ChatAgente agente={agente} />
+      <Cartao titulo="Personalidade e perfil">
+        {agente.perfil?.temperamento ? <p><b>Temperamento:</b> {agente.perfil.temperamento}</p> : null}
+        {agente.perfil?.tom ? <p><b>Tom de comunicação:</b> {agente.perfil.tom}</p> : null}
+        {agente.perfil?.especialidade ? <p><b>Especialidade:</b> {agente.perfil.especialidade}</p> : null}
+        {agente.perfil?.objetivos?.length ? <ul className="o-lista">{agente.perfil.objetivos.map((o) => <li key={o}>{o}</li>)}</ul> : null}
+        {agente.memoria?.length ? <details><summary>Memória de trabalho ({agente.memoria.length})</summary><ul className="o-lista">{agente.memoria.slice(-8).map((m, i) => <li key={i}>{m}</li>)}</ul></details> : null}
+      </Cartao>
+      <Cartao titulo="Relacionamentos profissionais">
+        {agente.relacionamentos?.length ? <ul className="o-lista">{agente.relacionamentos.map((r) => <li key={r.agenteId}><b>{r.nome}</b>: {r.descricao} <small>· {r.colaboracoes} colaborações, {r.discordancias} discordâncias</small></li>)}</ul> : <Vazio>Ainda sem histórico com os colegas. As relações nascem do trabalho em conjunto.</Vazio>}
+      </Cartao>
+      <Cartao titulo="Conversas">
+        <p className="o-mut">Você não conversa individualmente com os funcionários: dê uma ordem pela caixa “Chefe” e acompanhe a equipe. Aqui ficam as conversas internas de {agente.nome}.</p>
+        {abrirConversas && <Botao pequeno onClick={() => abrirConversas(agente.id)}>Ver conversas de {agente.nome}</Botao>}
+      </Cartao>
       <Cartao titulo="Histórico de estados">
         {agente.historico.length ? <ul className="o-lista">{agente.historico.slice(-12).reverse().map((h, i) => <li key={i}><small>{quando(h.em)}</small> {ESTADO_ROTULO[h.de ?? ''] ?? h.de} → <b>{ESTADO_ROTULO[h.para ?? ''] ?? h.para}</b>{h.nota ? <small> · {h.nota}</small> : null}</li>)}</ul> : <Vazio>O histórico aparece quando o agente trabalha.</Vazio>}
       </Cartao>
@@ -38,6 +51,7 @@ export function PainelAgente({ agente, tarefas, aoMudar, aviso }: { agente: Agen
 
 function EditarAgente({ agente, aoSalvar, aviso }: { agente: Agente; aoSalvar: () => void; aviso: (t: string) => void }) {
   const [f, setF] = useState({ nome: agente.nome, cargo: agente.cargo, departamento: agente.departamento, instrucoes: agente.instrucoes, personalidade: agente.personalidade, modelo: agente.modelo });
+  const [pf, setPf] = useState({ tom: agente.perfil?.tom ?? '', especialidade: agente.perfil?.especialidade ?? '', temperamento: agente.perfil?.temperamento ?? '', objetivos: (agente.perfil?.objetivos ?? []).join('\n') });
   return (
     <Cartao titulo="Editar funcionário">
       <Campo rotulo="Nome"><Entrada value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} maxLength={40} /></Campo>
@@ -46,7 +60,11 @@ function EditarAgente({ agente, aoSalvar, aviso }: { agente: Agente; aoSalvar: (
       <Campo rotulo="Instruções do agente" dica="Define como ele trabalha. Ferramentas e permissões continuam as do sistema."><Texto rows={5} value={f.instrucoes} onChange={(e) => setF({ ...f, instrucoes: e.target.value })} maxLength={2000} /></Campo>
       <Campo rotulo="Personalidade"><Seletor value={f.personalidade} onChange={(e) => setF({ ...f, personalidade: e.target.value })}>{['profissional', 'amigavel', 'divertido', 'mentor', 'zen', 'nerd'].map((p) => <option key={p}>{p}</option>)}</Seletor></Campo>
       <Campo rotulo="Modelo de IA" dica="'padrao' usa a IA configurada em Configurações → Assistente."><Seletor value={f.modelo} onChange={(e) => setF({ ...f, modelo: e.target.value })}>{['padrao', 'gemini', 'groq', 'claude'].map((p) => <option key={p}>{p}</option>)}</Seletor></Campo>
-      <Botao primario onClick={async () => { try { await api.put(`/agentes/${agente.id}`, f); aviso('Funcionário atualizado'); aoSalvar(); } catch (e) { aviso(erroTexto(e)); } }}>Salvar</Botao>
+      <Campo rotulo="Temperamento"><Entrada value={pf.temperamento} onChange={(e) => setPf({ ...pf, temperamento: e.target.value })} maxLength={300} /></Campo>
+      <Campo rotulo="Tom de comunicação"><Entrada value={pf.tom} onChange={(e) => setPf({ ...pf, tom: e.target.value })} maxLength={300} /></Campo>
+      <Campo rotulo="Especialidade"><Texto rows={2} value={pf.especialidade} onChange={(e) => setPf({ ...pf, especialidade: e.target.value })} maxLength={400} /></Campo>
+      <Campo rotulo="Objetivos profissionais" dica="Um por linha."><Texto rows={3} value={pf.objetivos} onChange={(e) => setPf({ ...pf, objetivos: e.target.value })} /></Campo>
+      <Botao primario onClick={async () => { try { await api.put(`/agentes/${agente.id}`, { ...f, perfil: { tom: pf.tom, especialidade: pf.especialidade, temperamento: pf.temperamento, objetivos: pf.objetivos.split('\n').map((x) => x.trim()).filter(Boolean) } }); aviso('Funcionário atualizado'); aoSalvar(); } catch (e) { aviso(erroTexto(e)); } }}>Salvar</Botao>
     </Cartao>
   );
 }
@@ -94,25 +112,5 @@ export function LinhaTarefa({ t, aoMudar, aviso, agentes }: { t: Tarefa; aoMudar
         </div>
       )}
     </div>
-  );
-}
-
-function ChatAgente({ agente }: { agente: Agente }) {
-  const [conversa, setConversa] = useState<string | null>(null); const [msgs, setMsgs] = useState<{ eu: boolean; texto: string }[]>([]); const [texto, setTexto] = useState(''); const [ocupado, setOcupado] = useState(false); const fim = useRef<HTMLDivElement>(null);
-  useEffect(() => { setMsgs([]); setConversa(null); api.get<{ conversaId: string }>(`/agentes/${agente.id}/conversa`).then((r) => setConversa(r.conversaId)).catch(() => {}); }, [agente.id]);
-  useEffect(() => { if (!conversa) return; api.hub<{ messages: { role: string; text: string }[] }>('GET', `/assistant/conversations/${conversa}`).then((c) => setMsgs((c.messages ?? []).slice(-20).map((m) => ({ eu: m.role === 'user', texto: m.text })))).catch(() => {}); }, [conversa]);
-  useEffect(() => { fim.current?.scrollIntoView({ block: 'end' }); }, [msgs]);
-  const enviar = async (): Promise<void> => {
-    if (!conversa || !texto.trim() || ocupado) return; const t = texto.trim(); setTexto(''); setOcupado(true);
-    setMsgs((m) => [...m, { eu: true, texto: t }, { eu: false, texto: '' }]);
-    try { await conversar(t, conversa, (ev) => { if (ev.type === 'text') setMsgs((m) => { const c = m.slice(); c[c.length - 1] = { eu: false, texto: c[c.length - 1].texto + (ev.text ?? '') }; return c; }); if (ev.type === 'error') setMsgs((m) => { const c = m.slice(); c[c.length - 1] = { eu: false, texto: ev.text ?? 'Erro' }; return c; }); }); }
-    catch (e) { setMsgs((m) => { const c = m.slice(); c[c.length - 1] = { eu: false, texto: erroTexto(e) }; return c; }); }
-    setOcupado(false);
-  };
-  return (
-    <Cartao titulo={`Conversar com ${agente.nome}`}>
-      <div className="o-chat">{msgs.length ? msgs.map((m, i) => <div key={i} className={`o-msg ${m.eu ? 'eu' : ''}`}>{m.texto || '…'}</div>) : <Vazio>Converse com {agente.nome}. É o mesmo chat do Hub, com as ferramentas do escritório.</Vazio>}<div ref={fim} /></div>
-      <div className="o-linha"><Entrada value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && enviar()} placeholder={`Mensagem para ${agente.nome}…`} disabled={!conversa || ocupado} /><Botao primario onClick={enviar} disabled={!conversa || ocupado || !texto.trim()}>Enviar</Botao></div>
-    </Cartao>
   );
 }

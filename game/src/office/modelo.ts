@@ -20,6 +20,7 @@ export interface Layout {
   paredes: ParedeLayout[]; objetos: ObjetoLayout[]; colisoes: { x: number; y: number }[];
   personagens: PersonagemLayout[]; departamentos: DepartamentoLayout[]; estacoes: EstacaoLayout[];
   camadas?: Record<string, boolean>;
+  meta?: { padrao?: string };            // marca o layout padrão de fábrica (ex.: "2.1")
 }
 
 export const layoutVazio = (largura = 24, altura = 18, piso = 'madeira'): Layout => ({

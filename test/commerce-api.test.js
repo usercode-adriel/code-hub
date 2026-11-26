@@ -44,7 +44,7 @@ test('exige login; cada usuário só vê os próprios dados', async () => {
 
 test('estado geral: agentes criados, módulos com situação honesta (operacional/pendente)', async () => {
   const e = (await A('GET', '/estado')).corpo;
-  assert.deepEqual(e.agentes.map((a) => a.nome), ['Helena', 'Arthur', 'Sofia', 'Isabela', 'Marina']);
+  assert.deepEqual(e.agentes.map((a) => a.nome), ['Eleonor', 'Lady Iris', 'Sophia', 'Laurinda', 'Lucya']);
   const sit = Object.fromEntries(e.status.map((s) => [s.modulo, s.situacao]));
   assert.match(sit['TikTok Shop / Shopee / Temu — API'], /pendente/); assert.match(sit['Editor de Vídeo e Video Cut'], /pendente/); assert.match(sit['Importação de relatórios CSV'], /operacional/);
   assert.equal(e.conectores.length, 3);
@@ -136,4 +136,19 @@ test('personagens: spritesheet com animações por estado e troca de aparência 
 test('regressão: rotas do Hub continuam respondendo', async () => {
   for (const rota of ['/api/health', '/api/tech-news']) assert.equal((await fetch(`${BASE}${rota}`, { headers: { Authorization: `Bearer ${tokA}` } })).status, 200);
   assert.equal((await fetch(`${BASE}/api/projects`, { headers: { Authorization: `Bearer ${tokA}` } })).status, 200);
+});
+
+test('equipe 2.1 pela API: ordem sem IA é recusada com explicação; estoque, documentos e config funcionam e são isolados por usuário', async () => {
+  const eq = await A('GET', '/equipe'); assert.equal(eq.status, 200); assert.equal(eq.corpo.agentes.length, 5); assert.equal(eq.corpo.modoIA, 'local'); assert.equal(eq.corpo.ordemAtiva, null);
+  assert.ok(eq.corpo.agentes.every((a) => a.perfil.tom && Array.isArray(a.relacionamentos)));
+  const o = await A('POST', '/ordens', { texto: 'Equipe, encontrem um produto para o TikTok Shop' }); assert.equal(o.status, 409); assert.match(o.corpo.error, /Nenhuma IA está configurada/);
+  assert.equal((await A('POST', '/ordens', { texto: 'x' })).status, 400); assert.equal((await A('GET', '/ordens')).corpo.length, 0); assert.equal((await A('GET', '/mensagens')).corpo.length, 0);
+  assert.equal((await A('PUT', '/equipe/config', { maxTurnos: 99, limiteChamadasDia: 1, balaoSegundos: 9 })).corpo.maxTurnos, 12, 'limites são travados');
+  const it = await A('POST', '/estoque/itens', { nome: 'Caixa P', quantidade: 5, minimo: 2 }); assert.equal(it.status, 200);
+  assert.equal((await A('POST', '/estoque/movimentos', { itemId: it.corpo.id, tipo: 'saida', quantidade: 9 })).status, 409);
+  assert.equal((await A('POST', '/estoque/movimentos', { itemId: it.corpo.id, tipo: 'saida', quantidade: 2 })).corpo.saldoApos, 3);
+  assert.equal((await B('GET', '/estoque')).corpo.itens.length, 0, 'o outro usuário não vê o estoque');
+  assert.equal((await A('POST', '/documentos', { titulo: 'R', texto: 'x', classificacao: 'real' })).status, 400, 'real exige fonte');
+  assert.equal((await A('POST', '/documentos', { titulo: 'Plano', texto: 'x' })).corpo.classificacao, 'sugestao_ia'); assert.equal((await B('GET', '/documentos')).corpo.length, 0);
+  assert.equal((await A('GET', '/layouts/ativo')).status, 200);
 });

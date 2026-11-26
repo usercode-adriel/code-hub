@@ -5,6 +5,8 @@ import { registerTools } from '../agent.js';
 import { area, txt, hoje } from './store.js';
 import { criarProduto, listarProdutos, criarTarefa, listarTarefas, criarCampanha, listarCampanhas, adicionarItemCampanha, atualizarCampanha, DEPARTAMENTOS } from './dados.js';
 import { resumo, PLATAFORMAS } from './finance.js';
+import { criarDocumento, listarDocumentos, TIPOS_DOC, CLASSIFICACOES } from './documentos.js';
+import { listarItens, cadastrarItem, movimentar, TIPOS_MOV } from './estoque.js';
 
 const S = (type, description, extra = {}) => ({ type, description, ...extra });
 const OBJ = (properties, required = []) => ({ type: 'OBJECT', properties, required });
@@ -82,6 +84,47 @@ registerTools({
         if (a.acao === 'etapa') { atualizarCampanha(uid, c.id, { etapa: a.etapa }); return { result: { ok: true, etapa: a.etapa } }; }
       } catch (e) { return { error: e.message }; }
       return { error: 'Ação desconhecida.' };
+    },
+  },
+});
+
+const tarefaDe = (ctx) => { const ag = agenteDe(ctx); return ag?.tarefaAtual ? area(ctx.user.id).tarefas.find((t) => t.id === ag.tarefaAtual) || null : null; };
+registerTools({
+  commerce_documentos: {
+    area: 'commerce',
+    description: 'Registra e lista DOCUMENTOS reais do escritório: roteiro, proposta estruturada, relatório, análise ou pesquisa. Sempre classifique a informação: "real" (veio de dados do Hub ou de fonte citada — exige fontes), "estimada" (cálculo/projeção), "sugestao_ia" (ideia/opinião sem comprovação). Nunca invente números.',
+    parameters: OBJ({
+      acao: S('STRING', 'listar ou criar', { enum: ['listar', 'criar'] }), tipo: S('STRING', 'Tipo do documento', { enum: TIPOS_DOC }), titulo: S('STRING', 'Título'), texto: S('STRING', 'Conteúdo completo em texto'),
+      classificacao: S('STRING', 'Natureza da informação', { enum: CLASSIFICACOES.filter((c) => c !== 'simulada') }), fontes: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Fontes (links ou nomes dos dados do Hub) — obrigatório para "real"' },
+      objetivo: S('STRING', 'Proposta: objetivo'), publico: S('STRING', 'Proposta: público'), orcamento: S('STRING', 'Proposta: orçamento (estimado)'), riscos: S('STRING', 'Proposta: riscos'), proximos_passos: S('STRING', 'Proposta: próximos passos'),
+      produto_id: S('STRING', 'ID do produto relacionado (opcional)'), campanha_id: S('STRING', 'ID da campanha relacionada (opcional)'),
+    }, ['acao']),
+    run(ctx, a) {
+      if (a.acao === 'listar') return { result: { documentos: listarDocumentos(ctx.user.id).slice(0, 20).map((d) => ({ id: d.id, tipo: d.tipo, titulo: d.titulo, classificacao: d.classificacao, autor: d.autor })) } };
+      try {
+        const t = tarefaDe(ctx);
+        const d = criarDocumento(ctx.user.id, { tipo: a.tipo, titulo: a.titulo, texto: a.texto, classificacao: a.classificacao, fontes: a.fontes, autorAgenteId: agenteDe(ctx)?.id, autor: quem(ctx), tarefaId: t?.id, ordemId: t?.ordemId, produtoId: a.produto_id, campanhaId: a.campanha_id,
+          estrutura: { objetivo: a.objetivo, publico: a.publico, orcamento: a.orcamento, riscos: a.riscos, proximosPassos: a.proximos_passos } });
+        return { result: { id: d.id, titulo: d.titulo, classificacao: d.classificacao }, summary: `Documento registrado: ${d.titulo}` };
+      } catch (e) { return { error: e.message }; }
+    },
+  },
+  commerce_estoque: {
+    area: 'commerce',
+    description: 'Controle de estoque da Sala de Estoque e Logística. "listar" mostra itens e saldos; "cadastrar" cria um item; "movimentar" registra entrada, saída, ajuste (informe o saldo correto e o motivo) ou divergência (quantidade CONTADA e a descrição). Registre só o que realmente aconteceu ou foi informado; nunca invente saldos.',
+    parameters: OBJ({
+      acao: S('STRING', 'listar, cadastrar ou movimentar', { enum: ['listar', 'cadastrar', 'movimentar'] }), item: S('STRING', 'ID, SKU ou nome do item'), nome: S('STRING', 'Nome do item novo'), sku: S('STRING', 'SKU (opcional)'),
+      quantidade: S('NUMBER', 'Quantidade (saldo inicial no cadastro; quantidade do movimento)'), minimo: S('NUMBER', 'Estoque mínimo (cadastro)'), local: S('STRING', 'Local/prateleira (cadastro)'),
+      tipo: S('STRING', 'Tipo do movimento', { enum: TIPOS_MOV }), motivo: S('STRING', 'Motivo / descrição da divergência / pedido ou nota'),
+    }, ['acao']),
+    run(ctx, a) {
+      const uid = ctx.user.id;
+      if (a.acao === 'listar') return { result: { itens: listarItens(uid).slice(0, 60).map((i) => ({ id: i.id, sku: i.sku, nome: i.nome, quantidade: i.quantidade, minimo: i.minimo, local: i.local, abaixoDoMinimo: i.abaixoDoMinimo })) } };
+      try {
+        if (a.acao === 'cadastrar') { const it = cadastrarItem(uid, { nome: a.nome, sku: a.sku, quantidade: a.quantidade, minimo: a.minimo, local: a.local }, quem(ctx)); return { result: { id: it.id, sku: it.sku, nome: it.nome, quantidade: it.quantidade }, summary: `Item cadastrado: ${it.nome}` }; }
+        const m = movimentar(uid, { item: a.item, tipo: a.tipo, quantidade: a.quantidade, motivo: a.motivo }, quem(ctx));
+        return { result: { movimento: m.id, tipo: m.tipo, saldoApos: m.saldoApos }, summary: `Estoque: ${m.tipo} de ${m.quantidade} em ${m.itemNome} (saldo ${m.saldoApos})` };
+      } catch (e) { return { error: e.message }; }
     },
   },
 });

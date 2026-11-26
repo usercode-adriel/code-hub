@@ -3,7 +3,7 @@
 import { area, auditar, erro, txt, numero, id, now, save } from './store.js';
 import { obter as obterAsset } from './assets.js';
 
-export const ESTADOS_ANIM = ['idle', 'walking', 'sitting', 'typing', 'thinking', 'talking', 'working', 'celebrating', 'error'];
+export const ESTADOS_ANIM = ['idle', 'walking', 'sitting', 'typing', 'thinking', 'talking', 'working', 'celebrating', 'error', 'resting', 'worried', 'meeting', 'meeting-talking'];
 export const DIRECOES = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];
 
 function limpar(b, asset) {

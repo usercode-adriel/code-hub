@@ -970,6 +970,18 @@ export async function geminiJSON(prompt, maxTokens = 3000, temperature = 0.5) {
   return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, ''));
 }
 
+// Geração curta para os agentes do Commerce Office (falas de equipe, plano de ordens): usa a IA da nuvem configurada, sem ferramentas
+// e sem gravar nada como memória do usuário. Sem IA na nuvem, falha com mensagem clara (o chamador não finge que gerou).
+export async function gerarTexto({ system, prompt, json = false, maxTokens = 500, temperature = 0.8, bot = null }) {
+  if (!hasCloud()) throw Object.assign(new Error('Nenhuma IA na nuvem configurada. Em Configurações → Assistente conecte Gemini, Groq ou OpenRouter para os agentes conversarem.'), { status: 409 });
+  const out = await llmCall({
+    ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature, maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
+  }, () => {}, false, bot);
+  return String(out || '').trim();
+}
+
 // Texto escrito pela IA no estilo do personagem, a partir de uma instrução e dos dados (null se não houver Gemini).
 export async function aiWrite(user, bot, instruction, data = '', maxTokens = 1500) {
   if (!hasCloud()) return null;

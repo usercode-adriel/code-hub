@@ -2,8 +2,10 @@
 // e uma lista de animações associadas a estados e direções. As animações refletem o estado REAL do agente: nada é encenado.
 import { DIRECOES, type Direcao } from './iso';
 
-export type EstadoAnim = 'idle' | 'walking' | 'sitting' | 'typing' | 'thinking' | 'talking' | 'working' | 'celebrating' | 'error';
-export const ESTADOS_ANIM: EstadoAnim[] = ['idle', 'walking', 'sitting', 'typing', 'thinking', 'talking', 'working', 'celebrating', 'error'];
+export type EstadoAnim = 'idle' | 'walking' | 'sitting' | 'typing' | 'thinking' | 'talking' | 'working' | 'celebrating' | 'error' | 'resting' | 'worried' | 'meeting' | 'meeting-talking';
+export const ESTADOS_ANIM: EstadoAnim[] = ['idle', 'walking', 'sitting', 'typing', 'thinking', 'talking', 'working', 'celebrating', 'error', 'resting', 'worried', 'meeting', 'meeting-talking'];
+/** Estados que o personagem mostra sentado (para ajustar a altura do sprite na cadeira). */
+export const ESTADOS_SENTADOS: EstadoAnim[] = ['sitting', 'typing', 'working', 'resting', 'meeting', 'meeting-talking'];
 
 export interface AnimDef { estado: EstadoAnim | null; nome: string; direcao: Direcao | null; linha: number; quadros: number[]; fps: number; loop: boolean }
 export interface SheetDef {
@@ -34,9 +36,16 @@ export function retanguloDoQuadro(def: SheetDef, linha: number, coluna: number):
   return { x: coluna * def.quadroL, y: linha * def.quadroA, w: def.quadroL, h: def.quadroA };
 }
 
-/** Estado do AGENTE (vindo do servidor) → animação. Andar só quando está de fato se movendo. */
-export function estadoParaAnimacao(estadoAgente: string, { noPosto = false, movendo = false }: { noPosto?: boolean; movendo?: boolean } = {}): EstadoAnim {
+/** Atividade social REAL (vem da ordem em andamento no servidor): conversando, reunido, comemorando ou preocupado. */
+export type AtividadeSocial = 'conversando' | 'reunido' | 'comemorando' | 'preocupado' | null;
+export const TEMPO_DESCANSO_MS = 5 * 60 * 1000;
+/** Estado do AGENTE (vindo do servidor) → animação. Andar só quando está de fato se movendo; nada é encenado sem causa real. */
+export function estadoParaAnimacao(estadoAgente: string, { noPosto = false, movendo = false, social = null, naReuniao = false, ociosoMs = 0 }: { noPosto?: boolean; movendo?: boolean; social?: AtividadeSocial; naReuniao?: boolean; ociosoMs?: number } = {}): EstadoAnim {
   if (movendo) return 'walking';
+  if (social === 'comemorando') return 'celebrating';
+  if (social === 'preocupado') return 'worried';
+  if (naReuniao) return social === 'conversando' ? 'meeting-talking' : 'meeting';
+  if (social === 'conversando') return 'talking';
   switch (estadoAgente) {
     case 'planejando': return 'thinking';
     case 'executando': return noPosto ? 'typing' : 'working';
@@ -45,7 +54,7 @@ export function estadoParaAnimacao(estadoAgente: string, { noPosto = false, move
     case 'concluido': return 'celebrating';
     case 'com_erro': return 'error';
     case 'pausado': return 'sitting';
-    default: return 'idle';                      // disponível, aguardando
+    default: return ociosoMs > TEMPO_DESCANSO_MS ? 'resting' : 'idle';       // disponível há muito tempo: descansando; senão aguardando tarefa
   }
 }
 /** Estados em que o agente de fato trabalha e, por isso, vai ao posto de trabalho. */

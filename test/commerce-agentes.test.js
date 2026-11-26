@@ -22,8 +22,8 @@ const executor = (eventos, retorno = 'conv-1') => async (_u, _ag, _prompt, write
 
 test('os cinco agentes iniciais são bots reais do sistema, com nomes e cargos editáveis', () => {
   const ags = Ag.garantirAgentes('e1');
-  assert.deepEqual(ags.map((a) => a.nome), ['Helena', 'Arthur', 'Sofia', 'Isabela', 'Marina']);
-  assert.deepEqual(ags.map((a) => a.departamento), ['diretoria', 'pesquisa', 'produtos', 'marketing', 'audiovisual']);
+  assert.deepEqual(ags.map((a) => a.nome), ['Eleonor', 'Lady Iris', 'Sophia', 'Laurinda', 'Lucya']);
+  assert.deepEqual(ags.map((a) => a.departamento), ['marketing', 'vendas', 'financeiro', 'inovacao', 'estoque']);
   const bots = DB.db().bots.filter((b) => b.userId === 'e1');
   assert.equal(bots.length, 5); assert.ok(bots.every((b) => b.commerceAgent && b.permissions.includes('commerce')));
   assert.equal(Ag.garantirAgentes('e1').length, 5, 'não duplica ao chamar de novo');
@@ -48,12 +48,12 @@ test('ferramentas: registram produto só com origem; financeiro é só leitura; 
   const ctx = { user: user('e3'), bot, conv: null, write: () => {}, actions: [], sources: [] };
   assert.match((await G.callTool(ctx, 'commerce_produtos', { acao: 'registrar', nome: 'Fone' })).error, /origem/);
   const ok = await G.callTool(ctx, 'commerce_produtos', { acao: 'registrar', nome: 'Fone X', preco: 100, comissao_pct: 10, origem: 'https://loja.exemplo/fone', plataforma: 'tiktokshop' });
-  assert.equal(ok.result.comissaoPotencial, 10); assert.match(S.area('e3').produtos[0].origem, /Arthur: https/);
+  assert.equal(ok.result.comissaoPotencial, 10); assert.match(S.area('e3').produtos[0].origem, /Lady Iris: https/);
   assert.match((await G.callTool(ctx, 'commerce_produtos', { acao: 'registrar', nome: 'Y', origem: 'x', avaliacao_nota: 5 })).error, /fonte/);
   const fin = await G.callTool(ctx, 'commerce_financeiro', {}); assert.ok(fin.result.real.indicadores); assert.ok(fin.result.observacao.includes('NÃO'));
-  const sol = await G.callTool(ctx, 'commerce_tarefas', { acao: 'solicitar', nome: 'Analisar comissões', para_agente: 'Sofia', departamento: 'produtos' });
+  const sol = await G.callTool(ctx, 'commerce_tarefas', { acao: 'solicitar', nome: 'Analisar comissões', para_agente: 'Sophia', departamento: 'financeiro' });
   assert.equal(sol.result.status, 'pendente');
-  const t = S.area('e3').tarefas[0]; assert.equal(t.agenteId, ags[2].id); assert.ok(t.historico.some((h) => h.acao === 'solicitada' && h.por === 'Arthur'));
+  const t = S.area('e3').tarefas[0]; assert.equal(t.agenteId, ags[2].id); assert.ok(t.historico.some((h) => h.acao === 'solicitada' && h.por === 'Lady Iris'));
   assert.match((await G.callTool(ctx, 'commerce_tarefas', { acao: 'solicitar', nome: 'x', para_agente: 'Fantasma' })).error, /não encontrado/);
   const semPermissao = { ...ctx, bot: { id: 'z', permissions: ['tarefas'] } };
   assert.match((await G.callTool(semPermissao, 'commerce_produtos', { acao: 'listar' })).error, /Sem permissão/);
@@ -61,12 +61,12 @@ test('ferramentas: registram produto só com origem; financeiro é só leitura; 
 
 test('despacho: o estado do agente segue os eventos reais e o resultado fica registrado aguardando aprovação humana', async () => {
   const ags = Ag.garantirAgentes('e4'); const arthur = ags[1];
-  const t = D.criarTarefa('e4', { nome: 'Pesquisar fones', descricao: 'ver os 3 melhores', agenteId: arthur.id, departamento: 'pesquisa' });
+  const t = D.criarTarefa('e4', { nome: 'Pesquisar fones', descricao: 'ver os 3 melhores', agenteId: arthur.id, departamento: 'vendas' });
   const prompts = [];
   const ex = async (u, ag, prompt, write) => { prompts.push(prompt); for (const e of [{ type: 'typing' }, { type: 'tool', name: 'pesquisar_web' }, { type: 'tool', name: 'commerce_produtos' }, { type: 'text', text: 'Achei 3 fones. ' }, { type: 'text', text: 'Fonte: loja.exemplo' }]) { write(e); await new Promise((r) => setImmediate(r)); } return 'c1'; };
   const r = await Ag.despachar(user('e4'), t.id, { executor: ex, esperar: true });
   assert.equal(r.status, 'aguardando_aprovacao'); assert.equal(r.resultado, 'Achei 3 fones. Fonte: loja.exemplo');
-  assert.match(prompts[0], /Pesquisar fones/); assert.match(prompts[0], /Arthur/);
+  assert.match(prompts[0], /Pesquisar fones/); assert.match(prompts[0], /Lady Iris/);
   const estados = S.area('e4').agentes[1].historico.filter((h) => h.evento === 'estado').map((h) => h.para);
   assert.deepEqual(estados, ['planejando', 'analisando', 'executando', 'concluido'], 'planejando → pesquisa (analisando) → ferramenta (executando) → concluído');
   assert.equal(S.area('e4').agentes[1].tarefaAtual, null);
@@ -101,7 +101,7 @@ test('orquestração: sem duplicidade, sem despachar duas vezes, sem agente paus
   D.criarTarefa('e6', { nome: 'Mapear nichos', agenteId: arthur.id });
   assert.throws(() => Ag.criarTarefaOrquestrada('e6', { nome: 'mapear NICHOS', agenteId: arthur.id }), /duplicadas/);
   assert.equal(Ag.criarTarefaOrquestrada('e6', { nome: 'Mapear nichos', agenteId: helena.id }).agenteId, helena.id, 'mesmo nome em outro agente é permitido');
-  assert.equal(Ag.criarTarefaOrquestrada('e6', { nome: 'Achar tendências', departamento: 'pesquisa' }).agenteId, arthur.id, 'sem agente: sugere o do departamento');
+  assert.equal(Ag.criarTarefaOrquestrada('e6', { nome: 'Achar tendências', departamento: 'vendas' }).agenteId, arthur.id, 'sem agente: sugere o do departamento');
   const t = D.criarTarefa('e6', { nome: 'Longa', agenteId: helena.id });
   let soltar; const trava = new Promise((r) => { soltar = r; });
   const p = Ag.despachar(user('e6'), t.id, { executor: async (_u, _a, _p, w) => { w({ type: 'text', text: 'ok' }); await trava; return 'c'; } });
@@ -123,7 +123,7 @@ test('reunião: pede o parecer real de cada participante e monta o relatório; d
   const ags = Ag.garantirAgentes('e7');
   const r = Ag.criarReuniao('e7', { pauta: 'Lançar campanha de fones', participantes: [ags[0].id, ags[3].id] });
   const rr = await Ag.pedirPareceres(user('e7'), r.id, { executor: async (_u, ag, _p, w) => { w({ type: 'text', text: `Parecer de ${ag.nome}` }); return 'c'; } });
-  assert.equal(rr.pareceres.length, 2); assert.match(rr.relatorio, /Parecer de Helena/); assert.match(rr.relatorio, /Parecer de Isabela/);
+  assert.equal(rr.pareceres.length, 2); assert.match(rr.relatorio, /Parecer de Eleonor/); assert.match(rr.relatorio, /Parecer de Laurinda/);
   assert.equal(Ag.registrarDecisao('e7', r.id, { texto: 'Seguir com a campanha', aprovadaPeloUsuario: true }).decisoes[0].aprovadaPeloUsuario, true);
   assert.equal(Ag.encerrarReuniao('e7', r.id).status, 'encerrada');
   assert.throws(() => Ag.criarReuniao('e7', { pauta: 'x', participantes: ['fantasma'] }), /Agente não encontrado/);

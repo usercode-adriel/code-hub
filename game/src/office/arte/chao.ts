@@ -12,9 +12,11 @@ export function texturaPiso(tipo: string): PixelImage {
   poligono(img, LOSANGO, t.cor);
   for (let y = 0; y < 32; y++) for (let x = 0; x < 64; x++) {
     if (!dentroLosango(x + 0.5, y + 0.5)) continue;
-    if (tipo === 'madeira' && ((x + y * 2) % 16 === 0 || (x - y * 2 + 64) % 32 === 0)) img.set(x, y, t.cor2);
+    if ((tipo === 'madeira' || tipo === 'escritorio') && ((x + y * 2) % 16 === 0 || (x - y * 2 + 64) % 32 === 0)) img.set(x, y, t.cor2);
     else if (tipo.startsWith('carpete') && r() < 0.28) img.set(x, y, r() < 0.5 ? shade(t.cor, 9) : t.cor2);
     else if (tipo === 'porcelanato' && ((x + y * 2) % 32 === 0 || (x - y * 2 + 64) % 32 === 0)) img.set(x, y, t.cor2);
+    else if (tipo === 'estoque' && ((x + y * 2) % 32 === 0 || (x - y * 2 + 64) % 32 === 0 || r() < 0.07)) img.set(x, y, t.cor2);
+    else if (tipo === 'estoque-faixa' && (Math.floor((x + y * 2) / 8) % 2 === 0)) img.set(x, y, 0x2a2d36);
     else if (tipo === 'corredor' && r() < 0.18) img.set(x, y, t.cor2);
     else if (tipo === 'estudio' && r() < 0.12) img.set(x, y, shade(t.cor, 10));
     else if (r() < 0.06) img.set(x, y, t.cor2);

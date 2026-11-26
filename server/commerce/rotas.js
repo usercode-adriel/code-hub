@@ -11,6 +11,9 @@ import * as Ast from './assets.js';
 import * as Aq from './aquisicao.js';
 import * as Lay from './layouts.js';
 import * as Per from './personagens.js';
+import * as Eq from './equipe.js';
+import * as Est from './estoque.js';
+import * as Doc from './documentos.js';
 
 const router = express.Router();
 const h = (fn) => async (req, res) => {
@@ -40,7 +43,7 @@ router.get('/estado', h((req) => {
 router.get('/auditoria', h((req) => area(uid(req)).auditoria.slice(-200).reverse()));
 
 // ---------- agentes, tarefas e reuniões ----------
-router.get('/agentes', h((req) => { Ag.garantirAgentes(uid(req)); return area(uid(req)).agentes.map((x) => Ag.resumoAgente(uid(req), x)); }));
+router.get('/agentes', h((req) => { Ag.garantirAgentes(uid(req)); return area(uid(req)).agentes.filter((x) => req.query.todos === 'true' || !x.arquivado).map((x) => Ag.resumoAgente(uid(req), x)); }));
 router.post('/agentes', h((req) => Ag.criarAgente(uid(req), req.body || {})));
 router.put('/agentes/:id', h((req) => Ag.atualizarAgente(uid(req), req.params.id, req.body || {})));
 router.delete('/agentes/:id', h((req) => { Ag.removerAgente(uid(req), req.params.id); return { ok: true }; }));
@@ -137,5 +140,19 @@ router.post('/personagens', h((req) => Per.criar(uid(req), req.body || {})));
 router.put('/personagens/:id', h((req) => Per.atualizar(uid(req), req.params.id, req.body || {})));
 router.delete('/personagens/:id', h((req) => { Per.remover(uid(req), req.params.id); return { ok: true }; }));
 router.post('/agentes/:id/aparencia', h((req) => Per.vincular(uid(req), req.params.id, req.body?.personagemId || null)));
+
+// ---------- equipe 2.1: ordens do chefe, comunicação interna, documentos, estoque ----------
+router.get('/equipe', h(async (req) => { const p = Eq.painelEquipe(uid(req)); const { assistantMode } = await import('../assistant.js'); return { ...p, modoIA: assistantMode() }; }));
+router.put('/equipe/config', h((req) => Eq.atualizarConfig(uid(req), req.body || {})));
+router.get('/ordens', h((req) => Eq.listarOrdens(uid(req))));
+router.post('/ordens', h(async (req, res) => { const o = await Eq.enviarOrdem(req.user, req.body?.texto); res.status(202).json(o); }));
+router.post('/ordens/:id/cancelar', h((req) => Eq.cancelarOrdem(uid(req), req.params.id)));
+router.get('/mensagens', h((req) => Eq.listarMensagens(uid(req), { depois: req.query.depois, ordemId: req.query.ordem || null, limite: req.query.limite })));
+router.get('/documentos', h((req) => Doc.listarDocumentos(uid(req), { ordemId: req.query.ordem || null, tipo: req.query.tipo || null })));
+router.get('/documentos/:id', h((req) => Doc.acharDocumento(uid(req), req.params.id)));
+router.post('/documentos', h((req) => Doc.criarDocumento(uid(req), { ...(req.body || {}), autor: 'chefe' })));
+router.get('/estoque', h((req) => ({ itens: Est.listarItens(uid(req)), movimentos: Est.listarMovimentos(uid(req), { itemId: req.query.item || null }), resumo: Est.resumoEstoque(uid(req)) })));
+router.post('/estoque/itens', h((req) => Est.cadastrarItem(uid(req), req.body || {}, 'chefe')));
+router.post('/estoque/movimentos', h((req) => Est.movimentar(uid(req), req.body || {}, 'chefe')));
 
 export default router;
