@@ -15,9 +15,20 @@ export interface ItemDef {
   solido: boolean; mesa?: boolean; sentavel?: boolean; assentos?: number;
   interacao?: Interacao; capacidade?: number;                        // capacidade: slots do armário
   girar: boolean; inicial?: boolean;
+  // ---- escala, superfícies e ancoragem (preenchidos por dados/propriedades.ts a partir de regras por categoria) ----
+  escala: { padrao: number; min: number; max: number };            // padrão = ajuste de proporção do asset; min/max = limites do multiplicador do jogador
+  superficie?: { tipo: string; niveis: Retangulo[] };              // móvel que recebe objetos: áreas úteis, em frações do sprite (x0,y0,x1,y1)
+  apoio?: string[];                                                // tipos de superfície em que o item pode ficar (camada 'sobre')
+  alturaPadrao?: number;                                           // objetos de parede: altura inicial na face (0 = rodapé, 1 = topo)
 }
+export interface Retangulo { x0: number; y0: number; x1: number; y1: number }
 
-export interface ObjetoColocado { id: string; def: string; x: number; y: number; rot: 0 | 1 | 2 | 3; sobre?: string; estado?: Record<string, unknown> }
+export interface ObjetoColocado {
+  id: string; def: string; x: number; y: number; rot: 0 | 1 | 2 | 3; sobre?: string; estado?: Record<string, unknown>;
+  ex?: number; ey?: number; travar?: boolean;                      // escala individual (multiplicadores sobre a escala padrão) e trava de proporção
+  nivel?: number; u?: number; v?: number;                          // objeto sobre móvel: nível da superfície e posição (0..1) dentro da área útil
+  alt?: number;                                                    // objeto de parede: altura na face (0 rodapé .. 1 topo)
+}
 export interface Porta { x: number; y: number; aberta: boolean }
 export interface Transacao { id: string; dia: number; hora: string; tipo: 'compra' | 'venda' | 'salario' | 'recompensa' | 'gasto' | 'inicial'; valor: number; descricao: string }
 

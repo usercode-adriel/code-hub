@@ -35,6 +35,7 @@ async function abrir() {
 const novoProjeto = async (p, nome = 'Escritório Teste') => { await p.fill('[data-testid=cr-nome]', nome); await p.click('[data-testid=cr-criar]'); await p.waitForSelector('[data-testid=canvas]'); await p.waitForTimeout(300); };
 const estado = (p) => p.evaluate(() => { const j = window.__jogo; return { cc: j.p.cc, objetos: j.p.objetos.map((o) => o.def), inv: j.p.inventario, func: j.p.funcionarios.map((f) => ({ estado: f.estado, nome: f.nome, estacao: f.estacao })), cand: j.p.candidatos.length, minuto: j.p.minuto }; });
 const clicarCelula = async (p, x, y) => { const pos = await p.evaluate(([x, y]) => { const m = window.__mundo; const r = m.canvas.getBoundingClientRect(); const t = m.paraTela(x + 0.5, y + 0.5); return { x: r.left + t.x, y: r.top + t.y }; }, [x, y]); await p.mouse.click(pos.x, pos.y); };
+const clicarObjeto = async (p, def) => { const c = await p.evaluate((def) => { const o = window.__jogo.p.objetos.find((q) => q.def === def); const r = window.__mundo.retDe(window.__jogo.p, o); const t = window.__mundo.paraTela(r.left + r.w / 2, r.top + r.h / 2); const b = window.__mundo.canvas.getBoundingClientRect(); return { x: b.left + t.x, y: b.top + t.y }; }, def); await p.mouse.click(c.x, c.y); };
 const shot = async (p, nome) => { if (SAIDA) { fs.mkdirSync(SAIDA, { recursive: true }); await p.screenshot({ path: path.join(SAIDA, nome) }); } };
 
 test('novo projeto: sala pedida, escritório inicial mínimo e CC 1500', async () => {
@@ -49,7 +50,7 @@ test('novo projeto: sala pedida, escritório inicial mínimo e CC 1500', async (
 test('loja pelo laptop, inventário, construir e vender; saldo muda de verdade', async () => {
   const p = await abrir(); try {
     await novoProjeto(p); const lap = await p.evaluate(() => { const o = window.__jogo.p.objetos.find((q) => q.def === 'laptop'); return { x: o.x, y: o.y }; });
-    await clicarCelula(p, lap.x, lap.y); await p.waitForSelector('[data-testid=so]'); await p.click('[data-testid=ico-loja]'); await p.waitForSelector('[data-testid=loja]');
+    await clicarObjeto(p, 'laptop'); await p.waitForSelector('[data-testid=so]'); await p.click('[data-testid=ico-loja]'); await p.waitForSelector('[data-testid=loja]');
     await p.click('[data-testid=comprar-mesa-baixa]'); await p.click('[data-testid=confirmar-compra]'); await p.waitForTimeout(150);
     let e = await estado(p); assert.equal(e.inv['mesa-baixa'], 1); assert.equal(e.cc, 1500 - 90); await shot(p, 'loja.png');
     await p.click('[data-testid=so-fechar]'); await p.click('[data-testid=btn-inventario]'); await p.waitForSelector('[data-testid=inv-item]'); await p.click('text=Colocar'); // abre construção com o item
@@ -75,7 +76,7 @@ test('contratar: candidato some da lista, funcionário chega, senta e trabalha s
 test('computador: arquivos (criar/editar/salvar), calculadora e navegador sem sessão não inventa resultados', async () => {
   const p = await abrir(); try {
     await novoProjeto(p); const lap = await p.evaluate(() => { const o = window.__jogo.p.objetos.find((q) => q.def === 'laptop'); return { x: o.x, y: o.y }; });
-    await clicarCelula(p, lap.x, lap.y); await p.waitForSelector('[data-testid=so]');
+    await clicarObjeto(p, 'laptop'); await p.waitForSelector('[data-testid=so]');
     await p.click('[data-testid=ico-calculadora]'); await p.click('button:text-is("7")'); await p.click('button:text-is("×")'); await p.click('button:text-is("8")'); await p.click('button:text-is("=")'); assert.equal((await p.textContent('[data-testid=calc-tela]')).trim(), '56');
     await p.click('[data-testid=ico-arquivos]'); await p.fill('[data-testid=arq-nome]', 'Relatorio'); await p.click('[data-testid=arq-criar]'); await p.dblclick('[data-testid=arq-item]:has-text("Relatorio")');
     await p.waitForSelector('[data-testid=editor-texto]'); await p.fill('[data-testid=editor-texto]', 'conteúdo real'); await p.click('[data-testid=editor-salvar]');

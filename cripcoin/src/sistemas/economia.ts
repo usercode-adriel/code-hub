@@ -1,6 +1,7 @@
 // ECONOMIA: Cripcoin (CC), loja, inventário, compra e venda. Toda a lógica vive aqui; a interface só chama estas funções.
 import { item, precoVenda } from '../dados/catalogo';
-import { colocar, remover } from '../nucleo/mapa';
+import { colocar, remover, podeColocar, type Extra } from '../nucleo/mapa';
+import { acharLugar, apoioDe } from '../nucleo/superficie';
 import { novoId } from '../nucleo/rng';
 import { diaDe, horaTexto } from '../nucleo/tempo';
 import type { ItemDef, ObjetoColocado, Projeto, Transacao } from '../tipos';
@@ -44,7 +45,19 @@ export function venderObjeto(p: Projeto, id: string): { ok: boolean; motivo: str
   return { ok: true, motivo: `${d.nome} vendido por ${total} CC.` };
 }
 /** Coloca no mapa um item do inventário (consome 1). */
-export function colocarDoInventario(p: Projeto, itemId: string, x: number, y: number, rot: 0 | 1 | 2 | 3): { ok: boolean; motivo: string; obj?: ObjetoColocado } {
+export function colocarDoInventario(p: Projeto, itemId: string, x: number, y: number, rot: 0 | 1 | 2 | 3, extra: Extra = {}): { ok: boolean; motivo: string; obj?: ObjetoColocado } {
   const d = item(itemId); if (!d) return { ok: false, motivo: 'Item inexistente.' }; if ((p.inventario[itemId] ?? 0) < 1) return { ok: false, motivo: 'Este item não está no inventário.' };
-  try { const o = colocar(p, d, x, y, rot); descartar(p, itemId, 1); return { ok: true, motivo: `${d.nome} colocado.`, obj: o }; } catch (e) { return { ok: false, motivo: e instanceof Error ? e.message : String(e) }; }
+  try { const o = colocar(p, d, x, y, rot, extra); descartar(p, itemId, 1); return { ok: true, motivo: `${d.nome} colocado.`, obj: o }; } catch (e) { return { ok: false, motivo: e instanceof Error ? e.message : String(e) }; }
+}
+
+/** Duplica um objeto do mapa: usa uma unidade do inventário ou COMPRA outra pelo preço da loja. Mantém escala e altura; escolhe o lugar livre mais próximo. */
+export function duplicarObjeto(p: Projeto, id: string): { ok: boolean; motivo: string; obj?: ObjetoColocado } {
+  const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!o || !d) return { ok: false, motivo: 'Objeto não encontrado.' };
+  const extra: Extra = { ex: o.ex, ey: o.ey, travar: o.travar, alt: o.alt };
+  let alvo: { x: number; y: number; extra: Extra } | null = null;
+  if (d.camada === 'sobre') { const s = apoioDe(p, o); const l = s && acharLugar(p, { ...o, id: '__dup', u: Math.min(1, (o.u ?? 0.5) + 0.2) }, d, s); if (l) alvo = { x: o.x, y: o.y, extra: { ...extra, ...l } }; }
+  else for (let r = 1; r <= 4 && !alvo; r++) for (let dy = -r; dy <= r && !alvo; dy++) for (let dx = -r; dx <= r && !alvo; dx++) { if (d.camada === 'parede' && dy !== 0) continue; const x = o.x + dx * (d.camada === 'parede' ? Math.max(1, d.w) : 1); const y = o.y + dy; if (podeColocar(p, d, x, y, o.rot, null, extra).ok) alvo = { x, y, extra }; }
+  if (!alvo) return { ok: false, motivo: 'Não há espaço livre perto para duplicar.' };
+  let nota = ''; if ((p.inventario[d.id] ?? 0) < 1) { const c = comprar(p, d.id, 1); if (!c.ok) return { ok: false, motivo: `Sem unidade no inventário e ${c.motivo}` }; nota = ` (comprado por ${d.preco} CC)`; }
+  const r = colocarDoInventario(p, d.id, alvo.x, alvo.y, o.rot, alvo.extra); return r.ok ? { ...r, motivo: `${d.nome} duplicado${nota}.` } : r;
 }

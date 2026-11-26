@@ -1,10 +1,11 @@
 // CATÁLOGO CENTRAL DE OBJETOS: tudo que existe no jogo (loja, inventário, construção e interações) sai daqui.
 // O sprite aponta para public/arte/objetos/<sprite>.png (arte 2x, desenhada a 0,5). Sem o arquivo, o jogo desenha um placeholder identificável.
 import type { Categoria, Interacao, ItemDef } from '../tipos';
+import { aplicar } from './propriedades';
 
 type Extra = Partial<ItemDef>;
 const I = (id: string, nome: string, descricao: string, categoria: Categoria, w: number, h: number, preco: number, camada: ItemDef['camada'], extra: Extra = {}): ItemDef =>
-  ({ id, nome, descricao, categoria, sprite: id, w, h, preco, estoque: 4, camada, solido: camada === 'objeto', girar: camada === 'objeto', ...extra });
+  ({ id, nome, descricao, categoria, sprite: id, w, h, preco, estoque: 4, camada, solido: camada === 'objeto', girar: camada === 'objeto', escala: { padrao: 1, min: 0.5, max: 2 }, ...extra });
 const cadeira = (id: string, nome: string, descricao: string, preco: number, v: ItemDef['variantes'], extra: Extra = {}): ItemDef =>
   I(id, nome, descricao, 'cadeiras', 1, 1, preco, 'objeto', { solido: false, sentavel: true, assentos: 1, interacao: 'assento', variantes: v, ...extra });
 const sobre = (id: string, nome: string, descricao: string, categoria: Categoria, preco: number, extra: Extra = {}): ItemDef => I(id, nome, descricao, categoria, 1, 1, preco, 'sobre', { solido: false, girar: false, estoque: 6, ...extra });
@@ -82,6 +83,7 @@ export const ITENS: ItemDef[] = [
   I('extintor', 'Extintor', 'Extintor de incêndio.', 'outros', 1, 1, 32, 'objeto', { solido: false, girar: false }),
 ];
 
+ITENS.forEach(aplicar);
 export const porId = new Map(ITENS.map((i) => [i.id, i]));
 export const item = (id: string): ItemDef | undefined => porId.get(id);
 export const CATEGORIAS: { id: Categoria; nome: string }[] = [

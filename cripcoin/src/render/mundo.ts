@@ -1,6 +1,7 @@
 // RENDERER 2D (canvas): vista de cima, grid real. Arte em 2x desenhada a 0,5 (tile lógico = 32 px). Câmera com zoom e pan.
 import { item } from '../dados/catalogo';
-import { celulasDe, ehParede, idx, pegada, portaEm, temPiso } from '../nucleo/mapa';
+import { celulasDe, ehParede, idx, portaEm, temPiso } from '../nucleo/mapa';
+import { alturaFace, ancora, apoioDe, escalaVisual, retSprite, RODAPE, spriteDe, tamanhoPegada, temFace, type Ret } from '../nucleo/superficie';
 import type { Jogo } from '../nucleo/jogo';
 import type { ItemDef, ObjetoColocado, Projeto } from '../tipos';
 import { avatar, CORES_PAREDE, objeto, parede as spriteParede, paredeColorida, piso } from './arte';
@@ -8,18 +9,12 @@ import { estado, seca } from '../sistemas/objetos';
 
 export const T = 32;                                          // pixels lógicos por tile (zoom 1)
 export interface Camera { x: number; y: number; zoom: number }   // x,y = ponto do mundo (em tiles) no centro da tela
-export interface Fantasma { itemId: string; x: number; y: number; rot: 0 | 1 | 2 | 3; ok: boolean; motivo: string; movendo?: string }
+export interface Fantasma { obj: ObjetoColocado; ok: boolean; motivo: string; movendo?: string }
 export interface VistaUI {
-  construcao: boolean; mostrarGrade: boolean; mostrarColisao: boolean; selecionado: string | null; fantasma: Fantasma | null; hover: { x: number; y: number } | null;
+  construcao: boolean; mostrarGrade: boolean; mostrarColisao: boolean; mostrarSuperficies: boolean; selecionado: string | null; fantasma: Fantasma | null; hover: { x: number; y: number } | null;
   area: { x0: number; y0: number; x1: number; y1: number; cor: string } | null; funcSel: string | null;
 }
-const ROT_DIR = ['S', 'E', 'N', 'W'] as const;
-/** Sprite (e espelhamento) correspondente à rotação do objeto. */
-export function spriteDe(d: ItemDef, rot: number): { nome: string; espelhar: boolean } {
-  const v = d.variantes?.[ROT_DIR[rot % 4]];
-  if (v) return { nome: v.sprite, espelhar: !!v.espelhar };
-  return { nome: d.sprite, espelhar: d.girar && rot >= 2 };
-}
+export { spriteDe };
 const corCateg = (d: ItemDef): string => (d.camada === 'sobre' ? '#6aa0ff' : d.camada === 'parede' ? '#c8a060' : '#a0a0a0');
 
 export class Mundo {
@@ -39,10 +34,21 @@ export class Mundo {
   paraTela(x: number, y: number): { x: number; y: number } { const s = T * this.cam.zoom; return { x: this.w / 2 + (x - this.cam.x) * s, y: this.h / 2 + (y - this.cam.y) * s }; }
   celula(sx: number, sy: number): { x: number; y: number } { const m = this.paraMundo(sx, sy); return { x: Math.floor(m.x), y: Math.floor(m.y) }; }
 
-  /** Objeto sob a célula (itens "sobre" têm prioridade, depois paredes-objeto, depois o resto). */
-  objetoEm(p: Projeto, x: number, y: number): ObjetoColocado | null {
+  /** Objeto sob um ponto do mundo (tiles). Usa o retângulo real do sprite (já com escala): itens apoiados e de parede têm prioridade, depois o resto. */
+  objetoEm(p: Projeto, mx: number, my: number): ObjetoColocado | null {
     const ordem = (o: ObjetoColocado): number => { const c = item(o.def)?.camada; return c === 'sobre' ? 0 : c === 'parede' ? 1 : c === 'objeto' ? 2 : 3; };
-    return [...p.objetos].filter((o) => { const d = item(o.def); return d && celulasDe(o, d).some((c) => c.x === x && c.y === y); }).sort((a, b) => ordem(a) - ordem(b))[0] ?? null;
+    const acertos = p.objetos.filter((o) => {
+      const d = item(o.def); if (!d) return false; const r = retSprite(p, o, d); const cx = Math.floor(mx); const cy = Math.floor(my);
+      if (d.camada === 'objeto' || d.camada === 'chao') { if (celulasDe(o, d).some((q) => q.x === cx && q.y === cy)) return true; }
+      return mx >= r.left && mx <= r.left + r.w && my >= r.top && my <= r.top + r.h;
+    });
+    return acertos.sort((a, b) => ordem(a) - ordem(b))[0] ?? null;
+  }
+  /** Retângulo do sprite (tiles) de um objeto do projeto. */
+  retDe(p: Projeto, o: ObjetoColocado): Ret | null { const d = item(o.def); return d ? retSprite(p, o, d) : null; }
+  /** Alças de redimensionamento (cantos) do retângulo do sprite, em tiles. */
+  alcas(p: Projeto, o: ObjetoColocado): { id: 'no' | 'ne' | 'so' | 'se'; x: number; y: number }[] {
+    const r = this.retDe(p, o); if (!r) return []; return [{ id: 'no', x: r.left, y: r.top }, { id: 'ne', x: r.left + r.w, y: r.top }, { id: 'so', x: r.left, y: r.top + r.h }, { id: 'se', x: r.left + r.w, y: r.top + r.h }];
   }
   funcionarioEm(p: Projeto, mx: number, my: number): string | null {
     let melhor: string | null = null; let dm = 0.9;
@@ -61,7 +67,7 @@ export class Mundo {
     }
     this.sombrasDoPiso(c, p);
     // objetos de chão (tapetes)
-    for (const o of p.objetos) { const d = item(o.def); if (d?.camada === 'chao') this.objeto(c, o, d); }
+    for (const o of p.objetos) { const d = item(o.def); if (d?.camada === 'chao') this.objeto(c, p, o, d); }
     // camada ordenada por profundidade: paredes, objetos, itens sobre mesas e funcionários
     type Cena = { z: number; f: () => void };
     const cena: Cena[] = [];
@@ -74,9 +80,9 @@ export class Mundo {
     for (const o of p.objetos) {
       const d = item(o.def); if (!d || d.camada === 'chao') continue;
       if (d.sentavel && sentados.has(`${o.x},${o.y}`)) continue;                                    // o sprite do funcionário já inclui a cadeira
-      const mesa = o.sobre ? p.objetos.find((m) => m.id === o.sobre) : null; const md = mesa && item(mesa.def);
-      const zz = d.camada === 'parede' ? o.y + 1.02 : d.camada === 'sobre' ? (mesa ? mesa.y + (md ? pegada(md, mesa.rot).h : 1) + 0.01 : o.y + 1) : o.y + pegada(d, o.rot).h;
-      cena.push({ z: zz, f: () => this.objeto(c, o, d, ui.selecionado === o.id) });
+      const mesa = apoioDe(p, o); const md = mesa && item(mesa.def); const an = d.camada === 'sobre' ? ancora(p, o) : null;
+      const zz = d.camada === 'parede' ? o.y + 1.02 : d.camada === 'sobre' ? (mesa && md ? mesa.y + tamanhoPegada(mesa, md).h + 0.01 + (an ? an.y * 0.0005 : 0) : o.y + 1) : o.y + tamanhoPegada(o, d).h;
+      cena.push({ z: zz, f: () => this.objeto(c, p, o, d) });
     }
     for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente') cena.push({ z: f.y + 0.5 + (f.estado === 'trabalhando' ? 0.02 : 0), f: () => this.funcionario(c, f, ui.funcSel === f.id) });
     cena.sort((a, b) => a.z - b.z); for (const e of cena) e.f();
@@ -110,23 +116,18 @@ export class Mundo {
     if (im && !aberta) { const W = im.width; const H = im.height; c.drawImage(im, 0, 0, W, H, x * T2, (y + 1) * T2 - Math.max(hFace, H / 2), T2, Math.max(hFace, H / 2)); }
     else if (!im) { c.fillStyle = '#8a5a3a'; c.fillRect(x * T2, y * T2 - 8, T2, T2 + 8); }
   }
-  private objeto(c: CanvasRenderingContext2D, o: ObjetoColocado, d: ItemDef, sel = false): void {
-    const sp = spriteDe(d, o.rot); if (d.interacao === 'planta' && seca(o) && objeto('planta-seca')) sp.nome = 'planta-seca'; const im = objeto(sp.nome); const { w, h } = d.camada === 'parede' ? { w: d.w, h: 1 } : pegada(d, o.rot);
-    let cx = (o.x + w / 2) * T; let by = (o.y + h) * T;
-    if (d.camada === 'sobre') { cx = (o.x + 0.5) * T + (this.deslocamento(o) * 7); by = (o.y + 0.78) * T; }
-    if (d.camada === 'parede') by = (o.y + 1) * T - 6;
-    let ligada = false; if (d.interacao === 'tv') ligada = !!estado(o, 'ligada', false);
+  private objeto(c: CanvasRenderingContext2D, p: Projeto, o: ObjetoColocado, d: ItemDef): void {
+    const sp = spriteDe(d, o.rot); if (d.interacao === 'planta' && seca(o) && objeto('planta-seca')) sp.nome = 'planta-seca'; const im = objeto(sp.nome);
+    const r = retSprite(p, o, d); const L = r.left * T; const Tp = r.top * T; const W = r.w * T; const H = r.h * T;
+    const ligada = d.interacao === 'tv' && !!estado(o, 'ligada', false);
     if (im) {
-      const sw = im.width / 2; const sh = im.height / 2; c.save(); c.translate(cx, by);
-      if (sp.espelhar) c.scale(-1, 1); c.drawImage(im, -sw / 2, -sh, sw, sh); c.restore();
-      if (ligada) { c.fillStyle = 'rgba(120,200,255,0.25)'; c.fillRect(cx - sw / 2 + 3, by - sh + 3, sw - 6, sh * 0.55); }
-    } else { this.placeholder(c, o, d, cx, by, w); }
-    if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; const x = o.x * T; const y = (d.camada === 'sobre' ? o.y : o.y) * T; c.strokeRect(x + 0.5, y + 0.5, (d.camada === 'sobre' ? 1 : w) * T - 1, (d.camada === 'sobre' ? 1 : h) * T - 1); }
+      c.save(); if (sp.espelhar) { c.translate(L + W, Tp); c.scale(-1, 1); c.drawImage(im, 0, 0, W, H); } else c.drawImage(im, L, Tp, W, H); c.restore();
+      if (ligada) { c.fillStyle = 'rgba(120,200,255,0.25)'; c.fillRect(L + 3, Tp + 3, W - 6, H * 0.55); }
+    } else this.placeholder(c, d, L, Tp, W, H);
   }
-  private deslocamento(o: ObjetoColocado): number { return (o.id.length + o.def.length) % 2 ? -0.5 : 0.5; }
-  private placeholder(c: CanvasRenderingContext2D, o: ObjetoColocado, d: ItemDef, cx: number, by: number, w: number): void {
-    c.fillStyle = corCateg(d) + 'cc'; c.fillRect(cx - (w * T) / 2 + 2, by - T + 2, w * T - 4, T - 4); c.strokeStyle = '#000'; c.strokeRect(cx - (w * T) / 2 + 2.5, by - T + 2.5, w * T - 5, T - 5);
-    c.fillStyle = '#000'; c.font = '7px monospace'; c.textAlign = 'center'; c.fillText(d.nome.slice(0, 9), cx, by - T / 2 + 2); void o;
+  private placeholder(c: CanvasRenderingContext2D, d: ItemDef, L: number, Tp: number, W: number, H: number): void {
+    c.fillStyle = corCateg(d) + 'cc'; c.fillRect(L + 1, Tp + 1, W - 2, H - 2); c.strokeStyle = '#000'; c.strokeRect(L + 1.5, Tp + 1.5, W - 3, H - 3);
+    c.fillStyle = '#000'; c.font = '7px monospace'; c.textAlign = 'center'; c.fillText(d.nome.slice(0, 9), L + W / 2, Tp + H / 2 + 2);
   }
   private funcionario(c: CanvasRenderingContext2D, f: ProjetoFunc, sel: boolean): void {
     const dirSprite = f.dir; const im = avatar(f.avatar, dirSprite); const andando = f.caminho.length > 0;
@@ -144,17 +145,39 @@ export class Mundo {
   }
   private sobreposicoes(c: CanvasRenderingContext2D, p: Projeto, ui: VistaUI): void {
     if (ui.mostrarGrade) { c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1; c.beginPath(); for (let x = 0; x <= p.largura; x++) { c.moveTo(x * T + 0.5, 0); c.lineTo(x * T + 0.5, p.altura * T); } for (let y = 0; y <= p.altura; y++) { c.moveTo(0, y * T + 0.5); c.lineTo(p.largura * T, y * T + 0.5); } c.stroke(); }
+    const face = alturaFace(p);
     if (ui.mostrarColisao) {
-      for (let y = 0; y < p.altura; y++) for (let x = 0; x < p.largura; x++) { if (ehParede(p, x, y)) { c.fillStyle = 'rgba(255,60,60,0.35)'; c.fillRect(x * T, y * T, T, T); } else if (!temPiso(p, x, y)) { c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(x * T, y * T, T, T); } }
-      for (const o of p.objetos) { const d = item(o.def); if (!d || d.camada === 'sobre') continue; c.fillStyle = d.solido ? 'rgba(255,60,60,0.35)' : 'rgba(255,200,40,0.28)'; for (const q of celulasDe(o, d)) c.fillRect(q.x * T, q.y * T, T, T); }
+      // colisão FÍSICA: a parede inteira (cap + face visível) e os móveis sólidos; a fixação de objetos é outra coisa (ver "Superfícies")
+      for (let y = 0; y < p.altura; y++) for (let x = 0; x < p.largura; x++) { if (ehParede(p, x, y)) { c.fillStyle = 'rgba(255,60,60,0.35)'; c.fillRect(x * T, y * T, T, T); if (temFace(p, x, y)) c.fillRect(x * T, (y + 1 - face) * T, T, (face - 1 > 0 ? face - 1 : 0) * T + 0.0001); } else if (!temPiso(p, x, y)) { c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(x * T, y * T, T, T); } }
+      for (const o of p.objetos) { const d = item(o.def); if (!d || d.camada === 'sobre' || d.camada === 'parede') continue; c.fillStyle = d.solido ? 'rgba(255,60,60,0.35)' : 'rgba(255,200,40,0.28)'; for (const q of celulasDe(o, d)) c.fillRect(q.x * T, q.y * T, T, T); }
     }
+    if (ui.mostrarSuperficies || ui.fantasma?.obj.sobre || (ui.fantasma && item(ui.fantasma.obj.def)?.camada === 'parede')) {
+      // superfícies de fixação: faces de parede (verde-água) e áreas úteis dos móveis (azul)
+      c.fillStyle = 'rgba(60,220,200,0.22)'; c.strokeStyle = 'rgba(60,220,200,0.9)'; c.lineWidth = 1;
+      for (let y = 0; y < p.altura; y++) for (let x = 0; x < p.largura; x++) if (temFace(p, x, y)) { c.fillRect(x * T, (y + 1 - face) * T, T, face * T - RODAPE * T); c.strokeRect(x * T + 0.5, (y + 1 - face) * T + 0.5, T - 1, face * T - RODAPE * T - 1); }
+      for (const o of p.objetos) { const d = item(o.def); if (!d?.superficie) continue; const r = retSprite(p, o, d);
+        for (const n of d.superficie.niveis) { c.fillStyle = 'rgba(90,150,255,0.35)'; c.fillRect((r.left + n.x0 * r.w) * T, (r.top + n.y0 * r.h) * T, (n.x1 - n.x0) * r.w * T, (n.y1 - n.y0) * r.h * T); c.strokeStyle = 'rgba(150,190,255,0.95)'; c.strokeRect((r.left + n.x0 * r.w) * T + 0.5, (r.top + n.y0 * r.h) * T + 0.5, (n.x1 - n.x0) * r.w * T - 1, (n.y1 - n.y0) * r.h * T - 1); } }
+    }
+    const sel = ui.selecionado ? p.objetos.find((o) => o.id === ui.selecionado) : null;
+    if (sel) this.selecao(c, p, sel);
     if (ui.area) { const { x0, y0, x1, y1, cor } = ui.area; c.fillStyle = cor; c.fillRect(Math.min(x0, x1) * T, Math.min(y0, y1) * T, (Math.abs(x1 - x0) + 1) * T, (Math.abs(y1 - y0) + 1) * T); }
-    else if (ui.hover) { c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.strokeRect(ui.hover.x * T + 0.5, ui.hover.y * T + 0.5, T - 1, T - 1); }
+    else if (ui.hover && !ui.fantasma) { c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.strokeRect(ui.hover.x * T + 0.5, ui.hover.y * T + 0.5, T - 1, T - 1); }
+  }
+  /** Seleção: contorno do sprite, colisão (pegada), área de suporte, âncora, dimensões e alças de redimensionamento. */
+  private selecao(c: CanvasRenderingContext2D, p: Projeto, o: ObjetoColocado): void {
+    const d = item(o.def); if (!d) return; const r = retSprite(p, o, d);
+    c.fillStyle = 'rgba(255,225,77,0.16)'; for (const q of celulasDe(o, d)) if (d.camada !== 'sobre' && d.camada !== 'parede') c.fillRect(q.x * T, q.y * T, T, T);
+    c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(r.left * T, r.top * T, r.w * T, r.h * T);
+    const an = d.camada === 'sobre' ? ancora(p, o) : d.camada === 'parede' ? { x: r.left + r.w / 2, y: r.top + r.h } : { x: r.left + r.w / 2, y: r.top + r.h };
+    if (an) { c.strokeStyle = '#ff5ab4'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(an.x * T - 4, an.y * T); c.lineTo(an.x * T + 4, an.y * T); c.moveTo(an.x * T, an.y * T - 4); c.lineTo(an.x * T, an.y * T + 4); c.stroke(); }
+    c.fillStyle = '#ffe14d'; for (const a of this.alcas(p, o)) c.fillRect(a.x * T - 3, a.y * T - 3, 6, 6);
+    const sc = escalaVisual(o, d); c.font = 'bold 7px monospace'; c.textAlign = 'left'; const txt = `${(r.w).toFixed(2)}×${(r.h).toFixed(2)} t · ${sc.sx.toFixed(2)}×${sc.sy.toFixed(2)}`; const tw = c.measureText(txt).width + 6;
+    c.fillStyle = 'rgba(0,0,0,0.75)'; c.fillRect(r.left * T, r.top * T - 11, tw, 10); c.fillStyle = '#ffe14d'; c.fillText(txt, r.left * T + 3, r.top * T - 3);
   }
   private fantasma(c: CanvasRenderingContext2D, p: Projeto, f: Fantasma): void {
-    const d = item(f.itemId); if (!d) return; const { w, h } = d.camada === 'parede' ? { w: d.w, h: 1 } : pegada(d, f.rot);
-    const o: ObjetoColocado = { id: 'fantasma', def: d.id, x: f.x, y: f.y, rot: f.rot }; c.save(); c.globalAlpha = 0.75; this.objeto(c, o, d); c.restore();
-    c.fillStyle = f.ok ? 'rgba(80,255,120,0.35)' : 'rgba(255,60,60,0.45)'; for (const q of celulasDe(o, d)) c.fillRect(q.x * T, q.y * T, T, T); void w; void h; void p;
+    const d = item(f.obj.def); if (!d) return; c.save(); c.globalAlpha = 0.78; this.objeto(c, p, f.obj, d); c.restore();
+    const r = retSprite(p, f.obj, d); c.strokeStyle = f.ok ? 'rgba(80,255,120,0.95)' : 'rgba(255,70,70,0.95)'; c.lineWidth = 1.5; c.strokeRect(r.left * T, r.top * T, r.w * T, r.h * T);
+    c.fillStyle = f.ok ? 'rgba(80,255,120,0.28)' : 'rgba(255,60,60,0.4)'; if (d.camada === 'sobre') { const an = ancora(p, f.obj); if (an) c.fillRect(an.x * T - 4, an.y * T - 2, 8, 4); } else if (d.camada !== 'parede') for (const q of celulasDe(f.obj, d)) c.fillRect(q.x * T, q.y * T, T, T);
   }
 }
 type ProjetoFunc = Projeto['funcionarios'][number];

@@ -2,6 +2,7 @@
 import { item } from '../dados/catalogo';
 import type { ItemDef, ObjetoColocado, Projeto } from '../tipos';
 import { novoId } from './rng';
+import { acharLugar, alturaFace, cabeNaSuperficie, celulaSob, escalaValida, localizar, apoioDe, tamanhoPegada, temFace } from './superficie';
 
 export const dentro = (p: { largura: number; altura: number }, x: number, y: number): boolean => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < p.largura && y < p.altura;
 export const idx = (p: { largura: number }, x: number, y: number): number => y * p.largura + x;
@@ -36,53 +37,63 @@ export function criarProjeto(c: ConfigNovo, agora = Date.now()): Projeto {
   return p;
 }
 
-/** Quais células a parede-objeto ocupa, na linha da parede. */
-export function celulasDe(o: { x: number; y: number; rot: number }, d: ItemDef): { x: number; y: number }[] {
-  const { w, h } = d.camada === 'parede' ? { w: d.w, h: 1 } : pegada(d, o.rot); const out: { x: number; y: number }[] = [];
+/** Células ocupadas por um objeto (colisão): a pegada do asset multiplicada pela escala individual. */
+export function celulasDe(o: { x: number; y: number; rot: number; ex?: number; ey?: number }, d: ItemDef): { x: number; y: number }[] {
+  const { w, h } = tamanhoPegada(o, d); const out: { x: number; y: number }[] = [];
   for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) out.push({ x: o.x + dx, y: o.y + dy });
   return out;
 }
 
-export interface Veredito { ok: boolean; motivo: string }
-/** Pode colocar este item aqui? Regras reais de espaço: piso, parede, sobreposição, mesas para itens "sobre", parede para enfeites de parede. */
-export function podeColocar(p: Projeto, d: ItemDef, x: number, y: number, rot: number, ignorar: string | null = null): Veredito {
-  const cel = celulasDe({ x, y, rot }, d);
+export interface Veredito { ok: boolean; motivo: string; pos?: { nivel: number; u: number; v: number } }
+export type Extra = Partial<Pick<ObjetoColocado, 'ex' | 'ey' | 'nivel' | 'u' | 'v' | 'alt' | 'travar'>>;
+/** Móvel com superfície sob a célula (x,y) que aceita o item. */
+function suporteEm(p: Projeto, d: ItemDef, x: number, y: number, ignorar: string | null): ObjetoColocado | null {
+  const cand = p.objetos.filter((o) => { const dd = item(o.def); return o.id !== ignorar && dd?.superficie && celulasDe(o, dd).some((q) => q.x === x && q.y === y); });
+  return cand.find((o) => (d.apoio ?? ['mesa']).includes(item(o.def)!.superficie!.tipo)) ?? cand[0] ?? null;
+}
+const novoTemp = (d: ItemDef, x: number, y: number, rot: number, extra: Extra, id = '__novo'): ObjetoColocado => ({ id, def: d.id, x, y, rot: rot as 0 | 1 | 2 | 3, ...extra });
+/** Resolve onde o item "sobre" fica no suporte: posição pedida (u,v) ou a mais próxima do centro da célula, ajustada para um lugar livre. */
+function lugarSobre(p: Projeto, d: ItemDef, suporte: ObjetoColocado, x: number, y: number, rot: number, extra: Extra, id: string): Veredito {
+  const base = novoTemp(d, x, y, rot, extra, id); base.sobre = suporte.id;
+  if (extra.u === undefined || extra.v === undefined) { const l = localizar(p, suporte, x + 0.5, y + 0.4); if (!l) return { ok: false, motivo: 'Isto não tem superfície de apoio.' }; Object.assign(base, { nivel: extra.nivel ?? l.nivel, u: extra.u ?? l.u, v: extra.v ?? l.v }); const lug = acharLugar(p, base, d, suporte); if (!lug) return { ok: false, motivo: cabeNaSuperficie(p, base, d, suporte).motivo || 'Sem espaço nesta superfície.' }; return { ok: true, motivo: '', pos: lug }; }
+  const v = cabeNaSuperficie(p, base, d, suporte); return v.ok ? { ok: true, motivo: '', pos: { nivel: base.nivel ?? 0, u: base.u!, v: base.v! } } : v;
+}
+/** Pode colocar este item aqui? Regras reais: piso, parede (fixação na face), sobreposição, superfícies de apoio, escala. */
+export function podeColocar(p: Projeto, d: ItemDef, x: number, y: number, rot: number, ignorar: string | null = null, extra: Extra = {}): Veredito {
+  if (!escalaValida(d, extra.ex ?? 1, extra.ey ?? extra.ex ?? 1)) return { ok: false, motivo: 'Escala fora dos limites deste item.' };
+  const cel = celulasDe({ x, y, rot, ...extra }, d);
   if (d.camada === 'parede') {
     for (const c of cel) {
       if (!dentro(p, c.x, c.y)) return { ok: false, motivo: 'Fora da sala.' };
       if (!ehParede(p, c.x, c.y)) return { ok: false, motivo: 'Este item fica preso a uma parede.' };
-      if (!temPiso(p, c.x, c.y + 1) || ehParede(p, c.x, c.y + 1)) return { ok: false, motivo: 'Só vai em parede com chão na frente (parede do fundo).' };
+      if (!temFace(p, c.x, c.y)) return { ok: false, motivo: 'Só vai em parede com chão na frente (face visível).' };
     }
-    const ocupado = p.objetos.some((o) => o.id !== ignorar && item(o.def)?.camada === 'parede' && celulasDe(o, item(o.def)!).some((q) => cel.some((c) => c.x === q.x && c.y === q.y)));
-    return ocupado ? { ok: false, motivo: 'Já há algo nesta parede.' } : { ok: true, motivo: '' };
+    const ocupado = p.objetos.some((o) => { const dd = item(o.def); return o.id !== ignorar && dd?.camada === 'parede' && celulasDe(o, dd).some((q) => cel.some((c) => c.x === q.x && c.y === q.y)) && Math.abs((o.alt ?? dd.alturaPadrao ?? 0.6) - (extra.alt ?? d.alturaPadrao ?? 0.6)) < 0.45 * Math.max(0.2, alturaFace(p)); });
+    return ocupado ? { ok: false, motivo: 'Já há algo neste ponto da parede.' } : { ok: true, motivo: '' };
   }
   for (const c of cel) {
     if (!dentro(p, c.x, c.y)) return { ok: false, motivo: 'Fora da sala.' };
     if (!temPiso(p, c.x, c.y)) return { ok: false, motivo: 'Sem piso aqui.' };
     if (ehParede(p, c.x, c.y) || portaEm(p, c.x, c.y)) return { ok: false, motivo: 'Há uma parede ou porta aqui.' };
   }
-  const outros = p.objetos.filter((o) => o.id !== ignorar);
   if (d.camada === 'sobre') {
-    const mesa = outros.find((o) => { const dd = item(o.def); return dd?.mesa && celulasDe(o, dd).some((q) => q.x === x && q.y === y); });
-    if (!mesa) return { ok: false, motivo: 'Este item precisa ficar sobre uma mesa.' };
-    const ja = outros.filter((o) => o.sobre === mesa.id && o.x === x && o.y === y);
-    if (ja.length >= 2) return { ok: false, motivo: 'A mesa não tem mais espaço neste lugar.' };
-    if (ja.some((o) => o.def === d.id)) return { ok: false, motivo: 'Já há um igual aqui.' };
-    return { ok: true, motivo: '' };
+    const s = suporteEm(p, d, x, y, ignorar); if (!s) return { ok: false, motivo: 'Este item precisa ficar sobre uma mesa, estante ou armário.' };
+    return lugarSobre(p, d, s, x, y, rot, extra, ignorar ?? '__novo');
   }
-  for (const o of outros) {
-    const dd = item(o.def); if (!dd || dd.camada === 'parede' || dd.camada === 'sobre') continue;
+  for (const o of p.objetos) {
+    if (o.id === ignorar) continue; const dd = item(o.def); if (!dd || dd.camada === 'parede' || dd.camada === 'sobre') continue;
     if (d.camada === 'chao' || dd.camada === 'chao') continue;                                  // tapete fica por baixo de tudo
     if (celulasDe(o, dd).some((q) => cel.some((c) => c.x === q.x && c.y === q.y))) return { ok: false, motivo: `Ocupado por ${dd.nome}.` };
   }
   return { ok: true, motivo: '' };
 }
 
-export function colocar(p: Projeto, d: ItemDef, x: number, y: number, rot: 0 | 1 | 2 | 3): ObjetoColocado {
-  const v = podeColocar(p, d, x, y, rot); if (!v.ok) throw new Error(v.motivo);
+export function colocar(p: Projeto, d: ItemDef, x: number, y: number, rot: 0 | 1 | 2 | 3, extra: Extra = {}): ObjetoColocado {
+  const v = podeColocar(p, d, x, y, rot, null, extra); if (!v.ok) throw new Error(v.motivo);
   const o: ObjetoColocado = { id: novoId('obj'), def: d.id, x, y, rot };
-  if (d.camada === 'sobre') { const mesa = p.objetos.find((m) => { const dd = item(m.def); return dd?.mesa && celulasDe(m, dd).some((q) => q.x === x && q.y === y); }); o.sobre = mesa!.id; }
-  if (d.camada === 'parede') o.rot = 0;
+  if (extra.ex !== undefined) o.ex = extra.ex; if (extra.ey !== undefined) o.ey = extra.ey; if (extra.travar !== undefined) o.travar = extra.travar;
+  if (d.camada === 'sobre') { const s = suporteEm(p, d, x, y, null)!; o.sobre = s.id; Object.assign(o, v.pos); const c = celulaSob(p, o); o.x = c.x; o.y = c.y; }
+  if (d.camada === 'parede') { o.rot = 0; o.alt = extra.alt ?? d.alturaPadrao ?? 0.6; }
   p.objetos.push(o); return o;
 }
 /** Remove o objeto e tudo que estava em cima dele; devolve a lista de itens retirados. */
@@ -92,22 +103,56 @@ export function remover(p: Projeto, id: string): ObjetoColocado[] {
   p.objetos = p.objetos.filter((o) => !ids.has(o.id)); for (const f of p.funcionarios) if (f.estacao && ids.has(f.estacao)) f.estacao = null;
   return saida;
 }
-/** Move (ou gira) um objeto; itens em cima de uma mesa acompanham a mesa. */
-export function mover(p: Projeto, id: string, x: number, y: number, rot?: number): Veredito {
+const filhosOk = (p: Projeto, o: ObjetoColocado): string => {
+  for (const f of p.objetos.filter((q) => q.sobre === o.id)) { const df = item(f.def)!; const v = cabeNaSuperficie(p, f, df, o); if (!v.ok) return v.motivo; }
+  return '';
+};
+/** Move (ou gira) um objeto; itens em cima de um móvel acompanham o móvel (a posição deles é relativa à superfície). */
+export function mover(p: Projeto, id: string, x: number, y: number, rot?: number, extra: Extra = {}): Veredito {
   const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!o || !d) return { ok: false, motivo: 'Objeto não encontrado.' };
-  const novaRot = (rot ?? o.rot) as 0 | 1 | 2 | 3; const v = podeColocar(p, d, x, y, novaRot, id); if (!v.ok) return v;
+  const novaRot = (rot ?? o.rot) as 0 | 1 | 2 | 3; const ex = { ex: o.ex, ey: o.ey, ...extra };
+  const v = podeColocar(p, d, x, y, novaRot, id, d.camada === 'sobre' ? extra : ex); if (!v.ok) return v;
+  const velho = { x: o.x, y: o.y, rot: o.rot, sobre: o.sobre, nivel: o.nivel, u: o.u, v: o.v, alt: o.alt };
   const dx = x - o.x; const dy = y - o.y;
-  if (d.mesa) {
-    const filhos = p.objetos.filter((q) => q.sobre === id);
-    const velho = { x: o.x, y: o.y, rot: o.rot }; o.x = x; o.y = y; o.rot = novaRot;
-    for (const f of filhos) { f.x += dx; f.y += dy; }
-    // com a rotação, itens que caírem fora da mesa voltam ao inventário (devolvidos pelo chamador)
-    const fora = filhos.filter((f) => !celulasDe(o, d).some((q) => q.x === f.x && q.y === f.y));
-    if (fora.length) { for (const f of filhos) { f.x -= dx; f.y -= dy; } o.x = velho.x; o.y = velho.y; o.rot = velho.rot as 0 | 1 | 2 | 3; return { ok: false, motivo: 'Há itens em cima da mesa que não caberiam. Guarde-os antes.' }; }
-    return { ok: true, motivo: '' };
+  if (d.camada === 'sobre') { const s = suporteEm(p, d, x, y, id)!; o.sobre = s.id; Object.assign(o, v.pos); const c = celulaSob(p, o); o.x = c.x; o.y = c.y; return { ok: true, motivo: '' }; }
+  o.x = x; o.y = y; o.rot = novaRot; if (d.camada === 'parede' && extra.alt !== undefined) o.alt = extra.alt;
+  if (d.superficie) {
+    const filhos = p.objetos.filter((q) => q.sobre === id); for (const f of filhos) { f.x += dx; f.y += dy; }
+    const erro = filhosOk(p, o);
+    if (erro) { for (const f of filhos) { f.x -= dx; f.y -= dy; } Object.assign(o, velho); return { ok: false, motivo: `Há itens em cima que não caberiam: ${erro}` }; }
   }
-  o.x = x; o.y = y; o.rot = novaRot; if (d.camada === 'sobre') { const mesa = p.objetos.find((m) => { const dd = item(m.def); return dd?.mesa && celulasDe(m, dd).some((q) => q.x === x && q.y === y); }); if (mesa) o.sobre = mesa.id; }
   return { ok: true, motivo: '' };
+}
+/** Define a escala individual (multiplicadores). Revalida colisão, superfície e os itens apoiados; desfaz se algo não couber. */
+export function redimensionar(p: Projeto, id: string, ex: number, ey: number, travar?: boolean): Veredito {
+  const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!o || !d) return { ok: false, motivo: 'Objeto não encontrado.' };
+  if (!escalaValida(d, ex, ey)) return { ok: false, motivo: `Escala permitida: ${d.escala.min}× a ${d.escala.max}×.` };
+  const ant = { ex: o.ex, ey: o.ey, travar: o.travar, pos: { nivel: o.nivel, u: o.u, v: o.v } };
+  const sup = d.camada === 'sobre' ? apoioDe(p, o) : null;
+  const v = sup ? cabeNaSuperficie(p, { ...o, ex, ey }, d, sup) : podeColocar(p, d, o.x, o.y, o.rot, id, { ex, ey, alt: o.alt }); if (!v.ok) return v;
+  o.ex = Math.round(ex * 1000) / 1000; o.ey = Math.round(ey * 1000) / 1000; if (travar !== undefined) o.travar = travar;
+  const erro = d.superficie ? filhosOk(p, o) : ''; if (erro) { o.ex = ant.ex; o.ey = ant.ey; o.travar = ant.travar; return { ok: false, motivo: `Há itens em cima que não caberiam: ${erro}` }; }
+  return { ok: true, motivo: '' };
+}
+export function restaurarTamanho(p: Projeto, id: string): Veredito { const r = redimensionar(p, id, 1, 1); if (r.ok) { const o = p.objetos.find((q) => q.id === id)!; delete o.ex; delete o.ey; } return r; }
+/** Reposiciona um item apoiado dentro da superfície do próprio móvel (nível e posição u,v livres). */
+export function posicionarNaSuperficie(p: Projeto, id: string, nivel: number, u: number, v: number): Veredito {
+  const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); const s = o && apoioDe(p, o); if (!o || !d || !s) return { ok: false, motivo: 'Este item não está sobre um móvel.' };
+  const t = { ...o, nivel, u, v }; const r = cabeNaSuperficie(p, t, d, s); if (!r.ok) return r; Object.assign(o, { nivel, u, v }); const c = celulaSob(p, o); o.x = c.x; o.y = c.y; return { ok: true, motivo: '' };
+}
+export function ajustarAltura(p: Projeto, id: string, alt: number): Veredito {
+  const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!o || !d || d.camada !== 'parede') return { ok: false, motivo: 'Só objetos de parede têm altura.' };
+  const v = podeColocar(p, d, o.x, o.y, 0, id, { ex: o.ex, ey: o.ey, alt }); if (!v.ok) return v; o.alt = Math.min(1, Math.max(0, alt)); return { ok: true, motivo: '' };
+}
+/** Completa as propriedades novas em projetos antigos (migração): posição na superfície, altura na parede, escala padrão. Não apaga nem move nada. */
+export function reacomodar(p: Projeto): void {
+  for (const o of p.objetos) { const d = item(o.def); if (!d) continue;
+    if (d.camada === 'parede') o.alt ??= d.alturaPadrao ?? 0.6;
+    if (d.camada === 'sobre') {
+      const s = apoioDe(p, o) ?? suporteEm(p, d, o.x, o.y, o.id); if (!s) continue; o.sobre = s.id;
+      if (o.u === undefined || o.v === undefined || o.nivel === undefined) { const l = localizar(p, s, o.x + 0.5, o.y + 0.4); if (l) { o.nivel = l.nivel; o.u = l.u; o.v = l.v; const lug = acharLugar(p, o, d, s); if (lug) Object.assign(o, lug); } }
+    }
+  }
 }
 
 /** Pinta o piso de um retângulo (inclusive limpar com ''). */
