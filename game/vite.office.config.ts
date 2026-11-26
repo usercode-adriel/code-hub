@@ -8,6 +8,7 @@ const here = fileURLToPath(new URL('./office/', import.meta.url));
 export default defineConfig({
   root: here,
   base: '/escritorio/',
+  publicDir: fileURLToPath(new URL('./office/public/', import.meta.url)),
   plugins: [react()],
   build: { outDir: fileURLToPath(new URL('../public/escritorio', import.meta.url)), emptyOutDir: true, sourcemap: false },
   server: { port: 5174, proxy: { '/api': 'http://localhost:3000' } },

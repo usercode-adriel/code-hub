@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { OfficeEngine, type AgenteInfo } from '../src/office/engine';
 import { Construtor, type EstadoConstrutor } from '../src/office/construtor';
-import { layoutPadrao } from '../src/office/layoutPadrao';
+import { layoutPadrao, VERSAO_PADRAO } from '../src/office/layoutPadrao';
 import { layoutVazio, type Layout } from '../src/office/modelo';
 import type { AlvoSelecao, Modo } from '../src/office/eventos';
 import { api, token, type Agente, type AssetM, type Campanha, type LayoutResumo, type Mensagem, type PainelEquipeDados, type PersonagemDef, type Produto, type Tarefa } from '../src/office/ui/api';
@@ -97,12 +97,12 @@ export function App() {
         const ags = await api.get<Agente[]>('/agentes'); agentesRef.current = ags;
         let ativo = await api.get<LayoutServidor | null>('/layouts/ativo');
         const mapa = Object.fromEntries(ags.filter((a) => a.chave).map((a) => [a.chave as string, a.id]));
-        // 2.1: o escritório tem exatamente duas salas. O layout antigo (oito departamentos) continua salvo na lista, mas deixa de ser o ativo.
-        const antigo = ativo && ativo.dados.meta?.padrao == null && ativo.dados.departamentos.some((d) => ['diretoria', 'pesquisa', 'produtos'].includes(d.chave));
+        // 3.0: o escritório é uma única sala ampla com a arte nova. Layouts anteriores (8 departamentos, 2 salas) continuam salvos na lista, mas deixam de ser o ativo.
+        const padrao = ativo?.dados.meta?.padrao; const antigo = ativo && padrao !== VERSAO_PADRAO && (padrao === '2.1' || (padrao == null && ativo.dados.departamentos.some((d) => ['diretoria', 'pesquisa', 'produtos'].includes(d.chave))));
         if (!ativo || antigo) {
-          const lista = await api.get<LayoutResumo[]>('/layouts'); const ja = lista.find((l) => l.nome === 'Escritório 2.1');
+          const lista = await api.get<LayoutResumo[]>('/layouts'); const ja = lista.find((l) => l.nome === 'Escritório 3.0');
           if (ja) { await api.post(`/layouts/${ja.id}/ativar`); ativo = await api.get<LayoutServidor>(`/layouts/${ja.id}`); }
-          else ativo = await api.post<LayoutServidor>('/layouts', { nome: 'Escritório 2.1', dados: layoutPadrao(mapa), ativar: true });
+          else ativo = await api.post<LayoutServidor>('/layouts', { nome: 'Escritório 3.0', dados: layoutPadrao(mapa), ativar: true });
         }
         if (!ativo) throw new Error('Não foi possível abrir o layout do escritório.');
         if (vincularIds(ativo.dados, ags)) ativo = await api.put<LayoutServidor>(`/layouts/${ativo.id}`, { dados: ativo.dados, versaoBase: ativo.versao });

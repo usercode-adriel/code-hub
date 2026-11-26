@@ -6,6 +6,8 @@ import { desenharObjeto, type ObjetoArte } from './arte/moveis';
 import { desenharParede, texturaPiso, type Parede } from './arte/chao';
 import { criarSheetProcedural, paletaPadrao } from './arte/personagem';
 import type { SheetDef } from './animacoes';
+import type { Pacote } from './pacote';
+import { PISO_PACOTE } from './catalogo';
 
 export function paraTextura(img: PixelImage): Texture {
   const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
@@ -24,13 +26,15 @@ export class Texturas {
   private quadros = new Map<string, Texture>();
   private externas = new Map<string, Texture | null>();
   private pendentes = new Set<string>();
+  private pacote: Pacote | null = null;
+  usarPacote(p: Pacote): void { this.pacote = p; this.canvasesPiso.clear(); }
   constructor(private readonly aoCarregar: () => void = () => {}, private readonly token: () => string = () => '') {}
 
   private canvasesPiso = new Map<string, HTMLCanvasElement>();
   /** Canvas do tile de piso (usado para assar pedaços do chão). */
   canvasPiso(tipo: string): HTMLCanvasElement {
     let c = this.canvasesPiso.get(tipo);
-    if (!c) { const img = texturaPiso(tipo); c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0); this.canvasesPiso.set(tipo, c); }
+    if (!c) { const dele = this.pacote?.pronto ? this.pacote.pisos.get(PISO_PACOTE[tipo] ?? '') : undefined; if (dele) { this.canvasesPiso.set(tipo, dele); return dele; } const img = texturaPiso(tipo); c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0); this.canvasesPiso.set(tipo, c); }
     return c;
   }
   piso(tipo: string): Texture { let t = this.pisos.get(tipo); if (!t) { t = paraTextura(texturaPiso(tipo)); this.pisos.set(tipo, t); } return t; }

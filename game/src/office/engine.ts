@@ -13,8 +13,10 @@ import { dentro, indice, type Layout, type ObjetoLayout, type PersonagemLayout }
 import { CAMADA, corpoIso, ordenarIso, type CorpoIso } from './profundidade';
 import { ESTADOS_DE_TRABALHO, ESTADOS_SENTADOS, escolherAnimacao, estadoParaAnimacao, quadroEm, type AtividadeSocial, type EstadoAnim, type SheetDef } from './animacoes';
 import { Texturas } from './texturas';
+import { Pacote, ESCALA_ARTE } from './pacote';
+import { movimentoLeve, novoComp, aleatorio, hash, proximaAcao, girar, type Comp } from './comportamento';
 import type { AlvoSelecao, Modo, OfficeEventos } from './eventos';
-import { ALTURA_PAREDE } from './arte/chao';
+export const ALTURA_PAREDE = 60;                         // altura (px) das paredes de tijolo do pacote
 import type { PixelImage } from '../assets/pixel';
 
 export interface AgenteInfo { id: string; chave: string; nome: string; cargo: string; departamento: string; estado: string; avatarId?: string | null; tarefaAtual?: string | null; estadoSocial?: AtividadeSocial; desde?: string | null }
@@ -27,13 +29,14 @@ interface EntObjeto { id: string; o: ObjetoLayout; t: TipoObjeto; sprite: Sprite
 interface EntParede { sprite: Sprite; corpo: CorpoIso }
 interface EntPessoa {
   id: string; p: PersonagemLayout; agenteId: string | null; x: number; y: number; dir: Direcao; caminho: Celula[]; sprite: Sprite; rotulo: Text; ponto: Graphics;
-  sheet: { base: unknown; def: SheetDef } | null; sheetKey: string; noPosto: boolean; corpo: CorpoIso; sentado: boolean; nome: string; indo: 'posto' | 'usuario' | 'assento' | null; reuniao: boolean;
+  sheet: { base: unknown; def: SheetDef } | null; sheetKey: string; noPosto: boolean; corpo: CorpoIso; sentado: boolean; nome: string; indo: 'posto' | 'usuario' | 'assento' | 'passeio' | null; reuniao: boolean; fase: number; comp: Comp; rnd: () => number;
 }
 
 export class OfficeEngine {
   readonly bus = new EventBus<OfficeEventos>();
   readonly camera = new CameraIso();
   readonly texturas: Texturas;
+  readonly pacote = new Pacote();
   readonly app = new Application();
   layout!: Layout; grade!: Grade;
   modo: Modo = 'execucao';
@@ -59,6 +62,7 @@ export class OfficeEngine {
   }
 
   async init(): Promise<void> {
+    await this.pacote.carregar(); this.texturas.usarPacote(this.pacote);
     await this.app.init({ resizeTo: this.host, background: '#10142b', antialias: false, roundPixels: true, autoStart: false, preference: 'webgl' });
     this.host.appendChild(this.app.canvas);
     this.app.canvas.style.touchAction = 'none';
@@ -151,8 +155,9 @@ export class OfficeEngine {
   reconstruirEstruturas(): void {
     for (const w of this.paredes) w.sprite.destroy(); this.paredes = [];
     for (const w of this.layout.paredes) {
-      const t = this.texturas.parede(w.lado, w.tipo ?? 'parede', w.abertura ?? null); const s = new Sprite(t.tex); const p = gridParaTela(w.x, w.y);
-      s.position.set(p.x - t.ox, p.y - t.oy);
+      const nomeP = `${w.abertura === 'porta' ? 'porta' : w.abertura === 'janela' || w.tipo === 'vidro' ? 'janela' : 'parede'}-${w.lado}`; const pp = this.pacote.pronto ? this.pacote.paredes.get(nomeP) : null;
+      const t = pp ? null : this.texturas.parede(w.lado, w.tipo ?? 'parede', w.abertura ?? null); const s = new Sprite(pp ? pp.tex : t!.tex); const p = gridParaTela(w.x, w.y);
+      if (pp) { s.scale.set(ESCALA_ARTE); s.position.set(p.x - pp.ax * ESCALA_ARTE, p.y - pp.ay * ESCALA_ARTE); } else s.position.set(p.x - t!.ox, p.y - t!.oy);
       // a parede é uma caixa fina sobre a aresta: N em y (de x a x+1), W em x (de y a y+1)
       const corpo = w.lado === 'N' ? corpoIso(`w:${w.x},${w.y},N`, w.x, w.y - 0.04, 1, 0.08, ALTURA_PAREDE, CAMADA.parede) : corpoIso(`w:${w.x},${w.y},W`, w.x - 0.04, w.y, 0.08, 1, ALTURA_PAREDE, CAMADA.parede);
       this.entidades.addChild(s); this.paredes.push({ sprite: s, corpo });
@@ -173,8 +178,11 @@ export class OfficeEngine {
         sprite.anchor.set(a?.ancora.x ?? 0.5, a?.ancora.y ?? 1); sprite.scale.set(a?.escala ?? 1);
         const base = gridParaTela(o.x + w, o.y + d); sprite.position.set(base.x, base.y - z);
       } else {
-        const tex = this.texturas.objeto(o.tipo, o.rot ?? 0); sprite = new Sprite(tex.tex); arte = tex.arte.img;
-        const top = gridParaTela(o.x, o.y); sprite.position.set(top.x - tex.ox, top.y - tex.oy - z);
+        const sp = this.pacote.pronto && t.sprite ? this.pacote.objeto(t.sprite, Boolean(t.espelhar) !== ((o.rot ?? 0) % 2 === 1)) : null;
+        if (sp) {                                                   // arte do pacote: o ponto mais baixo do desenho fica no vértice da frente do espaço ocupado
+          sprite = new Sprite(sp.tex); arte = sp.arte; sprite.scale.set(ESCALA_ARTE); const base = gridParaTela(o.x + w, o.y + d);
+          sprite.position.set(base.x - sp.ax * ESCALA_ARTE, base.y - sp.ay * ESCALA_ARTE - z - (t.parede ?? 0));
+        } else { const tex = this.texturas.objeto(o.tipo, o.rot ?? 0); sprite = new Sprite(tex.tex); arte = tex.arte.img; const top = gridParaTela(o.x, o.y); sprite.position.set(top.x - tex.ox, top.y - tex.oy - z); }
       }
       const camada = t.categoria === 'computadores' || t.categoria === 'equipamentos' ? CAMADA.objeto : CAMADA.mobiliario;
       const corpo = corpoIso(`o:${o.id}`, o.x, o.y, w, d, t.altura + z, t.tipo === 'tapete' ? CAMADA.piso : camada);
@@ -194,7 +202,7 @@ export class OfficeEngine {
       const ponto = new Graphics();
       this.entidades.addChild(sprite); this.efeitos.addChild(rotulo); this.efeitos.addChild(ponto);
       const ag = p.agenteId ? this.agentes.get(p.agenteId) : null;
-      this.pessoas.push({ id: p.id, p, agenteId: p.agenteId ?? null, x: ant?.x ?? p.x + 0.5, y: ant?.y ?? p.y + 0.5, dir: ant?.dir ?? p.dir ?? 'SE', caminho: ant?.caminho ?? [], sprite, rotulo, ponto, sheet: null, sheetKey: '', noPosto: ant?.noPosto ?? false, corpo: corpoIso(`p:${p.id}`, 0, 0, 0.2, 0.2, 44, CAMADA.personagem), sentado: false, nome: ag?.nome ?? p.id, indo: ant?.indo ?? null, reuniao: ant?.reuniao ?? false });
+      this.pessoas.push({ id: p.id, p, agenteId: p.agenteId ?? null, x: ant?.x ?? p.x + 0.5, y: ant?.y ?? p.y + 0.5, dir: ant?.dir ?? p.dir ?? 'SE', caminho: ant?.caminho ?? [], sprite, rotulo, ponto, sheet: null, sheetKey: '', noPosto: ant?.noPosto ?? false, corpo: corpoIso(`p:${p.id}`, 0, 0, 0.2, 0.2, 44, CAMADA.personagem), sentado: false, nome: ag?.nome ?? p.id, indo: ant?.indo ?? null, reuniao: ant?.reuniao ?? false, fase: ant?.fase ?? (hash(p.id) % 628) / 100, comp: ant?.comp ?? novoComp(p.dir ?? 'NE', this.tempo, p.id), rnd: ant?.rnd ?? aleatorio(hash(p.id)) });
     }
     this.sujoProfundidade = true; this.aplicarVisibilidade();
   }
@@ -205,7 +213,11 @@ export class OfficeEngine {
     const g = new Graphics();
     for (const o of this.layout.objetos) {
       const t = this.tipoDe(o); if (!t || !t.solido || t.altura < 20) continue;
-      const { w, d } = dimensoes(t, o.rot ?? 0); const a = gridParaTela(o.x + 0.1, o.y + 0.1); const b = gridParaTela(o.x + w + 0.35, o.y + 0.1); const c = gridParaTela(o.x + w + 0.35, o.y + d + 0.35); const e = gridParaTela(o.x + 0.1, o.y + d + 0.35);
+      const { w, d } = dimensoes(t, o.rot ?? 0);
+      if (t.sprite && this.pacote.pronto) {                      // arte do pacote: sombra suave redonda sob a base (nada de losango duro)
+        const c = gridParaTela(o.x + w / 2 + 0.1, o.y + d / 2 + 0.1); g.ellipse(c.x, c.y + 2, (w + d) * 11 + 6, (w + d) * 5.5 + 3).fill({ color: 0x000000, alpha: 0.16 }); continue;
+      }
+      const a = gridParaTela(o.x + 0.1, o.y + 0.1); const b = gridParaTela(o.x + w + 0.35, o.y + 0.1); const c = gridParaTela(o.x + w + 0.35, o.y + d + 0.35); const e = gridParaTela(o.x + 0.1, o.y + d + 0.35);
       g.poly([a.x, a.y, b.x, b.y, c.x, c.y, e.x, e.y]).fill({ color: 0x000000, alpha: 0.13 });
     }
     this.sombras.addChild(g); this.sombras.visible = this.camadasVisiveis.efeito !== false;
@@ -247,7 +259,7 @@ export class OfficeEngine {
   private chegouAoPosto(p: EntPessoa): void {
     p.noPosto = true; p.indo = null; p.x = Math.floor(p.x) + 0.5; p.y = Math.floor(p.y) + 0.5;
     const e = this.estacaoDe(p.agenteId); const obj = e ? this.layout.objetos.find((o) => o.id === e.objetoId) : null;
-    if (obj) p.dir = direcaoDe(Math.sign(obj.x - Math.floor(p.x)), Math.sign(obj.y - Math.floor(p.y)), p.dir);   // de frente para a mesa
+    p.dir = p.comp.casa; p.comp.estado = 'sitting'; p.comp.proxima = this.tempo + 4 + p.rnd() * 8; void obj;       // de frente para a mesa (direção de casa do avatar)
   }
   /** Manda um personagem andar até uma célula (clique do usuário). Devolve false se não houver caminho. */
   irPara(personagemId: string, destino: Celula): boolean {
@@ -397,10 +409,48 @@ export class OfficeEngine {
       const alvo = p.caminho[0]; const tx = alvo.x + 0.5; const ty = alvo.y + 0.5; const dx = tx - p.x; const dy = ty - p.y; const dist = Math.hypot(dx, dy);
       const vel = VELOCIDADE * (this.sheetDe(p)?.def.velocidade ?? 1) * dt;
       p.dir = direcaoDe(Math.round(Math.sign(dx) * (Math.abs(dx) > 0.01 ? 1 : 0)), Math.round(Math.sign(dy) * (Math.abs(dy) > 0.01 ? 1 : 0)), p.dir);
-      if (dist <= vel) { p.x = tx; p.y = ty; p.caminho.shift(); if (!p.caminho.length) { if (p.indo === 'posto') this.chegouAoPosto(p); else if (p.indo === 'assento') this.chegouAoAssento(p); else p.indo = null; } }
+      if (dist <= vel) { p.x = tx; p.y = ty; p.caminho.shift(); if (!p.caminho.length) { if (p.indo === 'posto') this.chegouAoPosto(p); else if (p.indo === 'assento') this.chegouAoAssento(p); else if (p.indo === 'passeio') { p.indo = null; p.comp.estado = 'idle'; p.comp.proxima = this.tempo + 3.5 + p.rnd() * 5; p.dir = girar(p.dir, p.rnd() < 0.5 ? 2 : -2); } else p.indo = null; } }
       else { p.x += (dx / dist) * vel; p.y += (dy / dist) * vel; }
       this.sujoProfundidade = true;
     }
+    this.comportar();
+  }
+
+  /** Liga/desliga a vida autônoma do ambiente (giros, pausas, voltinhas). Os estados reais dos agentes sempre têm prioridade. */
+  ambienteVivo = true;
+  private comportar(): void {
+    if (this.modo !== 'execucao' && this.modo !== 'visualizacao') return;
+    const passeando = this.pessoas.some((q) => q.indo === 'passeio');
+    for (const p of this.pessoas) {
+      const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; if (!ag) continue;
+      const c = p.comp; const movendo = p.caminho.length > 0;
+      const real = ESTADOS_DE_TRABALHO.includes(ag.estado) || ['aguardando_aprovacao', 'pausado', 'concluido', 'com_erro'].includes(ag.estado) || Boolean(ag.estadoSocial) || p.reuniao || p.indo === 'usuario' || p.indo === 'assento';
+      if (movendo) { c.estado = 'walking'; continue; }
+      if (real) { c.estado = ESTADOS_DE_TRABALHO.includes(ag.estado) ? 'working' : 'sitting'; c.proxima = this.tempo + 5 + p.rnd() * 6; continue; }
+      if (c.estado === 'working') c.estado = 'sitting';
+      if (!this.ambienteVivo) continue;
+      const e = this.estacaoDe(p.agenteId); const noPosto = !e?.pontoTrabalho || (Math.floor(p.x) === e.pontoTrabalho.x && Math.floor(p.y) === e.pontoTrabalho.y);
+      if (c.estado === 'idle' && !noPosto) { if (this.tempo >= c.proxima) { c.estado = 'walking'; this.irAoPosto(p, true); } continue; }       // acabou a pausa da voltinha: volta ao posto
+      const ocioso = ag.desde ? Math.max(0, Date.now() - Date.parse(ag.desde)) : 0;
+      const a = proximaAcao(c, { agora: this.tempo, rnd: p.rnd, livre: noPosto, podeAndar: !passeando && this.pessoas.length > 1 && !this.camposOcupados(), ocioMs: ocioso });
+      if (!a) continue;
+      if (a.tipo === 'virar') { p.dir = a.dir; c.dir = a.dir; }
+      else if (a.tipo === 'sentar') { p.dir = c.casa; c.estado = 'sitting'; }
+      else if (a.tipo === 'estado') { c.estado = a.estado; if (a.estado === 'resting') p.dir = girar(c.casa, p.rnd() < 0.5 ? 2 : -2); }
+      else if (a.tipo === 'andar') this.passear(p);
+    }
+  }
+  private camposOcupados(): boolean { return false; }
+  /** Voltinha curta: um ponto livre perto do posto (alcançável, no máximo 10 passos); depois uma pausa e o retorno. */
+  private passear(p: EntPessoa): void {
+    const ox = Math.floor(p.x); const oy = Math.floor(p.y);
+    for (let tentativa = 0; tentativa < 14; tentativa++) {
+      const dx = Math.round((p.rnd() - 0.5) * 9); const dy = Math.round((p.rnd() - 0.5) * 9); if (Math.abs(dx) + Math.abs(dy) < 3) continue;
+      const alvo = { x: ox + dx, y: oy + dy }; if (!this.grade.livre(alvo.x, alvo.y)) continue;
+      const rota = acharCaminho(this.grade, { x: ox, y: oy }, alvo); if (!rota || rota.length < 2 || rota.length > 10) continue;
+      p.caminho = rota; p.indo = 'passeio'; p.noPosto = false; p.comp.estado = 'walking'; return;
+    }
+    p.comp.proxima = this.tempo + 6;
   }
 
   private sheetDe(p: EntPessoa): { base: unknown; def: SheetDef } | null {
@@ -415,12 +465,13 @@ export class OfficeEngine {
 
   private estadoAnimacao(p: EntPessoa): EstadoAnim {
     const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const movendo = p.caminho.length > 0; const social = ag?.estadoSocial ?? null;
-    const sentadoAgora = !movendo && this.naCadeira(p);
+    const sentadoAgora = !movendo && (this.naCadeira(p) || this.usaArteDoPacote(p));       // o avatar do pacote já vem sentado na cadeira
     const ocioso = ag?.desde ? Math.max(0, Date.now() - Date.parse(ag.desde)) : 0;
     const base = estadoParaAnimacao(ag?.estado ?? 'disponivel', { noPosto: p.noPosto, movendo, social, naReuniao: sentadoAgora && (social === 'conversando' || social === 'reunido'), ociosoMs: sentadoAgora ? ocioso : 0 });
     if (base === 'idle' && sentadoAgora) return 'sitting';
     return base;
   }
+  private usaArteDoPacote(p: EntPessoa): boolean { const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const imp = p.p.personagemId ?? ag?.avatarId; return this.pacote.pronto && this.pacote.temPersonagem(ag?.chave ?? p.id.replace('pers-', '')) && !(imp && this.sheetsImportadas.has(imp)); }
   private naCadeira(p: EntPessoa): boolean { const cx = Math.floor(p.x); const cy = Math.floor(p.y); return this.objetos.some((o) => o.t.sentavel && o.o.x === cx && o.o.y === cy); }
 
   private desenhar(): void {
@@ -428,18 +479,31 @@ export class OfficeEngine {
     const off = this.camera.zoom;
     this.mundo.scale.set(off); this.mundo.position.set(Math.round(this.camera.viewW / 2 - this.camera.x * off), Math.round(this.camera.viewH / 2 - this.camera.y * off));
     for (const p of this.pessoas) {
-      const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const estado = this.estadoAnimacao(p); const s = this.sheetDe(p);
+      const ag = p.agenteId ? this.agentes.get(p.agenteId) : null; const estado = this.estadoAnimacao(p);
+      const chaveArte = ag?.chave ?? p.id.replace('pers-', ''); const importado = Boolean(p.p.personagemId ?? ag?.avatarId) && this.sheetsImportadas.has((p.p.personagemId ?? ag?.avatarId) as string);
+      const sp = !importado && this.pacote.pronto ? this.pacote.personagem(chaveArte, p.dir) : null;
+      let altura = 52;
+      if (sp) {                                                   // avatar do pacote: 8 direções (sentado na cadeira), com movimento leve por estado
+        const m = movimentoLeve(estado, this.tempo, p.fase);
+        p.sprite.texture = sp.tex; p.sprite.scale.set(ESCALA_ARTE); p.sprite.anchor.set(0.5, 1); altura = sp.h * ESCALA_ARTE; p.sentado = false;
+        const t = gridParaTela(p.x, p.y); p.sprite.position.set(Math.round(t.x + m.dx), Math.round(t.y + m.dy));
+        p.rotulo.text = p.nome; p.rotulo.position.set(Math.round(t.x), Math.round(t.y) - altura - 2);
+        const cor = COR_ESTADO[ag?.estado ?? 'disponivel'] ?? 0x2fd27a; p.ponto.clear().circle(Math.round(t.x), Math.round(t.y) - altura - 20, 4).fill(cor).stroke({ width: 1.5, color: 0x10142b });
+        if (p.agenteId) this.ancoras.set(p.agenteId, { x: Math.round(t.x) * off + this.mundo.position.x, y: (Math.round(t.y) - altura - 24) * off + this.mundo.position.y });
+        p.corpo = corpoIso(`p:${p.id}`, p.x - 0.12, p.y - 0.12, 0.24, 0.24, 44, CAMADA.personagem);
+        continue;
+      }
+      const s = this.sheetDe(p);
       if (s) {
         const anim = escolherAnimacao(s.def, estado, p.dir);
         if (anim) { p.sprite.texture = this.texturas.quadro(s as never, anim.linha, quadroEm(anim, this.tempo)); p.sprite.scale.set(s.def.escala); p.sprite.anchor.set(s.def.ancora.x, s.def.ancora.y); }
       }
       p.sentado = ESTADOS_SENTADOS.includes(estado);
       const t = gridParaTela(p.x, p.y, p.sentado ? 8 : 0); p.sprite.position.set(Math.round(t.x), Math.round(t.y));
-      p.rotulo.text = p.nome; p.rotulo.position.set(Math.round(t.x), Math.round(t.y) - 52 * (p.sprite.scale.y || 1));
-      if (p.agenteId) this.ancoras.set(p.agenteId, { x: Math.round(t.x) * off + this.mundo.position.x, y: (Math.round(t.y) - 52 * (p.sprite.scale.y || 1) - 22) * off + this.mundo.position.y });
-      const cor = COR_ESTADO[ag?.estado ?? 'disponivel'] ?? 0x2fd27a; p.ponto.clear().circle(Math.round(t.x), Math.round(t.y) - 52 * (p.sprite.scale.y || 1) - 18, 4).fill(cor).stroke({ width: 1.5, color: 0x10142b });
-      const grade = { x: p.x, y: p.y };
-      p.corpo = corpoIso(`p:${p.id}`, grade.x - 0.12, grade.y - 0.12, 0.24, 0.24, 44, CAMADA.personagem);
+      p.rotulo.text = p.nome; p.rotulo.position.set(Math.round(t.x), Math.round(t.y) - altura * (p.sprite.scale.y || 1));
+      const cor = COR_ESTADO[ag?.estado ?? 'disponivel'] ?? 0x2fd27a; p.ponto.clear().circle(Math.round(t.x), Math.round(t.y) - altura * (p.sprite.scale.y || 1) - 18, 4).fill(cor).stroke({ width: 1.5, color: 0x10142b });
+      if (p.agenteId) this.ancoras.set(p.agenteId, { x: Math.round(t.x) * off + this.mundo.position.x, y: (Math.round(t.y) - altura * (p.sprite.scale.y || 1) - 22) * off + this.mundo.position.y });
+      p.corpo = corpoIso(`p:${p.id}`, p.x - 0.12, p.y - 0.12, 0.24, 0.24, 44, CAMADA.personagem);
       if (p.sentado) p.corpo.vies = 400;
     }
     if (this.sujoProfundidade) this.reordenar();

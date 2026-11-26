@@ -1,84 +1,76 @@
 import { describe, expect, it } from 'vitest';
-import { layoutPadrao, FUNCIONARIOS } from '../../src/office/layoutPadrao';
+import { layoutPadrao, FUNCIONARIOS, VERSAO_PADRAO } from '../../src/office/layoutPadrao';
 import { Grade } from '../../src/office/grade';
 import { acharCaminho } from '../../src/office/caminho';
-import { dimensoes, objetoPorTipo, OBJETOS } from '../../src/office/catalogo';
+import { dimensoes, objetoPorTipo, OBJETOS, PISO_PACOTE, pisoPorTipo } from '../../src/office/catalogo';
 import { podeColocar } from '../../src/office/construtor';
 import { indice } from '../../src/office/modelo';
-import { desenharObjeto } from '../../src/office/arte/moveis';
 
 declare const process: { env: Record<string, string | undefined> };
 process.env.DATA_DIR ??= '.tmp-testes/vitest-layout';
 // o validador do servidor é JavaScript: o teste garante que o cliente e o servidor concordam sobre o formato
 // @ts-expect-error módulo JS sem declaração de tipos
 const { validarLayout } = (await import('../../../server/commerce/layouts.js')) as { validarLayout: (l: unknown) => unknown };
+// @ts-expect-error módulo do Node sem tipos neste projeto
+const { readFileSync } = (await import('node:fs')) as { readFileSync: (u: URL, e: string) => string };
+const man = JSON.parse(readFileSync(new URL('../../office/public/arte/manifesto.json', import.meta.url), 'utf8')) as { objetos: Record<string, unknown>; paredes: Record<string, unknown>; pisos: Record<string, unknown> };
 
-describe('layout padrão 2.1: duas salas', () => {
+describe('layout padrão 3.0: uma única sala com a arte nova', () => {
   const ids = { eleonor: 'ag-e', lady: 'ag-l', sophia: 'ag-s', laurinda: 'ag-u', lucya: 'ag-c' };
   const L = layoutPadrao(ids);
   const tipos = (t: string) => L.objetos.filter((o) => o.tipo === t);
-  const dentroDe = (o: { x: number; y: number }, chave: string) => { const d = L.departamentos.find((q) => q.chave === chave)!; return o.x >= d.x && o.x < d.x + d.w && o.y >= d.y && o.y < d.y + d.h; };
 
-  it('é aceito pelo servidor, marcado como 2.1 e tem EXATAMENTE duas salas: Estoque e Logística e Escritório Central', () => {
+  it('é aceito pelo servidor, marcado como 3.0 e tem UMA ÚNICA sala (nada de salas pequenas)', () => {
     expect(() => validarLayout(L)).not.toThrow();
-    expect(L.meta?.padrao).toBe('2.1');
-    expect(L.departamentos.map((d) => d.chave)).toEqual(['estoque', 'escritorio']);
+    expect(L.meta?.padrao).toBe(VERSAO_PADRAO); expect(VERSAO_PADRAO).toBe('3.0');
+    expect(L.departamentos).toHaveLength(1); expect(L.departamentos[0].chave).toBe('escritorio');
+    expect(L.paredes.filter((w) => w.x > 1 && w.lado === 'W' && w.abertura !== null)).toHaveLength(0);          // sem divisórias internas
+    expect(L.paredes.filter((w) => w.lado === 'W').every((w) => w.x === 1)).toBe(true);
   });
 
-  it('todo tipo usado existe no catálogo, fica sobre piso e os ids são únicos', () => {
+  it('todo sprite usado existe no pacote de arte; todo piso e toda parede também', () => {
+    for (const o of L.objetos) { const t = objetoPorTipo(o.tipo); expect(t, o.tipo).toBeDefined(); expect(t!.sprite, `${o.tipo} sem arte do pacote`).toBeTruthy(); expect(man.objetos[t!.sprite!], `${o.tipo} → ${t!.sprite}`).toBeDefined(); }
+    for (const t of new Set(L.piso.filter(Boolean))) { expect(PISO_PACOTE[t], `piso ${t}`).toBeTruthy(); expect(man.pisos[PISO_PACOTE[t]], `arquivo do piso ${t}`).toBeDefined(); expect(pisoPorTipo(t)).toBeDefined(); }
+    for (const n of ['parede-W', 'parede-N', 'janela-W', 'janela-N', 'porta-W', 'porta-N']) expect(man.paredes[n], n).toBeDefined();
+    for (const t of OBJETOS.filter((o) => o.sprite)) expect(man.objetos[t.sprite!], `${t.tipo} → ${t.sprite}`).toBeDefined();
+  });
+
+  it('todo objeto fica sobre piso, ids são únicos e as regras do Office Builder aceitam cada um (sem sobreposição nem objeto solto no ar)', () => {
     for (const o of L.objetos) {
-      const t = objetoPorTipo(o.tipo); expect(t, o.tipo).toBeDefined();
-      const { w, d } = dimensoes(t!, o.rot ?? 0);
+      const t = objetoPorTipo(o.tipo)!; const { w, d } = dimensoes(t, o.rot ?? 0);
       for (let dy = 0; dy < d; dy++) for (let dx = 0; dx < w; dx++) expect(L.piso[indice(L, o.x + dx, o.y + dy)], `${o.id} em ${o.x + dx},${o.y + dy}`).not.toBe('');
+      const sem = { ...L, objetos: L.objetos.filter((x) => x.id !== o.id) }; const r = podeColocar(sem, t, o.x, o.y, o.rot ?? 0); expect(r.ok, `${o.id} (${o.tipo}) em ${o.x},${o.y}: ${r.motivo}`).toBe(true);
     }
     expect(new Set(L.objetos.map((o) => o.id)).size).toBe(L.objetos.length);
   });
 
-  it('as regras do Office Builder aceitam cada objeto do layout (nada sobreposto nem solto no ar)', () => {
-    for (const o of L.objetos) {
-      const sem = { ...L, objetos: L.objetos.filter((x) => x.id !== o.id) };
-      const r = podeColocar(sem, objetoPorTipo(o.tipo)!, o.x, o.y, o.rot ?? 0);
-      expect(r.ok, `${o.id} (${o.tipo}) em ${o.x},${o.y}: ${r.motivo}`).toBe(true);
-    }
+  it('é um escritório vivo: estações completas, estantes e armários, convivência, café, plantas, janelas, logística e reunião', () => {
+    for (const c of ['eleonor', 'lady', 'sophia', 'laurinda', 'lucya']) for (const p of ['mesa', 'mon', 'torre', 'lum']) expect(L.objetos.some((o) => o.id === `${p}-${c}`), `${p}-${c}`).toBe(true);
+    for (const t of ['estante-livros', 'armario', 'sofa', 'poltrona', 'mesa-centro', 'cafeteira-mesa', 'bebedouro', 'copiadora', 'caixa-g', 'mesa-reuniao', 'quadro-branco', 'relogio-parede', 'quadro-decorativo', 'servidor-rack']) expect(tipos(t).length, t).toBeGreaterThan(0);
+    expect(L.objetos.filter((o) => /planta|arvore|vaso/.test(o.tipo)).length).toBeGreaterThanOrEqual(8);
+    expect(L.paredes.filter((w) => w.abertura === 'janela').length).toBeGreaterThanOrEqual(8); expect(L.paredes.some((w) => w.abertura === 'porta')).toBe(true);
+    expect(L.objetos.length).toBeGreaterThanOrEqual(90);
   });
 
-  it('a Sala de Estoque é rica: caixas, pilhas, prateleiras, bancada, computador, impressora de etiquetas, embalagem, carrinho e organização', () => {
-    const est = L.objetos.filter((o) => dentroDe(o, 'estoque'));
-    for (const t of ['caixa-p', 'caixa-m', 'caixa-g', 'pilha-caixas', 'palete-caixas', 'prateleira-estoque', 'mesa-bancada', 'monitor', 'impressora-etiquetas', 'materiais-embalagem', 'carrinho', 'organizador', 'quadro-avisos', 'balanca']) expect(est.some((o) => o.tipo === t), t).toBe(true);
-    expect(est.length).toBeGreaterThanOrEqual(40);
-  });
-
-  it('o Escritório Central tem quatro estações completas (mesa, computador, monitor, teclado, mouse, cadeira, documentos, objetos pessoais) e a decoração pedida', () => {
-    for (const c of ['eleonor', 'lady', 'sophia', 'laurinda']) {
-      for (const p of ['mesa', 'mon', 'tec', 'mou', 'doc', 'pes', 'lum', 'torre', 'cad']) expect(L.objetos.some((o) => o.id === `${p}-${c}`), `${p}-${c}`).toBe(true);
-    }
-    const esc = L.objetos.filter((o) => dentroDe(o, 'escritorio'));
-    for (const t of ['quadro-branco', 'estante-livros', 'prateleira-parede', 'armario', 'impressora', 'papeis-pastas', 'planta', 'vaso-grande', 'tapete', 'relogio-parede', 'luminaria-chao', 'cafeteira-mesa', 'sofa', 'poltrona', 'quadro-decorativo', 'servidor-rack', 'bebedouro', 'mesa-reuniao']) expect(esc.some((o) => o.tipo === t), t).toBe(true);
-    expect(tipos('mesa-reuniao')).toHaveLength(1);
-  });
-
-  it('estações ligadas a ids reais; cadeira de trabalho e assento de reunião livres e alcançáveis', () => {
+  it('estações ligadas a ids reais; cadeira (posto) e assento de reunião livres, e tudo alcançável a partir da entrada', () => {
     const idsObj = new Set(L.objetos.map((o) => o.id)); for (const e of L.estacoes) { if (e.objetoId) expect(idsObj.has(e.objetoId), e.id).toBe(true); expect(e.ferramenta).toBeTruthy(); }
-    const g = new Grade(L); const portaEstoque = { x: 11, y: 7 };
+    const g = new Grade(L); const entrada = { x: 2, y: 9 };
     for (const f of FUNCIONARIOS) {
-      const trabalho = L.estacoes.find((e) => e.agenteChave === f.chave && e.ferramenta !== 'assento')!; expect(trabalho.agenteId).toBe((ids as Record<string, string>)[f.chave]);
-      expect(trabalho.departamento).toBe(f.departamento); expect(g.livre(trabalho.pontoTrabalho!.x, trabalho.pontoTrabalho!.y)).toBe(true);
+      const trabalho = L.estacoes.find((e) => e.agenteChave === f.chave && e.ferramenta !== 'assento')!; expect(trabalho.agenteId).toBe((ids as Record<string, string>)[f.chave]); expect(g.livre(trabalho.pontoTrabalho!.x, trabalho.pontoTrabalho!.y)).toBe(true);
       const assento = L.estacoes.find((e) => e.agenteChave === f.chave && e.ferramenta === 'assento')!; expect(g.livre(assento.pontoTrabalho!.x, assento.pontoTrabalho!.y)).toBe(true);
-      expect(acharCaminho(g, portaEstoque, trabalho.pontoTrabalho!), `${f.chave} posto`).not.toBeNull(); expect(acharCaminho(g, trabalho.pontoTrabalho!, assento.pontoTrabalho!), `${f.chave} reunião`).not.toBeNull();
-      const p = L.personagens.find((x) => x.id === `pers-${f.chave}`)!; expect(p.agenteId).toBe((ids as Record<string, string>)[f.chave]); expect(g.livre(p.x, p.y)).toBe(true);
+      expect(acharCaminho(g, entrada, trabalho.pontoTrabalho!), `${f.chave} posto`).not.toBeNull(); expect(acharCaminho(g, trabalho.pontoTrabalho!, assento.pontoTrabalho!), `${f.chave} reunião`).not.toBeNull();
+      const p = L.personagens.find((x) => x.id === `pers-${f.chave}`)!; expect(p.agenteId).toBe((ids as Record<string, string>)[f.chave]); expect(g.livre(p.x, p.y)).toBe(true); expect(p.dir).toBe(f.dir);
     }
-    expect(L.estacoes.find((e) => e.agenteChave === 'lucya' && e.ferramenta !== 'assento')!.ferramenta).toBe('estoque');
+    for (const e of L.estacoes) { const o = L.objetos.find((q) => q.id === e.objetoId); const alvo = e.pontoTrabalho ?? { x: o!.x, y: o!.y }; expect(acharCaminho(g, entrada, alvo, { aproximar: true }), e.id).not.toBeNull(); }
   });
 
-  it('as duas salas são conectadas por porta, e tudo (equipamentos, painéis, café, sofás) é alcançável', () => {
-    const g = new Grade(L); expect(L.paredes.some((w) => w.x === 12 && w.y === 7 && w.lado === 'W' && w.abertura === 'porta')).toBe(true);
-    expect(acharCaminho(g, { x: 3, y: 7 }, { x: 31, y: 13 }), 'do fundo do estoque ao café').not.toBeNull();
-    for (const e of L.estacoes) { const o = L.objetos.find((q) => q.id === e.objetoId); const alvo = e.pontoTrabalho ?? { x: o!.x, y: o!.y }; expect(acharCaminho(g, { x: 3, y: 7 }, alvo, { aproximar: true }), e.id).not.toBeNull(); }
+  it('há espaço de circulação: corredor central livre de ponta a ponta', () => {
+    const g = new Grade(L); for (let x = 2; x <= 27; x++) expect(g.livre(x, 7), `corredor em ${x},7`).toBe(true);
+    expect(acharCaminho(g, { x: 2, y: 8 }, { x: 27, y: 16 })).not.toBeNull();
   });
 
-  it('o catálogo não tem tipos repetidos, todas as ações têm destino e todo tipo tem arte própria', () => {
+  it('o catálogo não tem tipos repetidos e todas as ações têm destino', () => {
     expect(new Set(OBJETOS.map((o) => o.tipo)).size).toBe(OBJETOS.length);
     for (const o of OBJETOS) if (o.acao) { expect(o.acao.alvo).toBeTruthy(); expect(o.acao.rotulo).toBeTruthy(); }
-    for (const t of OBJETOS) { const a = desenharObjeto(t.tipo, 0); let opacos = 0; for (let i = 3; i < a.img.data.length; i += 4) if (a.img.data[i] > 0) opacos++; expect(opacos, `arte de ${t.tipo}`).toBeGreaterThan(20); }
   });
 });

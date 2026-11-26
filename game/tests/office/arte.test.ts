@@ -10,8 +10,8 @@ const opacos = (img: PixelImage): number => { let n = 0; for (let i = 3; i < img
 const recorte = (img: PixelImage, x: number, y: number, w: number, h: number): string => { const out: number[] = []; for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) out.push(img.get(x + i, y + j) ?? -1); return out.join(','); };
 
 describe('arte dos objetos', () => {
-  it('todo tipo do catálogo tem desenho próprio, visível, com o tamanho da pegada e a âncora dentro da imagem', () => {
-    for (const t of OBJETOS) {
+  it('todo tipo procedural (sem arte do pacote) tem desenho próprio, visível, com o tamanho da pegada e a âncora dentro da imagem', () => {
+    for (const t of OBJETOS.filter((o) => !o.sprite)) {
       expect(TIPOS_COM_ARTE, `sem desenho: ${t.tipo}`).toContain(t.tipo);
       const a = desenharObjeto(t.tipo, 0); const { w, d } = dimensoes(t, 0);
       expect(a.img.width).toBeGreaterThanOrEqual((w + d) * 32); expect(opacos(a.img), t.tipo).toBeGreaterThan(80);
@@ -24,8 +24,8 @@ describe('arte dos objetos', () => {
     expect(a.ox).not.toBe(b.ox); expect(a.img.hash()).not.toBe(b.img.hash());
   });
   it('objetos diferentes não saem iguais (cada um tem a sua aparência)', () => {
-    const hashes = new Set(OBJETOS.map((t) => desenharObjeto(t.tipo).img.hash()));
-    expect(hashes.size).toBe(OBJETOS.length);
+    const proc = OBJETOS.filter((o) => !o.sprite); const hashes = new Set(proc.map((t) => desenharObjeto(t.tipo).img.hash()));
+    expect(hashes.size).toBe(proc.length);
   });
   it('o desenho respeita a pegada: nenhum pixel fora do losango do chão + altura (não vaza para os lados)', () => {
     const t = OBJETOS.find((o) => o.tipo === 'mesa-reuniao')!; const a = desenharObjeto(t.tipo); const { w, d } = dimensoes(t);

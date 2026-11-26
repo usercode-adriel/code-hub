@@ -6,15 +6,19 @@ export interface TipoObjeto {
   solido: boolean; sentavel?: boolean; suporte?: string;          // suporte: tipo (categoria "mesa") em que precisa ficar
   alturaSuporte?: number;                                          // quanto o objeto sobe quando está sobre algo
   acao?: { alvo: string; rotulo: string };                         // ação padrão (painel do escritório ou ferramenta do Hub)
+  sprite?: string;                                                 // arte do pacote (game/office/public/arte/objetos); sem ela vale o desenho procedural (reserva)
+  espelhar?: boolean;                                              // a arte original está virada para o outro lado do eixo
+  parede?: number;                                                 // enfeite de parede: altura (px) em que fica pendurado
+  legado?: boolean;                                                // só existe para layouts antigos; não aparece na biblioteca do construtor
 }
 
 const O = (t: TipoObjeto): TipoObjeto => t;
-export const OBJETOS: TipoObjeto[] = [
+const ANTIGOS: TipoObjeto[] = [
   O({ tipo: 'mesa', nome: 'Mesa de trabalho', categoria: 'moveis', largura: 2, profundidade: 1, altura: 26, solido: true }),
   O({ tipo: 'mesa-executiva', nome: 'Mesa executiva', categoria: 'moveis', largura: 3, profundidade: 1, altura: 28, solido: true }),
   O({ tipo: 'cadeira', nome: 'Cadeira', categoria: 'moveis', largura: 1, profundidade: 1, altura: 22, solido: false, sentavel: true }),
   O({ tipo: 'computador', nome: 'Computador', categoria: 'computadores', largura: 1, profundidade: 1, altura: 22, solido: false, suporte: 'mesa', alturaSuporte: 26, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }),
-  O({ tipo: 'mesa-reuniao', nome: 'Mesa de reuniões', categoria: 'moveis', largura: 3, profundidade: 2, altura: 26, solido: true, acao: { alvo: 'reunioes', rotulo: 'Abrir sala de reuniões' } }),
+  O({ tipo: 'mesa-reuniao', nome: 'Mesa de reuniões', categoria: 'moveis', largura: 2, profundidade: 2, altura: 26, solido: true, acao: { alvo: 'reunioes', rotulo: 'Abrir sala de reuniões' } }),
   O({ tipo: 'cadeira-reuniao', nome: 'Cadeira de reunião', categoria: 'moveis', largura: 1, profundidade: 1, altura: 20, solido: false, sentavel: true }),
   O({ tipo: 'painel-indicadores', nome: 'Painel de indicadores', categoria: 'paineis', largura: 2, profundidade: 1, altura: 64, solido: true, acao: { alvo: 'indicadores', rotulo: 'Abrir indicadores' } }),
   O({ tipo: 'painel-financeiro', nome: 'Painel financeiro', categoria: 'paineis', largura: 2, profundidade: 1, altura: 64, solido: true, acao: { alvo: 'financeiro', rotulo: 'Abrir módulo financeiro' } }),
@@ -50,12 +54,12 @@ export const OBJETOS: TipoObjeto[] = [
   O({ tipo: 'torre-pc', nome: 'Computador (torre)', categoria: 'computadores', largura: 1, profundidade: 1, altura: 34, solido: true }),
   O({ tipo: 'mesa-apoio', nome: 'Mesa de apoio', categoria: 'moveis', largura: 1, profundidade: 1, altura: 26, solido: true }),
   O({ tipo: 'mesa-balcao', nome: 'Balcão do café', categoria: 'moveis', largura: 2, profundidade: 1, altura: 28, solido: true }),
-  O({ tipo: 'quadro-branco', nome: 'Quadro branco', categoria: 'paineis', largura: 3, profundidade: 1, altura: 54, solido: false, acao: { alvo: 'reunioes', rotulo: 'Abrir sala de reuniões' } }),
-  O({ tipo: 'quadro-decorativo', nome: 'Quadro decorativo', categoria: 'decoracao', largura: 2, profundidade: 1, altura: 46, solido: false }),
+  O({ tipo: 'quadro-branco', nome: 'Quadro branco', categoria: 'paineis', largura: 1, profundidade: 1, altura: 54, solido: false, acao: { alvo: 'reunioes', rotulo: 'Abrir sala de reuniões' } }),
+  O({ tipo: 'quadro-decorativo', nome: 'Quadro decorativo', categoria: 'decoracao', largura: 1, profundidade: 1, altura: 46, solido: false }),
   O({ tipo: 'relogio-parede', nome: 'Relógio de parede', categoria: 'decoracao', largura: 1, profundidade: 1, altura: 56, solido: false }),
   O({ tipo: 'prateleira-parede', nome: 'Prateleira de parede', categoria: 'decoracao', largura: 2, profundidade: 1, altura: 50, solido: false }),
-  O({ tipo: 'estante-livros', nome: 'Estante de livros', categoria: 'moveis', largura: 2, profundidade: 1, altura: 62, solido: true, acao: { alvo: 'assets', rotulo: 'Abrir biblioteca de recursos' } }),
-  O({ tipo: 'armario', nome: 'Armário', categoria: 'moveis', largura: 2, profundidade: 1, altura: 54, solido: true }),
+  O({ tipo: 'estante-livros', nome: 'Estante de livros', categoria: 'moveis', largura: 1, profundidade: 1, altura: 62, solido: true, acao: { alvo: 'assets', rotulo: 'Abrir biblioteca de recursos' } }),
+  O({ tipo: 'armario', nome: 'Armário', categoria: 'moveis', largura: 1, profundidade: 1, altura: 54, solido: true }),
   O({ tipo: 'poltrona', nome: 'Poltrona', categoria: 'moveis', largura: 1, profundidade: 1, altura: 30, solido: true, sentavel: true }),
   O({ tipo: 'luminaria-chao', nome: 'Luminária de chão', categoria: 'decoracao', largura: 1, profundidade: 1, altura: 64, solido: true }),
   O({ tipo: 'vaso-grande', nome: 'Vaso grande', categoria: 'plantas', largura: 1, profundidade: 1, altura: 62, solido: true }),
@@ -77,6 +81,9 @@ export const OBJETOS: TipoObjeto[] = [
   O({ tipo: 'extintor', nome: 'Extintor', categoria: 'estoque', largura: 1, profundidade: 1, altura: 30, solido: false }),
   O({ tipo: 'lixeira', nome: 'Lixeira', categoria: 'estoque', largura: 1, profundidade: 1, altura: 22, solido: true }),
 ];
+import { ALIAS, NOVOS } from './catalogoSprites';
+/** Catálogo final: tipos antigos (com a arte nova quando há equivalente; os sem equivalente ficam como legado) + tipos novos do pacote. */
+export const OBJETOS: TipoObjeto[] = [...ANTIGOS.map((o) => { const a = ALIAS[o.tipo]; return a ? { ...o, sprite: a.sprite, espelhar: a.espelhar ?? o.espelhar, parede: a.parede ?? o.parede } : { ...o, legado: true }; }), ...NOVOS.filter((n) => !ANTIGOS.some((o) => o.tipo === n.tipo))];
 export const objetoPorTipo = (tipo: string): TipoObjeto | undefined => OBJETOS.find((o) => o.tipo === tipo);
 
 export interface TipoPiso { tipo: string; nome: string; cor: number; cor2: number }
@@ -87,7 +94,12 @@ export const PISOS: TipoPiso[] = [
   { tipo: 'convivencia', nome: 'Convivência', cor: 0xd8a773, cor2: 0xca9966 }, { tipo: 'financeiro', nome: 'Piso verde', cor: 0x5b8f6a, cor2: 0x538560 },
   { tipo: 'estoque', nome: 'Concreto do estoque', cor: 0x8d9199, cor2: 0x7d818a }, { tipo: 'estoque-faixa', nome: 'Faixa de segurança', cor: 0xcaa83a, cor2: 0xb4952c },
   { tipo: 'escritorio', nome: 'Madeira clara', cor: 0xcfae80, cor2: 0xbf9d70 },
+  { tipo: 'carpete', nome: 'Carpete verde-azulado', cor: 0x1f7f8c, cor2: 0x1a7480 }, { tipo: 'ceramica-creme', nome: 'Cerâmica creme', cor: 0xe3d9c8, cor2: 0xd2c8b6 }, { tipo: 'ceramica-branca', nome: 'Cerâmica branca', cor: 0xf1eee6, cor2: 0xdedad0 },
+  { tipo: 'ceramica-cinza', nome: 'Cerâmica cinza', cor: 0xc4c1bb, cor2: 0xaeaba5 }, { tipo: 'ceramica-azul', nome: 'Cerâmica azul', cor: 0x7a8ea5, cor2: 0x697d94 }, { tipo: 'concreto-escuro', nome: 'Concreto escuro', cor: 0x5d5d66, cor2: 0x50505a },
 ];
+/** Piso do layout → imagem do pacote (game/office/public/arte/pisos). Sem entrada: vale o desenho procedural. */
+export const PISO_PACOTE: Record<string, string> = { madeira: 'madeira', escritorio: 'madeira', convivencia: 'madeira', 'carpete-azul': 'carpete', carpete: 'carpete', 'carpete-cinza': 'ceramica-cinza', porcelanato: 'ceramica-branca', corredor: 'ceramica-creme', estudio: 'concreto-escuro', estoque: 'concreto-escuro', financeiro: 'ceramica-azul',
+  'ceramica-creme': 'ceramica-creme', 'ceramica-branca': 'ceramica-branca', 'ceramica-cinza': 'ceramica-cinza', 'ceramica-azul': 'ceramica-azul', 'concreto-escuro': 'concreto-escuro' };
 export const pisoPorTipo = (t: string): TipoPiso | undefined => PISOS.find((p) => p.tipo === t);
 export const TIPOS_PAREDE = [{ tipo: 'parede', nome: 'Parede' }, { tipo: 'vidro', nome: 'Vidro' }];
 
