@@ -44,3 +44,13 @@ Alterados: `game/src/office/{engine,texturas,catalogo,layoutPadrao,arte/personag
 
 ## Inventário ampliado (folhas de computadores, servidores e baia)
 `game/tools/inventario.py` recorta 19 assets de `game/assets-fonte/inv-*.png` e os registra na biblioteca do Office Builder (Construção → Objeto): iMac G3, iMac alumínio, PC retrô, 4 monitores (curvo, preto, widescreen, lateral), teclado cinza, mouse, teclado retrô, mesa digitalizadora, torre de PC preta, 2 servidores torre, rack aberto, UPS de módulos, armário de racks bege, porta de metal e baia dupla. Teclado e mouse antigos passaram a usar a arte nova.
+
+## Criar escritório (estilo The Sims)
+No modo **Construção/Edição**, aba **Construtor**:
+- **Criar escritório**: nome, largura e profundidade (8 a 60 tiles), piso inicial e paredes ao redor. O escritório novo vem vazio, só com os funcionários; o anterior continua salvo na lista de layouts.
+- **Posicionamento livre**: seletor de *Encaixe* (grade 1, meia grade 0,5, fino 0,25, livre 0,1). Objetos usam posições fracionárias; colisões e A* consideram as células tocadas.
+- **Tamanho** (40% a 300%) e **direção** (girar/espelhar: a arte tem uma única orientação, então "girar" alterna o espelhamento e troca a pegada). O tamanho do próximo objeto também é ajustável antes de colocar.
+- **Atalhos no elemento**: ao clicar num objeto (ferramenta Selecionar) aparece uma barrinha sobre ele com ⧉ duplicar, − / + tamanho, ↻ girar, ▲ ▼ camadas (frente/trás) e 🗑 apagar. Tudo entra no desfazer/refazer.
+- **Tilesets**: pisos com prévia da arte e "Preencher o mapa todo".
+- **Parede esticável**: com a ferramenta Parede, arraste em linha reta (ou Shift para o contorno de uma sala) e solte; as arestas aparecem em pré-visualização e entram de uma vez no histórico. Porta, janela e borracha continuam por aresta.
+Limitações: não há curvas nem paredes diagonais (a grade de paredes é N/W); a "direção" dos objetos é só espelhamento porque os sprites têm uma orientação.

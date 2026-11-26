@@ -18,7 +18,8 @@ import { PainelCampanhas } from '../src/office/ui/PainelCampanhas';
 import { PainelAssets } from '../src/office/ui/PainelAssets';
 import { PainelPersonagens } from '../src/office/ui/PainelPersonagens';
 import { PainelReunioes, type Reuniao } from '../src/office/ui/PainelReunioes';
-import { PainelConstrutor } from '../src/office/ui/PainelConstrutor';
+import { PainelConstrutor, type CfgEscritorio } from '../src/office/ui/PainelConstrutor';
+import { AtalhosObjeto } from '../src/office/ui/AtalhosObjeto';
 import { PainelDepartamento } from '../src/office/ui/PainelDepartamento';
 import { PainelIndicadores, type Estado } from '../src/office/ui/PainelIndicadores';
 import { Baloes } from '../src/office/ui/Baloes';
@@ -142,7 +143,16 @@ export function App() {
   const agenteAtual = agentes.find((a) => a.id === agenteSel) ?? null;
   const emConstrucao = modo === 'construcao' || modo === 'edicao';
 
-  const novoLayoutVazio = async (): Promise<void> => { try { const r = await api.post<LayoutServidor>('/layouts', { nome: 'Novo escritório', dados: layoutVazio(24, 18, 'madeira'), ativar: true }); await carregarLayoutServidor(r); await carregarResto(); } catch (e) { aviso(e instanceof Error ? e.message : String(e)); } };
+  const criarEscritorio = async (cfg: CfgEscritorio): Promise<void> => {
+    if (construtor.current?.sujo() && !window.confirm('Há alterações não salvas no layout atual. Criar um novo escritório mesmo assim?')) return;
+    try {
+      const d = layoutVazio(cfg.l, cfg.a, cfg.piso); d.meta = { padrao: 'personalizado' };
+      if (cfg.paredes) { for (let x = 0; x < cfg.l; x++) d.paredes.push({ x, y: 0, lado: 'N', tipo: 'parede', abertura: null }); for (let y = 0; y < cfg.a; y++) d.paredes.push({ x: 0, y, lado: 'W', tipo: 'parede', abertura: null }); }
+      d.departamentos = [{ id: 'dep-escritorio', chave: 'escritorio', nome: cfg.nome, x: 0, y: 0, w: cfg.l, h: cfg.a, cor: '#6c4cf5' }];
+      d.personagens = agentesRef.current.slice(0, 12).map((a, i) => ({ id: `pers-${a.chave ?? a.id}`, agenteId: a.id, personagemId: null, x: Math.min(cfg.l - 1, 1 + (i % Math.max(1, cfg.l - 2))), y: Math.min(cfg.a - 1, 1 + Math.floor(i / Math.max(1, cfg.l - 2))), dir: 'S' as const }));
+      const r = await api.post<LayoutServidor>('/layouts', { nome: cfg.nome, dados: d, ativar: true }); await carregarLayoutServidor(r); await carregarResto(); aviso(`Escritório “${cfg.nome}” criado (${cfg.l}×${cfg.a}). Monte as paredes, o piso e os móveis.`);
+    } catch (e) { aviso(e instanceof Error ? e.message : String(e)); }
+  };
   const duplicar = async (): Promise<void> => { const ref = layoutRef.current; if (!ref) return; try { const r = await api.post<LayoutServidor>(`/layouts/${ref.id}/duplicar`); await api.post(`/layouts/${r.id}/ativar`); await carregarLayoutServidor(r); await carregarResto(); aviso('Layout duplicado — você está editando a cópia'); } catch (e) { aviso(e instanceof Error ? e.message : String(e)); } };
   const abrirLayout = async (id: string): Promise<void> => { try { const r = await api.get<LayoutServidor>(`/layouts/${id}`); await api.post(`/layouts/${id}/ativar`); await carregarLayoutServidor(r); await carregarResto(); } catch (e) { aviso(e instanceof Error ? e.message : String(e)); } };
   const removerLayout = async (id: string): Promise<void> => { if (!window.confirm('Remover este layout?')) return; try { await api.del(`/layouts/${id}`); await carregarResto(); const ativo = await api.get<LayoutServidor | null>('/layouts/ativo'); if (ativo && ativo.id !== layoutRef.current?.id) await carregarLayoutServidor(ativo); } catch (e) { aviso(e instanceof Error ? e.message : String(e)); } };
@@ -162,6 +172,7 @@ export function App() {
         </header>
         {hover && <div className="o-dica">{hover}</div>}
         {!pronto && <div className="o-carregando">Abrindo o escritório…</div>}
+        {emConstrucao && ec && construtor.current && motor.current && layout && <AtalhosObjeto motor={motor.current} c={construtor.current} e={ec} layout={motor.current.layout} />}
         <Baloes motor={motor.current} novas={novasMsgs} segundos={equipe.painel?.config.balaoSegundos ?? 7} />
         {modo !== 'visualizacao' && !emConstrucao && pronto && <CaixaChefe painel={equipe.painel} aoEnviar={equipe.enviarOrdem} aoCancelar={equipe.cancelar} aviso={aviso} />}
         <div className="o-avisos" role="status">{avisos.map((a) => <div key={a.id}>{a.texto}</div>)}</div>
@@ -172,7 +183,7 @@ export function App() {
         <aside className="o-lateral" aria-label="Painéis">
           <nav className="o-abas-nav">{emConstrucao && <button type="button" className={aba === ('construtor' as Aba) ? 'on' : ''} onClick={() => setAba('construtor' as Aba)}>Construtor</button>}{ABAS.map(([k, r]) => <button key={k} type="button" className={aba === k ? 'on' : ''} onClick={() => { setAba(k); setFerramenta(null); }}>{r}</button>)}</nav>
           <div className="o-lateral-corpo">
-            {aba === ('construtor' as Aba) && emConstrucao && construtor.current && ec && layout && motor.current && <PainelConstrutor c={construtor.current} e={ec} motor={motor.current} layout={motor.current.layout} layouts={layouts} assets={assets} agentes={agentes} aoSalvar={salvarLayout} aoNovo={novoLayoutVazio} aoDuplicar={duplicar} aoAbrir={abrirLayout} aoRemoverLayout={removerLayout} camadas={camadas} setCamada={setCamada} modo={modo} salvando={salvando} />}
+            {aba === ('construtor' as Aba) && emConstrucao && construtor.current && ec && layout && motor.current && <PainelConstrutor c={construtor.current} e={ec} motor={motor.current} layout={motor.current.layout} layouts={layouts} assets={assets} agentes={agentes} aoSalvar={salvarLayout} aoCriar={criarEscritorio} aoDuplicar={duplicar} aoAbrir={abrirLayout} aoRemoverLayout={removerLayout} camadas={camadas} setCamada={setCamada} modo={modo} salvando={salvando} />}
             {aba === 'escritorio' && (ferramenta === 'departamento' && depSel && layout ? <PainelDepartamento chave={depSel} nome={nomeDep} layout={layout} agentes={agentes} tarefas={tarefas} abrirAgente={(id) => { setAgenteSel(id); setAba('agentes'); }} abrirTarefas={() => setAba('tarefas')} />
               : ferramenta === 'estudio-video' ? <EstudioVideo agentes={agentes} aoMudar={atualizarTudo} aviso={aviso} /> : <PainelIndicadores estado={estado} agentes={agentes} tarefas={tarefas} resumoReal={resumo} />)}
             {aba === 'agentes' && (agenteAtual ? <div className="o-pilha"><Botao pequeno onClick={() => setAgenteSel(null)}>← Todos os agentes</Botao><PainelAgente agente={agenteAtual} tarefas={tarefas} aoMudar={atualizarTudo} aviso={aviso} abrirConversas={(id) => { setFiltroConversa(id); setAba('conversas'); }} /></div> : <ListaAgentes agentes={agentes} abrir={(id) => { setAgenteSel(id); const p = motor.current?.listaPessoas().find((x) => x.agenteId === id); if (p) motor.current?.selecionar({ tipo: 'personagem', id: p.id, agenteId: id }); }} />)}

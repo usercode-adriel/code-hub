@@ -1,7 +1,7 @@
 // GRADE LÓGICA DE COLISÃO E NAVEGAÇÃO. Construída a partir do layout: células sem piso, móveis sólidos, colisões manuais e paredes.
 // Paredes ficam nas ARESTAS entre células: 'N' separa (x, y−1) de (x, y); 'W' separa (x−1, y) de (x, y). Porta deixa passar; janela não.
 import { dentro, indice, type Layout, type ObjetoLayout } from './modelo';
-import { dimensoes, objetoPorTipo, type TipoObjeto } from './catalogo';
+import { celulasDe, dimensoes, objetoPorTipo, type TipoObjeto } from './catalogo';
 
 export type ResolveTipo = (o: ObjetoLayout) => TipoObjeto | undefined;
 export const resolvePadrao: ResolveTipo = (o) => objetoPorTipo(o.tipo);
@@ -20,8 +20,8 @@ export class Grade {
     for (const c of l.colisoes) if (dentro(l, c.x, c.y)) this.bloq[indice(l, c.x, c.y)] = 1;
     for (const o of l.objetos) {
       const t = resolve(o); if (!t || !t.solido) continue;
-      const { w, d } = dimensoes(t, o.rot ?? 0);
-      for (let dy = 0; dy < d; dy++) for (let dx = 0; dx < w; dx++) if (dentro(l, o.x + dx, o.y + dy)) this.bloq[indice(l, o.x + dx, o.y + dy)] = 1;
+      const { w, d } = dimensoes(t, o.rot ?? 0, o.escala); const c = celulasDe(o.x, o.y, w, d);
+      for (let cy = c.y0; cy < c.y1; cy++) for (let cx = c.x0; cx < c.x1; cx++) if (dentro(l, cx, cy)) this.bloq[indice(l, cx, cy)] = 1;
     }
     for (const p of l.paredes) {
       if (!dentro(l, p.x, p.y) || p.abertura === 'porta') continue;

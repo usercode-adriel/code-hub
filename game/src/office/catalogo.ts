@@ -103,7 +103,12 @@ export const PISO_PACOTE: Record<string, string> = { madeira: 'madeira', escrito
 export const pisoPorTipo = (t: string): TipoPiso | undefined => PISOS.find((p) => p.tipo === t);
 export const TIPOS_PAREDE = [{ tipo: 'parede', nome: 'Parede' }, { tipo: 'vidro', nome: 'Vidro' }];
 
-/** Dimensões ocupadas considerando a rotação (rot 1 e 3 trocam largura e profundidade). */
-export function dimensoes(tipo: TipoObjeto, rot = 0): { w: number; d: number } {
-  return rot % 2 === 1 ? { w: tipo.profundidade, d: tipo.largura } : { w: tipo.largura, d: tipo.profundidade };
+/** Dimensões ocupadas (em tiles) considerando a rotação (rot ímpar troca largura e profundidade) e a escala do objeto (mínimo de 1 tile). */
+export function dimensoes(tipo: TipoObjeto, rot = 0, escala = 1): { w: number; d: number } {
+  const w0 = rot % 2 === 1 ? tipo.profundidade : tipo.largura; const d0 = rot % 2 === 1 ? tipo.largura : tipo.profundidade;
+  return { w: Math.max(1, Math.round(w0 * escala)), d: Math.max(1, Math.round(d0 * escala)) };
+}
+/** Células [x0,x1) × [y0,y1) tocadas por uma caixa em posição possivelmente fracionária. */
+export function celulasDe(x: number, y: number, w: number, d: number): { x0: number; x1: number; y0: number; y1: number } {
+  return { x0: Math.floor(x + 1e-6), x1: Math.ceil(x + w - 1e-6), y0: Math.floor(y + 1e-6), y1: Math.ceil(y + d - 1e-6) };
 }

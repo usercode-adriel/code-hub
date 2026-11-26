@@ -1,11 +1,12 @@
 // OFFICE BUILDER: edição do escritório. Ferramentas: selecionar/mover, piso, parede, porta, janela, objeto (arrastar da biblioteca),
 // borracha, colisão, personagem, departamento e estação. Tudo respeita a grade isométrica, tem desfazer/refazer e só salva quando você manda.
 import { Sprite } from 'pixi.js';
-import { dimensoes, objetoPorTipo, type TipoObjeto } from './catalogo';
+import { celulasDe, dimensoes, objetoPorTipo, type TipoObjeto } from './catalogo';
 import { dentro, indice, copiar, novoId, redimensionar, type EstacaoLayout, type Layout, type ObjetoLayout, type ParedeLayout } from './modelo';
 import { gridParaTela, telaParaGrid, type Direcao } from './iso';
 import { Historico } from './historico';
 import type { OfficeEngine } from './engine';
+import { ESCALA_ARTE } from './pacote';
 import { Grade } from './grade';
 
 export type Ferramenta = 'selecionar' | 'piso' | 'parede' | 'porta' | 'janela' | 'objeto' | 'borracha' | 'colisao' | 'personagem' | 'departamento';
@@ -14,24 +15,23 @@ export type ResolveTipo = (o: { tipo: string }) => TipoObjeto | undefined;
 const resolvePadrao: ResolveTipo = (o) => objetoPorTipo(o.tipo);
 const ehMesa = (t: TipoObjeto | undefined): boolean => t?.categoria === 'moveis' && /^mesa/.test(t.tipo);
 
-/** Pode colocar este tipo, nesta posição e rotação? (função pura, usada pelo editor e pelos testes) */
-export function podeColocar(l: Layout, tipo: TipoObjeto, x: number, y: number, rot: number, resolve: ResolveTipo = resolvePadrao, ignorarId: string | null = null): { ok: boolean; motivo: string } {
-  const { w, d } = dimensoes(tipo, rot);
-  for (let dy = 0; dy < d; dy++) for (let dx = 0; dx < w; dx++) {
-    const cx = x + dx; const cy = y + dy;
+/** Pode colocar este tipo, nesta posição (pode ser fracionária), rotação e escala? (função pura, usada pelo editor e pelos testes) */
+export function podeColocar(l: Layout, tipo: TipoObjeto, x: number, y: number, rot: number, resolve: ResolveTipo = resolvePadrao, ignorarId: string | null = null, escala = 1): { ok: boolean; motivo: string } {
+  const { w, d } = dimensoes(tipo, rot, escala); const c = celulasDe(x, y, w, d);
+  for (let cy = c.y0; cy < c.y1; cy++) for (let cx = c.x0; cx < c.x1; cx++) {
     if (!dentro(l, cx, cy)) return { ok: false, motivo: 'Fora do mapa.' };
     if (!l.piso[indice(l, cx, cy)]) return { ok: false, motivo: 'Sem piso nesta área.' };
   }
-  const resto = l.objetos.filter((o) => o.id !== ignorarId);
+  const resto = l.objetos.filter((o) => o.id !== ignorarId); const E = 1e-6;
   if (tipo.suporte) {
-    const sobreMesa = resto.some((o) => { const t = resolve(o); if (!ehMesa(t)) return false; const m = dimensoes(t!, o.rot ?? 0); return x >= o.x && x < o.x + m.w && y >= o.y && y < o.y + m.d; });
+    const sobreMesa = resto.some((o) => { const t = resolve(o); if (!ehMesa(t)) return false; const m = dimensoes(t!, o.rot ?? 0, o.escala); return x + 0.5 >= o.x && x + 0.5 < o.x + m.w && y + 0.5 >= o.y && y + 0.5 < o.y + m.d; });
     if (!sobreMesa) return { ok: false, motivo: 'Precisa ficar sobre uma mesa.' };
-    if (resto.some((o) => o.tipo === tipo.tipo && o.x === x && o.y === y)) return { ok: false, motivo: 'Já há um igual aqui.' };
+    if (resto.some((o) => o.tipo === tipo.tipo && Math.abs(o.x - x) < 0.3 && Math.abs(o.y - y) < 0.3)) return { ok: false, motivo: 'Já há um igual aqui.' };
     return { ok: true, motivo: '' };
   }
   for (const o of resto) {
-    const t = resolve(o); if (!t) continue; const m = dimensoes(t, o.rot ?? 0);
-    const sobrepoe = x < o.x + m.w && x + w > o.x && y < o.y + m.d && y + d > o.y; if (!sobrepoe) continue;
+    const t = resolve(o); if (!t) continue; const m = dimensoes(t, o.rot ?? 0, o.escala);
+    const sobrepoe = x < o.x + m.w - E && x + w > o.x + E && y < o.y + m.d - E && y + d > o.y + E; if (!sobrepoe) continue;
     if (t.suporte && !tipo.solido) continue;                                     // computador sobre mesa não atrapalha cadeira ao lado
     if (t.tipo === 'tapete' || tipo.tipo === 'tapete') continue;                  // tapete fica por baixo de tudo
     if (t.suporte) { if (tipo.solido && !ehMesa(tipo)) return { ok: false, motivo: `Ocupado por ${t.nome}.` }; continue; }
@@ -49,12 +49,23 @@ export function arestaMaisProxima(gx: number, gy: number): { x: number; y: numbe
   const m = cand.sort((a, b) => a.d - b.d)[0]; return { x: m.x, y: m.y, lado: m.lado };
 }
 
-export interface EstadoConstrutor { ferramenta: Ferramenta; piso: string; paredeTipo: string; tipoObjeto: string; rot: number; agenteId: string | null; selecionadoId: string | null; podeDesfazer: boolean; podeRefazer: boolean; sujo: boolean; motivoInvalido: string }
+export interface EstadoConstrutor { ferramenta: Ferramenta; piso: string; paredeTipo: string; tipoObjeto: string; rot: number; agenteId: string | null; selecionadoId: string | null; passo: number; escalaNova: number; podeDesfazer: boolean; podeRefazer: boolean; sujo: boolean; motivoInvalido: string }
 
-interface Arrasto { tipo: 'piso' | 'parede' | 'mover' | 'retangulo' | 'colisao'; objetoId?: string; origem?: { x: number; y: number }; ultima?: string; modificou: boolean; valor?: boolean }
+interface Arrasto { tipo: 'piso' | 'parede' | 'linha' | 'mover' | 'retangulo' | 'colisao'; objetoId?: string; origem?: { x: number; y: number }; v0?: { x: number; y: number; gx: number; gy: number }; ultima?: string; modificou: boolean; valor?: boolean; pos0?: { gx: number; gy: number; ox: number; oy: number } }
+
+/** Arestas de parede de um traçado "estilo The Sims": do vértice inicial (v0) até o ponto atual, em linha reta pelo eixo dominante, ou o contorno de um retângulo (Shift). */
+export function segmentoParede(v0: { gx: number; gy: number }, atual: { gx: number; gy: number }, retangulo = false): { x: number; y: number; lado: 'N' | 'W' }[] {
+  const x0 = Math.round(v0.gx); const y0 = Math.round(v0.gy); const x1 = Math.round(atual.gx); const y1 = Math.round(atual.gy); const out: { x: number; y: number; lado: 'N' | 'W' }[] = [];
+  const xa = Math.min(x0, x1); const xb = Math.max(x0, x1); const ya = Math.min(y0, y1); const yb = Math.max(y0, y1);
+  if (retangulo) { for (let x = xa; x < xb; x++) { out.push({ x, y: ya, lado: 'N' }); out.push({ x, y: yb, lado: 'N' }); } for (let y = ya; y < yb; y++) { out.push({ x: xa, y, lado: 'W' }); out.push({ x: xb, y, lado: 'W' }); } return out; }
+  if (Math.abs(atual.gx - v0.gx) >= Math.abs(atual.gy - v0.gy)) { for (let x = xa; x < xb; x++) out.push({ x, y: y0, lado: 'N' }); } else { for (let y = ya; y < yb; y++) out.push({ x: x0, y, lado: 'W' }); }
+  return out;
+}
 
 export class Construtor {
   ferramenta: Ferramenta = 'selecionar'; piso = 'madeira'; paredeTipo = 'parede'; tipoObjeto = 'mesa'; rot = 0; agenteId: string | null = null;
+  /** Encaixe do posicionamento: 1 = grade, 0,5 = meia grade, 0,25 = fino, 0,1 = livre. */
+  passo = 0.5; escalaNova = 1;
   private hist!: Historico<Layout>; private base = ''; private fantasmaSprite: Sprite | null = null; private fantasmaChave = '';
   private arrasto: Arrasto | null = null;
   private motivo = ''; selecionadoId: string | null = null;
@@ -68,7 +79,7 @@ export class Construtor {
     this.motor.redesenharGrade(); this.emitir();
   }
   desativar(): void { this.motor.gancho = {}; this.limparFantasma(); this.motor.fantasma.clear(); this.arrasto = null; }
-  estado(): EstadoConstrutor { return { ferramenta: this.ferramenta, piso: this.piso, paredeTipo: this.paredeTipo, tipoObjeto: this.tipoObjeto, rot: this.rot, agenteId: this.agenteId, selecionadoId: this.selecionadoId, podeDesfazer: this.hist?.podeDesfazer ?? false, podeRefazer: this.hist?.podeRefazer ?? false, sujo: this.sujo(), motivoInvalido: this.motivo }; }
+  estado(): EstadoConstrutor { return { ferramenta: this.ferramenta, piso: this.piso, paredeTipo: this.paredeTipo, tipoObjeto: this.tipoObjeto, rot: this.rot, agenteId: this.agenteId, selecionadoId: this.selecionadoId, passo: this.passo, escalaNova: this.escalaNova, podeDesfazer: this.hist?.podeDesfazer ?? false, podeRefazer: this.hist?.podeRefazer ?? false, sujo: this.sujo(), motivoInvalido: this.motivo }; }
   sujo(): boolean { return JSON.stringify(this.motor.layout) !== this.base; }
   /** Depois de salvar no servidor: o estado atual passa a ser o "limpo". */
   marcarSalvo(): void { this.base = JSON.stringify(this.motor.layout); this.emitir(); }
@@ -100,11 +111,11 @@ export class Construtor {
   // ---------- operações sobre o layout ----------
   private tipoDe = (o: { tipo: string }): TipoObjeto | undefined => this.motor.tipoDe(o as ObjetoLayout);
 
-  colocarObjeto(tipo: string, x: number, y: number, rot = this.rot, assetId: string | null = null): ObjetoLayout | null {
+  colocarObjeto(tipo: string, x: number, y: number, rot = this.rot, assetId: string | null = null, escala = this.escalaNova): ObjetoLayout | null {
     const t = this.tipoDe({ tipo }); if (!t) return null;
-    const v = podeColocar(this.motor.layout, t, x, y, rot, this.tipoDe); this.motivo = v.motivo;
+    const v = podeColocar(this.motor.layout, t, x, y, rot, this.tipoDe, null, escala); this.motivo = v.motivo;
     if (!v.ok) { this.motor.bus.emit('aviso', { texto: v.motivo }); this.emitir(); return null; }
-    const o: ObjetoLayout = { id: novoId('obj'), tipo, x, y, rot, ...(assetId ? { assetId } : {}) };
+    const o: ObjetoLayout = { id: novoId('obj'), tipo, x, y, rot, ...(escala !== 1 ? { escala } : {}), ...(assetId ? { assetId } : {}) };
     this.motor.layout.objetos.push(o); this.confirmar(['objetos']); return o;
   }
   removerObjeto(id: string): void {
@@ -116,21 +127,47 @@ export class Construtor {
   removerSelecionado(): void { if (this.selecionadoId) this.removerObjeto(this.selecionadoId); }
   moverObjeto(id: string, x: number, y: number): boolean {
     const o = this.motor.layout.objetos.find((q) => q.id === id); const t = o && this.tipoDe(o); if (!o || !t) return false;
-    const v = podeColocar(this.motor.layout, t, x, y, o.rot ?? 0, this.tipoDe, id); this.motivo = v.motivo; if (!v.ok) return false;
+    const v = podeColocar(this.motor.layout, t, x, y, o.rot ?? 0, this.tipoDe, id, o.escala ?? 1); this.motivo = v.motivo; if (!v.ok) return false;
     o.x = x; o.y = y; return true;
   }
   girarSelecionado(): void {
     const o = this.motor.layout.objetos.find((q) => q.id === this.selecionadoId); const t = o && this.tipoDe(o); if (!o || !t) return;
-    const nova = ((o.rot ?? 0) + 1) % 4; const v = podeColocar(this.motor.layout, t, o.x, o.y, nova, this.tipoDe, o.id);
+    const nova = ((o.rot ?? 0) + 1) % 4; const v = podeColocar(this.motor.layout, t, o.x, o.y, nova, this.tipoDe, o.id, o.escala ?? 1);
     if (!v.ok) { this.motor.bus.emit('aviso', { texto: `Não dá para girar: ${v.motivo}` }); return; }
     o.rot = nova; this.confirmar(['objetos']);
   }
   /** Troca o tipo de um objeto mantendo posição (se couber) e a estação ligada a ele. */
   substituirObjeto(id: string, novoTipo: string, assetId: string | null = null): boolean {
     const o = this.motor.layout.objetos.find((q) => q.id === id); const t = this.tipoDe({ tipo: novoTipo }); if (!o || !t) return false;
-    const v = podeColocar(this.motor.layout, t, o.x, o.y, o.rot ?? 0, this.tipoDe, id); if (!v.ok) { this.motor.bus.emit('aviso', { texto: `Não dá para substituir: ${v.motivo}` }); return false; }
+    const v = podeColocar(this.motor.layout, t, o.x, o.y, o.rot ?? 0, this.tipoDe, id, o.escala ?? 1); if (!v.ok) { this.motor.bus.emit('aviso', { texto: `Não dá para substituir: ${v.motivo}` }); return false; }
     o.tipo = novoTipo; if (assetId) o.assetId = assetId; else delete o.assetId; this.confirmar(['objetos']); return true;
   }
+  /** Atalho: duplica o objeto selecionado ao lado (primeira posição que couber) e seleciona a cópia. */
+  duplicarSelecionado(): ObjetoLayout | null {
+    const L = this.motor.layout; const o = L.objetos.find((q) => q.id === this.selecionadoId); const t = o && this.tipoDe(o); if (!o || !t) return null;
+    const { w, d } = dimensoes(t, o.rot ?? 0, o.escala); const passos = [[w, 0], [0, d], [-w, 0], [0, -d], [w, d], [-w, -d], [1, 1], [0.5, 0.5]];
+    for (const [dx, dy] of passos) {
+      if (podeColocar(L, t, o.x + dx, o.y + dy, o.rot ?? 0, this.tipoDe, null, o.escala ?? 1).ok) {
+        const c: ObjetoLayout = { ...copiar(o), id: novoId('obj'), x: o.x + dx, y: o.y + dy }; L.objetos.push(c); this.selecionadoId = c.id; this.motor.selecionar({ tipo: 'objeto', id: c.id, tipoObjeto: c.tipo }); this.confirmar(['objetos']); return c;
+      }
+    }
+    this.motor.bus.emit('aviso', { texto: 'Não há espaço livre ao lado para duplicar.' }); return null;
+  }
+  /** Atalho: define o tamanho (escala 0,4–3) do objeto selecionado. */
+  definirEscala(id: string, escala: number): boolean {
+    const o = this.motor.layout.objetos.find((q) => q.id === id); const t = o && this.tipoDe(o); if (!o || !t) return false;
+    const e = Math.round(Math.min(3, Math.max(0.4, escala)) * 10) / 10; if (e === (o.escala ?? 1)) return false;
+    const v = podeColocar(this.motor.layout, t, o.x, o.y, o.rot ?? 0, this.tipoDe, id, e); if (!v.ok) { this.motor.bus.emit('aviso', { texto: `Não dá para mudar o tamanho: ${v.motivo}` }); return false; }
+    if (e === 1) delete o.escala; else o.escala = e; this.confirmar(['objetos']); this.motor.atualizarSelecao(); return true;
+  }
+  escalarSelecionado(delta: number): void { const o = this.motor.layout.objetos.find((q) => q.id === this.selecionadoId); if (o) this.definirEscala(o.id, (o.escala ?? 1) + delta); }
+  /** Atalho de camadas: sobe (+1) ou desce (-1) o objeto em relação aos que se sobrepõem a ele. */
+  camadaSelecionado(delta: number): void {
+    const o = this.motor.layout.objetos.find((q) => q.id === this.selecionadoId); if (!o) return; const nova = Math.max(-10, Math.min(10, (o.camada ?? 0) + delta)); if (nova === (o.camada ?? 0)) return;
+    if (nova === 0) delete o.camada; else o.camada = nova; this.confirmar(['objetos']);
+  }
+  /** Pinta o mapa inteiro com um piso (ou limpa). */
+  preencherPiso(tipo: string): void { const L = this.motor.layout; L.piso = L.piso.map(() => tipo); this.confirmar(['chao']); }
   pintarPiso(x: number, y: number, tipo: string): boolean {
     const L = this.motor.layout; if (!dentro(L, x, y)) return false; const i = indice(L, x, y); if (L.piso[i] === tipo) return false;
     L.piso[i] = tipo; this.motor.atualizarPiso(x, y); return true;
@@ -181,13 +218,21 @@ export class Construtor {
     const m = this.motor.camera.telaParaMundo(sx, sy); const g = telaParaGrid(m.x, m.y); return { gx: g.x, gy: g.y, x: Math.floor(g.x), y: Math.floor(g.y) };
   }
 
+  /** Aproxima um valor do encaixe atual (grade, meia grade, fino ou livre). */
+  private encaixar(v: number): number { return Math.round(v / this.passo) * this.passo; }
+  /** Posição (canto de cima) de um objeto cujo centro está sob o cursor, respeitando o encaixe. Na grade cheia, vale a célula sob o cursor. */
+  private posicaoSob(g: { gx: number; gy: number; x: number; y: number }, w: number, d: number): { x: number; y: number } {
+    if (this.passo >= 1) return { x: g.x, y: g.y };
+    const r = (n: number): number => Math.round(n * 1000) / 1000; return { x: r(this.encaixar(g.gx - w / 2)), y: r(this.encaixar(g.gy - d / 2)) };
+  }
+
   private ponteiro(t: 'down' | 'move' | 'up', sx: number, sy: number, ev: PointerEvent): boolean {
     const g = this.gridSob(sx, sy);
-    if (t === 'move') { this.mostrarFantasma(g.x, g.y); if (this.arrasto) this.arrastarOp(g, ev); return Boolean(this.arrasto); }
+    if (t === 'move') { this.mostrarFantasma(g); if (this.arrasto) this.arrastarOp(g, ev); return Boolean(this.arrasto); }
     if (t === 'down') { if (ev.button !== 0) return false; return this.iniciar(g, sx, sy); }
     // 'up'
     const a = this.arrasto; this.arrasto = null;
-    if (a) { this.finalizar(a, g); return true; }
+    if (a) { this.finalizar(a, g, ev); return true; }
     if (this.ferramenta === 'selecionar') { this.selecionarEm(sx, sy); return true; }
     return false;
   }
@@ -202,7 +247,8 @@ export class Construtor {
     const L = this.motor.layout;
     switch (this.ferramenta) {
       case 'piso': { this.arrasto = { tipo: 'piso', modificou: false }; if (this.pintarPiso(g.x, g.y, this.piso)) this.arrasto.modificou = true; return true; }
-      case 'parede': case 'porta': case 'janela': case 'borracha': {
+      case 'parede': { this.arrasto = { tipo: 'linha', modificou: false, v0: { x: Math.round(g.gx), y: Math.round(g.gy), gx: g.gx, gy: g.gy } }; return true; }       // traçado esticável (como no The Sims)
+      case 'porta': case 'janela': case 'borracha': {
         if (this.ferramenta === 'borracha') {
           const alvo = this.motor.escolher(sx, sy);
           if (alvo.tipo === 'objeto') { this.removerObjeto(alvo.id); return true; }
@@ -212,11 +258,11 @@ export class Construtor {
       }
       case 'colisao': { const quer = !L.colisoes.some((c) => c.x === g.x && c.y === g.y); this.arrasto = { tipo: 'colisao', modificou: false, valor: quer }; if (this.alternarColisao(g.x, g.y, quer)) this.arrasto.modificou = true; return true; }
       case 'departamento': this.arrasto = { tipo: 'retangulo', origem: { x: g.x, y: g.y }, modificou: false }; return true;
-      case 'objeto': { this.colocarObjeto(this.tipoObjeto, g.x, g.y, this.rot); return true; }
+      case 'objeto': { const t = this.tipoDe({ tipo: this.tipoObjeto }); const { w, d } = t ? dimensoes(t, this.rot, this.escalaNova) : { w: 1, d: 1 }; const p = this.posicaoSob(g, w, d); this.colocarObjeto(this.tipoObjeto, p.x, p.y, this.rot); return true; }
       case 'personagem': { this.posicionarPersonagem(this.agenteId, g.x, g.y); return true; }
       case 'selecionar': {
         const alvo = this.motor.escolher(sx, sy);
-        if (alvo.tipo === 'objeto') { this.selecionadoId = alvo.id; this.motor.selecionar(alvo); this.arrasto = { tipo: 'mover', objetoId: alvo.id, origem: { x: g.x, y: g.y }, modificou: false }; this.emitir(); return true; }
+        if (alvo.tipo === 'objeto') { const ob = L.objetos.find((q) => q.id === alvo.id)!; this.selecionadoId = alvo.id; this.motor.selecionar(alvo); this.arrasto = { tipo: 'mover', objetoId: alvo.id, origem: { x: g.x, y: g.y }, pos0: { gx: g.gx, gy: g.gy, ox: ob.x, oy: ob.y }, modificou: false }; this.emitir(); return true; }
         return false;
       }
     }
@@ -234,16 +280,31 @@ export class Construtor {
     if (a.tipo === 'piso') { if (this.pintarPiso(g.x, g.y, this.piso)) a.modificou = true; }
     else if (a.tipo === 'colisao') { if (this.alternarColisao(g.x, g.y, a.valor)) { a.modificou = true; this.motor.recalcularGrade(); this.motor.redesenharGrade(); } }
     else if (a.tipo === 'parede') this.aplicarParede(g);
-    else if (a.tipo === 'mover' && a.objetoId && a.origem) {
-      const o = this.motor.layout.objetos.find((q) => q.id === a.objetoId)!; const nx = o.x + (g.x - a.origem.x); const ny = o.y + (g.y - a.origem.y);
-      if ((nx !== o.x || ny !== o.y) && this.moverObjeto(a.objetoId, nx, ny)) { a.origem = { x: g.x, y: g.y }; a.modificou = true; this.motor.reconstruirObjetos(); this.motor.atualizarSelecao(); }
+    else if (a.tipo === 'linha' && a.v0) this.desenharLinhaParede(a.v0, g, _ev.shiftKey);
+    else if (a.tipo === 'mover' && a.objetoId && a.pos0) {
+      const o = this.motor.layout.objetos.find((q) => q.id === a.objetoId)!;
+      const r = (n: number): number => Math.round(n * 1000) / 1000; const nx = r(this.encaixar(a.pos0.ox + (g.gx - a.pos0.gx))); const ny = r(this.encaixar(a.pos0.oy + (g.gy - a.pos0.gy)));
+      if ((nx !== o.x || ny !== o.y) && this.moverObjeto(a.objetoId, nx, ny)) { a.modificou = true; this.motor.reconstruirObjetos(); this.motor.atualizarSelecao(); this.emitir(); }
     } else if (a.tipo === 'retangulo' && a.origem) this.desenharRetangulo(a.origem, g);
   }
 
-  private finalizar(a: Arrasto, g: { x: number; y: number }): void {
+  private finalizar(a: Arrasto, g: { gx: number; gy: number; x: number; y: number }, ev?: PointerEvent): void {
+    if (a.tipo === 'linha' && a.v0) { this.motor.fantasma.clear(); this.aplicarLinhaParede(a.v0, g, Boolean(ev?.shiftKey)); return; }
     if (a.tipo === 'retangulo' && a.origem) { this.motor.fantasma.clear(); this.criarDepartamento(a.origem.x, a.origem.y, g.x, g.y); return; }
     if (!a.modificou) return;
     if (a.tipo === 'piso') this.confirmar(); else if (a.tipo === 'parede') this.confirmar(['paredes']); else if (a.tipo === 'colisao') this.confirmar(); else if (a.tipo === 'mover') this.confirmar(['objetos']);
+  }
+
+  private desenharLinhaParede(v0: { gx: number; gy: number }, g: { gx: number; gy: number }, retangulo: boolean): void {
+    const f = this.motor.fantasma.clear(); const seg = segmentoParede(v0, g, retangulo);
+    for (const e of seg) { const a = gridParaTela(e.x, e.y); const b = e.lado === 'N' ? gridParaTela(e.x + 1, e.y) : gridParaTela(e.x, e.y + 1); f.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 5, color: 0xf7c948, alpha: 0.9 }); }
+  }
+  /** Solta o traçado: cria todas as arestas de uma vez (um único passo no histórico). Sem arrasto, vale a aresta mais próxima do clique. */
+  private aplicarLinhaParede(v0: { gx: number; gy: number }, g: { gx: number; gy: number }, retangulo: boolean): void {
+    let seg = segmentoParede(v0, g, retangulo);
+    if (!seg.length) seg = [arestaMaisProxima(v0.gx, v0.gy)];
+    let mudou = false; for (const e of seg) if (this.alternarParede(e.x, e.y, e.lado, 'colocar')) mudou = true;
+    if (mudou) { this.motor.reconstruirEstruturas(); this.confirmar(['paredes']); }
   }
 
   private desenharRetangulo(a: { x: number; y: number }, b: { x: number; y: number }): void {
@@ -252,18 +313,22 @@ export class Construtor {
     this.motor.fantasma.clear().poly(p.flatMap((q) => [q.x, q.y])).fill({ color: 0x8b7bff, alpha: 0.22 }).stroke({ width: 2, color: 0x8b7bff });
   }
 
-  private mostrarFantasma(x: number, y: number): void {
-    const f = this.motor.fantasma; f.clear();
+  private mostrarFantasma(g: { gx: number; gy: number; x: number; y: number }): void {
+    const f = this.motor.fantasma; if (this.arrasto?.tipo === 'linha') return; f.clear();
     if (this.ferramenta !== 'objeto') { this.limparFantasma(); return; }
-    const t = this.tipoDe({ tipo: this.tipoObjeto }); if (!t) return;
-    const v = podeColocar(this.motor.layout, t, x, y, this.rot, this.tipoDe); this.motivo = v.motivo;
-    const { w, d } = dimensoes(t, this.rot); const pts = [gridParaTela(x, y), gridParaTela(x + w, y), gridParaTela(x + w, y + d), gridParaTela(x, y + d)];
+    const t = this.tipoDe({ tipo: this.tipoObjeto }); if (!t) return; const esc = this.escalaNova;
+    const { w, d } = dimensoes(t, this.rot, esc); const { x, y } = this.posicaoSob(g, w, d);
+    const v = podeColocar(this.motor.layout, t, x, y, this.rot, this.tipoDe, null, esc); this.motivo = v.motivo;
+    const pts = [gridParaTela(x, y), gridParaTela(x + w, y), gridParaTela(x + w, y + d), gridParaTela(x, y + d)];
     f.poly(pts.flatMap((q) => [q.x, q.y])).fill({ color: v.ok ? 0x2fd27a : 0xff4d5e, alpha: 0.3 }).stroke({ width: 2, color: v.ok ? 0x2fd27a : 0xff4d5e });
     if (!this.tipoObjeto.startsWith('asset:')) {
-      const tex = this.motor.texturas.objeto(this.tipoObjeto, this.rot); const top = gridParaTela(x, y);
-      if (!this.fantasmaSprite) { this.fantasmaSprite = new Sprite(tex.tex); this.motor.interativo.addChild(this.fantasmaSprite); }
-      const chave = `${this.tipoObjeto}|${this.rot}`; if (chave !== this.fantasmaChave) { this.fantasmaSprite.texture = tex.tex; this.fantasmaChave = chave; }
-      this.fantasmaSprite.alpha = v.ok ? 0.75 : 0.35; this.fantasmaSprite.position.set(top.x - tex.ox, top.y - tex.oy - (t.suporte ? t.alturaSuporte ?? 0 : 0)); this.fantasmaSprite.visible = true;
+      const z = t.suporte ? t.alturaSuporte ?? 0 : 0; const sp = this.motor.pacote.pronto && t.sprite ? this.motor.pacote.objeto(t.sprite, Boolean(t.espelhar) !== (this.rot % 2 === 1)) : null;
+      const proc = sp ? null : this.motor.texturas.objeto(this.tipoObjeto, this.rot); const tex = sp ? sp.tex : proc!.tex;
+      if (!this.fantasmaSprite) { this.fantasmaSprite = new Sprite(tex); this.motor.interativo.addChild(this.fantasmaSprite); }
+      const chave = `${this.tipoObjeto}|${this.rot}|${esc}`; if (chave !== this.fantasmaChave) { this.fantasmaSprite.texture = tex; this.fantasmaChave = chave; }
+      if (sp) { const base = gridParaTela(x + w, y + d); this.fantasmaSprite.scale.set(ESCALA_ARTE * esc); this.fantasmaSprite.position.set(base.x - sp.ax * ESCALA_ARTE * esc, base.y - sp.ay * ESCALA_ARTE * esc - z - (t.parede ?? 0) * esc); }
+      else { const top = gridParaTela(x, y); this.fantasmaSprite.scale.set(esc); this.fantasmaSprite.position.set(top.x - proc!.ox * esc, top.y - proc!.oy * esc - z); }
+      this.fantasmaSprite.alpha = v.ok ? 0.75 : 0.35; this.fantasmaSprite.visible = true;
     }
     this.emitir();
   }

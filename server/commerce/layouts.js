@@ -24,6 +24,10 @@ export function validarLayout(d) {
   for (const c of lista('colisoes', LIMITES.colisoes)) if (!dentro(c.x, c.y)) throw erro('Colisão fora do mapa.');
   for (const p of lista('personagens', LIMITES.personagens)) { unico(p, 'Personagem'); if (!dentro(p.x, p.y)) throw erro(`Personagem "${p.id}" fora do mapa.`); }
   for (const dp of lista('departamentos', LIMITES.departamentos)) { unico(dp, 'Departamento'); if (!dentro(dp.x, dp.y) || int(dp.w, 1, L) === null || int(dp.h, 1, A) === null) throw erro(`Departamento "${dp.id}" inválido.`); }
+  for (const o of d.objetos) {                              // tamanho e camada (opcionais) dos objetos
+    if (o.escala !== undefined && !(Number(o.escala) >= 0.25 && Number(o.escala) <= 4)) throw erro(`Objeto "${o.id}" com tamanho inválido (0,25 a 4).`);
+    if (o.camada !== undefined && int(o.camada, -20, 20) === null) throw erro(`Objeto "${o.id}" com camada inválida.`);
+  }
   const objIds = new Set(d.objetos.map((o) => o.id));
   for (const e of lista('estacoes', LIMITES.estacoes)) { unico(e, 'Estação'); if (e.objetoId && !objIds.has(e.objetoId)) throw erro(`Estação "${e.id}" aponta para um objeto que não existe.`); if (e.pontoTrabalho && !dentro(e.pontoTrabalho.x, e.pontoTrabalho.y)) throw erro(`Ponto de trabalho da estação "${e.id}" fora do mapa.`); }
   return d;

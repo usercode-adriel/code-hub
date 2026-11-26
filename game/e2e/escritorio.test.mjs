@@ -40,7 +40,7 @@ async function abrir(rota = '/escritorio/') {
   await p.goto(`${BASE}${rota}`);
   return { p, ctx };
 }
-const esperarEscritorio = async (p, vivo = false) => { await p.waitForFunction(() => window.__office?.layout?.objetos?.length > 50 && window.__office?.pacote?.pronto && document.querySelector('.o-av'), null, { timeout: 45000 }); await p.evaluate((v) => { window.__office.ambienteVivo = v; }, vivo); };
+const esperarEscritorio = async (p, vivo = false, minimo = 50) => { await p.waitForFunction((m) => window.__office?.layout?.objetos?.length > m && window.__office?.pacote?.pronto && document.querySelector('.o-av'), minimo - 1, { timeout: 45000 }); await p.evaluate((v) => { window.__office.ambienteVivo = v; }, vivo); };
 const aba = (p, nome) => p.locator('.o-abas-nav button', { hasText: new RegExp(`^${nome}$`) }).click();
 
 /** coordenadas de página de um ponto do mundo (centra a câmera nele antes) */
@@ -220,7 +220,7 @@ test('Office Builder: colocar objeto com validação, desfazer/refazer, pintar p
   await p.keyboard.press('Control+Shift+z'); await p.waitForFunction((n) => window.__office.layout.objetos.length === n + 1, n0, { timeout: 8000 });
   assert.match(await p.locator('.o-barra-constr').textContent(), /não salvas/);
   // piso
-  await p.getByRole('button', { name: '🟫 Piso' }).click(); await p.locator('.o-chip', { hasText: 'Cerâmica creme' }).first().click();
+  await p.getByRole('button', { name: '🟫 Piso' }).click(); await p.locator('.o-tile[title="Cerâmica creme"]').click();
   await clicarCelula(p, 10, 6); const piso = await p.evaluate(() => window.__office.layout.piso[6 * 14 + 10]); assert.equal(piso, 'ceramica-creme');
   // computador só sobre mesa
   await p.locator('.o-ferramentas button', { hasText: 'Objeto' }).click(); await p.locator('.o-grade-lib button', { hasText: 'Computador' }).first().click();
@@ -403,5 +403,46 @@ test('vida autônoma: avatares giram entre direções vizinhas com pausas, fazem
   await p.route('**/api/commerce/equipe', async (rota) => { const r = await rota.fetch(); const j = await r.json(); for (const a of j.agentes) if (a.chave === 'lady') a.estado = 'executando'; await rota.fulfill({ response: r, json: j }); });
   await p.waitForFunction(() => { const q = window.__office.pessoas.find((x) => x.id === 'pers-lady'); return q.comp.estado === 'working' && q.noPosto && !q.caminho.length; }, null, { timeout: 60000 });
   assert.equal(await p.evaluate(() => { const o = window.__office; return o.estadoAnimacao(o.pessoas.find((x) => x.id === 'pers-lady')); }), 'typing');
+  assert.deepEqual(p.erros, []); await ctx.close();
+});
+
+test('Criar escritório (estilo The Sims): define o tamanho, parede esticável, objeto livre, atalhos de duplicar/tamanho/camada/apagar', async () => {
+  const { p, ctx } = await abrir(); await esperarEscritorio(p);
+  await p.getByRole('button', { name: 'Construção' }).click(); await p.waitForSelector('text=Criar escritório');
+  const card = painel(p).locator('section', { hasText: 'Criar escritório' });
+  await card.locator('.o-campo', { hasText: /^Nome/ }).locator('input').fill('Sala do Chefe'); await card.locator('.o-campo', { hasText: /^Largura/ }).locator('input').fill('10'); await card.locator('.o-campo', { hasText: /^Profundidade/ }).locator('input').fill('9');
+  await card.locator('.o-campo', { hasText: /^Piso inicial/ }).locator('select').selectOption('ceramica-creme'); await card.getByRole('button', { name: 'Criar e abrir' }).click();
+  await p.waitForFunction(() => window.__office.layout.largura === 10 && window.__office.layout.altura === 9, null, { timeout: 15000 });
+  const r = await p.evaluate(() => { const L = window.__office.layout; return { piso: [...new Set(L.piso)], paredes: L.paredes.length, pessoas: L.personagens.length, objetos: L.objetos.length }; });
+  assert.deepEqual(r.piso, ['ceramica-creme']); assert.equal(r.paredes, 19); assert.equal(r.pessoas, 5); assert.equal(r.objetos, 0);
+  assert.match(await p.locator('.o-nome-layout').textContent(), /Sala do Chefe/);
+  // piso com prévia: escolhe madeira e pinta uma célula
+  await p.getByRole('button', { name: '🟫 Piso' }).click(); assert.ok((await p.locator('.o-tile img').count()) >= 6, 'pisos com prévia da arte'); await p.locator('.o-tile[title="Madeira"]').click(); await clicarCelula(p, 5, 5);
+  assert.equal(await p.evaluate(() => window.__office.layout.piso[5 * 10 + 5]), 'madeira');
+  // parede esticável: arrasta de um vértice até 4 tiles para a direita e solta (uma linha de 4 arestas)
+  await p.getByRole('button', { name: '🧱 Parede' }).click(); const w0 = await p.evaluate(() => window.__office.layout.paredes.length);
+  const a = await pontoMundo(p, 0, 3 * 32 * 0.5 + 0); const v = (gx, gy) => ({ x: (gx - gy) * 32, y: (gx + gy) * 16 });
+  const pa = await pontoMundo(p, v(2, 4).x, v(2, 4).y); await p.mouse.move(pa.x, pa.y); await p.mouse.down(); const pb = await pontoMundo(p, v(6, 4).x, v(6, 4).y); await p.mouse.move((pa.x + pb.x) / 2, (pa.y + pb.y) / 2, { steps: 4 }); await p.mouse.move(pb.x, pb.y, { steps: 4 }); await p.mouse.up(); void a;
+  assert.equal(await p.evaluate(() => window.__office.layout.paredes.length), w0 + 4, 'parede esticada de 4 tiles');
+  // objeto com encaixe livre e tamanho
+  await p.getByRole('button', { name: '🖱 Selecionar / mover' }).click(); await p.locator('.o-ferramentas button', { hasText: 'Objeto' }).click();
+  await p.locator('.o-campo', { hasText: /^Encaixe/ }).locator('select').selectOption('0.1'); await p.locator('.o-grade-lib button', { hasText: 'Planta' }).first().click(); await clicarCelula(p, 3, 7);
+  await p.waitForFunction(() => window.__office.layout.objetos.length === 1, null, { timeout: 8000 });
+  // clicar no objeto (ferramenta selecionar) mostra os atalhos; tamanho, duplicar, camadas, apagar
+  await p.getByRole('button', { name: '🖱 Selecionar / mover' }).click(); const id = await p.evaluate(() => window.__office.layout.objetos[0].id); const pt = await pontoObjeto(p, id); await p.mouse.click(pt.x, pt.y);
+  await p.waitForSelector('[data-testid="atalhos-objeto"]', { timeout: 8000 });
+  await p.getByRole('button', { name: 'Aumentar' }).click(); await p.getByRole('button', { name: 'Aumentar' }).click(); assert.equal(await p.evaluate(() => window.__office.layout.objetos[0].escala), 1.2); assert.match(await p.locator('.o-atalho-esc').textContent(), /120%/);
+  await p.getByRole('button', { name: 'Diminuir' }).click(); assert.equal(await p.evaluate(() => window.__office.layout.objetos[0].escala), 1.1);
+  await p.getByRole('button', { name: 'Trazer para frente' }).click(); assert.equal(await p.evaluate(() => window.__office.layout.objetos[0].camada), 1);
+  await p.getByRole('button', { name: 'Enviar para trás' }).click(); await p.getByRole('button', { name: 'Enviar para trás' }).click(); assert.equal(await p.evaluate(() => window.__office.layout.objetos[0].camada), -1);
+  await p.getByRole('button', { name: 'Duplicar' }).first().click(); await p.waitForFunction(() => window.__office.layout.objetos.length === 2, null, { timeout: 8000 });
+  const dup = await p.evaluate(() => { const o = window.__office.layout.objetos; return { igualTipo: o[0].tipo === o[1].tipo, escala: o[1].escala, camada: o[1].camada, outroLugar: o[0].x !== o[1].x || o[0].y !== o[1].y, sel: window.__office.selecionado.id === o[1].id }; });
+  assert.deepEqual(dup, { igualTipo: true, escala: 1.1, camada: -1, outroLugar: true, sel: true }, 'cópia ao lado, selecionada, com tamanho e camada');
+  await p.waitForSelector('[data-testid="atalhos-objeto"]'); await p.getByRole('button', { name: 'Apagar' }).click(); await p.waitForFunction(() => window.__office.layout.objetos.length === 1, null, { timeout: 8000 });
+  // desfazer traz de volta; salvar e recarregar mantém tamanho e camada
+  await p.keyboard.press('Control+z'); await p.waitForFunction(() => window.__office.layout.objetos.length === 2, null, { timeout: 8000 });
+  await p.getByRole('button', { name: 'Salvar layout' }).first().click(); await p.waitForFunction(() => /Layout salvo/.test(document.querySelector('.o-avisos')?.textContent ?? ''), null, { timeout: 10000 });
+  await p.reload(); await esperarEscritorio(p, false, 1);
+  const fim = await p.evaluate(() => ({ l: window.__office.layout.largura, n: window.__office.layout.objetos.length, e: window.__office.layout.objetos[0].escala })); assert.deepEqual(fim, { l: 10, n: 2, e: 1.1 }, 'o novo escritório e o tamanho persistiram');
   assert.deepEqual(p.erros, []); await ctx.close();
 });

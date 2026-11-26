@@ -169,7 +169,7 @@ export class OfficeEngine {
     for (const o of this.objetos) o.sprite.destroy(); this.objetos = [];
     for (const o of this.layout.objetos) {
       const t = this.tipoDe(o); if (!t) continue;
-      const { w, d } = dimensoes(t, o.rot ?? 0);
+      const esc = o.escala ?? 1; const { w, d } = dimensoes(t, o.rot ?? 0, esc);
       const z = t.suporte ? (this.layout.objetos.some((m) => m.tipo === t.suporte || (objetoPorTipo(m.tipo)?.categoria === 'moveis' && o.x >= m.x && o.x < m.x + dimensoes(objetoPorTipo(m.tipo)!, m.rot ?? 0).w && o.y >= m.y && o.y < m.y + dimensoes(objetoPorTipo(m.tipo)!, m.rot ?? 0).d && m.tipo.startsWith('mesa'))) ? (t.alturaSuporte ?? 0) : 0) : 0;
       let sprite: Sprite; let arte: PixelImage | null = null;
       if (o.tipo.startsWith('asset:')) {
@@ -180,13 +180,13 @@ export class OfficeEngine {
       } else {
         const sp = this.pacote.pronto && t.sprite ? this.pacote.objeto(t.sprite, Boolean(t.espelhar) !== ((o.rot ?? 0) % 2 === 1)) : null;
         if (sp) {                                                   // arte do pacote: o ponto mais baixo do desenho fica no vértice da frente do espaço ocupado
-          sprite = new Sprite(sp.tex); arte = sp.arte; sprite.scale.set(ESCALA_ARTE); const base = gridParaTela(o.x + w, o.y + d);
-          sprite.position.set(base.x - sp.ax * ESCALA_ARTE, base.y - sp.ay * ESCALA_ARTE - z - (t.parede ?? 0));
-        } else { const tex = this.texturas.objeto(o.tipo, o.rot ?? 0); sprite = new Sprite(tex.tex); arte = tex.arte.img; const top = gridParaTela(o.x, o.y); sprite.position.set(top.x - tex.ox, top.y - tex.oy - z); }
+          sprite = new Sprite(sp.tex); arte = sp.arte; sprite.scale.set(ESCALA_ARTE * esc); const base = gridParaTela(o.x + w, o.y + d);
+          sprite.position.set(base.x - sp.ax * ESCALA_ARTE * esc, base.y - sp.ay * ESCALA_ARTE * esc - z - (t.parede ?? 0) * esc);
+        } else { const tex = this.texturas.objeto(o.tipo, o.rot ?? 0); sprite = new Sprite(tex.tex); arte = tex.arte.img; const top = gridParaTela(o.x, o.y); sprite.scale.set(esc); sprite.position.set(top.x - tex.ox * esc, top.y - tex.oy * esc - z); }
       }
       const camada = t.categoria === 'computadores' || t.categoria === 'equipamentos' ? CAMADA.objeto : CAMADA.mobiliario;
-      const corpo = corpoIso(`o:${o.id}`, o.x, o.y, w, d, t.altura + z, t.tipo === 'tapete' ? CAMADA.piso : camada);
-      if (z > 0) corpo.vies = 500;                                   // objeto sobre uma mesa: sempre depois dela (desenho e clique)
+      const corpo = corpoIso(`o:${o.id}`, o.x, o.y, w, d, t.altura * esc + z, t.tipo === 'tapete' ? CAMADA.piso : camada);
+      corpo.vies = (z > 0 ? 500 : 0) + (o.camada ?? 0) * 500;       // sobre uma mesa: depois dela; camada do usuário (frente/trás) desempata objetos sobrepostos
       this.entidades.addChild(sprite); this.objetos.push({ id: o.id, o, t, sprite, corpo, arte, z });
     }
     this.sujoProfundidade = true; this.aplicarVisibilidade();
@@ -213,7 +213,7 @@ export class OfficeEngine {
     const g = new Graphics();
     for (const o of this.layout.objetos) {
       const t = this.tipoDe(o); if (!t || !t.solido || t.altura < 20) continue;
-      const { w, d } = dimensoes(t, o.rot ?? 0);
+      const { w, d } = dimensoes(t, o.rot ?? 0, o.escala);
       if (t.sprite && this.pacote.pronto) {                      // arte do pacote: sombra suave redonda sob a base (nada de losango duro)
         const c = gridParaTela(o.x + w / 2 + 0.1, o.y + d / 2 + 0.1); g.ellipse(c.x, c.y + 2, (w + d) * 11 + 6, (w + d) * 5.5 + 3).fill({ color: 0x000000, alpha: 0.16 }); continue;
       }
@@ -391,7 +391,7 @@ export class OfficeEngine {
     if (rotulo !== this.hoverRotulo) { this.hoverRotulo = rotulo; this.bus.emit('hover', { rotulo }); }
   }
   private contorno(o: EntObjeto): void {
-    const { w, d } = dimensoes(o.t, o.o.rot ?? 0); const pts = [gridParaTela(o.o.x, o.o.y), gridParaTela(o.o.x + w, o.o.y), gridParaTela(o.o.x + w, o.o.y + d), gridParaTela(o.o.x, o.o.y + d)];
+    const { w, d } = dimensoes(o.t, o.o.rot ?? 0, o.o.escala); const pts = [gridParaTela(o.o.x, o.o.y), gridParaTela(o.o.x + w, o.o.y), gridParaTela(o.o.x + w, o.o.y + d), gridParaTela(o.o.x, o.o.y + d)];
     this.hoverG.poly(pts.flatMap((q) => [q.x, q.y])).stroke({ width: 2, color: 0x7dd3fc, alpha: 0.95 });
   }
 
@@ -521,7 +521,7 @@ export class OfficeEngine {
 
   private desenharSelecao(): void {
     this.selG.clear(); this.sujoSelecao = false; const a = this.selecionado;
-    if (a.tipo === 'objeto') { const o = this.objetos.find((x) => x.id === a.id); if (o) { const { w, d } = dimensoes(o.t, o.o.rot ?? 0); const pts = [gridParaTela(o.o.x, o.o.y), gridParaTela(o.o.x + w, o.o.y), gridParaTela(o.o.x + w, o.o.y + d), gridParaTela(o.o.x, o.o.y + d)]; this.selG.poly(pts.flatMap((q) => [q.x, q.y])).fill({ color: 0xf7c948, alpha: 0.18 }).stroke({ width: 2, color: 0xf7c948 }); } }
+    if (a.tipo === 'objeto') { const o = this.objetos.find((x) => x.id === a.id); if (o) { const { w, d } = dimensoes(o.t, o.o.rot ?? 0, o.o.escala); const pts = [gridParaTela(o.o.x, o.o.y), gridParaTela(o.o.x + w, o.o.y), gridParaTela(o.o.x + w, o.o.y + d), gridParaTela(o.o.x, o.o.y + d)]; this.selG.poly(pts.flatMap((q) => [q.x, q.y])).fill({ color: 0xf7c948, alpha: 0.18 }).stroke({ width: 2, color: 0xf7c948 }); } }
     else if (a.tipo === 'departamento') { const dp = this.layout.departamentos.find((x) => x.id === a.id); if (dp) { const pts = [gridParaTela(dp.x, dp.y), gridParaTela(dp.x + dp.w, dp.y), gridParaTela(dp.x + dp.w, dp.y + dp.h), gridParaTela(dp.x, dp.y + dp.h)]; this.selG.poly(pts.flatMap((q) => [q.x, q.y])).fill({ color: 0xffffff, alpha: 0.05 }).stroke({ width: 2, color: Number.parseInt((dp.cor ?? '#ffffff').slice(1), 16), alpha: 0.9 }); } }
     else if (a.tipo === 'celula') { const c = centroCelula(a.x, a.y); this.selG.circle(c.x, c.y, 10).stroke({ width: 2, color: 0xf7c948 }); }
   }
@@ -531,6 +531,11 @@ export class OfficeEngine {
   anelDoSelecionado(): void { /* o anel é desenhado junto do rótulo em desenhar() */ }
 
   // ---------- consulta ----------
+  /** Posição na tela (relativa ao canvas), logo acima do objeto: os atalhos do elemento selecionado ficam ali. */
+  ancoraObjeto(id: string): { x: number; y: number } | null {
+    const o = this.objetos.find((q) => q.id === id); if (!o) return null; const z = this.camera.zoom;
+    return { x: (o.sprite.x + o.sprite.width / 2) * z + this.mundo.position.x, y: o.sprite.y * z + this.mundo.position.y };
+  }
   objetoPorId(id: string): EntObjeto | undefined { return this.objetos.find((o) => o.id === id); }
   get totalSprites(): number { return this.pedacos.size + (this.pisoUnico ? 1 : 0) + this.paredes.length + this.objetos.length + this.pessoas.length; }
 

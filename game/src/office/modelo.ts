@@ -4,7 +4,7 @@ import type { Direcao } from './iso';
 export const FORMATO = 'codeniac-office';
 export const VERSAO_FORMATO = 1;
 
-export interface ObjetoLayout { id: string; tipo: string; x: number; y: number; rot?: number; assetId?: string | null; nome?: string }
+export interface ObjetoLayout { id: string; tipo: string; x: number; y: number; rot?: number; assetId?: string | null; nome?: string; escala?: number; camada?: number }   // x,y podem ser fracionários (posicionamento livre); escala 0,4–3; camada -10..10
 export interface ParedeLayout { x: number; y: number; lado: 'N' | 'W'; tipo?: string; abertura?: 'porta' | 'janela' | null }
 export interface EstacaoLayout {
   id: string; objetoId?: string | null;
