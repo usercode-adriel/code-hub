@@ -48,6 +48,7 @@ export interface Funcionario {
   entrada: number; saida: number; estacao: string | null; status: 'ativo' | 'demitido' | 'afastado'; contratadoEm: number; diasSemPagar: number;
   estado: EstadoFunc; x: number; y: number; dir: Dir; caminho: { x: number; y: number }[]; alvo?: string | null; desde: number; fala?: string; falaAte?: number; produzido: number;
   defeitos?: string[]; extras?: string;                              // defeitos escolhidos e habilidades extras em texto livre (definidos na contratação)
+  metaDia?: number;                                                   // rendimento sorteado para hoje (10–120 CC); define a seta de desempenho e é creditado à meia-noite
   giroAte?: number;                                                   // (tempo real, s) até quando a personagem fica virada para o jogador
 }
 
@@ -60,7 +61,7 @@ export interface Projeto {
   cc: number; transacoes: Transacao[]; inventario: Record<string, number>; estoqueLoja: Record<string, number>; diaEstoque: number;
   funcionarios: Funcionario[]; candidatos: Candidato[]; recontratar: Candidato[];
   computadores: Record<string, Computador>; quadros: Record<string, QuadroDados>; armarios: Record<string, Record<string, number>>;
-  minuto: number; velocidade: number; prox: number; config: { som: boolean; papelDeParede: string };
+  minuto: number; velocidade: number; prox: number; config: { som: boolean; papelDeParede: string; bonus5000?: boolean };
   coresParede?: string[];                                              // cor por célula de parede ('' = cor padrão do projeto)
   conversas?: Record<string, { de: 'eu' | 'ela'; texto: string; em: number }[]>;   // histórico do chat por funcionário
   automacoes?: Automacao[];                                            // regras de automação (ver src/automacao)

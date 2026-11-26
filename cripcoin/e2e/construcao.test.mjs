@@ -113,3 +113,17 @@ test('construção: cor de paredes por trecho, todas as paredes, piso da sala in
     await usarItem(p, 'Quadro Codeniac'); await clicarMundo(p, 8, -0.1); await p.waitForTimeout(150); const q = await obj(p, 'quadro-codeniac'); assert.ok(q, 'quadro com o logo colocado na parede'); await shot(p, 'v3-logo.png'); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
 });
+
+test('seta de desempenho: verde para cima (alto) e vermelha para baixo (baixo) sobre a cabeça', async () => {
+  const p = await abrir(); try {
+    await novoProjeto(p, 'Setas'); await contratarUI(p, 'Marina');
+    for (const [meta, nome] of [[110, 'alto'], [20, 'baixo']]) {
+      await p.evaluate((m) => { window.__jogo.p.funcionarios[0].metaDia = m; window.__jogo.emitir(); }, meta); await p.waitForTimeout(300);
+      const px = await p.evaluate(() => { const j = window.__jogo; const m = window.__mundo; const f = j.p.funcionarios[0]; const cv = m.canvas; const t = m.paraTela(f.x, f.y + 0.5 - 2.35); const ctx = cv.getContext('2d'); const d = ctx.getImageData(Math.round((t.x - 16) * m.dpr), Math.round((t.y - 10) * m.dpr), Math.round(32 * m.dpr), Math.round(40 * m.dpr)).data; let verde = 0; let vermelho = 0; for (let i = 0; i < d.length; i += 4) { if (d[i] < 90 && d[i + 1] > 190 && d[i + 2] < 130) verde++; if (d[i] > 230 && d[i + 1] < 110 && d[i + 2] < 110) vermelho++; } return { verde, vermelho }; });
+      if (nome === 'alto') { assert.ok(px.verde > 8 && px.vermelho === 0, `seta verde visível (${JSON.stringify(px)})`); await shot(p, 'v4-seta-alta.png'); } else { assert.ok(px.vermelho > 8 && px.verde === 0, `seta vermelha visível (${JSON.stringify(px)})`); await shot(p, 'v4-seta-baixa.png'); }
+    }
+    await p.evaluate(() => { window.__jogo.p.funcionarios[0].metaDia = 65; window.__jogo.emitir(); }); await p.waitForTimeout(300);
+    const sem = await p.evaluate(() => { const j = window.__jogo; const m = window.__mundo; const f = j.p.funcionarios[0]; const t = m.paraTela(f.x, f.y + 0.5 - 2.35); const d = m.canvas.getContext('2d').getImageData(Math.round((t.x - 16) * m.dpr), Math.round((t.y - 10) * m.dpr), Math.round(32 * m.dpr), Math.round(40 * m.dpr)).data; let n = 0; for (let i = 0; i < d.length; i += 4) { if ((d[i] < 90 && d[i + 1] > 190) || (d[i] > 230 && d[i + 1] < 110 && d[i + 2] < 110)) n++; } return n; });
+    assert.equal(sem, 0, 'desempenho médio: sem seta'); assert.deepEqual(p.erros, []);
+  } finally { await p.ctx.close(); }
+});

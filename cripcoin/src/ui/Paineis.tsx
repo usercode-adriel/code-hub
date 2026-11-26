@@ -6,7 +6,7 @@ import { diaDe, horaTexto, minutoDoDia } from '../nucleo/tempo';
 import { urlAvatar, urlObjeto } from '../render/arte';
 import { spriteDe } from '../render/mundo';
 import { venderDoInventario } from '../sistemas/economia';
-import { afastar, atribuirEstacao, contratar, demitir, estacoesLivres, readmitir, retornar } from '../sistemas/funcionarios';
+import { afastar, atribuirEstacao, contratar, demitir, desempenhoDe, estacoesLivres, readmitir, retornar } from '../sistemas/funcionarios';
 import type { Candidato, Funcionario } from '../tipos';
 import { cc, Janela, useJogo } from './comum';
 
@@ -127,7 +127,7 @@ export function Perfil({ jogo, id, fechar }: { jogo: Jogo; id: string; fechar: (
       <div className="linha" style={{ alignItems: 'flex-start' }}><img className="avatar" style={{ width: 90, height: 140 }} src={urlAvatar(f.avatar)} alt="" />
         <div className="grow"><div className="ouro">{f.cargo}</div><div className="dim">{f.idade} anos · {f.status === 'ativo' ? ESTADOS[f.estado] : f.status === 'afastado' ? 'Em licença' : 'Demitido'} · contratado no dia {diaDe(f.contratadoEm)}</div>
           <div>Energia {Math.round(f.energia)}%<div className="barra"><i style={{ width: `${f.energia}%` }} /></div></div><div>Humor {Math.round(f.humor)}%<div className="barra"><i style={{ width: `${f.humor}%`, background: '#ffd75e' }} /></div></div>
-          <div className="dim">Produtividade ×{f.produtividade} · produziu {cc(Math.round(f.produzido * 10) / 10)} hoje · salário {cc(f.salario)}/dia · expediente {hora(f.entrada)}–{hora(f.saida)}</div></div></div>
+          <div className="dim">Rende hoje {f.metaDia ?? '—'} CC ({desempenhoDe(f) === 'alto' ? 'desempenho ALTO ▲' : desempenhoDe(f) === 'baixo' ? 'desempenho BAIXO ▼' : 'desempenho médio'}) · último dia {cc(Math.round(f.produzido))} · salário {cc(f.salario)}/dia · expediente {hora(f.entrada)}–{hora(f.saida)}</div></div></div>
       <Habilidades h={f.habilidades} /><Tracos ids={f.tracos} />{(f.defeitos ?? []).length > 0 && <Defeitos ids={f.defeitos ?? []} />}{f.extras && <div className="dim">Outras habilidades: {f.extras}</div>}<p className="dim">{f.comportamento}</p>
       <label>Estação de trabalho</label>
       <div className="linha"><select value={f.estacao ?? ''} onChange={(e) => jogo.resultado(atribuirEstacao(p, f.id, e.target.value || null))} data-testid="sel-estacao" disabled={f.status !== 'ativo'}>

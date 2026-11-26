@@ -6,6 +6,7 @@ import type { Jogo } from '../nucleo/jogo';
 import type { ItemDef, ObjetoColocado, Projeto } from '../tipos';
 import { avatar, CORES_PAREDE, objeto, parede as spriteParede, paredeColorida, piso } from './arte';
 import { estado, seca } from '../sistemas/objetos';
+import { desempenhoDe } from '../sistemas/funcionarios';
 
 export const T = 32;                                          // pixels lógicos por tile (zoom 1)
 export interface Camera { x: number; y: number; zoom: number }   // x,y = ponto do mundo (em tiles) no centro da tela
@@ -136,7 +137,17 @@ export class Mundo {
     const sw = im ? im.width / 2 : 32; const sh = im ? im.height / 2 : 60;
     if (im) c.drawImage(im, cx - sw / 2, by - sh, sw, sh); else { c.fillStyle = '#d98'; c.fillRect(cx - 8, by - 36, 16, 34); }
     if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(cx - sw / 2, by - sh, sw, sh); }
+    this.seta(c, f, cx, by - sh);
     c.fillStyle = 'rgba(0,0,0,0.6)'; c.font = 'bold 7px monospace'; c.textAlign = 'center'; const nome = f.apelido || f.nome; const tw = c.measureText(nome).width + 4; c.fillRect(cx - tw / 2, by + 1, tw, 9); c.fillStyle = '#fff'; c.fillText(nome, cx, by + 8);
+  }
+  /** Seta de desempenho sobre a cabeça: verde para cima (alto) ou vermelha para baixo (baixo); pixel art com contorno e leve vaivém. */
+  private seta(c: CanvasRenderingContext2D, f: ProjetoFunc, cx: number, topo: number): void {
+    const d = desempenhoDe(f); if (d === 'medio') return; const alto = d === 'alto';
+    const bmp = ['...X...', '..XXX..', '.XXXXX.', 'XXXXXXX', '..XXX..', '..XXX..', '..XXX..'];                  // seta para cima (7×7)
+    const linhas = alto ? bmp : [...bmp].reverse(); const K = 2; const ox = Math.round(cx) - 7; const oy = Math.round(topo - 20 + Math.sin(this.tempo * 3) * 1.5);
+    const cel = (x: number, y: number): boolean => y >= 0 && y < 7 && x >= 0 && x < 7 && linhas[y][x] === 'X';
+    c.fillStyle = '#0d0a14'; for (let y = -1; y <= 7; y++) for (let x = -1; x <= 7; x++) if (!cel(x, y) && (cel(x - 1, y) || cel(x + 1, y) || cel(x, y - 1) || cel(x, y + 1))) c.fillRect(ox + x * K, oy + y * K, K, K);
+    c.fillStyle = alto ? '#3ddc6a' : '#ff4d4d'; for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (cel(x, y)) c.fillRect(ox + x * K, oy + y * K, K, K);
   }
   /** Balão de fala sobre a cabeça, com quebra de linha; "pensando" mostra reticências animadas. */
   private balao(c: CanvasRenderingContext2D, x: number, yBase: number, texto: string, pensando: boolean): void {

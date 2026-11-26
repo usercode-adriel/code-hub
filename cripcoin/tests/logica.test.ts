@@ -5,7 +5,7 @@ import { Grade } from '../src/nucleo/grade';
 import { Jogo, novoProjeto } from '../src/nucleo/jogo';
 import { alternarPorta, colocar, criarProjeto, mover, pintarPiso, podeColocar, tracarParede } from '../src/nucleo/mapa';
 import { comprar, colocarDoInventario, guardarObjeto, venderDoInventario, venderObjeto } from '../src/sistemas/economia';
-import { atribuirEstacao, computadorDaMesa, contratar, demitir, estacoesLivres, readmitir } from '../src/sistemas/funcionarios';
+import { atribuirEstacao, computadorDaMesa, contratar, demitir, desempenhoDe, estacoesLivres, readmitir } from '../src/sistemas/funcionarios';
 import { copiar, criar, excluir, fsInicial, achar, mover as moverArq, renomear, salvar } from '../src/sistemas/arquivos';
 import { adicionarNota, guardarNoArmario, prepararCafe, quadro, retirarDoArmario } from '../src/sistemas/objetos';
 import { diaDe, horaTexto } from '../src/nucleo/tempo';
@@ -21,9 +21,9 @@ describe('projeto e mapa', () => {
     expect(p.paredes[0]).toBe(1); expect(p.paredes[13]).toBe(1); expect(p.portas).toHaveLength(1); expect(p.paredes[9 * 14 + 7]).toBe(0);
   });
   it('rejeita tamanhos fora do limite', () => { expect(() => criarProjeto({ ...cfg, largura: 3 })).toThrow(); expect(() => criarProjeto({ ...cfg, altura: 99 })).toThrow(); });
-  it('começa só com mesa simples + laptop + cadeira básica, 1500 CC, sem funcionários', () => {
+  it('começa só com mesa simples + laptop + cadeira básica, 5000 CC, sem funcionários', () => {
     const p = novo(); expect(p.objetos.map((o) => o.def).sort()).toEqual(['cadeira-escritorio', 'laptop', 'mesa-simples']);
-    expect(p.cc).toBe(1500); expect(p.funcionarios).toHaveLength(0); expect(Object.keys(p.inventario)).toHaveLength(0);
+    expect(p.cc).toBe(5000); expect(p.funcionarios).toHaveLength(0); expect(Object.keys(p.inventario)).toHaveLength(0);
     const lap = p.objetos.find((o) => o.def === 'laptop')!; expect(lap.sobre).toBeTruthy(); expect(p.computadores[lap.id].fs.nome).toBe('Computador');
   });
   it('não coloca objeto em parede, fora do piso ou sobre outro objeto', () => {
@@ -57,7 +57,7 @@ describe('pathfinding e colisão', () => {
 
 describe('economia (CRIPCOIN)', () => {
   it('compra: debita CC, entrega ao inventário, registra transação e baixa estoque', () => {
-    const p = novo(); const r = comprar(p, 'mesa-metal'); expect(r.ok).toBe(true); expect(p.cc).toBe(1500 - item('mesa-metal')!.preco); expect(p.inventario['mesa-metal']).toBe(1); expect(p.transacoes.at(-1)!.tipo).toBe('compra');
+    const p = novo(); const r = comprar(p, 'mesa-metal'); expect(r.ok).toBe(true); expect(p.cc).toBe(5000 - item('mesa-metal')!.preco); expect(p.inventario['mesa-metal']).toBe(1); expect(p.transacoes.at(-1)!.tipo).toBe('compra');
   });
   it('recusa compra sem saldo e sem estoque', () => { const p = novo(); p.cc = 5; expect(comprar(p, 'mesa-metal').ok).toBe(false); expect(p.inventario['mesa-metal']).toBeUndefined(); p.cc = 99999; for (let i = 0; i < 4; i++) comprar(p, 'mesa-metal'); expect(comprar(p, 'mesa-metal').ok).toBe(false); });
   it('vende por 60% e o saldo nunca fica negativo', () => { const p = novo(); comprar(p, 'planta-vaso'); const cc0 = p.cc; expect(venderDoInventario(p, 'planta-vaso').ok).toBe(true); expect(p.cc).toBe(cc0 + precoVenda(item('planta-vaso')!)); expect(venderDoInventario(p, 'planta-vaso').ok).toBe(false); expect(p.cc).toBeGreaterThanOrEqual(0); });
@@ -90,10 +90,14 @@ describe('presença fixa na mesa (sem andar, só girar)', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); const f = p.funcionarios[0]; const a = p.objetos.find((o) => o.def === 'cadeira-escritorio')!; p.velocidade = 3;
     for (const hora of [3, 9, 13, 22]) { p.minuto = hora * 60; rodar(j, 2); expect(f.estado).not.toBe('ausente'); expect(Math.floor(f.x)).toBe(a.x); expect(Math.floor(f.y)).toBe(a.y); expect(f.caminho).toHaveLength(0); }
   });
-  it('trabalha (gera CC) no expediente e fica parada na mesa fora dele', () => {
-    const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.minuto = 10 * 60; const cc0 = p.cc; rodar(j, 20); expect(p.funcionarios[0].estado).toBe('trabalhando'); expect(p.cc).toBeGreaterThan(cc0);
-    p.minuto = 20 * 60; const cc1 = p.cc; rodar(j, 10); expect(p.funcionarios[0].estado).toBe('parado'); expect(p.cc).toBeCloseTo(cc1, 5);
+  it('rendimento diário: entre 10 e 120 CC por funcionária, sorteado a cada dia e creditado à meia-noite', () => {
+    const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; const f = p.funcionarios[0]; const valores = new Set<number>();
+    for (let d = 0; d < 40; d++) { const meta = f.metaDia!; expect(meta).toBeGreaterThanOrEqual(10); expect(meta).toBeLessThanOrEqual(120); expect(Number.isInteger(meta)).toBe(true); valores.add(meta);
+      const antes = p.transacoes.length; p.cc = 100000; p.minuto = (diaDe(p.minuto)) * 1440 - 2; rodar(j, 4); const r = p.transacoes.slice(antes).find((t) => t.tipo === 'recompensa'); expect(r!.valor).toBe(meta); }
+    expect(valores.size).toBeGreaterThan(10);
   });
+  it('sem estação ela não rende nem recebe salário', () => { const p = novo(); contratar(p, p.candidatos[0].id, { nome: 'A', sobrenome: '', apelido: '', cargo: '', profissao: '', tracos: [], comportamento: '', salario: 30 }); p.funcionarios[0].estacao = null; p.objetos = p.objetos.filter((o) => o.def !== 'laptop'); const j = new Jogo(p); p.velocidade = 3; p.minuto = 1440 - 2; const cc0 = p.cc; rodar(j, 4); expect(p.cc).toBe(cc0); });
+  it('desempenho: alto (seta verde) a partir de 85, baixo (seta vermelha) até 45, médio no meio', () => { expect(desempenhoDe({ metaDia: 120 })).toBe('alto'); expect(desempenhoDe({ metaDia: 85 })).toBe('alto'); expect(desempenhoDe({ metaDia: 84 })).toBe('medio'); expect(desempenhoDe({ metaDia: 46 })).toBe('medio'); expect(desempenhoDe({ metaDia: 45 })).toBe('baixo'); expect(desempenhoDe({ metaDia: 10 })).toBe('baixo'); });
   it('só usa vistas existentes (S, N, W, E) e volta a olhar para a mesa depois de girar', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); const f = p.funcionarios[0]; const vistos = new Set<string>(); p.velocidade = 1;
     for (let i = 0; i < 4000; i++) { j.passo(0.1); vistos.add(f.dir); } expect([...vistos].every((d) => ['S', 'N', 'W', 'E'].includes(d))).toBe(true); expect(vistos.size).toBeGreaterThan(1);
@@ -113,7 +117,7 @@ describe('presença fixa na mesa (sem andar, só girar)', () => {
   it('paga salário no fim do dia; sem saldo por 3 dias a pessoa pede demissão', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.minuto = 23 * 60 + 58; const antes = p.transacoes.length; rodar(j, 5);
     expect(diaDe(p.minuto)).toBe(2); expect(p.transacoes.slice(antes).some((t) => t.tipo === 'salario' && t.valor === -40)).toBe(true);
-    p.cc = 0; for (let d = 0; d < 3; d++) { p.minuto = diaDe(p.minuto) * 1440 - 2; rodar(j, 4); p.cc = 0; } expect(p.funcionarios[0].status).toBe('demitido');
+    p.funcionarios[0].salario = 500; p.cc = 0; for (let d = 0; d < 3; d++) { p.minuto = diaDe(p.minuto) * 1440 - 2; rodar(j, 4); p.cc = 0; } expect(p.funcionarios[0].status).toBe('demitido');
   });
 });
 

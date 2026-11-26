@@ -23,8 +23,8 @@ export function criarProjeto(c: ConfigNovo, agora = Date.now()): Projeto {
   const p: Projeto = {
     versao: 1, id: novoId('proj'), nome: c.nome.trim() || 'Meu escritório', empresa: c.empresa.trim() || 'Minha empresa', criadoEm: agora, atualizadoEm: agora, largura, altura, tile: LIMITES.tiles.includes(c.tile) ? c.tile : 32,
     piso: Array(largura * altura).fill(c.piso || 'madeira'), paredes: Array(largura * altura).fill(0), corParede: c.corParede || 'creme', alturaParede: LIMITES.alturaParede.includes(c.alturaParede) ? c.alturaParede : 1.4,
-    portas: [], objetos: [], cc: 1500, transacoes: [], inventario: {}, estoqueLoja: {}, diaEstoque: 0, funcionarios: [], candidatos: [], recontratar: [], computadores: {}, quadros: {}, armarios: {},
-    minuto: 8 * 60, velocidade: 1, prox: 1, config: { som: true, papelDeParede: 'azul' },
+    portas: [], objetos: [], cc: 5000, transacoes: [], inventario: {}, estoqueLoja: {}, diaEstoque: 0, funcionarios: [], candidatos: [], recontratar: [], computadores: {}, quadros: {}, armarios: {},
+    minuto: 8 * 60, velocidade: 1, prox: 1, config: { som: true, papelDeParede: 'azul', bonus5000: true },
   };
   for (let x = 0; x < largura; x++) { p.paredes[idx(p, x, 0)] = 1; p.paredes[idx(p, x, altura - 1)] = 1; }
   for (let y = 0; y < altura; y++) { p.paredes[idx(p, 0, y)] = 1; p.paredes[idx(p, largura - 1, y)] = 1; }

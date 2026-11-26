@@ -38,12 +38,12 @@ const clicarCelula = async (p, x, y) => { const pos = await p.evaluate(([x, y]) 
 const clicarObjeto = async (p, def) => { const c = await p.evaluate((def) => { const o = window.__jogo.p.objetos.find((q) => q.def === def); const r = window.__mundo.retDe(window.__jogo.p, o); const t = window.__mundo.paraTela(r.left + r.w / 2, r.top + r.h / 2); const b = window.__mundo.canvas.getBoundingClientRect(); return { x: b.left + t.x, y: b.top + t.y }; }, def); await p.mouse.click(c.x, c.y); };
 const shot = async (p, nome) => { if (SAIDA) { fs.mkdirSync(SAIDA, { recursive: true }); await p.screenshot({ path: path.join(SAIDA, nome) }); } };
 
-test('novo projeto: sala pedida, escritório inicial mínimo e CC 1500', async () => {
+test('novo projeto: sala pedida, escritório inicial mínimo e CC 5000', async () => {
   const p = await abrir(); try {
     await p.fill('[data-testid=cr-w]', '12'); await p.fill('[data-testid=cr-h]', '9'); await novoProjeto(p);
     const dim = await p.evaluate(() => ({ w: window.__jogo.p.largura, h: window.__jogo.p.altura })); assert.deepEqual(dim, { w: 12, h: 9 });
     const e = await estado(p); assert.deepEqual([...e.objetos].sort(), ['cadeira-escritorio', 'laptop', 'mesa-simples']); assert.equal(e.func.length, 0);
-    assert.match(await p.textContent('[data-testid=saldo]'), /1500/); await shot(p, 'inicial.png'); assert.deepEqual(p.erros, []);
+    assert.match(await p.textContent('[data-testid=saldo]'), /5000/); await shot(p, 'inicial.png'); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
 });
 
@@ -52,13 +52,13 @@ test('loja pelo laptop, inventário, construir e vender; saldo muda de verdade',
     await novoProjeto(p); const lap = await p.evaluate(() => { const o = window.__jogo.p.objetos.find((q) => q.def === 'laptop'); return { x: o.x, y: o.y }; });
     await clicarObjeto(p, 'laptop'); await p.waitForSelector('[data-testid=so]'); await p.click('[data-testid=ico-loja]'); await p.waitForSelector('[data-testid=loja]');
     await p.click('[data-testid=comprar-mesa-baixa]'); await p.click('[data-testid=confirmar-compra]'); await p.waitForTimeout(150);
-    let e = await estado(p); assert.equal(e.inv['mesa-baixa'], 1); assert.equal(e.cc, 1500 - 90); await shot(p, 'loja.png');
+    let e = await estado(p); assert.equal(e.inv['mesa-baixa'], 1); assert.equal(e.cc, 5000 - 90); await shot(p, 'loja.png');
     await p.click('[data-testid=so-fechar]'); await p.click('[data-testid=btn-inventario]'); await p.waitForSelector('[data-testid=inv-item]'); await p.click('text=Colocar'); // abre construção com o item
     await p.waitForSelector('[data-testid=painel-construcao]'); await clicarCelula(p, 2, 6); await p.waitForTimeout(150);
     e = await estado(p); assert.ok(e.objetos.includes('mesa-baixa')); assert.equal(e.inv['mesa-baixa'], undefined);
     // seleciona e vende pelo painel
     await p.click('[data-testid=ferr-selecionar]'); await clicarCelula(p, 2, 6); await p.waitForSelector('[data-testid=sel-info]'); await p.click('text=Vender'); await p.click('text=Confirmar'); await p.waitForTimeout(150);
-    e = await estado(p); assert.ok(!e.objetos.includes('mesa-baixa')); assert.equal(e.cc, 1500 - 90 + 54); assert.deepEqual(p.erros, []);
+    e = await estado(p); assert.ok(!e.objetos.includes('mesa-baixa')); assert.equal(e.cc, 5000 - 90 + 54); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
 });
 
@@ -69,7 +69,10 @@ test('contratar: candidato some da lista, funcionário chega, senta e trabalha s
     let e = await estado(p); assert.equal(e.func.length, 1); assert.equal(e.func[0].nome, 'Marina'); assert.equal(e.cand, antes - 1); assert.ok(e.func[0].estacao);
     await p.evaluate(() => { const j = window.__jogo; j.p.minuto = 9 * 60 - 2; j.p.velocidade = 3; });
     await p.waitForFunction(() => window.__jogo.p.funcionarios[0].estado === 'trabalhando', null, { timeout: 40000 }); await shot(p, 'trabalhando.png');
-    const cc0 = (await estado(p)).cc; await p.waitForTimeout(4000); assert.ok((await estado(p)).cc > cc0, 'o funcionário produz CC'); assert.deepEqual(p.erros, []);
+    const meta = await p.evaluate(() => window.__jogo.p.funcionarios[0].metaDia); assert.ok(meta >= 10 && meta <= 120, `rendimento do dia sorteado entre 10 e 120 (${meta})`);
+    const cc0 = (await estado(p)).cc; await p.evaluate(() => { const j = window.__jogo; j.p.minuto = Math.ceil(j.p.minuto / 1440) * 1440 - 1; j.p.velocidade = 3; });
+    await p.waitForFunction(() => window.__jogo.p.transacoes.some((t) => t.tipo === 'recompensa' && /Rendimento/.test(t.descricao)), null, { timeout: 20000 });
+    const gan = await p.evaluate(() => window.__jogo.p.transacoes.find((t) => /Rendimento/.test(t.descricao)).valor); assert.equal(gan, meta); assert.ok((await estado(p)).cc > cc0 - 200, 'rendimento creditado'); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
 });
 

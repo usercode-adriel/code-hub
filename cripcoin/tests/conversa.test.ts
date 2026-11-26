@@ -78,3 +78,10 @@ describe('cores de parede, piso e logo', () => {
     const r = importar(JSON.stringify(velho))!; expect(r.funcionarios).toHaveLength(0); expect(r.candidatos.map((c) => c.avatar).sort()).toEqual(['afro', 'cacheada', 'oculos']);
   });
 });
+
+describe('bônus de 5.000 CC', () => {
+  it('projetos antigos recebem os 5.000 CC uma única vez; novos já começam com 5.000', () => {
+    const p = novoProjeto(cfg); expect(p.cc).toBe(5000); const velho = JSON.parse(exportar(p)); delete velho.config.bonus5000; velho.cc = 1234;
+    const r = importar(JSON.stringify(velho))!; expect(r.cc).toBe(6234); expect(r.transacoes.at(-1)!.descricao).toMatch(/5\.000/); const r2 = importar(exportar(r))!; expect(r2.cc).toBe(6234);
+  });
+});

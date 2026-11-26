@@ -56,9 +56,9 @@ export class Jogo {
     if (Date.now() - this.ultimoSalvar > 8000 && this.sujo) this.salvar();
   }
   private novoDia(): void {
-    const p = this.p; const r = pagarSalarios(p, (t, v, d) => { registrar(p, t, v, d); });
+    const p = this.p; const r = pagarSalarios(p, (t, v, d) => { registrar(p, t, v, d); }, this.rnd);
     reporEstoque(p); passarDiaPlantas(p);
-    this.aviso(`Dia ${diaDe(p.minuto)} — ${horaTexto(p.minuto)}. ${r.pago ? `Salários pagos: ${r.pago} CC.` : 'Nenhum salário a pagar.'}${r.saidas.length ? ` ${r.saidas.join(', ')} pediu(ram) demissão por falta de pagamento.` : ''}`, 'info'); this.grade = new Grade(p); this.notificar('dia_novo', { dia: diaDe(p.minuto), pago: r.pago });
+    this.aviso(`Dia ${diaDe(p.minuto)} — ${horaTexto(p.minuto)}. ${r.rendeu ? `Equipe rendeu ${r.rendeu} CC. ` : ''}${r.pago ? `Salários pagos: ${r.pago} CC.` : 'Nenhum salário a pagar.'}${r.saidas.length ? ` ${r.saidas.join(', ')} pediu(ram) demissão por falta de pagamento.` : ''}`, 'info'); this.grade = new Grade(p); this.notificar('dia_novo', { dia: diaDe(p.minuto), pago: r.pago });
   }
   salvar(): boolean { const ok = salvarProjeto(this.p, diaDe(this.p.minuto)); this.ultimoSalvar = Date.now(); if (ok) { this.sujo = false; this.salvoEm = Date.now(); this.notificar('projeto_salvo', { projeto: this.p.nome }); } else this.aviso('Não foi possível salvar (armazenamento cheio?).', 'erro'); this.emitir(); return ok; }
   get g(): Grade { return this.grade; }

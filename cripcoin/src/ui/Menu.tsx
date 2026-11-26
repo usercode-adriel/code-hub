@@ -57,7 +57,7 @@ function Criador({ onFechar, onCriar }: { onFechar: () => void; onCriar: (c: Con
           <button disabled={c.portas.length <= 1} onClick={() => up('portas', c.portas.filter((_, j) => j !== i))}>Remover</button></div>))}
         <button disabled={c.portas.length >= 4} onClick={() => up('portas', [...c.portas, { lado: 'N', pos: 3 }])}>+ Porta</button>
         {erro && <div className="erro">{erro}</div>}
-        <div className="dim">Você começa com 1500 CC e só uma mesa simples, um laptop e uma cadeira básica.</div>
+        <div className="dim">Você começa com 5000 CC e só uma mesa simples, um laptop e uma cadeira básica.</div>
         <div className="linha dir"><button onClick={onFechar}>Cancelar</button><button className="primario" disabled={!!erro || !c.nome.trim()} onClick={() => onCriar(c)} data-testid="cr-criar">Criar escritório</button></div>
       </div></div></div>
   );

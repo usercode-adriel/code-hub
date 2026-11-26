@@ -10,6 +10,11 @@ import { ehFimDeSemana, minutoDoDia } from '../nucleo/tempo';
 import type { Candidato, Dir, Funcionario, Habilidades, ObjetoColocado, Projeto } from '../tipos';
 
 const clampH = (n: number): number => Math.min(10, Math.max(0, Math.round(Number(n) || 0)));
+/** Rendimento diário de cada funcionária: valor aleatório entre 10 e 120 CC, sorteado a cada dia. */
+export const RENDIMENTO = { min: 10, max: 120, alto: 85, baixo: 45 };
+export const sortearRendimento = (rnd: () => number): number => RENDIMENTO.min + Math.floor(rnd() * (RENDIMENTO.max - RENDIMENTO.min + 1));
+/** Desempenho do dia: 'alto' (seta verde ▲), 'baixo' (seta vermelha ▼) ou 'medio' (sem seta). */
+export function desempenhoDe(f: Pick<Funcionario, 'metaDia'>): 'alto' | 'baixo' | 'medio' { const v = f.metaDia ?? 0; return v >= RENDIMENTO.alto ? 'alto' : v <= RENDIMENTO.baixo ? 'baixo' : 'medio'; }
 export const HORARIO = { entrada: 9 * 60, saida: 18 * 60, almoco: [12 * 60, 13 * 60] as [number, number] };
 export interface CfgContrato { nome: string; sobrenome: string; apelido: string; cargo: string; profissao: string; tracos: string[]; comportamento: string; salario: number; entrada?: number; saida?: number; defeitos?: string[]; habilidades?: Habilidades; extras?: string }
 
@@ -52,7 +57,7 @@ export function contratar(p: Projeto, candidatoId: string, cfg: CfgContrato): { 
   const prod = tracos.reduce((a, t) => a + (tracoPorId.get(t)?.prod ?? 0), 1) * (0.7 + (hab.logica + hab.organizacao + hab.criatividade + hab.comunicacao) / 40);
   const f: Funcionario = { id: novoId('func'), candidatoId, avatar: c.avatar, nome: cfg.nome.trim().slice(0, 30), sobrenome: cfg.sobrenome.trim().slice(0, 30), apelido: cfg.apelido.trim().slice(0, 20), cargo: cfg.cargo.trim().slice(0, 40) || c.cargo, profissao: cfg.profissao.trim().slice(0, 40) || c.cargo,
     idade: c.idade, tracos, comportamento: cfg.comportamento.trim().slice(0, 300), habilidades: hab, defeitos: (cfg.defeitos ?? []).slice(0, 6), extras: (cfg.extras ?? '').trim().slice(0, 300), produtividade: Math.round(prod * 100) / 100, energia: 100, humor: 75, salario: Math.round(cfg.salario),
-    entrada: cfg.entrada ?? HORARIO.entrada, saida: cfg.saida ?? HORARIO.saida, estacao: null, status: 'ativo', contratadoEm: p.minuto, diasSemPagar: 0, estado: 'ausente', x: 0, y: 0, dir: 'S', caminho: [], desde: p.minuto, produzido: 0 };
+    entrada: cfg.entrada ?? HORARIO.entrada, saida: cfg.saida ?? HORARIO.saida, estacao: null, metaDia: sortearRendimento(Math.random), status: 'ativo', contratadoEm: p.minuto, diasSemPagar: 0, estado: 'ausente', x: 0, y: 0, dir: 'S', caminho: [], desde: p.minuto, produzido: 0 };
   p.candidatos.splice(i, 1); p.funcionarios.push(f); const livre = estacoesLivres(p)[0]; if (livre) f.estacao = livre;
   return { ok: true, motivo: f.estacao ? `${f.nome} foi contratado(a) e já tem estação de trabalho.` : `${f.nome} foi contratado(a). Falta uma estação (mesa + cadeira + computador).`, func: f };
 }
@@ -85,6 +90,7 @@ export function atualizarFuncionarios(p: Projeto, ctx: Contexto, dtMin: number, 
     if (!f.estacao) { const livre = estacoesLivres(p)[0]; if (livre) f.estacao = livre; }          // compra de uma estação nova encaixa quem estava esperando
     const a = f.estacao ? acharAssento(p, f.estacao) : null;
     if (!a) { f.estado = 'ausente'; continue; }
+    f.metaDia ??= sortearRendimento(rnd);
     f.x = a.x + 0.5; f.y = a.y + 0.5; f.caminho = [];
     const trabalha = dentroDoExpediente(p, f); f.estado = trabalha ? 'trabalhando' : 'parado';
     // giro: de vez em quando vira para o jogador (frente) ou para o lado e depois volta para a mesa; sempre só entre as vistas existentes
@@ -95,20 +101,19 @@ export function atualizarFuncionarios(p: Projeto, ctx: Contexto, dtMin: number, 
   }
 }
 function trabalhar(p: Projeto, f: Funcionario, dtMin: number): void {
-  const mesa = f.estacao; const pc = mesa ? computadorDaMesa(p, mesa) : null; if (!pc) return;
-  const t = f.tracos.map((x) => tracoPorId.get(x)); const humorBase = 70 + t.reduce((a, x) => a + (x?.humor ?? 0), 0) * 20; const eficiencia = Math.max(0.2, f.produtividade * (0.8 + f.humor / 250));
-  const ganho = 0.05 * eficiencia * dtMin; p.cc = Math.round((p.cc + ganho) * 1000) / 1000; f.produzido += ganho; f.humor = Math.max(10, Math.min(100, f.humor + (humorBase - f.humor) * 0.005 * dtMin)); f.energia = 100;
+  const mesa = f.estacao; const pc = mesa ? computadorDaMesa(p, mesa) : null; if (!pc) return;                 // o dinheiro vem do rendimento diário (pagarSalarios); aqui só o humor
+  const t = f.tracos.map((x) => tracoPorId.get(x)); const humorBase = 70 + t.reduce((a, x) => a + (x?.humor ?? 0), 0) * 20; f.humor = Math.max(10, Math.min(100, f.humor + (humorBase - f.humor) * 0.005 * dtMin)); f.energia = 100;
 }
-/** Fim do dia: paga os salários; quem não recebe por 3 dias pede demissão. Devolve o resumo. */
-export function pagarSalarios(p: Projeto, registrar: (tipo: 'salario' | 'recompensa', valor: number, desc: string) => void): { pago: number; saidas: string[] } {
-  let pago = 0; const saidas: string[] = [];
+/** Fim do dia: credita o rendimento do dia de cada personagem na mesa (10–120 CC), sorteia o do dia seguinte e paga os salários; quem não recebe por 3 dias pede demissão. */
+export function pagarSalarios(p: Projeto, registrar: (tipo: 'salario' | 'recompensa', valor: number, desc: string) => void, rnd: () => number = Math.random): { pago: number; rendeu: number; saidas: string[] } {
+  let pago = 0; let rendeu = 0; const saidas: string[] = [];
   for (const f of p.funcionarios) {
-    if (f.status !== 'ativo') continue;
-    if (f.produzido > 0.01) { registrar('recompensa', Math.round(f.produzido * 100) / 100, `Produção de ${f.nome}`); f.produzido = 0; }
+    if (f.status !== 'ativo' || !f.estacao || f.estado === 'ausente') continue;                // sem estação ela não trabalha: não rende nem recebe
+    const ganho = f.metaDia ?? sortearRendimento(rnd); p.cc = Math.round((p.cc + ganho) * 1000) / 1000; rendeu += ganho; f.produzido = ganho; registrar('recompensa', ganho, `Rendimento de ${f.nome} no dia`); f.metaDia = sortearRendimento(rnd);
     if (p.cc >= f.salario) { p.cc = Math.round((p.cc - f.salario) * 1000) / 1000; pago += f.salario; f.diasSemPagar = 0; registrar('salario', -f.salario, `Salário de ${f.nome}`); }
     else { f.diasSemPagar++; f.humor = Math.max(0, f.humor - 25); if (f.diasSemPagar >= 3) { demitir(p, f.id); saidas.push(f.nome); } }
   }
-  return { pago, saidas };
+  return { pago, rendeu, saidas };
 }
 
 /** Licença: o funcionário sai do escritório, libera a estação e não recebe salário até voltar. */

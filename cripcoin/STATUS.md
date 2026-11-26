@@ -48,6 +48,11 @@ server/cripcoin.js  rotas /api/cripcoin/pesquisar e /pagina (web real, exigem lo
 - **Quadro Codeniac**: o logo foi recortado do fundo preto, colocado sobre fundo cinza com moldura (`tools/logo.py`) e entra na loja (Decoração) como objeto de parede.
 - **Editor**: nova ferramenta **Cor da parede** (12 cores, arrastar sobre trechos ou "Pintar todas"), e o piso pode ser trocado por trecho ou **na sala inteira**.
 
+## Economia da equipe (versão atual)
+- **Capital inicial 5.000 CC**; saves antigos recebem +5.000 CC uma única vez (registrado no extrato como "Bônus de 5.000 CC").
+- **Rendimento diário**: cada personagem na mesa rende **entre 10 e 120 CC por dia** (inteiro sorteado a cada dia, creditado à meia-noite e registrado no extrato). Sem estação (não está trabalhando) ela não rende nem recebe salário. O salário diário continua sendo pago.
+- **Seta de desempenho sobre a cabeça**: valor do dia ≥ 85 CC = **seta verde ▲** (desempenho alto); ≤ 45 CC = **seta vermelha ▼** (baixo); no meio, sem seta. O perfil mostra "Rende hoje N CC".
+
 ## Construção v2 (superfícies, parede e escala)
 - **Parede como superfície inteira**: a face visível da parede (célula + faixa acima dela) é a área de fixação. Relógios, quadros, prateleiras, janelas e plantas penduradas ficam em qualquer segmento com chão na frente e em **qualquer altura** (`alt` 0 rodapé … 1 topo), com profundidade própria. A colisão física (chão) e a fixação são regras separadas (`nucleo/superficie.ts`: `temFace`, `paredeSob`).
 - **Superfícies de apoio**: móveis declaram áreas úteis por nível (mesas, estantes com 3 níveis, armários) em frações do sprite (`dados/propriedades.ts`); cada item declara em que tipos de superfície fica (`apoio`). A posição do item é (`nivel`, `u`, `v`) relativa ao móvel: acompanha o móvel quando ele é movido, nunca sai da área útil e recusa sobreposição por largura real do sprite.
