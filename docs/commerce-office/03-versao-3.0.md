@@ -2,7 +2,7 @@
 
 ## O que foi pedido e como foi interpretado
 - **"D4 Boxes"** não existe com esse nome no projeto; entendi como o escritório do Commerce Office (Estúdio → Ecommerce) e renovei esse ambiente.
-- **Uma única sala ampla**: as duas salas da 2.1 (Estoque e Escritório Central) viraram um só salão de 28×18 tiles. A logística (Lucya, caixas, arquivos, copiadora) ocupa um canto do mesmo salão. Os layouts anteriores continuam salvos na lista de layouts (nada foi apagado); o 3.0 passa a ser o ativo.
+- **Uma única sala ampla**: as duas salas da 2.1 (Estoque e Escritório Central) viraram uma sala **compacta e quadrada de 12×12 tiles (144, contra 504 antes), só com piso de madeira**: 5 mesas com avatares, mesa de reuniões, estantes, armário, arquivos, logística (caixas, copiadora), cantinho de descanso/café e decoração, sem espaço sobrando. Reduzir 10x de verdade (≈50 tiles) não comportaria as 5 mesas; 12×12 é o menor quadrado que ainda deixa circulação. Os layouts anteriores continuam salvos na lista de layouts (nada foi apagado); o 3.0 passa a ser o ativo.
 
 ## Assets
 **Fontes** (suas imagens, guardadas em `game/assets-fonte/`): folha de paredes/pisos, folha de objetos e 5 folhas de avatares.
