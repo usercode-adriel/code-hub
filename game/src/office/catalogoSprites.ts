@@ -27,6 +27,16 @@ export const NOVOS: TipoObjeto[] = [
   S('quadro-praia', 'Quadro praia', 'decoracao', 1, 1, 40, false, { parede: 28 }), S('quadro-mapa', 'Quadro mapa', 'decoracao', 1, 1, 40, false, { parede: 28 }), S('trofeu', 'Troféu', 'decoracao', 1, 1, 14, false, MESA),
   S('caixa-metal-1', 'Caixa de metal', 'estoque', 1, 1, 24, true), S('caixa-organizadora', 'Caixa organizadora', 'estoque', 1, 1, 22, true), S('maleta', 'Maleta', 'estoque', 1, 1, 22, true), S('kit-socorros', 'Kit de primeiros socorros', 'estoque', 1, 1, 18, false, { parede: 20 }),
   S('lixeira-grande', 'Lixeira grande', 'estoque', 1, 1, 34, true), S('lixeira-reciclagem', 'Lixeira de reciclagem', 'estoque', 1, 1, 30, true), S('lixeira-2', 'Lixeira', 'estoque', 1, 1, 28, true),
+  // ---- inventário ampliado (folhas de computadores, servidores e baia): computadores, periféricos, servidores e baia dupla ----
+  S('imac-g3', 'iMac G3 azul', 'computadores', 1, 1, 24, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }), S('imac-aluminio', 'iMac alumínio', 'computadores', 1, 1, 26, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }),
+  S('pc-retro-bege', 'PC retrô bege', 'computadores', 1, 1, 26, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }), S('monitor-curvo', 'Monitor curvo', 'computadores', 1, 1, 26, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }),
+  S('monitor-preto', 'Monitor preto', 'computadores', 1, 1, 24, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }), S('monitor-widescreen', 'Monitor widescreen', 'computadores', 1, 1, 26, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }),
+  S('monitor-lateral', 'Monitor de lado', 'computadores', 1, 1, 26, false, { ...MESA, acao: { alvo: 'estacao', rotulo: 'Abrir estação de trabalho' } }),
+  S('teclado-cinza', 'Teclado cinza', 'computadores', 1, 1, 4, false, MESA), S('mouse-cinza', 'Mouse cinza', 'computadores', 1, 1, 3, false, MESA), S('teclado-retro-bege', 'Teclado retrô', 'computadores', 1, 1, 4, false, MESA), S('tablet-grafico', 'Mesa digitalizadora', 'computadores', 1, 1, 4, false, MESA),
+  S('torre-pc-preta-2', 'Torre de PC preta', 'computadores', 1, 1, 34, true),
+  S('servidor-torre-1', 'Servidor torre', 'equipamentos', 1, 1, 58, true, { acao: { alvo: 'conectores', rotulo: 'Abrir integrações comerciais' } }), S('servidor-torre-2', 'Servidor torre com tela', 'equipamentos', 1, 1, 56, true),
+  S('rack-aberto', 'Rack aberto', 'equipamentos', 1, 1, 56, true), S('ups-modulos', 'UPS de módulos', 'equipamentos', 1, 2, 40, true), S('armario-bege-racks', 'Armário de racks bege', 'equipamentos', 1, 1, 62, true),
+  S('porta-metal', 'Porta de metal', 'decoracao', 1, 1, 62, false), S('mesa-baia-dupla', 'Baia dupla', 'moveis', 2, 1, 56, true, { sprite: 'baia-dupla' }),
   // objetos com ação (ligados a ferramentas reais do Hub)
   S('terminal-financeiro', 'Terminal financeiro', 'computadores', 1, 1, 26, false, { ...MESA, sprite: 'monitor-duplo', acao: { alvo: 'financeiro', rotulo: 'Abrir módulo financeiro' } }),
   S('terminal-produtos', 'Terminal de produtos', 'computadores', 1, 1, 18, false, { ...MESA, sprite: 'laptop', acao: { alvo: 'produtos', rotulo: 'Abrir produtos' } }),
@@ -45,5 +55,5 @@ export const ALIAS: Record<string, { sprite: string; espelhar?: boolean; parede?
   'luminaria-mesa': { sprite: 'luminaria-mesa-1' }, 'luminaria-chao': { sprite: 'luminaria-chao' }, 'torre-pc': { sprite: 'torre-pc' }, armario: { sprite: 'armario-madeira' }, 'relogio-parede': { sprite: 'relogio', parede: 34 }, 'quadro-decorativo': { sprite: 'quadro-cidade', parede: 28 },
   'quadro-branco': { sprite: 'quadro-branco' }, 'caixa-p': { sprite: 'caixa-p' }, 'caixa-m': { sprite: 'caixa-m' }, 'caixa-g': { sprite: 'caixa-g' }, frigobar: { sprite: 'vitrine' }, 'servidor-rack': { sprite: 'rack-1' }, extintor: { sprite: 'extintor' }, lixeira: { sprite: 'lixeira-2' },
   documentos: { sprite: 'pastas-1' }, caneca: { sprite: 'caneca-1' }, 'papeis-pastas': { sprite: 'pastas-2' }, 'quadro-avisos': { sprite: 'mural', parede: 30 }, organizador: { sprite: 'arquivo-3' }, 'balanca': { sprite: 'mini-pc' }, cafeteira: { sprite: 'cafeteira' },
-  'estacao-marketplace': { sprite: 'rack-2' }, 'painel-indicadores': { sprite: 'quadro-cidade' },
+  teclado: { sprite: 'teclado-cinza' }, mouse: { sprite: 'mouse-cinza' }, 'estacao-marketplace': { sprite: 'rack-2' }, 'painel-indicadores': { sprite: 'quadro-cidade' },
 };

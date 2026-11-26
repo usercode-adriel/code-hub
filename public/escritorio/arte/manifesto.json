@@ -359,6 +359,101 @@
   "arquivo-pequeno": {
    "w": 56,
    "h": 69
+  },
+  "imac-g3": {
+   "w": 82,
+   "h": 82,
+   "extra": true
+  },
+  "imac-aluminio": {
+   "w": 73,
+   "h": 97,
+   "extra": true
+  },
+  "pc-retro-bege": {
+   "w": 99,
+   "h": 119,
+   "extra": true
+  },
+  "monitor-curvo": {
+   "w": 91,
+   "h": 97,
+   "extra": true
+  },
+  "monitor-preto": {
+   "w": 100,
+   "h": 73,
+   "extra": true
+  },
+  "monitor-widescreen": {
+   "w": 88,
+   "h": 99,
+   "extra": true
+  },
+  "monitor-lateral": {
+   "w": 51,
+   "h": 97,
+   "extra": true
+  },
+  "teclado-cinza": {
+   "w": 71,
+   "h": 51,
+   "extra": true
+  },
+  "mouse-cinza": {
+   "w": 27,
+   "h": 46,
+   "extra": true
+  },
+  "teclado-retro-bege": {
+   "w": 66,
+   "h": 37,
+   "extra": true
+  },
+  "tablet-grafico": {
+   "w": 59,
+   "h": 38,
+   "extra": true
+  },
+  "torre-pc-preta-2": {
+   "w": 67,
+   "h": 88,
+   "extra": true
+  },
+  "servidor-torre-1": {
+   "w": 82,
+   "h": 159,
+   "extra": true
+  },
+  "rack-aberto": {
+   "w": 108,
+   "h": 157,
+   "extra": true
+  },
+  "ups-modulos": {
+   "w": 158,
+   "h": 135,
+   "extra": true
+  },
+  "servidor-torre-2": {
+   "w": 86,
+   "h": 157,
+   "extra": true
+  },
+  "armario-bege-racks": {
+   "w": 88,
+   "h": 156,
+   "extra": true
+  },
+  "porta-metal": {
+   "w": 60,
+   "h": 174,
+   "extra": true
+  },
+  "baia-dupla": {
+   "w": 300,
+   "h": 283,
+   "extra": true
   }
  },
  "paredes": {

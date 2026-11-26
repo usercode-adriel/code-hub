@@ -90,5 +90,9 @@ for idx, nome in PISOS.items():
         borda = (dist > 0.88) & (dist <= 1.0) & (yy < 16)
         a2[borda, :3] = (a2[borda, :3] * 0.78).astype(np.uint8)
     Image.fromarray(a2, 'RGBA').save(os.path.join(PUB, 'pisos', f'{nome}.png')); manifesto['pisos'][nome] = {'w': 64, 'h': 32}
+_ant = os.path.join(PUB, 'manifesto.json')
+if os.path.exists(_ant):                                                                       # preserva os itens acrescentados por game/tools/inventario.py
+    for k, v in json.load(open(_ant)).get('objetos', {}).items():
+        if v.get('extra'): manifesto['objetos'][k] = v
 json.dump(manifesto, open(os.path.join(PUB, 'manifesto.json'), 'w'), indent=1, ensure_ascii=False)
 print({k: len(v) for k, v in manifesto.items()}); print(json.dumps(manifesto['paredes']))

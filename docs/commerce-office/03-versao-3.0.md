@@ -41,3 +41,6 @@ Alterados: `game/src/office/{engine,texturas,catalogo,layoutPadrao,arte/personag
 - O quadriculado das folhas foi removido por processamento: as bordas das peças podem ter pequenas imperfeições; as paredes foram levemente cisalhadas (≈ 10–20%) para acompanhar a grade 2:1.
 - Madeira foi dessaturada de propósito (a original é laranja forte).
 - 60 FPS em GPU real continua sem medição (só WebGL por software).
+
+## Inventário ampliado (folhas de computadores, servidores e baia)
+`game/tools/inventario.py` recorta 19 assets de `game/assets-fonte/inv-*.png` e os registra na biblioteca do Office Builder (Construção → Objeto): iMac G3, iMac alumínio, PC retrô, 4 monitores (curvo, preto, widescreen, lateral), teclado cinza, mouse, teclado retrô, mesa digitalizadora, torre de PC preta, 2 servidores torre, rack aberto, UPS de módulos, armário de racks bege, porta de metal e baia dupla. Teclado e mouse antigos passaram a usar a arte nova.
