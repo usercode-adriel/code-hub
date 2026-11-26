@@ -8,6 +8,7 @@ import { load, saveNow, UPLOAD_DIR, APP_ROOT, DATA_DIR, db } from './db.js';
 import { bootstrap, systemConfig } from './seed.js';
 import { migrate } from './migrate.js';
 import { requireAuth } from './auth.js';
+import cripcoin from './cripcoin.js';
 import api from './routes/api.js';
 import pages from './routes/pages.js';
 import life from './routes/life.js';
@@ -33,8 +34,6 @@ import { startScheduler } from './scheduler.js';
 import { logger } from './log.js';
 import { medirPedidos, diagnostico } from './diagnostico.js';
 import techNews from './tech-news.js';
-import './commerce/ferramentas.js';
-import commerce from './commerce/rotas.js';
 
 load();
 loadLibrary();
@@ -183,9 +182,9 @@ app.post('/api/system/shutdown', (req, res) => {
 
 app.use('/api/ai', aiRoutes);
 app.use('/api/library', requireAuth, library);
+app.use('/api/cripcoin', requireAuth, cripcoin);
 app.use('/api', api);
 app.use('/api/tech-news', requireAuth, techNews);
-app.use('/api/commerce', requireAuth, commerce);
 app.use('/api', requireAuth, pages);
 app.use('/api', requireAuth, life);
 app.use('/api', requireAuth, automations);

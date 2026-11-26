@@ -13,9 +13,10 @@
     "jogo:build": "tsc -p game/tsconfig.json && vite build --config game/vite.config.ts",
     "jogo:test": "vitest run --config game/vite.config.ts",
     "jogo:e2e": "node --test game/e2e/*.test.mjs",
-    "office:dev": "vite --config game/vite.office.config.ts",
-    "office:build": "tsc -p game/tsconfig.json && vite build --config game/vite.office.config.ts",
-    "office:e2e": "node --test --test-concurrency=1 game/e2e/escritorio.test.mjs"
+    "cripcoin:dev": "vite --config cripcoin/vite.config.ts",
+    "cripcoin:build": "tsc -p cripcoin/tsconfig.json && vite build --config cripcoin/vite.config.ts",
+    "cripcoin:test": "vitest run --config cripcoin/vite.config.ts",
+    "cripcoin:e2e": "node --test --test-concurrency=1 cripcoin/e2e/*.test.mjs"
   },
   "engines": {
     "node": ">=20.12"

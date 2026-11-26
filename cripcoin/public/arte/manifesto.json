@@ -1,0 +1,436 @@
+{
+ "objetos": {
+  "despertador": {
+   "w": 32,
+   "h": 43
+  },
+  "poltrona-grande": {
+   "w": 115,
+   "h": 114
+  },
+  "poltrona": {
+   "w": 77,
+   "h": 88
+  },
+  "poltrona-pequena": {
+   "w": 64,
+   "h": 60
+  },
+  "puff-verde": {
+   "w": 64,
+   "h": 61
+  },
+  "lixeira-reciclagem": {
+   "w": 58,
+   "h": 71
+  },
+  "lixeira": {
+   "w": 51,
+   "h": 68
+  },
+  "prateleira-pastas": {
+   "w": 122,
+   "h": 80
+  },
+  "cadeira-escritorio-costas": {
+   "w": 64,
+   "h": 113
+  },
+  "cadeira-escritorio-lado": {
+   "w": 58,
+   "h": 104
+  },
+  "caixa-papelao": {
+   "w": 64,
+   "h": 73
+  },
+  "pilha-caixas": {
+   "w": 83,
+   "h": 104
+  },
+  "cadeira-azul": {
+   "w": 51,
+   "h": 94
+  },
+  "cadeira-azul-lado": {
+   "w": 51,
+   "h": 87
+  },
+  "arquivo-gavetas": {
+   "w": 70,
+   "h": 108
+  },
+  "cadeira-azul-costas": {
+   "w": 51,
+   "h": 84
+  },
+  "relogio-parede": {
+   "w": 58,
+   "h": 57
+  },
+  "calendario": {
+   "w": 58,
+   "h": 68
+  },
+  "cafeteira": {
+   "w": 58,
+   "h": 95
+  },
+  "diploma": {
+   "w": 70,
+   "h": 55
+  },
+  "mural-cortica": {
+   "w": 90,
+   "h": 100
+  },
+  "cadeira-gamer": {
+   "w": 70,
+   "h": 117
+  },
+  "cadeira-gamer-lado": {
+   "w": 58,
+   "h": 115
+  },
+  "mesa-simples": {
+   "w": 128,
+   "h": 91
+  },
+  "mesa-l": {
+   "w": 166,
+   "h": 134
+  },
+  "mesa-metal": {
+   "w": 128,
+   "h": 119
+  },
+  "cadeira-escritorio-b": {
+   "w": 64,
+   "h": 100
+  },
+  "cadeira-escritorio": {
+   "w": 64,
+   "h": 93
+  },
+  "kit-socorros": {
+   "w": 51,
+   "h": 42
+  },
+  "caneca": {
+   "w": 22,
+   "h": 23
+  },
+  "jarra-cafe": {
+   "w": 29,
+   "h": 27
+  },
+  "flipchart": {
+   "w": 70,
+   "h": 126
+  },
+  "frigobar": {
+   "w": 64,
+   "h": 84
+  },
+  "aquecedor": {
+   "w": 77,
+   "h": 80
+  },
+  "mesa-baixa": {
+   "w": 102,
+   "h": 61
+  },
+  "abajur-chao": {
+   "w": 38,
+   "h": 86
+  },
+  "laptop": {
+   "w": 58,
+   "h": 49
+  },
+  "lata": {
+   "w": 19,
+   "h": 40
+  },
+  "latas": {
+   "w": 26,
+   "h": 35
+  },
+  "locker": {
+   "w": 51,
+   "h": 150
+  },
+  "placa-saida": {
+   "w": 70,
+   "h": 47
+  },
+  "microondas": {
+   "w": 64,
+   "h": 49
+  },
+  "monitor": {
+   "w": 64,
+   "h": 54
+  },
+  "ventilador": {
+   "w": 51,
+   "h": 71
+  },
+  "monitor-duplo": {
+   "w": 77,
+   "h": 47
+  },
+  "monitor-curvo": {
+   "w": 77,
+   "h": 58
+  },
+  "extintor": {
+   "w": 32,
+   "h": 47
+  },
+  "mouse": {
+   "w": 19,
+   "h": 29
+  },
+  "caneca-2": {
+   "w": 22,
+   "h": 24
+  },
+  "copo-macarrao": {
+   "w": 26,
+   "h": 34
+  },
+  "caderno": {
+   "w": 32,
+   "h": 36
+  },
+  "papel-amassado": {
+   "w": 26,
+   "h": 25
+  },
+  "papeis": {
+   "w": 38,
+   "h": 36
+  },
+  "ampulheta": {
+   "w": 26,
+   "h": 46
+  },
+  "torre-pc": {
+   "w": 45,
+   "h": 98
+  },
+  "teclado": {
+   "w": 51,
+   "h": 24
+  },
+  "porta-lapis": {
+   "w": 26,
+   "h": 46
+  },
+  "telefone": {
+   "w": 38,
+   "h": 37
+  },
+  "luminaria-mesa": {
+   "w": 38,
+   "h": 48
+  },
+  "almofada": {
+   "w": 51,
+   "h": 36
+  },
+  "laptop-fechado": {
+   "w": 51,
+   "h": 27
+  },
+  "caixa-pizza": {
+   "w": 58,
+   "h": 46
+  },
+  "pizza": {
+   "w": 32,
+   "h": 29
+  },
+  "planta-seca": {
+   "w": 58,
+   "h": 65
+  },
+  "suculenta": {
+   "w": 51,
+   "h": 64
+  },
+  "planta-pendurada": {
+   "w": 32,
+   "h": 61
+  },
+  "planta-feliz": {
+   "w": 58,
+   "h": 71
+  },
+  "planta-vaso": {
+   "w": 58,
+   "h": 83
+  },
+  "quadro-paisagem": {
+   "w": 77,
+   "h": 56
+  },
+  "impressora": {
+   "w": 96,
+   "h": 93
+  },
+  "projetor": {
+   "w": 64,
+   "h": 64
+  },
+  "roteador": {
+   "w": 45,
+   "h": 40
+  },
+  "cofre": {
+   "w": 58,
+   "h": 78
+  },
+  "tela-projecao": {
+   "w": 128,
+   "h": 102
+  },
+  "vitrine": {
+   "w": 64,
+   "h": 90
+  },
+  "estante": {
+   "w": 122,
+   "h": 93
+  },
+  "prateleira-livros": {
+   "w": 109,
+   "h": 66
+  },
+  "sofa-2": {
+   "w": 128,
+   "h": 76
+  },
+  "sofa-3": {
+   "w": 192,
+   "h": 142
+  },
+  "sofa-lado": {
+   "w": 64,
+   "h": 115
+  },
+  "quadro-postit": {
+   "w": 83,
+   "h": 89
+  },
+  "banco-alto": {
+   "w": 45,
+   "h": 88
+  },
+  "banco-alto-2": {
+   "w": 45,
+   "h": 83
+  },
+  "mesa-lateral": {
+   "w": 90,
+   "h": 43
+  },
+  "mesa-redonda": {
+   "w": 77,
+   "h": 90
+  },
+  "mesa-digitalizadora": {
+   "w": 64,
+   "h": 52
+  },
+  "trofeu": {
+   "w": 32,
+   "h": 60
+  },
+  "grade-ventilacao": {
+   "w": 64,
+   "h": 63
+  },
+  "garrafa": {
+   "w": 19,
+   "h": 44
+  },
+  "bebedouro": {
+   "w": 51,
+   "h": 117
+  },
+  "webcam": {
+   "w": 26,
+   "h": 34
+  },
+  "quadro-branco": {
+   "w": 96,
+   "h": 98
+  }
+ },
+ "paredes": {
+  "parede": {
+   "w": 64,
+   "h": 88
+  },
+  "porta": {
+   "w": 64,
+   "h": 88
+  },
+  "janela": {
+   "w": 192,
+   "h": 147
+  },
+  "parede-tela": {
+   "w": 192,
+   "h": 165
+  },
+  "parede-grade": {
+   "w": 192,
+   "h": 130
+  }
+ },
+ "pisos": {
+  "xadrez-azul": {
+   "w": 64,
+   "h": 64
+  },
+  "ceramica-creme": {
+   "w": 64,
+   "h": 64
+  },
+  "madeira": {
+   "w": 64,
+   "h": 64
+  },
+  "metal": {
+   "w": 64,
+   "h": 64
+  },
+  "concreto-escuro": {
+   "w": 64,
+   "h": 64
+  },
+  "ceramica-azul": {
+   "w": 64,
+   "h": 64
+  },
+  "ceramica-branca": {
+   "w": 64,
+   "h": 64
+  },
+  "ceramica-verde": {
+   "w": 64,
+   "h": 64
+  },
+  "tapete-escuro": {
+   "w": 64,
+   "h": 64
+  },
+  "parquet": {
+   "w": 64,
+   "h": 64
+  }
+ }
+}

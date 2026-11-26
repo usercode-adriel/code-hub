@@ -15,7 +15,6 @@ export const AREAS = {
   tarefas: 'Tarefas', financeiro: 'Finanças pessoais (gastos, receitas, contas)', indrive: 'InDrive', agenda: 'Agenda',
   livros: 'Livros', habitos: 'Hábitos', notas: 'Notas e ideias', ingles: 'Cartões de inglês', memoria: 'Memória',
   web: 'Pesquisar na web', imagens: 'Gerar imagens', arquivos: 'Criar arquivos', dev: 'Código do sistema no GitHub (só administrador)',
-  commerce: 'Commerce Office (produtos, campanhas, tarefas e leitura do financeiro comercial)',
 };
 // Pesquisar, gerar imagens e criar arquivos valem para todo personagem (o usuário liga/desliga em Configurações → Assistente).
 // O acesso ao código (dev) só existe se o personagem receber essa permissão de propósito.

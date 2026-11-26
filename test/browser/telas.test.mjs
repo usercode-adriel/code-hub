@@ -163,10 +163,13 @@ test('news: carrossel de destaques troca sozinho, pausa com o mouse, é personal
   await ctx.close();
 });
 
-test('estúdio: três cards (Video editor, Video cut, Ecommerce), sem funcionalidade', async () => {
+test('estúdio: três cards; o Cripcoin Office abre o simulador novo em um iframe', async () => {
   const { p, ctx } = await paginaLogada();
   await p.goto(`${BASE}/#/estudio`); await p.waitForSelector('.nx-est', { timeout: 30000 });
-  assert.deepEqual((await p.locator('.nx-est h3').allTextContents()).map((t) => t.trim()), ['Video editor', 'Video cut', 'Ecommerce']);
+  assert.deepEqual((await p.locator('.nx-est h3').allTextContents()).map((t) => t.trim()), ['Video editor', 'Video cut', 'Cripcoin Office']);
+  await p.click('[data-ferramenta=cripcoin]'); await p.waitForSelector('iframe[title="Cripcoin Office"]', { timeout: 15000 });
+  const quadro = p.frameLocator('iframe[title="Cripcoin Office"]'); await quadro.locator('[data-testid=novo-projeto], [data-testid=cr-criar]').first().waitFor({ timeout: 20000 });
+  assert.match(await quadro.locator('body').innerText(), /CRIPCOIN/);
   assert.deepEqual(p.errosJS, []);
   await ctx.close();
 });
