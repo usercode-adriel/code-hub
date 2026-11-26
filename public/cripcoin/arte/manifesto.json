@@ -367,6 +367,10 @@
   "quadro-branco": {
    "w": 96,
    "h": 98
+  },
+  "quadro-codeniac": {
+   "w": 128,
+   "h": 80
   }
  },
  "paredes": {

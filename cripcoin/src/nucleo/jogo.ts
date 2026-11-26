@@ -11,6 +11,9 @@ import { fsInicial } from '../sistemas/arquivos';
 import { atualizarFuncionarios, pagarSalarios } from '../sistemas/funcionarios';
 import { passarDiaPlantas } from '../sistemas/objetos';
 import type { Projeto } from '../tipos';
+import { Barramento, type Dados, type NomeEvento } from '../automacao/eventos';
+import { instalar as instalarAutomacoes } from '../automacao/regras';
+import { Conversa } from '../sistemas/conversa';
 
 /** Monta o escritório inicial: só uma mesa simples, um laptop e uma cadeira básica (sem decoração, sem funcionários). */
 export function montarInicial(p: Projeto): void {
@@ -26,17 +29,22 @@ export type Aviso = { id: number; texto: string; tipo: 'ok' | 'erro' | 'info' };
 export class Jogo {
   p: Projeto; private ouvintes = new Set<() => void>(); avisos: Aviso[] = []; private n = 0; private grade: Grade; private rnd: () => number; sujo = false; salvoEm = 0;
   private acc = 0; private timer: ReturnType<typeof setInterval> | null = null; ultimoSalvar = Date.now(); pausado = false; modoConstrucao = false;
-  constructor(p: Projeto) { this.p = p; this.grade = new Grade(p); this.rnd = aleatorio((p.criadoEm ^ p.minuto) >>> 0 || 1); }
+  /** Barramento de eventos (ponto de ligação das automações) e a conversa com as personagens. */
+  readonly eventos = new Barramento(); readonly conversa: Conversa; private offAuto: () => void = () => {};
+  desligarAutomacoes(): void { this.offAuto(); }
+  constructor(p: Projeto, esperar?: (ms: number) => Promise<void>) { this.p = p; this.grade = new Grade(p); this.rnd = aleatorio((p.criadoEm ^ p.minuto) >>> 0 || 1); this.conversa = new Conversa(this, esperar); this.offAuto = instalarAutomacoes(this); atualizarFuncionarios(p, { g: this.grade, rnd: this.rnd }, 0, 0); }
+  notificar(evento: NomeEvento, dados: Dados = {}): void { this.eventos.emitir(evento, dados); }
+  registrarTransacao(tipo: 'recompensa' | 'gasto', valor: number, descricao: string): void { registrar(this.p, tipo, valor, descricao); this.emitir(); }
   assinar(f: () => void): () => void { this.ouvintes.add(f); return () => { this.ouvintes.delete(f); }; }
   emitir(): void { this.sujo = true; for (const f of this.ouvintes) f(); }
   /** Chame depois de qualquer alteração do mapa (reconstrói a grade de colisão). */
-  mudou(): void { this.grade = new Grade(this.p); this.emitir(); }
+  mudou(): void { this.grade = new Grade(this.p); atualizarFuncionarios(this.p, { g: this.grade, rnd: this.rnd }, 0, 0); this.emitir(); }
   aviso(texto: string, tipo: Aviso['tipo'] = 'info'): void { this.avisos = [...this.avisos.slice(-3), { id: ++this.n, texto, tipo }]; this.emitir(); setTimeout(() => { this.avisos = this.avisos.filter((a) => a.texto !== texto); this.emitir(); }, 4200); }
   resultado(r: { ok: boolean; motivo: string }): boolean { this.aviso(r.motivo, r.ok ? 'ok' : 'erro'); if (r.ok) this.mudou(); return r.ok; }
   iniciar(): void {
     if (this.timer) return; this.timer = setInterval(() => this.passo(0.1), 100);
   }
-  parar(): void { if (this.timer) clearInterval(this.timer); this.timer = null; this.salvar(); }
+  parar(): void { if (this.timer) clearInterval(this.timer); this.timer = null; this.desligarAutomacoes(); this.salvar(); }
   /** Avança `dt` segundos reais: 1 s = 1 minuto de jogo × velocidade. */
   passo(dt: number): void {
     if (this.pausado) return; const p = this.p;
@@ -50,9 +58,8 @@ export class Jogo {
   private novoDia(): void {
     const p = this.p; const r = pagarSalarios(p, (t, v, d) => { registrar(p, t, v, d); });
     reporEstoque(p); passarDiaPlantas(p);
-    if (p.candidatos.length < 3) p.candidatos.push(...gerarCandidatos(p.minuto + p.candidatos.length).filter((c) => !p.funcionarios.some((f) => f.candidatoId === c.id)).slice(0, 3));
-    this.aviso(`Dia ${diaDe(p.minuto)} — ${horaTexto(p.minuto)}. ${r.pago ? `Salários pagos: ${r.pago} CC.` : 'Nenhum salário a pagar.'}${r.saidas.length ? ` ${r.saidas.join(', ')} pediu(ram) demissão por falta de pagamento.` : ''}`, 'info'); this.grade = new Grade(p);
+    this.aviso(`Dia ${diaDe(p.minuto)} — ${horaTexto(p.minuto)}. ${r.pago ? `Salários pagos: ${r.pago} CC.` : 'Nenhum salário a pagar.'}${r.saidas.length ? ` ${r.saidas.join(', ')} pediu(ram) demissão por falta de pagamento.` : ''}`, 'info'); this.grade = new Grade(p); this.notificar('dia_novo', { dia: diaDe(p.minuto), pago: r.pago });
   }
-  salvar(): boolean { const ok = salvarProjeto(this.p, diaDe(this.p.minuto)); this.ultimoSalvar = Date.now(); if (ok) { this.sujo = false; this.salvoEm = Date.now(); } else this.aviso('Não foi possível salvar (armazenamento cheio?).', 'erro'); this.emitir(); return ok; }
+  salvar(): boolean { const ok = salvarProjeto(this.p, diaDe(this.p.minuto)); this.ultimoSalvar = Date.now(); if (ok) { this.sujo = false; this.salvoEm = Date.now(); this.notificar('projeto_salvo', { projeto: this.p.nome }); } else this.aviso('Não foi possível salvar (armazenamento cheio?).', 'erro'); this.emitir(); return ok; }
   get g(): Grade { return this.grade; }
 }

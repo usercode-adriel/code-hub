@@ -71,7 +71,7 @@ export const ITENS: ItemDef[] = [
   parede('planta-pendurada', 'Planta pendurada', 'Planta pendente presa à parede.', 'plantas', 1, 38, { interacao: 'planta' }),
   // ---- decoração ----
   parede('relogio-parede', 'Relógio de parede', 'Relógio que mostra o horário do jogo.', 'decoracao', 1, 60, { interacao: 'relogio' }), parede('calendario', 'Calendário', 'Calendário de parede.', 'decoracao', 1, 40),
-  parede('diploma', 'Diploma', 'Diploma emoldurado.', 'decoracao', 1, 55), parede('quadro-paisagem', 'Quadro de paisagem', 'Quadro com paisagem.', 'decoracao', 1, 90),
+  parede('quadro-codeniac', 'Quadro Codeniac', 'Logo da empresa Codeniac em um quadro de parede com fundo cinza.', 'decoracao', 2, 120), parede('diploma', 'Diploma', 'Diploma emoldurado.', 'decoracao', 1, 55), parede('quadro-paisagem', 'Quadro de paisagem', 'Quadro com paisagem.', 'decoracao', 1, 90),
   parede('prateleira-pastas', 'Prateleira de pastas', 'Prateleira com pastas coloridas.', 'decoracao', 2, 110), parede('prateleira-livros', 'Prateleira de livros', 'Prateleira com livros.', 'decoracao', 2, 120),
   parede('kit-socorros', 'Kit de primeiros socorros', 'Maleta de primeiros socorros.', 'decoracao', 1, 70), parede('placa-saida', 'Placa de saída', 'Placa de saída de emergência.', 'decoracao', 1, 50), parede('grade-ventilacao', 'Grade de ventilação', 'Grade de ar.', 'decoracao', 1, 45),
   parede('janela', 'Janela', 'Janela grande com vista da cidade (ocupa 3 tiles de parede).', 'decoracao', 3, 160, { sprite: 'janela' }),

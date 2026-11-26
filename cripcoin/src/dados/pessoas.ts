@@ -2,8 +2,11 @@
 import { aleatorio } from '../nucleo/rng';
 import type { Candidato, Habilidades } from '../tipos';
 
-export const AVATARES = ['eleonor', 'lady', 'sophia', 'laurinda', 'lucya'];
-export const NOMES_AVATAR: Record<string, string> = { eleonor: 'jersey 98 e óculos escuros', lady: 'óculos de grau e regata branca', sophia: 'cabelo longo e blusa listrada verde', laurinda: 'coque castanho e regata roxa', lucya: 'rabos de cavalo e blusa listrada' };
+export const AVATARES = ['cacheada', 'oculos', 'afro'];
+export const NOMES_AVATAR: Record<string, string> = { cacheada: 'cabelo cacheado longo e blusa marrom', oculos: 'cabelo liso preto, óculos e regata branca', afro: 'cabelo black power, óculos e moletom preto' };
+/** Quantas vistas a personagem tem: só frente, costas e os dois lados (movimento apenas rotacional). */
+export const VISTAS = ['S', 'N', 'W', 'E'] as const;
+export const DEFEITOS = ['Impaciente', 'Desorganizado', 'Teimoso', 'Distraído', 'Perfeccionista', 'Fofoqueiro', 'Pavio curto', 'Procrastinador', 'Inseguro', 'Mandão', 'Sensível demais', 'Esquecido'];
 export interface TracoDef { id: string; nome: string; prod: number; social: number; energia: number; humor: number; dica: string }
 export const TRACOS: TracoDef[] = [
   { id: 'introvertido', nome: 'Introvertido', prod: 0.05, social: -0.5, energia: 0, humor: 0, dica: 'Prefere trabalhar quieto; conversa pouco.' },
@@ -33,15 +36,15 @@ const SOBRE = ['Almeida', 'Barros', 'Cardoso', 'Dias', 'Esteves', 'Ferraz', 'Gom
 const FORTES: Record<keyof Habilidades, string> = { criatividade: 'Ideias originais', logica: 'Raciocínio lógico', comunicacao: 'Comunica bem', organizacao: 'Muito organizada' };
 const FRACOS: Record<keyof Habilidades, string> = { criatividade: 'Segue pouco o inusitado', logica: 'Se perde em cálculos', comunicacao: 'Tem dificuldade em explicar', organizacao: 'Esquece prazos' };
 
-/** Gera os candidatos (um por avatar), de forma determinística a partir da semente do projeto. */
+/** Gera os candidatos (um por personagem), de forma determinística a partir da semente do projeto. */
 export function gerarCandidatos(semente: number): Candidato[] {
   const r = aleatorio(semente); const esc = <T,>(l: T[]): T => l[Math.floor(r() * l.length)];
-  return AVATARES.map((avatar, i) => {
+  return AVATARES.map((avatar) => {
     const c = CARGOS[Math.floor(r() * CARGOS.length)]; const h: Habilidades = { criatividade: 3 + Math.floor(r() * 5), logica: 3 + Math.floor(r() * 5), comunicacao: 3 + Math.floor(r() * 5), organizacao: 3 + Math.floor(r() * 5) };
     h[c.foco] = Math.min(10, h[c.foco] + 3); const ord = (Object.keys(h) as (keyof Habilidades)[]).sort((a, b) => h[b] - h[a]);
     const tracos = [esc(TRACOS).id]; while (tracos.length < 3) { const t = esc(TRACOS).id; if (!tracos.includes(t)) tracos.push(t); }
     const nome = esc(NOMES); const idade = 21 + Math.floor(r() * 20); const media = (h.criatividade + h.logica + h.comunicacao + h.organizacao) / 4; const salario = Math.round(14 + media * 2.6 + r() * 4);
-    return { id: `cand-${semente.toString(36)}-${i}`, avatar, nome: `${nome} ${esc(SOBRE)}`, idade, cargo: c.cargo, especialidade: c.esp, habilidades: h, tracos,
+    return { id: `cand-${avatar}`, avatar, nome: `${nome} ${esc(SOBRE)}`, idade, cargo: c.cargo, especialidade: c.esp, habilidades: h, tracos,
       fortes: [FORTES[ord[0]], FORTES[ord[1]]], fracos: [FRACOS[ord[3]]], salario, descricao: `${nome} tem ${idade} anos, aparência com ${NOMES_AVATAR[avatar]}, e busca uma vaga como ${c.cargo.toLowerCase()}.`,
       disponibilidade: ['Imediata', 'Imediata', 'Em 1 dia', 'Meio período à tarde'][Math.floor(r() * 4)], comportamento: tracos.map((t) => tracoPorId.get(t)!.dica).join(' ') };
   });

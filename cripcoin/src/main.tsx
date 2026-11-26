@@ -5,7 +5,12 @@ import { carregarArte } from './render/arte';
 import type { Projeto } from './tipos';
 import { Menu } from './ui/Menu';
 import { TelaJogo } from './ui/TelaJogo';
+import { adicionarAutomacao, registrarAcao, removerAutomacao, tiposDeAcao } from './automacao/regras';
+import { definirProvedor, provedorAtual } from './automacao/provedor';
 import './ui/estilos.css';
+
+/** API pública para integrações e automações futuras (provedor de respostas, ações novas, regras). */
+(window as unknown as { cripcoin: unknown }).cripcoin = { definirProvedor, provedorAtual, registrarAcao, tiposDeAcao, adicionarAutomacao, removerAutomacao };
 
 function App() {
   const [pronto, setPronto] = useState(false); const [jogo, setJogo] = useState<Jogo | null>(null);

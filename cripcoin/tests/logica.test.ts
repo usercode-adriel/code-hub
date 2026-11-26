@@ -84,23 +84,37 @@ describe('funcionários', () => {
   it('a mesa precisa de computador e cadeira para ser estação', () => { const p = novo(); const m = p.objetos.find((o) => o.def === 'mesa-simples')!; expect(computadorDaMesa(p, m.id)).toBeTruthy(); const nova = colocar(p, item('mesa-simples')!, 3, 6, 0); expect(estacoesLivres(p)).not.toContain(nova.id); });
 });
 
-describe('simulação autônoma', () => {
+describe('presença fixa na mesa (sem andar, só girar)', () => {
   const rodar = (j: Jogo, minutos: number): void => { for (let i = 0; i < minutos * 10; i++) j.passo(0.1); };
-  it('o funcionário chega no horário, anda até a mesa, senta, trabalha e gera CC; vai embora no fim do expediente', () => {
-    const { p } = contratarPrimeiro(); const j = new Jogo(p); p.minuto = 8 * 60 + 55; p.velocidade = 3; const f = p.funcionarios[0]; expect(f.estado).toBe('ausente');
-    rodar(j, 4); expect(['chegando', 'indo_trabalhar', 'trabalhando']).toContain(f.estado); const cc0 = p.cc; let visto = false; for (let i = 0; i < 400 && !visto; i++) { j.passo(0.1); visto = f.estado === 'trabalhando'; } expect(visto).toBe(true);
-    const a = p.objetos.find((o) => o.def === 'cadeira-escritorio')!; expect(Math.floor(f.x)).toBe(a.x); expect(Math.floor(f.y)).toBe(a.y); rodar(j, 20); expect(p.cc).toBeGreaterThan(cc0);
-    p.minuto = 18 * 60 - 1; rodar(j, 10); expect(['indo_embora', 'ausente']).toContain(f.estado);
+  it('a personagem contratada aparece sentada na cadeira da estação e não sai mais do lugar', () => {
+    const { p } = contratarPrimeiro(); const j = new Jogo(p); const f = p.funcionarios[0]; const a = p.objetos.find((o) => o.def === 'cadeira-escritorio')!; p.velocidade = 3;
+    for (const hora of [3, 9, 13, 22]) { p.minuto = hora * 60; rodar(j, 2); expect(f.estado).not.toBe('ausente'); expect(Math.floor(f.x)).toBe(a.x); expect(Math.floor(f.y)).toBe(a.y); expect(f.caminho).toHaveLength(0); }
   });
-  it('paga salário no fim do dia e registra a transação', () => {
+  it('trabalha (gera CC) no expediente e fica parada na mesa fora dele', () => {
+    const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.minuto = 10 * 60; const cc0 = p.cc; rodar(j, 20); expect(p.funcionarios[0].estado).toBe('trabalhando'); expect(p.cc).toBeGreaterThan(cc0);
+    p.minuto = 20 * 60; const cc1 = p.cc; rodar(j, 10); expect(p.funcionarios[0].estado).toBe('parado'); expect(p.cc).toBeCloseTo(cc1, 5);
+  });
+  it('só usa vistas existentes (S, N, W, E) e volta a olhar para a mesa depois de girar', () => {
+    const { p } = contratarPrimeiro(); const j = new Jogo(p); const f = p.funcionarios[0]; const vistos = new Set<string>(); p.velocidade = 1;
+    for (let i = 0; i < 4000; i++) { j.passo(0.1); vistos.add(f.dir); } expect([...vistos].every((d) => ['S', 'N', 'W', 'E'].includes(d))).toBe(true); expect(vistos.size).toBeGreaterThan(1);
+  });
+  it('sem estação ela não aparece; ao comprar mesa+cadeira+computador, é encaixada sozinha', () => {
+    const p = novo(); contratar(p, p.candidatos[0].id, { nome: 'Ana', sobrenome: '', apelido: '', cargo: '', profissao: '', tracos: [], comportamento: '', salario: 30 });
+    const outra = p.candidatos[0]; contratar(p, outra.id, { nome: 'Beto', sobrenome: '', apelido: '', cargo: '', profissao: '', tracos: [], comportamento: '', salario: 30 }); const j = new Jogo(p); j.passo(0.1);
+    const beto = p.funcionarios[1]; expect(beto.estacao).toBeNull(); expect(beto.estado).toBe('ausente');
+    p.cc = 9999; const m = colocar(p, item('mesa-simples')!, 3, 6, 0); colocar(p, item('cadeira-escritorio')!, 3, 7, 2); colocar(p, item('laptop')!, 3, 6, 0); j.mudou(); expect(beto.estacao).toBe(m.id); expect(beto.estado).not.toBe('ausente');
+  });
+  it('defeitos, habilidades definidas pelo jogador e texto livre ficam salvos', () => {
+    const p = novo(); const r = contratar(p, p.candidatos[0].id, { nome: 'Ana', sobrenome: 'Lima', apelido: 'Aninha', cargo: 'Designer', profissao: 'UI', tracos: ['criativo'], comportamento: 'x', salario: 40, defeitos: ['Teimoso', 'Distraído'], habilidades: { criatividade: 9, logica: 2, comunicacao: 11, organizacao: -3 }, extras: 'fala inglês' });
+    const f = r.func!; expect(f.defeitos).toEqual(['Teimoso', 'Distraído']); expect(f.habilidades).toEqual({ criatividade: 9, logica: 2, comunicacao: 10, organizacao: 0 }); expect(f.extras).toBe('fala inglês');
+  });
+  it('há exatamente 3 personagens candidatas (uma por sprite novo)', () => { const p = novo(); expect(p.candidatos.map((c) => c.avatar).sort()).toEqual(['afro', 'cacheada', 'oculos']); });
+  it('a hora do jogo formata corretamente', () => { expect(horaTexto(8 * 60 + 5)).toBe('08:05'); });
+  it('paga salário no fim do dia; sem saldo por 3 dias a pessoa pede demissão', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.minuto = 23 * 60 + 58; const antes = p.transacoes.length; rodar(j, 5);
     expect(diaDe(p.minuto)).toBe(2); expect(p.transacoes.slice(antes).some((t) => t.tipo === 'salario' && t.valor === -40)).toBe(true);
+    p.cc = 0; for (let d = 0; d < 3; d++) { p.minuto = diaDe(p.minuto) * 1440 - 2; rodar(j, 4); p.cc = 0; } expect(p.funcionarios[0].status).toBe('demitido');
   });
-  it('sem saldo: salário atrasa e, depois de 3 dias, o funcionário pede demissão', () => {
-    const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.cc = 0; for (let d = 0; d < 3; d++) { p.minuto = (diaDe(p.minuto)) * 1440 - 2; rodar(j, 4); p.cc = 0; } expect(p.funcionarios[0].status).toBe('demitido');
-  });
-  it('não trabalha no fim de semana', () => { const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; p.minuto = 5 * 1440 + 9 * 60 + 5; rodar(j, 3); expect(p.funcionarios[0].estado).toBe('ausente'); });
-  it('a hora do jogo formata corretamente', () => { expect(horaTexto(8 * 60 + 5)).toBe('08:05'); });
 });
 
 describe('sistema de arquivos do computador', () => {

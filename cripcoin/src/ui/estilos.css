@@ -35,3 +35,8 @@ label { display:block; margin:7px 0 3px; color:var(--dim); } h1,h2,h3 { margin:6
 .app .corpo { padding:8px; overflow:auto; flex:1; } .app input, .app select, .app textarea { background:#fff; color:#1b1626; } .app button { color:var(--luz); }
 .menu-start { position:absolute; left:0; bottom:0; background:#1d2a3a; border:3px solid var(--borda); padding:6px; display:grid; gap:4px; z-index:5; width:200px; }
 @media (max-width: 760px) { .lateral { width:100%; top:auto; height:46%; border-right:0; border-top:3px solid var(--borda); } body { font-size:9px; } }
+.chat { position:absolute; right:10px; bottom:10px; width:320px; max-width:calc(100% - 20px); background:rgba(27,22,38,.97); border:3px solid var(--borda); box-shadow:0 0 0 2px #6a5aa0; z-index:12; padding:6px; }
+.chat-topo { display:flex; justify-content:space-between; align-items:center; color:var(--ouro); margin-bottom:4px; } .chat-topo button { padding:1px 6px; }
+.chat-log { max-height:130px; overflow:auto; margin-bottom:5px; font-size:9px; } .chat-eu { color:var(--azul); margin:2px 0; } .chat-ela { color:var(--luz); margin:2px 0; }
+.cores { display:grid; grid-template-columns: repeat(6, 1fr); gap:4px; } .cores button { height:26px; padding:0; } .cores button.ativo { outline:3px solid var(--ouro); }
+@media (max-width: 760px) { .chat { left:10px; right:10px; width:auto; bottom:calc(46% + 8px); } }

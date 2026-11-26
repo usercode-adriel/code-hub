@@ -32,7 +32,7 @@ export function aplicar(d: ItemDef): void {
     const alvo = ALVO_ITEM[d.id] ?? ALVO_CATEGORIA[d.categoria] ?? 36; const padrao = limitar(alvo / nat, 0.3, 1.2);
     d.escala = { padrao: Math.round(padrao * 100) / 100, min: 0.4, max: 2 };
     d.apoio = ['mesa', ...(EM_ESTANTE.has(d.id) ? ['estante'] : []), ...(EM_ARMARIO.has(d.id) ? ['armario'] : [])];
-  } else if (d.camada === 'parede') { d.escala = { padrao: 1, min: 0.5, max: 2 }; d.alturaPadrao = ALTURA_PAREDE[d.id] ?? 0.6; }
+  } else if (d.camada === 'parede') { d.escala = { padrao: d.id === 'quadro-codeniac' ? 0.8 : 1, min: 0.5, max: 2 }; d.alturaPadrao = ALTURA_PAREDE[d.id] ?? 0.6; }
   else d.escala = { padrao: 1, min: 0.5, max: 2 };
   const s = SUPERFICIES[d.id] ?? (d.mesa ? sup('mesa', R(0.08, 0.12, 0.92, 0.38)) : undefined); if (s) { d.superficie = s; if (d.camada === 'objeto') d.girar = false; }   // o sprite do móvel tem uma só vista
 }

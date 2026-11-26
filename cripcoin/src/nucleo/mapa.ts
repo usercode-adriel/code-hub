@@ -160,6 +160,16 @@ export function pintarPiso(p: Projeto, x0: number, y0: number, x1: number, y1: n
   let n = 0; for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) if (dentro(p, x, y) && !ehParede(p, x, y) && p.piso[idx(p, x, y)] !== piso) { p.piso[idx(p, x, y)] = piso; n++; }
   return n;
 }
+/** Pinta (cor) as paredes de um retângulo. Cada célula guarda a própria cor; devolve quantas paredes mudaram. */
+export function pintarParedeCor(p: Projeto, x0: number, y0: number, x1: number, y1: number, cor: string): number {
+  const cores = (p.coresParede ??= Array(p.largura * p.altura).fill('')); let n = 0;
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) if (ehParede(p, x, y) && (cores[idx(p, x, y)] || p.corParede) !== cor) { cores[idx(p, x, y)] = cor; n++; }
+  return n;
+}
+/** Define a cor de TODAS as paredes (e a cor padrão do projeto). */
+export function pintarTodasParedes(p: Projeto, cor: string): void { p.corParede = cor; p.coresParede = Array(p.largura * p.altura).fill(''); }
+/** Troca o piso de toda a sala (todas as células que não são parede). Devolve quantas mudaram. */
+export function preencherPiso(p: Projeto, piso: string): number { return pintarPiso(p, 0, 0, p.largura - 1, p.altura - 1, piso); }
 /** Parede estilo The Sims: constrói/remove uma linha reta de paredes (ou o contorno de um retângulo). Não remove paredes que têm objeto preso; portas viram parede ao construir. */
 export function tracarParede(p: Projeto, x0: number, y0: number, x1: number, y1: number, modo: 'construir' | 'remover', retangulo = false): number {
   const cel: { x: number; y: number }[] = [];

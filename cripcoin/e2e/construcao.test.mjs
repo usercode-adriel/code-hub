@@ -81,3 +81,35 @@ test('construção v2: relógio na parede (qualquer ponto da face), computador/c
     assert.equal(depois, antes); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
 });
+
+const contratarUI = async (p, nome) => { await p.click('[data-testid=btn-contratar]'); await p.waitForSelector('[data-testid=candidato]'); await p.locator('[data-testid=ver-candidato]').first().click(); await p.fill('[data-testid=ct-nome]', nome); await p.fill('[data-testid=ct-extras]', 'fala inglês'); await p.click('[data-testid=defeito-Teimoso]').catch(() => {}); await p.click('[data-testid=confirmar-contratar]'); await p.waitForTimeout(200); await p.evaluate(() => document.querySelectorAll('.x').forEach((x) => x.click())); };
+
+test('equipe fixa na mesa: personagem nova sentada, conversa com balão (uma por vez), sem IA mostra erro honesto', async () => {
+  const p = await abrir(); try {
+    await novoProjeto(p, 'Equipe'); await contratarUI(p, 'Marina');
+    const f = await p.evaluate(() => { const j = window.__jogo; const a = j.p.objetos.find((o) => o.def === 'cadeira-escritorio'); const e = j.p.funcionarios[0]; return { estado: e.estado, cx: Math.floor(e.x) === a.x && Math.floor(e.y) === a.y, avatar: e.avatar, defeitos: e.defeitos, extras: e.extras }; });
+    assert.notEqual(f.estado, 'ausente'); assert.ok(f.cx, 'sentada na cadeira da estação'); assert.ok(['cacheada', 'oculos', 'afro'].includes(f.avatar)); assert.equal(f.extras, 'fala inglês');
+    // sem login no Hub: erro claro, nada de resposta inventada
+    await p.fill('[data-testid=chat-input]', 'Marina, bom dia!'); await p.click('[data-testid=chat-enviar]'); await p.waitForFunction(() => window.__jogo.avisos.some((a) => a.tipo === 'erro' && /logado|IA/i.test(a.texto)), null, { timeout: 8000 });
+    assert.equal(await p.evaluate(() => window.__jogo.conversa.balao), null);
+    // provedor de teste: o balão aparece sobre a personagem
+    await p.evaluate(() => window.cripcoin.definirProvedor({ nome: 'teste', responder: async (ped) => `Oi chefe, aqui é a ${ped.funcionario.nome}!` }));
+    await p.fill('[data-testid=chat-input]', 'Marina, tudo bem?'); await p.press('[data-testid=chat-input]', 'Enter');
+    await p.waitForFunction(() => { const b = window.__jogo.conversa.balao; return b && !b.pensando; }, null, { timeout: 8000 }); await shot(p, 'v3-balao.png');
+    const b = await p.evaluate(() => ({ ...window.__jogo.conversa.balao })); assert.match(b.texto, /Marina/); assert.equal(await p.evaluate(() => window.__jogo.p.funcionarios[0].dir), 'S');
+    assert.ok((await p.textContent('[data-testid=chat-log]')).includes('Oi chefe')); assert.deepEqual(p.erros, []);
+  } finally { await p.ctx.close(); }
+});
+
+test('construção: cor de paredes por trecho, todas as paredes, piso da sala inteira e quadro Codeniac', async () => {
+  const p = await abrir(); try {
+    await novoProjeto(p, 'Cores'); await dar(p, { 'quadro-codeniac': 1 }); await construir(p);
+    const arrastar = async (x0, y0, x1, y1) => { const a = await tela(p, x0 + 0.5, y0 + 0.5); const b = await tela(p, x1 + 0.5, y1 + 0.5); await p.mouse.move(a.x, a.y); await p.mouse.down(); await p.mouse.move(b.x, b.y, { steps: 4 }); await p.mouse.up(); };
+    await p.click('[data-testid=ferr-corParede]'); await p.click('[data-testid=cor-vinho]'); await arrastar(2, 0, 5, 0);
+    const cores = await p.evaluate(() => { const j = window.__jogo.p; return { a: j.coresParede[2], b: j.coresParede[8] }; }); assert.equal(cores.a, 'vinho'); assert.equal(cores.b, '');
+    await p.click('[data-testid=cor-tudo]'); assert.equal(await p.evaluate(() => window.__jogo.p.corParede), 'vinho'); await shot(p, 'v3-cores.png');
+    await p.click('[data-testid=ferr-piso]'); await p.click('.pisos button[title=metal]'); await p.click('[data-testid=piso-tudo]');
+    assert.equal(await p.evaluate(() => { const j = window.__jogo.p; return j.piso.filter((x, i) => j.paredes[i] === 0).every((x) => x === 'metal'); }), true);
+    await usarItem(p, 'Quadro Codeniac'); await clicarMundo(p, 8, -0.1); await p.waitForTimeout(150); const q = await obj(p, 'quadro-codeniac'); assert.ok(q, 'quadro com o logo colocado na parede'); await shot(p, 'v3-logo.png'); assert.deepEqual(p.erros, []);
+  } finally { await p.ctx.close(); }
+});

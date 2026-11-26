@@ -17,6 +17,8 @@ export interface VistaUI {
 export { spriteDe };
 const corCateg = (d: ItemDef): string => (d.camada === 'sobre' ? '#6aa0ff' : d.camada === 'parede' ? '#c8a060' : '#a0a0a0');
 
+/** Escurece/clareia uma cor #rrggbb (f<1 escurece; f=1 igual). */
+const mistura = (hex: string, f: number): string => { const n = parseInt(hex.slice(1), 16); const k = (v: number): number => Math.min(255, Math.round(v * f)); return `rgb(${k((n >> 16) & 255)},${k((n >> 8) & 255)},${k(n & 255)})`; };
 export class Mundo {
   cam: Camera = { x: 0, y: 0, zoom: 2 }; w = 0; h = 0; dpr = 1; private tempo = 0;
   constructor(readonly canvas: HTMLCanvasElement) {}
@@ -71,12 +73,11 @@ export class Mundo {
     // camada ordenada por profundidade: paredes, objetos, itens sobre mesas e funcionários
     type Cena = { z: number; f: () => void };
     const cena: Cena[] = [];
-    const corP = CORES_PAREDE[p.corParede]?.cor ?? null;
     for (let y = 0; y < p.altura; y++) for (let x = 0; x < p.largura; x++) {
-      if (ehParede(p, x, y)) cena.push({ z: y + 1, f: () => this.parede(c, p, x, y, corP) });
+      if (ehParede(p, x, y)) { const cp = CORES_PAREDE[p.coresParede?.[idx(p, x, y)] || p.corParede]?.cor ?? null; cena.push({ z: y + 1, f: () => this.parede(c, p, x, y, cp) }); }
       else { const q = portaEm(p, x, y); if (q) cena.push({ z: y + 1, f: () => this.porta(c, p, q.x, q.y, q.aberta) }); }
     }
-    const sentados = new Set(p.funcionarios.filter((f) => f.status === 'ativo' && f.estado === 'trabalhando').map((f) => `${Math.floor(f.x)},${Math.floor(f.y)}`));
+    const sentados = new Set(p.funcionarios.filter((f) => f.status === 'ativo' && f.estado !== 'ausente').map((f) => `${Math.floor(f.x)},${Math.floor(f.y)}`));
     for (const o of p.objetos) {
       const d = item(o.def); if (!d || d.camada === 'chao') continue;
       if (d.sentavel && sentados.has(`${o.x},${o.y}`)) continue;                                    // o sprite do funcionário já inclui a cadeira
@@ -84,13 +85,13 @@ export class Mundo {
       const zz = d.camada === 'parede' ? o.y + 1.02 : d.camada === 'sobre' ? (mesa && md ? mesa.y + tamanhoPegada(mesa, md).h + 0.01 + (an ? an.y * 0.0005 : 0) : o.y + 1) : o.y + tamanhoPegada(o, d).h;
       cena.push({ z: zz, f: () => this.objeto(c, p, o, d) });
     }
-    for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente') cena.push({ z: f.y + 0.5 + (f.estado === 'trabalhando' ? 0.02 : 0), f: () => this.funcionario(c, f, ui.funcSel === f.id) });
+    for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente') cena.push({ z: f.y + 0.52, f: () => this.funcionario(c, f, ui.funcSel === f.id) });
     cena.sort((a, b) => a.z - b.z); for (const e of cena) e.f();
     // sobreposições do editor
     if (ui.construcao) this.sobreposicoes(c, p, ui);
     if (ui.fantasma) this.fantasma(c, p, ui.fantasma);
     // balões de fala por cima de tudo
-    for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente' && f.fala) this.balao(c, f.x * T, (f.y - 1.25) * T, f.fala);
+    const bl = jogo.conversa.balao; if (bl) { const f = p.funcionarios.find((q) => q.id === bl.fid); if (f && f.estado !== 'ausente') { const im = avatar(f.avatar, f.dir); const topo = (f.y + 0.5) * T + 2 - (im ? im.height / 2 : 60); this.balao(c, f.x * T, topo - 3, bl.texto, bl.pensando); } }
     c.restore();
   }
   private sombrasDoPiso(c: CanvasRenderingContext2D, p: Projeto): void {
@@ -101,14 +102,14 @@ export class Mundo {
   private parede(c: CanvasRenderingContext2D, p: Projeto, x: number, y: number, cor: string | null): void {
     const im = paredeColorida('parede', cor) as (HTMLImageElement | HTMLCanvasElement | null); const baixo = y + 1 < p.altura && (ehParede(p, x, y + 1));
     // topo da parede (visto de cima): bloco cinza-arroxeado com aresta clara
-    c.fillStyle = '#8f89a3'; c.fillRect(x * T, y * T, T, T); c.fillStyle = '#b3aec4'; c.fillRect(x * T, y * T, T, 3); c.fillStyle = '#6f6985'; c.fillRect(x * T, y * T + T - 2, T, 2);
+    const topo = cor ? mistura(cor, 0.55) : '#8f89a3'; c.fillStyle = topo; c.fillRect(x * T, y * T, T, T); c.fillStyle = cor ? mistura(cor, 0.8) : '#b3aec4'; c.fillRect(x * T, y * T, T, 3); c.fillStyle = cor ? mistura(cor, 0.4) : '#6f6985'; c.fillRect(x * T, y * T + T - 2, T, 2);
     if (baixo) return;                                                                   // só aparece a face frontal quando há chão logo abaixo
     const hFace = Math.round(p.alturaParede * T);
     if (!im) { c.fillStyle = '#d8cfb8'; c.fillRect(x * T, (y + 1) * T - hFace, T, hFace); return; }
     const W = im.width; const H = im.height; const tampa = 24; const corpo = H - tampa; const srcH = Math.min(corpo, hFace * 2); const dstH = srcH / 2;
     c.drawImage(im, 0, H - srcH, W, srcH, x * T, (y + 1) * T - dstH, T, dstH);              // base (rodapé) nativa
     for (let falta = hFace - dstH, topo = (y + 1) * T - dstH; falta > 0; ) { const h = Math.min(falta, 8); c.drawImage(im, 0, tampa + 6, W, h * 2, x * T, topo - h, T, h); topo -= h; falta -= h; }   // completa a altura com o trecho liso
-    c.fillStyle = '#9a94ad'; c.fillRect(x * T, (y + 1) * T - hFace - 2, T, 2);
+    c.fillStyle = cor ? mistura(cor, 0.7) : '#9a94ad'; c.fillRect(x * T, (y + 1) * T - hFace - 2, T, 2);
   }
   private porta(c: CanvasRenderingContext2D, p: Projeto, x: number, y: number, aberta: boolean): void {
     const im = spriteParede('porta'); const T2 = T; const hFace = Math.round(p.alturaParede * T2);
@@ -130,18 +131,21 @@ export class Mundo {
     c.fillStyle = '#000'; c.font = '7px monospace'; c.textAlign = 'center'; c.fillText(d.nome.slice(0, 9), L + W / 2, Tp + H / 2 + 2);
   }
   private funcionario(c: CanvasRenderingContext2D, f: ProjetoFunc, sel: boolean): void {
-    const dirSprite = f.dir; const im = avatar(f.avatar, dirSprite); const andando = f.caminho.length > 0;
-    const balanco = andando ? Math.sin(this.tempo * 9) * 1.2 : 0; const cx = f.x * T; const by = (f.y + 0.5) * T + 2 + (f.estado === 'descansando' ? 4 : 0) + balanco;
-    c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.ellipse(cx, by - 2, 11, 4, 0, 0, Math.PI * 2); c.fill();
-    if (im) { const sw = im.width / 2; const sh = im.height / 2; c.drawImage(im, cx - sw / 2, by - sh, sw, sh); }
-    else { c.fillStyle = '#d98'; c.fillRect(cx - 8, by - 36, 16, 34); }
-    if (f.estado === 'descansando') { c.fillStyle = '#fff'; c.font = 'bold 8px monospace'; c.textAlign = 'center'; c.fillText('z' + 'z'.repeat(Math.floor(this.tempo * 1.5) % 3), cx + 12, by - 38 - (this.tempo * 6) % 4); }
-    if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(cx - 14, by - 62, 28, 62); }
+    const im = avatar(f.avatar, f.dir); const cx = f.x * T; const by = (f.y + 0.5) * T + 2;                  // sentada na cadeira: sem andar, só trocar de vista
+    c.fillStyle = 'rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(cx, by - 2, 14, 4.5, 0, 0, Math.PI * 2); c.fill();
+    const sw = im ? im.width / 2 : 32; const sh = im ? im.height / 2 : 60;
+    if (im) c.drawImage(im, cx - sw / 2, by - sh, sw, sh); else { c.fillStyle = '#d98'; c.fillRect(cx - 8, by - 36, 16, 34); }
+    if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(cx - sw / 2, by - sh, sw, sh); }
     c.fillStyle = 'rgba(0,0,0,0.6)'; c.font = 'bold 7px monospace'; c.textAlign = 'center'; const nome = f.apelido || f.nome; const tw = c.measureText(nome).width + 4; c.fillRect(cx - tw / 2, by + 1, tw, 9); c.fillStyle = '#fff'; c.fillText(nome, cx, by + 8);
   }
-  private balao(c: CanvasRenderingContext2D, x: number, y: number, texto: string): void {
-    c.font = 'bold 7px monospace'; c.textAlign = 'center'; const tw = Math.min(150, c.measureText(texto).width + 8); c.fillStyle = '#fffbe8'; c.strokeStyle = '#222'; c.lineWidth = 1;
-    c.fillRect(x - tw / 2, y - 18, tw, 12); c.strokeRect(x - tw / 2 + 0.5, y - 18 + 0.5, tw - 1, 11); c.fillStyle = '#222'; c.fillText(texto.slice(0, 26), x, y - 9);
+  /** Balão de fala sobre a cabeça, com quebra de linha; "pensando" mostra reticências animadas. */
+  private balao(c: CanvasRenderingContext2D, x: number, yBase: number, texto: string, pensando: boolean): void {
+    c.font = 'bold 7px monospace'; c.textAlign = 'left'; const maxW = 118; const txt = pensando ? '.'.repeat(1 + (Math.floor(this.tempo * 3) % 3)) : texto; const linhas: string[] = []; let atual = '';
+    for (const w of txt.split(/\s+/)) { const t = atual ? `${atual} ${w}` : w; if (c.measureText(t).width > maxW && atual) { linhas.push(atual); atual = w; } else atual = t; } if (atual) linhas.push(atual);
+    const lw = Math.max(...linhas.map((l) => c.measureText(l).width)); const w = Math.ceil(lw) + 10; const h = linhas.length * 9 + 7; const x0 = Math.round(x - w / 2); const y0 = Math.round(yBase - h - 5);
+    c.fillStyle = '#fffbe8'; c.strokeStyle = '#1b1626'; c.lineWidth = 1; c.fillRect(x0, y0, w, h); c.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+    c.beginPath(); c.moveTo(x - 4, y0 + h); c.lineTo(x, y0 + h + 5); c.lineTo(x + 4, y0 + h); c.closePath(); c.fill(); c.stroke(); c.fillStyle = '#fffbe8'; c.fillRect(x - 3, y0 + h - 1, 7, 2);
+    c.fillStyle = '#1b1626'; linhas.forEach((l, i) => c.fillText(l, x0 + 5, y0 + 9 + i * 9));
   }
   private sobreposicoes(c: CanvasRenderingContext2D, p: Projeto, ui: VistaUI): void {
     if (ui.mostrarGrade) { c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1; c.beginPath(); for (let x = 0; x <= p.largura; x++) { c.moveTo(x * T + 0.5, 0); c.lineTo(x * T + 0.5, p.altura * T); } for (let y = 0; y <= p.altura; y++) { c.moveTo(0, y * T + 0.5); c.lineTo(p.largura * T, y * T + 0.5); } c.stroke(); }

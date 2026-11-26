@@ -970,6 +970,18 @@ export async function geminiJSON(prompt, maxTokens = 3000, temperature = 0.5) {
   return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, ''));
 }
 
+// Geração curta e sem ferramentas (falas das personagens do Cripcoin Office): usa a IA da nuvem configurada e não grava nada como memória do usuário.
+// Sem IA na nuvem, falha com mensagem clara (o chamador não finge que gerou).
+export async function gerarTexto({ system, prompt, maxTokens = 300, temperature = 0.85, bot = null }) {
+  if (!hasCloud()) throw Object.assign(new Error('Nenhuma IA na nuvem configurada. Em Configurações → Assistente conecte Gemini, Groq ou OpenRouter para as personagens conversarem.'), { status: 409, semIA: true });
+  const out = await llmCall({
+    ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature, maxOutputTokens: maxTokens },
+  }, () => {}, false, bot);
+  return String(out || '').trim();
+}
+
 // Texto escrito pela IA no estilo do personagem, a partir de uma instrução e dos dados (null se não houver Gemini).
 export async function aiWrite(user, bot, instruction, data = '', maxTokens = 1500) {
   if (!hasCloud()) return null;
