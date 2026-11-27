@@ -2,8 +2,8 @@
 export type Dir = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 export const DIRS: Dir[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
-export type Categoria = 'mesas' | 'cadeiras' | 'computadores' | 'armazenamento' | 'sofas' | 'decoracao' | 'plantas' | 'iluminacao' | 'impressoras' | 'equipamentos' | 'cafeteria' | 'quadros' | 'outros';
-export type Interacao = 'computador' | 'armario' | 'quadro' | 'cafeteira' | 'impressora' | 'tv' | 'relogio' | 'planta' | 'lixeira' | 'bebedouro' | 'assento';
+export type Categoria = 'mesas' | 'cadeiras' | 'computadores' | 'armazenamento' | 'sofas' | 'decoracao' | 'plantas' | 'iluminacao' | 'impressoras' | 'equipamentos' | 'cafeteria' | 'quadros' | 'descanso' | 'outros';
+export type Interacao = 'computador' | 'armario' | 'quadro' | 'cafeteira' | 'impressora' | 'tv' | 'relogio' | 'planta' | 'lixeira' | 'bebedouro' | 'assento' | 'frigobar' | 'bolsa' | 'colchonete';
 
 export interface Variante { sprite: string; espelhar?: boolean }
 export interface ItemDef {
@@ -15,6 +15,8 @@ export interface ItemDef {
   solido: boolean; mesa?: boolean; sentavel?: boolean; assentos?: number;
   interacao?: Interacao; capacidade?: number;                        // capacidade: slots do armário
   girar: boolean; inicial?: boolean;
+  spriteAberto?: string;                                             // sprite usado quando estado.aberto = true (ex.: frigobar aberto)
+  naLoja?: boolean;                                                  // false = não aparece na loja (bebidas do frigobar, bolsas das personagens)
   // ---- escala, superfícies e ancoragem (preenchidos por dados/propriedades.ts a partir de regras por categoria) ----
   escala: { padrao: number; min: number; max: number };            // padrão = ajuste de proporção do asset; min/max = limites do multiplicador do jogador
   superficie?: { tipo: string; niveis: Retangulo[] };              // móvel que recebe objetos: áreas úteis, em frações do sprite (x0,y0,x1,y1)
@@ -36,7 +38,7 @@ export type NoArquivo = { id: string; nome: string; tipo: 'pasta' | 'txt' | 'doc
 export interface Computador { fs: NoArquivo; papel?: string }
 export interface QuadroDados { tracos: { cor: string; tam: number; apagar?: boolean; pts: [number, number][] }[]; notas: { id: string; texto: string; feito: boolean }[]; ideias: string[] }
 
-export type EstadoFunc = 'ausente' | 'chegando' | 'indo_trabalhar' | 'trabalhando' | 'conversando' | 'pausa' | 'cafe' | 'descansando' | 'indo_embora' | 'parado';
+export type EstadoFunc = 'dormindo' | 'ausente' | 'chegando' | 'indo_trabalhar' | 'trabalhando' | 'conversando' | 'pausa' | 'cafe' | 'descansando' | 'indo_embora' | 'parado';
 export interface Habilidades { criatividade: number; logica: number; comunicacao: number; organizacao: number }
 export interface Candidato {
   id: string; avatar: string; nome: string; idade: number; cargo: string; especialidade: string; habilidades: Habilidades; tracos: string[];
@@ -48,7 +50,9 @@ export interface Funcionario {
   entrada: number; saida: number; estacao: string | null; status: 'ativo' | 'demitido' | 'afastado'; contratadoEm: number; diasSemPagar: number;
   estado: EstadoFunc; x: number; y: number; dir: Dir; caminho: { x: number; y: number }[]; alvo?: string | null; desde: number; fala?: string; falaAte?: number; produzido: number;
   defeitos?: string[]; extras?: string;                              // defeitos escolhidos e habilidades extras em texto livre (definidos na contratação)
-  metaDia?: number;                                                   // rendimento sorteado para hoje (10–120 CC); define a seta de desempenho e é creditado à meia-noite
+  metaDia?: number;
+  saldo?: number; extrato?: { dia: number; valor: number; desc: string }[];   // conta bancária da personagem (salários recebidos)
+  dormeEm?: { x: number; y: number; colchao?: string };            // onde dorme fora do expediente (colchonete do mapa ou canto livre)                                                   // rendimento sorteado para hoje (10–120 CC); define a seta de desempenho e é creditado à meia-noite
   giroAte?: number;                                                   // (tempo real, s) até quando a personagem fica virada para o jogador
 }
 
@@ -61,9 +65,9 @@ export interface Projeto {
   cc: number; transacoes: Transacao[]; inventario: Record<string, number>; estoqueLoja: Record<string, number>; diaEstoque: number;
   funcionarios: Funcionario[]; candidatos: Candidato[]; recontratar: Candidato[];
   computadores: Record<string, Computador>; quadros: Record<string, QuadroDados>; armarios: Record<string, Record<string, number>>;
-  minuto: number; velocidade: number; prox: number; config: { som: boolean; papelDeParede: string; bonus5000?: boolean };
+  minuto: number; velocidade: number; prox: number; config: { som: boolean; papelDeParede: string; bonus5000?: boolean; conversasEquipe?: boolean };
   coresParede?: string[];                                              // cor por célula de parede ('' = cor padrão do projeto)
-  conversas?: Record<string, { de: 'eu' | 'ela'; texto: string; em: number }[]>;   // histórico do chat por funcionário
+  conversas?: Record<string, { de: 'eu' | 'ela'; texto: string; em: number; quem?: string }[]>;   // histórico do chat por funcionário
   automacoes?: Automacao[];                                            // regras de automação (ver src/automacao)
 }
 

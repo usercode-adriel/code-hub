@@ -86,9 +86,10 @@ describe('funcionários', () => {
 
 describe('presença fixa na mesa (sem andar, só girar)', () => {
   const rodar = (j: Jogo, minutos: number): void => { for (let i = 0; i < minutos * 10; i++) j.passo(0.1); };
-  it('a personagem contratada aparece sentada na cadeira da estação e não sai mais do lugar', () => {
+  it('no expediente fica sentada na cadeira da estação (não anda); fora dele dorme', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); const f = p.funcionarios[0]; const a = p.objetos.find((o) => o.def === 'cadeira-escritorio')!; p.velocidade = 3;
-    for (const hora of [3, 9, 13, 22]) { p.minuto = hora * 60; rodar(j, 2); expect(f.estado).not.toBe('ausente'); expect(Math.floor(f.x)).toBe(a.x); expect(Math.floor(f.y)).toBe(a.y); expect(f.caminho).toHaveLength(0); }
+    for (const hora of [9, 13, 17]) { p.minuto = hora * 60 + 1; rodar(j, 2); expect(f.estado).toBe('trabalhando'); expect(Math.floor(f.x)).toBe(a.x); expect(Math.floor(f.y)).toBe(a.y); expect(f.caminho).toHaveLength(0); }
+    for (const hora of [3, 22]) { p.minuto = hora * 60; rodar(j, 2); expect(f.estado).toBe('dormindo'); expect(Math.floor(f.x) === a.x && Math.floor(f.y) === a.y).toBe(false); }
   });
   it('rendimento diário: entre 10 e 120 CC por funcionária, sorteado a cada dia e creditado à meia-noite', () => {
     const { p } = contratarPrimeiro(); const j = new Jogo(p); p.velocidade = 3; const f = p.funcionarios[0]; const valores = new Set<number>();

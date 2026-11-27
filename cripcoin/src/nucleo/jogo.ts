@@ -28,7 +28,7 @@ export function novoProjeto(c: ConfigNovo): Projeto { const p = criarProjeto(c);
 export type Aviso = { id: number; texto: string; tipo: 'ok' | 'erro' | 'info' };
 export class Jogo {
   p: Projeto; private ouvintes = new Set<() => void>(); avisos: Aviso[] = []; private n = 0; private grade: Grade; private rnd: () => number; sujo = false; salvoEm = 0;
-  private acc = 0; private timer: ReturnType<typeof setInterval> | null = null; ultimoSalvar = Date.now(); pausado = false; modoConstrucao = false;
+  private acc = 0; private timer: ReturnType<typeof setInterval> | null = null; ultimoSalvar = Date.now(); pausado = false; modoConstrucao = false; proximaConversa = Date.now() + 12000;
   /** Barramento de eventos (ponto de ligação das automações) e a conversa com as personagens. */
   readonly eventos = new Barramento(); readonly conversa: Conversa; private offAuto: () => void = () => {};
   desligarAutomacoes(): void { this.offAuto(); }
@@ -54,6 +54,8 @@ export class Jogo {
     if (diaDe(p.minuto) !== ant) this.novoDia();
     if (m > 0) for (const f of this.ouvintes) f();
     if (Date.now() - this.ultimoSalvar > 8000 && this.sujo) this.salvar();
+    // conversa espontânea da equipe (tempo real, 35–75 s), se ligada nas configurações
+    if (this.p.config.conversasEquipe !== false && Date.now() >= this.proximaConversa) { this.proximaConversa = Date.now() + 35000 + Math.random() * 40000; void this.conversa.conversaEquipe(); }
   }
   private novoDia(): void {
     const p = this.p; const r = pagarSalarios(p, (t, v, d) => { registrar(p, t, v, d); }, this.rnd);

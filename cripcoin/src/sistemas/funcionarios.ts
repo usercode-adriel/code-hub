@@ -4,9 +4,9 @@
 import { item } from '../dados/catalogo';
 import { tracoPorId } from '../dados/pessoas';
 import type { Grade } from '../nucleo/grade';
-import { celulasDe } from '../nucleo/mapa';
+import { celulasDe, colocar, podeColocar } from '../nucleo/mapa';
 import { novoId } from '../nucleo/rng';
-import { ehFimDeSemana, minutoDoDia } from '../nucleo/tempo';
+import { diaDe, ehFimDeSemana, minutoDoDia } from '../nucleo/tempo';
 import type { Candidato, Dir, Funcionario, Habilidades, ObjetoColocado, Projeto } from '../tipos';
 
 const clampH = (n: number): number => Math.min(10, Math.max(0, Math.round(Number(n) || 0)));
@@ -63,7 +63,7 @@ export function contratar(p: Projeto, candidatoId: string, cfg: CfgContrato): { 
 }
 export function demitir(p: Projeto, fid: string): { ok: boolean; motivo: string } {
   const f = p.funcionarios.find((q) => q.id === fid && q.status === 'ativo'); if (!f) return { ok: false, motivo: 'Funcionário não encontrado.' };
-  f.status = 'demitido'; f.estacao = null; f.estado = 'ausente'; f.caminho = []; const c = candidatoDe(f); p.recontratar.push(c); return { ok: true, motivo: `${f.nome} foi demitido(a).` };
+  f.status = 'demitido'; f.estacao = null; p.objetos = p.objetos.filter((o) => !(item(o.def)?.interacao === 'bolsa' && o.estado?.dona === f.id)); f.estado = 'ausente'; f.caminho = []; const c = candidatoDe(f); p.recontratar.push(c); return { ok: true, motivo: `${f.nome} foi demitido(a).` };
 }
 export const candidatoDe = (f: Funcionario): Candidato => ({ id: f.candidatoId, avatar: f.avatar, nome: `${f.nome} ${f.sobrenome}`.trim(), idade: f.idade, cargo: f.cargo, especialidade: f.profissao, habilidades: f.habilidades, tracos: f.tracos, fortes: [], fracos: [], salario: f.salario, descricao: 'Ex-funcionário(a).', disponibilidade: 'Imediata', comportamento: f.comportamento });
 /** Demitidos podem voltar à lista de candidatos (e só então ser contratados de novo). */
@@ -90,15 +90,53 @@ export function atualizarFuncionarios(p: Projeto, ctx: Contexto, dtMin: number, 
     if (!f.estacao) { const livre = estacoesLivres(p)[0]; if (livre) f.estacao = livre; }          // compra de uma estação nova encaixa quem estava esperando
     const a = f.estacao ? acharAssento(p, f.estacao) : null;
     if (!a) { f.estado = 'ausente'; continue; }
-    f.metaDia ??= sortearRendimento(rnd);
-    f.x = a.x + 0.5; f.y = a.y + 0.5; f.caminho = [];
-    const trabalha = dentroDoExpediente(p, f); f.estado = trabalha ? 'trabalhando' : 'parado';
+    f.metaDia ??= sortearRendimento(rnd); if (dtMin > 0 || dtSeg === 0) garantirBolsa(p, f);
+    f.caminho = []; const trabalha = dentroDoExpediente(p, f);
+    if (!trabalha) {                                                     // fora do expediente: some da cadeira e aparece dormindo no colchonete (ou num canto livre)
+      const cama = localDeDormir(p, f, ctx.g);
+      if (cama) { f.dormeEm = cama; f.estado = 'dormindo'; f.x = cama.x + 0.5; f.y = cama.y + 1.5; f.giroAte = undefined; continue; }
+    }
+    f.dormeEm = undefined; f.x = a.x + 0.5; f.y = a.y + 0.5;
+    f.estado = trabalha ? 'trabalhando' : 'parado';
     // giro: de vez em quando vira para o jogador (frente) ou para o lado e depois volta para a mesa; sempre só entre as vistas existentes
     if (f.giroAte !== undefined && agora >= f.giroAte) { f.giroAte = undefined; f.dir = a.dir; }
     else if (f.giroAte === undefined && rnd() < dtSeg / 40) { f.dir = ['S', 'E', 'W'][Math.floor(rnd() * 3)] as Dir; f.giroAte = agora + 2.5 + rnd() * 3; }
     else if (f.giroAte === undefined) f.dir = a.dir;
     if (trabalha && dtMin > 0) trabalhar(p, f, dtMin);
   }
+}
+// ---------- sono ----------
+const chave = (x: number, y: number): string => `${x},${y}`;
+/** Onde a personagem dorme: um colchonete colocado no mapa (livre) ou, sem colchonete, uma faixa livre de 1×3 tiles perto de um canto da sala. */
+export function localDeDormir(p: Projeto, f: Funcionario, g: Grade): { x: number; y: number; colchao?: string } | null {
+  const outros = p.funcionarios.filter((q) => q.id !== f.id && q.status === 'ativo' && q.estado === 'dormindo' && q.dormeEm);
+  const usados = new Set(outros.map((q) => q.dormeEm!.colchao).filter(Boolean) as string[]);
+  const colchoes = p.objetos.filter((o) => item(o.def)?.interacao === 'colchonete' && !usados.has(o.id));
+  const meu = f.dormeEm?.colchao ? colchoes.find((o) => o.id === f.dormeEm!.colchao) : undefined; const c = meu ?? colchoes[0];
+  if (c) return { x: c.x, y: c.y, colchao: c.id };
+  // sem colchonete: canto livre (não ocupa móveis, portas, paredes nem o lugar de outra pessoa dormindo)
+  const ocupado = new Set<string>();
+  for (const o of p.objetos) { const d = item(o.def); if (!d || d.camada === 'parede' || d.camada === 'sobre') continue; for (const q of celulasDe(o, d)) ocupado.add(chave(q.x, q.y)); }
+  for (const q of outros) for (let k = 0; k < 3; k++) ocupado.add(chave(q.dormeEm!.x, q.dormeEm!.y + k));
+  for (const q of p.portas) for (const [dx, dy] of [[0, 0], [0, 1], [0, -1], [1, 0], [-1, 0]]) ocupado.add(chave(q.x + dx, q.y + dy));
+  const cabe = (x: number, y: number): boolean => [0, 1, 2].every((k) => g.livre(x, y + k) && !ocupado.has(chave(x, y + k)));
+  if (f.dormeEm && !f.dormeEm.colchao && cabe(f.dormeEm.x, f.dormeEm.y)) return f.dormeEm;
+  const cantos = [[1, 1], [p.largura - 2, 1], [1, p.altura - 2], [p.largura - 2, p.altura - 2]];
+  let melhor: { x: number; y: number } | null = null; let dist = Infinity;
+  for (let y = 0; y < p.altura - 2; y++) for (let x = 0; x < p.largura; x++) {
+    if (!cabe(x, y)) continue; const d = Math.min(...cantos.map(([cx, cy]) => Math.abs(cx - x) + Math.min(Math.abs(cy - y), Math.abs(cy - (y + 2)))));
+    if (d < dist) { dist = d; melhor = { x, y }; }
+  }
+  return melhor;
+}
+// ---------- bolsa da personagem (fica na mesa; tem o celular) ----------
+export const BOLSA_DE: Record<string, string> = { cacheada: 'bolsa-rosa', oculos: 'ecobag', afro: 'necessaire' };
+export const bolsaDe = (p: Projeto, fid: string): ObjetoColocado | null => p.objetos.find((o) => item(o.def)?.interacao === 'bolsa' && o.estado?.dona === fid) ?? null;
+/** Coloca a bolsa da personagem na mesa dela (se ainda não houver e se couber). A bolsa não vai para o inventário nem é vendida. */
+export function garantirBolsa(p: Projeto, f: Funcionario): void {
+  if (!f.estacao || bolsaDe(p, f.id)) return; const mesa = p.objetos.find((o) => o.id === f.estacao); const dm = mesa && item(mesa.def); const d = item(BOLSA_DE[f.avatar] ?? 'bolsa-rosa');
+  if (!mesa || !dm || !d) return;
+  for (const c of celulasDe(mesa, dm).reverse()) { if (!podeColocar(p, d, c.x, c.y, 0).ok) continue; const o = colocar(p, d, c.x, c.y, 0); o.estado = { dona: f.id }; return; }
 }
 function trabalhar(p: Projeto, f: Funcionario, dtMin: number): void {
   const mesa = f.estacao; const pc = mesa ? computadorDaMesa(p, mesa) : null; if (!pc) return;                 // o dinheiro vem do rendimento diário (pagarSalarios); aqui só o humor
@@ -110,7 +148,7 @@ export function pagarSalarios(p: Projeto, registrar: (tipo: 'salario' | 'recompe
   for (const f of p.funcionarios) {
     if (f.status !== 'ativo' || !f.estacao || f.estado === 'ausente') continue;                // sem estação ela não trabalha: não rende nem recebe
     const ganho = f.metaDia ?? sortearRendimento(rnd); p.cc = Math.round((p.cc + ganho) * 1000) / 1000; rendeu += ganho; f.produzido = ganho; registrar('recompensa', ganho, `Rendimento de ${f.nome} no dia`); f.metaDia = sortearRendimento(rnd);
-    if (p.cc >= f.salario) { p.cc = Math.round((p.cc - f.salario) * 1000) / 1000; pago += f.salario; f.diasSemPagar = 0; registrar('salario', -f.salario, `Salário de ${f.nome}`); }
+    if (p.cc >= f.salario) { p.cc = Math.round((p.cc - f.salario) * 1000) / 1000; pago += f.salario; f.diasSemPagar = 0; registrar('salario', -f.salario, `Salário de ${f.nome}`); f.saldo = (f.saldo ?? 0) + f.salario; (f.extrato ??= []).push({ dia: diaDe(p.minuto), valor: f.salario, desc: `Salário — ${p.empresa}` }); if (f.extrato.length > 60) f.extrato.splice(0, f.extrato.length - 60); }
     else { f.diasSemPagar++; f.humor = Math.max(0, f.humor - 25); if (f.diasSemPagar >= 3) { demitir(p, f.id); saidas.push(f.nome); } }
   }
   return { pago, rendeu, saidas };

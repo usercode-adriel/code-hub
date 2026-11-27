@@ -10,10 +10,12 @@ import { lerPagina, pesquisar, type Pagina, type RespostaPesquisa } from '../sis
 import type { NoArquivo } from '../tipos';
 import { cc, useJogo } from './comum';
 import { IconeItem } from './Paineis';
+import { urlIcone } from '../render/arte';
 
 type App = 'arquivos' | 'navegador' | 'notas' | 'calculadora' | 'loja' | 'config' | 'editor';
 interface Jan { id: number; app: App; x: number; y: number; w: number; arquivo?: string }
-const APPS: { id: App; nome: string; icone: string }[] = [{ id: 'arquivos', nome: 'Arquivos', icone: '📁' }, { id: 'navegador', nome: 'Navegador', icone: '🌐' }, { id: 'notas', nome: 'Notas', icone: '📝' }, { id: 'calculadora', nome: 'Calculadora', icone: '🧮' }, { id: 'loja', nome: 'LOJA', icone: '🛒' }, { id: 'config', nome: 'Configurações', icone: '⚙' }];
+const APPS: { id: App; nome: string; icone: string }[] = [{ id: 'arquivos', nome: 'Arquivos', icone: 'arquivos' }, { id: 'navegador', nome: 'Navegador', icone: 'navegador' }, { id: 'notas', nome: 'Notas', icone: 'notas' }, { id: 'calculadora', nome: 'Calculadora', icone: 'calculadora' }, { id: 'loja', nome: 'LOJA', icone: 'loja' }, { id: 'config', nome: 'Configurações', icone: 'config' }];
+const Icone = ({ n, tam = 34 }: { n: string; tam?: number }) => <img src={urlIcone(n)} alt="" style={{ width: tam, height: tam, objectFit: 'contain', imageRendering: 'pixelated', display: 'block', margin: '0 auto 2px' }} />;
 const PAPEIS: Record<string, string> = { azul: 'linear-gradient(135deg,#3a86b4,#2a5c85)', verde: 'linear-gradient(135deg,#4aa56a,#2a6a45)', roxo: 'linear-gradient(135deg,#7a5ab4,#3a2a6a)', escuro: 'linear-gradient(135deg,#2a2a35,#14141c)', laranja: 'linear-gradient(135deg,#e0883a,#8a3a1a)' };
 
 export function SO({ jogo, id, fechar, abrirLoja }: { jogo: Jogo; id: string; fechar: () => void; abrirLoja: boolean }) {
@@ -30,7 +32,7 @@ export function SO({ jogo, id, fechar, abrirLoja }: { jogo: Jogo; id: string; fe
       <div className="janela" style={{ width: 'min(900px,100%)' }} data-testid="so">
         <div className="jan-barra"><span>💻 {pc.papel === undefined ? 'Computador' : 'Computador'} — CripcoinOS</span><button className="x" onClick={fechar} data-testid="so-fechar">✕</button></div>
         <div className="so"><div className="area" style={{ background: PAPEIS[p.config.papelDeParede] ?? PAPEIS.azul }} onMouseDown={() => setMenu(false)}>
-          <div className="icones">{APPS.map((a) => <button key={a.id} className="ico" onClick={() => abrir(a.id)} data-testid={`ico-${a.id}`}><span>{a.icone}</span>{a.nome}</button>)}</div>
+          <div className="icones">{APPS.map((a) => <button key={a.id} className="ico" onClick={() => abrir(a.id)} data-testid={`ico-${a.id}`}><Icone n={a.icone} />{a.nome}</button>)}</div>
           {jans.map((j, i) => (
             <div key={j.id} className="app" style={{ left: j.x, top: j.y, width: j.w, maxWidth: '96%', zIndex: i + 1, maxHeight: '96%' }} onMouseDown={() => frente(j.id)} data-testid={`app-${j.app}`}>
               <div className="barra-app" onPointerDown={(e) => { const el = e.currentTarget; el.setPointerCapture(e.pointerId); let lx = e.clientX; let ly = e.clientY; const mv = (ev: PointerEvent): void => { mexer(j.id, ev.clientX - lx, ev.clientY - ly); lx = ev.clientX; ly = ev.clientY; }; const fim = (): void => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', fim); }; el.addEventListener('pointermove', mv); el.addEventListener('pointerup', fim); }}>
@@ -44,7 +46,7 @@ export function SO({ jogo, id, fechar, abrirLoja }: { jogo: Jogo; id: string; fe
                 {j.app === 'loja' && <Loja jogo={jogo} />}
                 {j.app === 'config' && <ConfigPC jogo={jogo} />}
               </div></div>))}
-          {menu && <div className="menu-start" data-testid="menu-start">{APPS.map((a) => <button key={a.id} onClick={() => abrir(a.id)}>{a.icone} {a.nome}</button>)}<button className="perigo" onClick={fechar}>⏻ Desligar</button></div>}
+          {menu && <div className="menu-start" data-testid="menu-start">{APPS.map((a) => <button key={a.id} onClick={() => abrir(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icone n={a.icone} tam={18} />{a.nome}</button>)}<button className="perigo" onClick={fechar}>⏻ Desligar</button></div>}
         </div>
           <div className="taskbar"><button onClick={() => setMenu(!menu)} className="primario" data-testid="btn-iniciar">▣ Iniciar</button>
             {jans.map((j) => <button key={j.id} onClick={() => frente(j.id)}>{nomeApp(j).slice(0, 12)}</button>)}
@@ -106,23 +108,23 @@ function ConfigPC({ jogo }: { jogo: Jogo }) {
 }
 
 // ---------- Navegador (pesquisa REAL) ----------
-function Navegador({ jogo, cid }: { jogo: Jogo; cid: string }) {
+export function Navegador({ jogo, cid }: { jogo: Jogo; cid?: string }) {
   const [q, setQ] = useState(''); const [res, setRes] = useState<RespostaPesquisa | null>(null); const [pag, setPag] = useState<Pagina | null>(null); const [erro, setErro] = useState(''); const [carregando, setCarregando] = useState(false);
   const buscar = async (): Promise<void> => { if (!q.trim()) return; setCarregando(true); setErro(''); setPag(null); try { setRes(await pesquisar(q)); } catch (e) { setRes(null); setErro(e instanceof Error ? e.message : String(e)); } finally { setCarregando(false); } };
   const ler = async (url: string): Promise<void> => { setCarregando(true); setErro(''); try { setPag(await lerPagina(url)); } catch (e) { setErro(e instanceof Error ? e.message : String(e)); } finally { setCarregando(false); } };
-  const guardarPag = (): void => { if (!pag) return; const fs = jogo.p.computadores[cid].fs; const pasta = (fs.filhos ?? []).find((f) => f.nome === 'Documentos') ?? fs; criar(fs, pasta.id, pag.title || 'Página', 'txt', `${pag.url}\n\n${pag.text}`); jogo.aviso('Página salva em Documentos.', 'ok'); jogo.emitir(); };
+  const guardarPag = (): void => { if (!pag || !cid) return; const fs = jogo.p.computadores[cid].fs; const pasta = (fs.filhos ?? []).find((f) => f.nome === 'Documentos') ?? fs; criar(fs, pasta.id, pag.title || 'Página', 'txt', `${pag.url}\n\n${pag.text}`); jogo.aviso('Página salva em Documentos.', 'ok'); jogo.emitir(); };
   return (<div data-testid="navegador"><div className="linha"><input placeholder="Pesquisar na web ou colar um endereço (https://...)" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void (/^https?:\/\//i.test(q) ? ler(q) : buscar()); }} data-testid="nav-busca" /><button className="primario" onClick={() => void (/^https?:\/\//i.test(q) ? ler(q) : buscar())} data-testid="nav-ir">Ir</button></div>
     {carregando && <div className="dim">Carregando...</div>}{erro && <div className="erro" data-testid="nav-erro">{erro}</div>}
     {res && !pag && (<div data-testid="nav-resultados"><div className="dim">Resultados reais ({res.fonte}).</div>{res.resumo && <div className="cartao" style={{ background: '#d8d0f0', color: '#1b1626' }}>{res.resumo}</div>}
       {res.resultados.map((r) => <div key={r.url} className="cartao" style={{ background: '#f6f3ff', color: '#1b1626', marginTop: 4 }}><a href={r.url} target="_blank" rel="noreferrer noopener" style={{ color: '#2a4aa0' }}>{r.titulo}</a><div className="dim" style={{ wordBreak: 'break-all' }}>{r.url}</div>{r.trecho && <div>{r.trecho}</div>}<button onClick={() => void ler(r.url)}>Ler aqui</button></div>)}</div>)}
-    {pag && (<div><div className="linha"><button onClick={() => setPag(null)}>← Voltar</button><button onClick={guardarPag}>Salvar em Documentos</button><a href={pag.url} target="_blank" rel="noreferrer noopener">Abrir no site</a></div><b>{pag.title}</b><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', maxHeight: 260, overflow: 'auto' }}>{pag.text}{pag.truncated ? '\n[…texto cortado]' : ''}</pre></div>)}
+    {pag && (<div><div className="linha"><button onClick={() => setPag(null)}>← Voltar</button>{cid && <button onClick={guardarPag}>Salvar em Documentos</button>}<a href={pag.url} target="_blank" rel="noreferrer noopener">Abrir no site</a></div><b>{pag.title}</b><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', maxHeight: 260, overflow: 'auto' }}>{pag.text}{pag.truncated ? '\n[…texto cortado]' : ''}</pre></div>)}
     {!res && !pag && !erro && !carregando && <div className="dim">Pesquisas usam a web de verdade (via servidor do Hub). Sem login no Hub não há pesquisa.</div>}</div>);
 }
 
 // ---------- Loja ----------
 function Loja({ jogo }: { jogo: Jogo }) {
   useJogo(jogo); const p = jogo.p; const [cat, setCat] = useState('mesas'); const [q, setQ] = useState(''); const [conf, setConf] = useState<string | null>(null);
-  const lista = ITENS.filter((d) => (q ? d.nome.toLowerCase().includes(q.toLowerCase()) : d.categoria === cat)); const ped = conf ? ITENS.find((d) => d.id === conf) : null;
+  const lista = ITENS.filter((d) => d.naLoja !== false && (q ? d.nome.toLowerCase().includes(q.toLowerCase()) : d.categoria === cat)); const ped = conf ? ITENS.find((d) => d.id === conf) : null;
   return (<div data-testid="loja"><div className="linha"><b>🛒 LOJA CRIPCOIN</b><span className="ouro" style={{ marginLeft: 'auto' }}>Saldo {cc(Math.floor(p.cc * 10) / 10)}</span></div>
     <input placeholder="Buscar item..." value={q} onChange={(e) => setQ(e.target.value)} />
     <div className="abas" style={{ marginTop: 6 }}>{CATEGORIAS.map((c) => <button key={c.id} className={cat === c.id && !q ? 'ativo' : ''} onClick={() => { setCat(c.id); setQ(''); }}>{c.nome}</button>)}</div>

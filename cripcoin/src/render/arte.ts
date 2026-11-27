@@ -1,6 +1,7 @@
 // ARTE: carrega os sprites recortados (public/arte). Arquivo ausente => `null` e o desenho usa um placeholder identificável (nada é inventado).
 import { ITENS } from '../dados/catalogo';
 import { AVATARES, VISTAS } from '../dados/pessoas';
+import manifesto from '../../public/arte/manifesto.json';
 
 const base = (): string => `${import.meta.env.BASE_URL}arte/`;
 const cache = new Map<string, HTMLImageElement | null>();
@@ -17,9 +18,11 @@ let pronto: Promise<void> | null = null;
 export function carregarArte(): Promise<void> {
   pronto ??= (async () => {
     const t: Promise<void>[] = [];
-    for (const s of new Set(ITENS.flatMap((i) => [i.sprite, ...Object.values(i.variantes ?? {}).map((v) => v!.sprite)]))) t.push(carregar(`o:${s}`, `${base()}objetos/${s}.png`));
+    for (const s of new Set(ITENS.flatMap((i) => [i.sprite, ...(i.spriteAberto ? [i.spriteAberto] : []), ...Object.values(i.variantes ?? {}).map((v) => v!.sprite)]))) t.push(carregar(`o:${s}`, `${base()}objetos/${s}.png`));
     for (const p of PISOS) t.push(carregar(`p:${p}`, `${base()}pisos/${p}.png`));
     for (const w of ['parede', 'porta', 'janela', 'parede-tela', 'parede-grade']) t.push(carregar(`w:${w}`, `${base()}paredes/${w}.png`));
+    for (const a of AVATARES) t.push(carregar(`a:${a}-dormindo`, `${base()}personagens/${a}-dormindo.png`));
+    for (const n of Object.keys(manifesto.itens ?? {})) t.push(carregar(`i:${n}`, `${base()}itens/${n}.png`));
     for (const a of AVATARES) for (const d of VISTAS) t.push(carregar(`a:${a}-${d}`, `${base()}personagens/${a}-${d}.png`));
     await Promise.all(t);
   })();
@@ -31,6 +34,11 @@ export const parede = (s: string): HTMLImageElement | null => cache.get(`w:${s}`
 /** Só há 4 vistas (frente, costas, lados): diagonais usam a vista cardeal mais próxima. */
 const CARDEAL: Record<string, string> = { N: 'N', S: 'S', E: 'E', W: 'W', NE: 'N', NW: 'N', SE: 'S', SW: 'S' };
 export const avatar = (a: string, d: string): HTMLImageElement | null => cache.get(`a:${a}-${CARDEAL[d] ?? 'S'}`) ?? null;
+export const dormindo = (a: string): HTMLImageElement | null => cache.get(`a:${a}-dormindo`) ?? null;
+export const imgItem = (n: string): HTMLImageElement | null => cache.get(`i:${n}`) ?? null;
+export const urlItem = (n: string): string => `${base()}itens/${n}.png`;
+export const urlIcone = (n: string): string => `${base()}icones/${n}.png`;
+export const urlDormindo = (a: string): string => `${base()}personagens/${a}-dormindo.png`;
 export const urlAvatar = (a: string, d = 'S'): string => `${base()}personagens/${a}-${d}.png`;
 export const urlObjeto = (s: string): string => `${base()}objetos/${s}.png`;
 export const urlPiso = (s: string): string => `${base()}pisos/${s}.png`;

@@ -33,3 +33,16 @@ test('prompt da personagem usa personalidade e defeitos e corta entradas enormes
   assert.match(system, /Calmo/); assert.match(system, /Teimoso/); assert.ok(system.length < 2500); assert.ok(prompt.includes('Chefe: oi') && prompt.includes('Ana: olá')); assert.ok(prompt.length < 700);
   assert.equal(limparResposta('"Ana: **Oi** chefe!"', 'Ana'), 'Oi chefe!'); assert.ok(limparResposta('Frase um. '.repeat(40), 'Ana').length <= 221);
 });
+test('conversa entre a equipe: prompt com o trabalho de afiliadas (Temu/Shopee) e leitura só de falas de quem existe', async () => {
+  const { montarPromptEquipe, lerDialogo } = await import('../server/cripcoin-conversa.js');
+  assert.throws(() => montarPromptEquipe({ pessoas: [{ nome: 'Ana' }] }));
+  const { system, nomes } = montarPromptEquipe({ pessoas: [{ nome: 'Ana', personalidade: ['Calmo'] }, { nome: 'Bia', defeitos: ['Teimoso'] }], contexto: { hora: '10:00' }, recentes: ['meta de cliques'] });
+  assert.match(system, /Temu/); assert.match(system, /Shopee/); assert.match(system, /brincadeira|piadas/i); assert.deepEqual(nomes, ['Ana', 'Bia']);
+  assert.deepEqual(lerDialogo('Ana: Oi\nNarrador: x\n**Bia**: Bom dia\n3. Ana: Bora\nCarla: nao existe', nomes).map((l) => l.quem), ['Ana', 'Bia', 'Ana']);
+});
+test('fonte de IA: nuvem > Ollama > gratuita (desligável) e rota informa', async () => {
+  const { fonteIA } = await import('../server/cripcoin-ia.js'); const antes = process.env.CRIPCOIN_IA_GRATIS;
+  process.env.CRIPCOIN_IA_GRATIS = '0'; assert.ok(['nuvem', 'ollama', 'nenhuma'].includes(fonteIA())); delete process.env.CRIPCOIN_IA_GRATIS; assert.ok(['nuvem', 'ollama', 'gratis'].includes(fonteIA()));
+  if (antes !== undefined) process.env.CRIPCOIN_IA_GRATIS = antes;
+  await com(async (b) => { const r = await fetch(`${b}/ia`); assert.equal(r.status, 200); assert.ok((await r.json()).fonte); });
+});

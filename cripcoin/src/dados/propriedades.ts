@@ -4,12 +4,13 @@ import manifesto from '../../public/arte/manifesto.json';
 import type { ItemDef, Retangulo } from '../tipos';
 
 /** Dimensões originais do sprite em pixels de arte (2x). Sem arquivo => 64×64 (placeholder). */
-export const dimSprite = (nome: string): { w: number; h: number } => (manifesto.objetos as Record<string, { w: number; h: number }>)[nome] ?? { w: 64, h: 64 };
+/** Dimensões originais do sprite (px de arte, 2x) e `ox`: fração da largura que fica no centro da pegada (origem; padrão 0,5). */
+export const dimSprite = (nome: string): { w: number; h: number; ox?: number } => (manifesto.objetos as Record<string, { w: number; h: number; ox?: number }>)[nome] ?? { w: 64, h: 64 };
 export const ART_POR_TILE = 64;
 
 // largura-alvo (px de arte, com a mesa de 2 tiles = 128 px) para itens pequenos, por categoria: mantém a proporção objeto × mesa
-const ALVO_CATEGORIA: Record<string, number> = { computadores: 48, equipamentos: 44, cafeteria: 34, plantas: 34, decoracao: 30, iluminacao: 34, outros: 36 };
-const ALVO_ITEM: Record<string, number> = { monitor: 52, 'monitor-duplo': 64, 'monitor-curvo': 64, laptop: 46, teclado: 40, mouse: 14, telefone: 30, caneca: 15, 'jarra-cafe': 22, cafeteira: 30, microondas: 48, suculenta: 28, caderno: 26, papeis: 30, despertador: 22, trofeu: 22, 'torre-pc': 28, projetor: 44, 'mesa-digitalizadora': 50, webcam: 18 };
+const ALVO_CATEGORIA: Record<string, number> = { computadores: 48, equipamentos: 44, cafeteria: 16, plantas: 34, decoracao: 30, iluminacao: 34, outros: 36 };
+const ALVO_ITEM: Record<string, number> = { 'tv-netflix': 60, 'bolsa-rosa': 24, ecobag: 22, necessaire: 24, monitor: 52, 'monitor-duplo': 64, 'monitor-curvo': 64, laptop: 46, teclado: 40, mouse: 14, telefone: 30, caneca: 15, 'jarra-cafe': 22, cafeteira: 30, microondas: 48, suculenta: 28, caderno: 26, papeis: 30, despertador: 22, trofeu: 22, 'torre-pc': 28, projetor: 44, 'mesa-digitalizadora': 50, webcam: 18 };
 
 const sup = (tipo: string, ...niveis: Retangulo[]): { tipo: string; niveis: Retangulo[] } => ({ tipo, niveis });
 const R = (x0: number, y0: number, x1: number, y1: number): Retangulo => ({ x0, y0, x1, y1 });

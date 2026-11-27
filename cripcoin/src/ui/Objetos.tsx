@@ -8,6 +8,10 @@ import { listarArquivos } from '../sistemas/arquivos';
 import { adicionarIdeia, adicionarNota, agua, alternarTv, cafes, capacidade, comprarPapel, conteudoArmario, definir, enviarParaImpressora, estado, fila, graos, guardarNoArmario, imprimirProximo, limparFila, ligada, ocupacaoArmario, papel, prepararCafe, quadro, recarregarGraos, regar, retirarDoArmario, seca, tomarCafe } from '../sistemas/objetos';
 import type { ObjetoColocado } from '../tipos';
 import { Janela, useJogo } from './comum';
+import { BEBIDAS } from '../dados/catalogo';
+import { urlItem, urlObjeto } from '../render/arte';
+import { Celular } from './Celular';
+import manifesto from '../../public/arte/manifesto.json';
 import { IconeItem } from './Paineis';
 
 export function JanelaObjeto({ jogo, id, fechar }: { jogo: Jogo; id: string; fechar: () => void }) {
@@ -21,6 +25,8 @@ export function JanelaObjeto({ jogo, id, fechar }: { jogo: Jogo; id: string; fec
     case 'tv': return <Janela titulo={`📺 ${T}`} onFechar={fechar} largura={380}><Tv jogo={jogo} o={o} /></Janela>;
     case 'planta': return <Janela titulo={`🌱 ${T}`} onFechar={fechar} largura={380}><Planta jogo={jogo} o={o} /></Janela>;
     case 'relogio': return <Janela titulo="🕒 Relógio" onFechar={fechar} largura={340}><div style={{ fontSize: 22, textAlign: 'center' }} className="ouro">{horaTexto(jogo.p.minuto)}</div><div style={{ textAlign: 'center' }}>Dia {diaDe(jogo.p.minuto)} · {diaSemana(jogo.p.minuto)}</div><div className="dim">Mostra o horário real do jogo (1 s = 1 min × velocidade).</div></Janela>;
+    case 'frigobar': return <Janela titulo={`🧊 ${T}`} onFechar={fechar} largura={620}><Frigobar jogo={jogo} o={o} /></Janela>;
+    case 'bolsa': return <Bolsa jogo={jogo} o={o} fechar={fechar} />;
     case 'lixeira': return <Janela titulo={`🗑 ${T}`} onFechar={fechar} largura={360}><Lixeira jogo={jogo} o={o} /></Janela>;
     default: return <Janela titulo={T} onFechar={fechar} largura={380}><p>{d.descricao}</p><div className="dim">Este objeto não tem função além de existir no escritório (ainda não implementada).</div></Janela>;
   }
@@ -83,4 +89,24 @@ function Planta({ jogo, o }: { jogo: Jogo; o: ObjetoColocado }) {
 function Lixeira({ jogo, o }: { jogo: Jogo; o: ObjetoColocado }) {
   const n = estado(o, 'lixo', 0);
   return (<div data-testid="lixeira"><div>Lixo: <b>{n}</b>/10</div><div className="linha"><button className="primario" onClick={() => { definir(o, 'lixo', 0); jogo.aviso('Lixeira esvaziada.', 'ok'); jogo.emitir(); }}>Esvaziar</button></div><div className="dim">Funcionários jogam o resto do café aqui.</div></div>);
+}
+
+/** Frigobar: ao abrir, o sprite troca para "aberto" e aparece o estoque de bebidas — infinito; cada clique leva uma para o inventário. */
+function Frigobar({ jogo, o }: { jogo: Jogo; o: ObjetoColocado }) {
+  useEffect(() => { definir(o, 'aberto', true); jogo.emitir(); return () => { definir(o, 'aberto', false); jogo.emitir(); }; }, [jogo, o]);
+  const pegar = (id: string, nome: string): void => { jogo.p.inventario[id] = (jogo.p.inventario[id] ?? 0) + 1; jogo.aviso(`${nome} foi para o inventário (pode colocar numa mesa).`, 'ok'); jogo.emitir(); };
+  return (<div className="frig" data-testid="frigobar"><img src={urlObjeto('frigobar-aberto')} alt="Frigobar aberto" />
+    <div style={{ flex: 1 }}><div className="dim">Estoque infinito: clique para pegar.</div>
+      <div className="frig-lista">{BEBIDAS.map((d) => <div key={d.id} className="slot" title={d.descricao} onClick={() => pegar(d.id, d.nome)} data-testid={`pegar-${d.id}`}><img src={urlObjeto(d.sprite)} alt="" />{d.nome}<br /><span className="ouro">∞</span></div>)}</div></div></div>);
+}
+const NOMES_ITENS: Record<string, string> = { 'colchonete-enrolado-rosa': 'Colchonete enrolado', 'colchonete-enrolado-vermelho': 'Colchonete enrolado', celular: 'Celular', escova: 'Escova', xuxinha: 'Xuxinha', moletom: 'Moletom', cropped: 'Cropped', shorts: 'Shorts', saia: 'Saia', batom: 'Batom', 'po-compacto': 'Pó compacto', 'paleta-sombras': 'Paleta de sombras', chapinha: 'Chapinha', perfume: 'Perfume', 'garrafa-termica': 'Garrafa térmica', hidratante: 'Hidratante', espelho: 'Espelho', 'oculos-sol': 'Óculos de sol', 'fones-bluetooth': 'Fones', headphone: 'Headphone', 'mascara-dormir': 'Máscara de dormir', 'garrafa-agua': 'Garrafa de água', necessaire: 'Necessaire', 'piranha-cabelo': 'Piranha', colar: 'Colar', brincos: 'Brincos', ecobag: 'Ecobag', 'bolsa-rosa': 'Bolsa rosa' };
+/** Bolsa da funcionária: objetos pessoais (a TV não está aqui: é vendida na loja). O celular abre. */
+function Bolsa({ jogo, o, fechar }: { jogo: Jogo; o: ObjetoColocado; fechar: () => void }) {
+  const dona = jogo.p.funcionarios.find((f) => f.id === o.estado?.dona); const [cel, setCel] = useState(false);
+  const itens = Object.keys((manifesto as { itens?: Record<string, unknown> }).itens ?? {}).filter((n) => n !== 'tv-netflix' && n !== o.def);
+  if (cel && dona) return <Celular jogo={jogo} fid={dona.id} fechar={() => setCel(false)} />;
+  return (<Janela titulo={`👜 ${item(o.def)?.nome ?? 'Bolsa'}${dona ? ` de ${dona.nome}` : ''}`} onFechar={fechar} largura={560}>
+    <div data-testid="bolsa">{!dona && <div className="dim">Bolsa sem dona.</div>}
+      <div className="frig-lista">{itens.map((n) => <div key={n} className={`slot ${n === 'celular' ? 'ativo' : ''}`} data-testid={`bolsa-${n}`} style={n === 'celular' ? { borderColor: '#ffd75e' } : undefined} onClick={() => { if (n === 'celular' && dona) setCel(true); }}><img src={urlItem(n)} alt="" />{NOMES_ITENS[n] ?? n}{n === 'celular' && <><br /><span className="ouro">abrir</span></>}</div>)}</div></div>
+  </Janela>);
 }

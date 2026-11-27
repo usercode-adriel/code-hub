@@ -32,6 +32,7 @@ export function descartar(p: Projeto, itemId: string, qtd = 1): boolean { if ((p
 export function guardarObjeto(p: Projeto, id: string): ObjetoColocado[] {
   const saida = remover(p, id);
   for (const o of saida) {
+    if (item(o.def)?.interacao === 'bolsa') continue;                                  // bolsa da funcionária volta sozinha para a mesa dela
     p.inventario[o.def] = (p.inventario[o.def] ?? 0) + 1;
     const dentro = p.armarios[o.id]; if (dentro) { for (const [k, n] of Object.entries(dentro)) p.inventario[k] = (p.inventario[k] ?? 0) + n; delete p.armarios[o.id]; }
   }
@@ -41,7 +42,7 @@ export function guardarObjeto(p: Projeto, id: string): ObjetoColocado[] {
 export function venderObjeto(p: Projeto, id: string): { ok: boolean; motivo: string } {
   const alvo = p.objetos.find((o) => o.id === id); const d = alvo && item(alvo.def); if (!alvo || !d) return { ok: false, motivo: 'Objeto não encontrado.' };
   const itens = guardarObjeto(p, id); let total = 0;
-  for (const o of itens) { const dd = item(o.def)!; venderDoInventario(p, o.def, 1); total += precoVenda(dd); }
+  for (const o of itens) { const dd = item(o.def)!; if (dd.interacao === 'bolsa') continue; venderDoInventario(p, o.def, 1); total += precoVenda(dd); }
   return { ok: true, motivo: `${d.nome} vendido por ${total} CC.` };
 }
 /** Coloca no mapa um item do inventário (consome 1). */

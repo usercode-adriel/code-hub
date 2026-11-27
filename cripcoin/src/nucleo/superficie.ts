@@ -29,7 +29,9 @@ export function tamanhoPegada(o: { rot: number; ex?: number; ey?: number }, d: I
   return o.rot % 2 === 1 ? { w: h0, h: w0 } : { w: w0, h: h0 };
 }
 export interface Ret { left: number; top: number; w: number; h: number }
-const tamSprite = (o: ObjetoColocado, d: ItemDef): { w: number; h: number } => { const dm = dimSprite(spriteDe(d, o.rot).nome); const s = escalaVisual(o, d); return { w: (dm.w / ART_POR_TILE) * s.sx, h: (dm.h / ART_POR_TILE) * s.sy }; };
+/** Sprite atual do objeto: a vista da rotação, ou o sprite de estado (ex.: frigobar aberto). */
+export function spriteAtual(o: ObjetoColocado, d: ItemDef): { nome: string; espelhar: boolean } { if (d.spriteAberto && o.estado?.aberto) return { nome: d.spriteAberto, espelhar: false }; return spriteDe(d, o.rot); }
+const tamSprite = (o: ObjetoColocado, d: ItemDef): { w: number; h: number; ox: number } => { const dm = dimSprite(spriteAtual(o, d).nome); const s = escalaVisual(o, d); return { w: (dm.w / ART_POR_TILE) * s.sx, h: (dm.h / ART_POR_TILE) * s.sy, ox: dm.ox ?? 0.5 }; };
 
 /** Altura (tiles) da face visível da parede. */
 export const alturaFace = (p: Pick<Projeto, 'alturaParede'>): number => p.alturaParede;
@@ -45,7 +47,7 @@ export function retSprite(p: Projeto, o: ObjetoColocado, d: ItemDef): Ret {
   const t = tamSprite(o, d);
   if (d.camada === 'parede') { const w = tamanhoPegada(o, d).w; return { left: o.x + w / 2 - t.w / 2, top: baseParede(p, o, d) - t.h, w: t.w, h: t.h }; }
   if (d.camada === 'sobre') { const a = ancora(p, o); const ax = a?.x ?? o.x + 0.5; const ay = a?.y ?? o.y + 0.5; return { left: ax - t.w / 2, top: ay - t.h, w: t.w, h: t.h }; }
-  const f = tamanhoPegada(o, d); return { left: o.x + f.w / 2 - t.w / 2, top: o.y + f.h - t.h, w: t.w, h: t.h };
+  const f = tamanhoPegada(o, d); return { left: o.x + f.w / 2 - t.w * t.ox, top: o.y + f.h - t.h, w: t.w, h: t.h };
 }
 export const apoioDe = (p: Projeto, o: ObjetoColocado): ObjetoColocado | null => (o.sobre ? p.objetos.find((q) => q.id === o.sobre) ?? null : null);
 const nivelDe = (suporte: ItemDef, n: number): Retangulo | null => suporte.superficie?.niveis[Math.min(Math.max(0, Math.floor(n)), suporte.superficie.niveis.length - 1)] ?? null;

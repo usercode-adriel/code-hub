@@ -32,7 +32,7 @@ async function abrir() {
   p.on('pageerror', (e) => p.erros.push(e.message)); p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) p.erros.push(m.text()); });
   await p.goto(`${BASE}/cripcoin/`); await p.waitForSelector('[data-testid=cr-criar], [data-testid=novo-projeto]'); p.ctx = ctx; return p;
 }
-const novoProjeto = async (p, nome = 'Escritório Teste') => { await p.fill('[data-testid=cr-nome]', nome); await p.click('[data-testid=cr-criar]'); await p.waitForSelector('[data-testid=canvas]'); await p.waitForTimeout(300); };
+const novoProjeto = async (p, nome = 'Escritório Teste') => { await p.fill('[data-testid=cr-nome]', nome); await p.click('[data-testid=cr-criar]'); await p.waitForSelector('[data-testid=canvas]'); await p.evaluate(() => { window.__jogo.p.minuto = 10 * 60; window.__jogo.mudou(); }); await p.waitForTimeout(300); };
 const estado = (p) => p.evaluate(() => { const j = window.__jogo; return { cc: j.p.cc, objetos: j.p.objetos.map((o) => o.def), inv: j.p.inventario, func: j.p.funcionarios.map((f) => ({ estado: f.estado, nome: f.nome, estacao: f.estacao })), cand: j.p.candidatos.length, minuto: j.p.minuto }; });
 const clicarCelula = async (p, x, y) => { const pos = await p.evaluate(([x, y]) => { const m = window.__mundo; const r = m.canvas.getBoundingClientRect(); const t = m.paraTela(x + 0.5, y + 0.5); return { x: r.left + t.x, y: r.top + t.y }; }, [x, y]); await p.mouse.click(pos.x, pos.y); };
 const shot = async (p, nome) => { if (SAIDA) { fs.mkdirSync(SAIDA, { recursive: true }); await p.screenshot({ path: path.join(SAIDA, nome) }); } };
@@ -126,4 +126,54 @@ test('seta de desempenho: verde para cima (alto) e vermelha para baixo (baixo) s
     const sem = await p.evaluate(() => { const j = window.__jogo; const m = window.__mundo; const f = j.p.funcionarios[0]; const t = m.paraTela(f.x, f.y + 0.5 - 2.35); const d = m.canvas.getContext('2d').getImageData(Math.round((t.x - 16) * m.dpr), Math.round((t.y - 10) * m.dpr), Math.round(32 * m.dpr), Math.round(40 * m.dpr)).data; let n = 0; for (let i = 0; i < d.length; i += 4) { if ((d[i] < 90 && d[i + 1] > 190) || (d[i] > 230 && d[i + 1] < 110 && d[i + 2] < 110)) n++; } return n; });
     assert.equal(sem, 0, 'desempenho médio: sem seta'); assert.deepEqual(p.erros, []);
   } finally { await p.ctx.close(); }
+});
+
+const centroObj = (p, def) => p.evaluate((def) => { const j = window.__jogo; const o = j.p.objetos.find((q) => q.def === def || (def === 'bolsa' && ['bolsa-rosa', 'ecobag', 'necessaire'].includes(q.def))); const r = window.__mundo.retDe(j.p, o); const t = window.__mundo.paraTela(r.left + r.w / 2, r.top + r.h / 2); const b = window.__mundo.canvas.getBoundingClientRect(); return { x: b.left + t.x, y: b.top + t.y }; }, def);
+
+test('v5: frigobar abre (sprite aberto) com bebidas infinitas; bolsa na mesa abre o celular (Instagram, Bank, Galeria, Chrome); ícones do sistema', async () => {
+  const p = await abrir(); try {
+    await novoProjeto(p, 'V5'); await dar(p, { frigobar: 1 }); await construir(p); await usarItem(p, 'Frigobar'); await clicarMundo(p, 9.5, 6.5); await p.click('[data-testid=btn-construir]');
+    await contratarUI(p, 'Marina'); await p.waitForFunction(() => window.__jogo.p.objetos.some((o) => ['bolsa-rosa', 'ecobag', 'necessaire'].includes(o.def)), null, { timeout: 5000 });
+    let c = await centroObj(p, 'frigobar'); await p.mouse.click(c.x, c.y); await p.waitForSelector('[data-testid=frigobar]'); await p.waitForTimeout(200);
+    assert.equal(await p.evaluate(() => window.__jogo.p.objetos.find((o) => o.def === 'frigobar').estado.aberto), true);
+    for (let i = 0; i < 3; i++) await p.click('[data-testid=pegar-energetico-verde]'); assert.equal(await p.evaluate(() => window.__jogo.p.inventario['energetico-verde']), 3); await shot(p, 'v5-frigobar.png');
+    await p.click('.jan-barra .x'); await p.waitForTimeout(150); assert.equal(await p.evaluate(() => window.__jogo.p.objetos.find((o) => o.def === 'frigobar').estado.aberto), false);
+    c = await centroObj(p, 'bolsa'); await p.mouse.click(c.x, c.y); await p.waitForSelector('[data-testid=bolsa]'); assert.equal(await p.locator('[data-testid=bolsa-tv-netflix]').count(), 0); await shot(p, 'v5-bolsa.png');
+    await p.click('[data-testid=bolsa-celular]'); await p.waitForSelector('[data-testid=celular]');
+    await p.click('[data-testid=cel-instagram]'); await p.waitForSelector('[data-testid=ig-post]'); assert.ok(await p.locator('[data-testid=ig-post]').count() > 3);
+    await p.click('[data-testid=ig-meu-perfil]'); await p.waitForSelector('[data-testid=ig-perfil]'); assert.ok(await p.locator('[data-testid=ig-perfil] .foto').count() >= 9); await shot(p, 'v5-instagram.png');
+    await p.click('[data-testid=ig-busca]'); assert.ok(await p.locator('[data-testid=ig-conta]').count() >= 7);
+    await p.click('[data-testid=cel-home]'); await p.click('[data-testid=cel-banco]'); assert.match(await p.textContent('[data-testid=banco-saldo]'), /CC/);
+    await p.click('[data-testid=cel-home]'); await p.click('[data-testid=cel-galeria]'); assert.equal(await p.locator('[data-testid=galeria] .foto').count(), 15);
+    await p.click('[data-testid=cel-home]'); await p.click('[data-testid=cel-chrome]'); await p.waitForSelector('[data-testid=navegador]'); await p.click('[data-testid=cel-fechar]'); await p.waitForSelector('[data-testid=bolsa]'); await p.click('.jan-barra .x');
+    // ícones do computador vêm da folha de ícones
+    c = await centroObj(p, 'laptop'); await p.mouse.click(c.x, c.y); await p.waitForSelector('[data-testid=so]'); assert.match(await p.getAttribute('[data-testid=ico-arquivos] img', 'src'), /icones\/arquivos\.png$/);
+    const icones = await p.evaluate(() => [...document.querySelectorAll('[data-testid^=ico-] img')].every((i) => i.complete && i.naturalWidth > 0)); assert.ok(icones, 'todos os ícones carregaram'); await shot(p, 'v5-desktop.png');
+    assert.deepEqual(p.erros, []);
+  } finally { await p.ctx.close(); }
+});
+
+test('v5: fora do expediente a personagem some da cadeira e dorme (zzz) no canto/colchonete', async () => {
+  const p = await abrir(); try {
+    await novoProjeto(p, 'Sono'); await contratarUI(p, 'Marina'); await p.evaluate(() => { const j = window.__jogo; j.p.minuto = 22 * 60; j.mudou(); }); await p.waitForTimeout(300);
+    const e = await p.evaluate(() => { const f = window.__jogo.p.funcionarios[0]; const a = window.__jogo.p.objetos.find((o) => o.def === 'cadeira-escritorio'); return { estado: f.estado, cama: f.dormeEm, naCadeira: Math.floor(f.x) === a.x && Math.floor(f.y) === a.y }; });
+    assert.equal(e.estado, 'dormindo'); assert.ok(e.cama); assert.equal(e.naCadeira, false); await shot(p, 'v5-dormindo.png'); assert.deepEqual(p.erros, []);
+  } finally { await p.ctx.close(); }
+});
+
+test('mobile: barra rolável, painel de construção recolhível, chat compacto, toque seleciona e pinça dá zoom', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }); const p = await ctx.newPage(); p.erros = []; p.on('pageerror', (e) => p.erros.push(e.message));
+  try {
+    await p.goto(`${BASE}/cripcoin/`); await p.waitForSelector('[data-testid=cr-criar]'); await p.click('[data-testid=cr-criar]'); await p.waitForSelector('[data-testid=canvas]');
+    const topo = await p.evaluate(() => { const t = document.querySelector('[data-testid=topo]'); return { h: t.getBoundingClientRect().height, rola: t.scrollWidth > t.clientWidth }; }); assert.ok(topo.h < 60, `barra superior baixa (${topo.h}px)`); assert.ok(topo.rola, 'botões roláveis na horizontal');
+    assert.equal(await p.locator('[data-testid=chat-input]').count(), 0, 'chat começa recolhido no celular');
+    await p.click('[data-testid=btn-construir]'); const h1 = await p.evaluate(() => document.querySelector('[data-testid=painel-construcao]').getBoundingClientRect().height); await p.click('[data-testid=recolher]'); const h2 = await p.evaluate(() => document.querySelector('[data-testid=painel-construcao]').getBoundingClientRect().height); assert.ok(h2 < h1 / 2, `painel recolhe (${h1} -> ${h2})`);
+    const c = await p.evaluate(() => { const j = window.__jogo; const o = j.p.objetos.find((q) => q.def === 'mesa-simples'); const r = window.__mundo.retDe(j.p, o); const t = window.__mundo.paraTela(r.left + r.w / 2, r.top + r.h * 0.8); const b = window.__mundo.canvas.getBoundingClientRect(); return { x: b.left + t.x, y: b.top + t.y }; });
+    await p.touchscreen.tap(c.x, c.y); await p.waitForTimeout(150); assert.ok(await p.evaluate(() => document.querySelector('[data-testid=sel-info]') !== null || document.querySelector('[data-testid=painel-construcao].recolhido') !== null));
+    const z0 = await p.evaluate(() => window.__mundo.cam.zoom);
+    const cdp = await ctx.newCDPSession(p); const tp = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+    await tp('touchStart', [[150, 400], [240, 400]]); for (let k = 1; k <= 5; k++) await tp('touchMove', [[150 - k * 12, 400], [240 + k * 12, 400]]); await tp('touchEnd', []);
+    const z1 = await p.evaluate(() => window.__mundo.cam.zoom); assert.ok(z1 > z0 * 1.2, `pinça aumentou o zoom (${z0} -> ${z1})`);
+    if (SAIDA) await p.screenshot({ path: path.join(SAIDA, 'mobile.png') }); assert.deepEqual(p.erros, []);
+  } finally { await ctx.close(); }
 });

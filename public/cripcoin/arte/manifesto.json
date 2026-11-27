@@ -130,7 +130,7 @@
   },
   "frigobar": {
    "w": 64,
-   "h": 84
+   "h": 88
   },
   "aquecedor": {
    "w": 77,
@@ -371,6 +371,111 @@
   "quadro-codeniac": {
    "w": 128,
    "h": 80
+  },
+  "bebida-suco-vermelho": {
+   "w": 56,
+   "h": 80
+  },
+  "bebida-garrafa-pimenta": {
+   "w": 32,
+   "h": 80
+  },
+  "bebida-coquetel-laranja": {
+   "w": 80,
+   "h": 80
+  },
+  "bebida-suco-rosa": {
+   "w": 48,
+   "h": 80
+  },
+  "bebida-cha-gelado": {
+   "w": 48,
+   "h": 80
+  },
+  "bebida-shot-dourado": {
+   "w": 64,
+   "h": 80
+  },
+  "bebida-coquetel-azul": {
+   "w": 80,
+   "h": 80
+  },
+  "bebida-chopp-escuro": {
+   "w": 80,
+   "h": 80
+  },
+  "bebida-chopp-dourado": {
+   "w": 80,
+   "h": 80
+  },
+  "bebida-refrigerante-limao": {
+   "w": 48,
+   "h": 80
+  },
+  "bebida-coquetel-tropical": {
+   "w": 64,
+   "h": 80
+  },
+  "bebida-coquetel-rosa": {
+   "w": 80,
+   "h": 80
+  },
+  "energetico-verde": {
+   "w": 56,
+   "h": 117
+  },
+  "energetico-branco": {
+   "w": 56,
+   "h": 117
+  },
+  "energetico-azul": {
+   "w": 57,
+   "h": 118
+  },
+  "energetico-laranja": {
+   "w": 57,
+   "h": 118
+  },
+  "energetico-vermelho": {
+   "w": 56,
+   "h": 118
+  },
+  "energetico-rosa": {
+   "w": 56,
+   "h": 117
+  },
+  "energetico-limao": {
+   "w": 57,
+   "h": 117
+  },
+  "frigobar-aberto": {
+   "w": 101,
+   "h": 94,
+   "ox": 0.3168
+  },
+  "colchonete-rosa": {
+   "w": 72,
+   "h": 181
+  },
+  "colchonete-vermelho": {
+   "w": 72,
+   "h": 183
+  },
+  "tv-netflix": {
+   "w": 96,
+   "h": 70
+  },
+  "bolsa-rosa": {
+   "w": 44,
+   "h": 48
+  },
+  "necessaire": {
+   "w": 44,
+   "h": 29
+  },
+  "ecobag": {
+   "w": 44,
+   "h": 59
   }
  },
  "paredes": {
@@ -435,6 +540,192 @@
   "parquet": {
    "w": 64,
    "h": 64
+  }
+ },
+ "itens": {
+  "colchonete-enrolado-rosa": {
+   "w": 34,
+   "h": 56
+  },
+  "colchonete-enrolado-vermelho": {
+   "w": 31,
+   "h": 56
+  },
+  "tv-netflix": {
+   "w": 56,
+   "h": 41
+  },
+  "celular": {
+   "w": 35,
+   "h": 56
+  },
+  "bolsa-rosa": {
+   "w": 51,
+   "h": 56
+  },
+  "escova": {
+   "w": 30,
+   "h": 56
+  },
+  "xuxinha": {
+   "w": 56,
+   "h": 56
+  },
+  "moletom": {
+   "w": 54,
+   "h": 56
+  },
+  "cropped": {
+   "w": 48,
+   "h": 56
+  },
+  "shorts": {
+   "w": 56,
+   "h": 44
+  },
+  "saia": {
+   "w": 56,
+   "h": 46
+  },
+  "batom": {
+   "w": 20,
+   "h": 56
+  },
+  "po-compacto": {
+   "w": 37,
+   "h": 56
+  },
+  "paleta-sombras": {
+   "w": 56,
+   "h": 51
+  },
+  "chapinha": {
+   "w": 56,
+   "h": 37
+  },
+  "perfume": {
+   "w": 43,
+   "h": 56
+  },
+  "garrafa-termica": {
+   "w": 23,
+   "h": 56
+  },
+  "hidratante": {
+   "w": 23,
+   "h": 56
+  },
+  "espelho": {
+   "w": 35,
+   "h": 56
+  },
+  "oculos-sol": {
+   "w": 56,
+   "h": 22
+  },
+  "fones-bluetooth": {
+   "w": 55,
+   "h": 56
+  },
+  "headphone": {
+   "w": 56,
+   "h": 56
+  },
+  "mascara-dormir": {
+   "w": 56,
+   "h": 27
+  },
+  "garrafa-agua": {
+   "w": 28,
+   "h": 56
+  },
+  "necessaire": {
+   "w": 56,
+   "h": 37
+  },
+  "piranha-cabelo": {
+   "w": 56,
+   "h": 46
+  },
+  "colar": {
+   "w": 35,
+   "h": 56
+  },
+  "brincos": {
+   "w": 56,
+   "h": 33
+  },
+  "ecobag": {
+   "w": 42,
+   "h": 56
+  }
+ },
+ "icones": {
+  "arquivos": {
+   "w": 44,
+   "h": 42
+  },
+  "navegador": {
+   "w": 31,
+   "h": 52
+  },
+  "notas": {
+   "w": 34,
+   "h": 45
+  },
+  "calculadora": {
+   "w": 38,
+   "h": 48
+  },
+  "loja": {
+   "w": 48,
+   "h": 48
+  },
+  "config": {
+   "w": 41,
+   "h": 47
+  },
+  "instagram": {
+   "w": 42,
+   "h": 48
+  },
+  "galeria": {
+   "w": 32,
+   "h": 45
+  },
+  "chrome": {
+   "w": 32,
+   "h": 50
+  },
+  "lixeira": {
+   "w": 25,
+   "h": 50
+  },
+  "terminal": {
+   "w": 46,
+   "h": 45
+  },
+  "musica": {
+   "w": 39,
+   "h": 50
+  },
+  "banco": {
+   "w": 48,
+   "h": 48
+  }
+ },
+ "dormindo": {
+  "afro": {
+   "w": 75,
+   "h": 187
+  },
+  "cacheada": {
+   "w": 78,
+   "h": 201
+  },
+  "oculos": {
+   "w": 77,
+   "h": 189
   }
  }
 }

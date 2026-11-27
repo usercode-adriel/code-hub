@@ -12,7 +12,7 @@ import { cc, Janela, useJogo } from './comum';
 
 const hora = (m: number): string => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const paraMin = (t: string): number => { const [h, m] = t.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-export const ESTADOS: Record<string, string> = { ausente: 'Sem estação (precisa de mesa + cadeira + computador)', trabalhando: 'Trabalhando na mesa', parado: 'Na mesa (fora do expediente)' };
+export const ESTADOS: Record<string, string> = { ausente: 'Sem estação (precisa de mesa + cadeira + computador)', trabalhando: 'Trabalhando na mesa', parado: 'Na mesa (fora do expediente)', dormindo: 'Dormindo (fora do expediente)' };
 export function IconeItem({ id }: { id: string }) { const d = item(id); return <img src={d ? urlObjeto(spriteDe(d, 0).nome) : ''} alt="" onError={(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')} />; }
 
 export function Inventario({ jogo, fechar, colocar }: { jogo: Jogo; fechar: () => void; colocar: (id: string) => void }) {
@@ -43,6 +43,7 @@ export function Config({ jogo, fechar, sair }: { jogo: Jogo; fechar: () => void;
   return (<Janela titulo="⚙ CONFIGURAÇÕES" onFechar={fechar} largura={460}>
     <label>Nome do escritório</label><input value={nome} onChange={(e) => setNome(e.target.value)} /><label>Empresa</label><input value={emp} onChange={(e) => setEmp(e.target.value)} />
     <div className="linha"><button className="primario" onClick={() => { p.nome = nome.trim() || p.nome; p.empresa = emp.trim() || p.empresa; jogo.salvar(); jogo.aviso('Configurações salvas.', 'ok'); fechar(); }}>Salvar</button></div>
+    <label style={{ margin: '8px 0' }}><input type="checkbox" style={{ width: 'auto' }} checked={p.config.conversasEquipe !== false} onChange={(e) => { p.config.conversasEquipe = e.target.checked; jogo.emitir(); }} data-testid="cfg-conversas" /> Equipe conversa entre si sozinha (usa a IA)</label>
     <div className="dim">Sala {p.largura}×{p.altura} tiles · tile {p.tile}px · salvamento automático a cada alteração (≈8 s) e ao sair.</div>
     <h3>Controles</h3><div className="dim">Clique: usar objetos · Arrastar: mover a câmera · Roda: zoom · B: construir · R: girar · Esc: cancelar</div>
     <div className="linha dir"><button onClick={() => { jogo.salvar(); sair(); }} data-testid="sair">Salvar e voltar ao menu</button></div></Janela>);

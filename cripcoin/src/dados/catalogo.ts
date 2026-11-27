@@ -41,7 +41,7 @@ export const ITENS: ItemDef[] = [
   I('estante', 'Estante de madeira', 'Estante aberta de duas prateleiras. Guarda 24 itens.', 'armazenamento', 2, 1, 230, 'objeto', { interacao: 'armario', capacidade: 24 }),
   I('vitrine', 'Vitrine', 'Vitrine de vidro para itens especiais. Guarda 12 itens.', 'armazenamento', 1, 1, 210, 'objeto', { interacao: 'armario', capacidade: 12 }),
   I('cofre', 'Cofre', 'Cofre pequeno. Guarda 8 itens.', 'armazenamento', 1, 1, 420, 'objeto', { interacao: 'armario', capacidade: 8, estoque: 2 }),
-  I('frigobar', 'Frigobar', 'Geladeira pequena. Guarda 10 itens.', 'armazenamento', 1, 1, 260, 'objeto', { interacao: 'armario', capacidade: 10 }),
+  I('frigobar', 'Frigobar', 'Abra para pegar bebidas geladas à vontade (estoque infinito).', 'cafeteria', 1, 1, 260, 'objeto', { interacao: 'frigobar', spriteAberto: 'frigobar-aberto', girar: false }),
   // ---- sofás ----
   I('sofa-2', 'Sofá de 2 lugares', 'Sofá cinza. Funcionários descansam nele.', 'sofas', 2, 1, 390, 'objeto', { sentavel: true, assentos: 2, interacao: 'assento', solido: false }),
   I('sofa-3', 'Sofá de 3 lugares', 'Sofá grande cinza.', 'sofas', 3, 1, 540, 'objeto', { sentavel: true, assentos: 3, interacao: 'assento', solido: false, estoque: 2 }),
@@ -83,12 +83,32 @@ export const ITENS: ItemDef[] = [
   I('extintor', 'Extintor', 'Extintor de incêndio.', 'outros', 1, 1, 32, 'objeto', { solido: false, girar: false }),
 ];
 
+// ---- bebidas do frigobar (infinitas; não vendidas na loja), descanso, bolsas das personagens e TV ----
+const beb = (id: string, nome: string, desc: string): ItemDef => sobre(id, nome, desc, 'cafeteria', 3, { naLoja: false, apoio: undefined });
+export const BEBIDAS: ItemDef[] = [
+  beb('bebida-suco-vermelho', 'Suco vermelho', 'Copo de suco de frutas vermelhas.'), beb('bebida-garrafa-pimenta', 'Molho de pimenta', 'Garrafinha de molho picante.'),
+  beb('bebida-coquetel-laranja', 'Drinque de laranja', 'Taça com drinque de laranja.'), beb('bebida-suco-rosa', 'Suco rosa', 'Copo de suco de morango.'),
+  beb('bebida-cha-gelado', 'Chá gelado', 'Copo de chá gelado.'), beb('bebida-shot-dourado', 'Shot dourado', 'Copinho dourado.'), beb('bebida-coquetel-azul', 'Drinque azul', 'Taça com drinque azul e limão.'),
+  beb('bebida-chopp-escuro', 'Caneca escura', 'Caneca com bebida escura e espuma.'), beb('bebida-chopp-dourado', 'Caneca dourada', 'Caneca com bebida dourada e espuma.'),
+  beb('bebida-refrigerante-limao', 'Refrigerante de limão', 'Copo de refrigerante de limão.'), beb('bebida-coquetel-tropical', 'Drinque tropical', 'Drinque com folhinhas.'), beb('bebida-coquetel-rosa', 'Drinque rosa', 'Taça com drinque rosa.'),
+  beb('energetico-verde', 'Energético verde', 'Lata de energético (verde).'), beb('energetico-branco', 'Energético branco', 'Lata de energético (branco).'), beb('energetico-azul', 'Energético azul', 'Lata de energético (azul).'),
+  beb('energetico-laranja', 'Energético laranja', 'Lata de energético (laranja).'), beb('energetico-vermelho', 'Energético vermelho', 'Lata de energético (vermelho).'), beb('energetico-rosa', 'Energético rosa', 'Lata de energético (rosa).'), beb('energetico-limao', 'Energético limão', 'Lata de energético (limão).'),
+];
+ITENS.push(...BEBIDAS,
+  I('colchonete-rosa', 'Colchonete rosa', 'Colchonete para a equipe dormir fora do expediente.', 'descanso', 1, 3, 80, 'objeto', { solido: false, girar: false, interacao: 'colchonete' }),
+  I('colchonete-vermelho', 'Colchonete vermelho', 'Colchonete para a equipe dormir fora do expediente.', 'descanso', 1, 3, 80, 'objeto', { solido: false, girar: false, interacao: 'colchonete' }),
+  sobre('tv-netflix', 'TV Netflix', 'TV de mesa: liga e desliga, mostra o painel do escritório.', 'equipamentos', 450, { interacao: 'tv', estoque: 2 }),
+  sobre('bolsa-rosa', 'Bolsa rosa', 'Bolsa de uma funcionária (com celular e objetos pessoais).', 'outros', 1, { naLoja: false, interacao: 'bolsa' }),
+  sobre('ecobag', 'Ecobag', 'Bolsa de uma funcionária (com celular e objetos pessoais).', 'outros', 1, { naLoja: false, interacao: 'bolsa' }),
+  sobre('necessaire', 'Necessaire', 'Bolsa de uma funcionária (com celular e objetos pessoais).', 'outros', 1, { naLoja: false, interacao: 'bolsa' }),
+);
+
 ITENS.forEach(aplicar);
 export const porId = new Map(ITENS.map((i) => [i.id, i]));
 export const item = (id: string): ItemDef | undefined => porId.get(id);
 export const CATEGORIAS: { id: Categoria; nome: string }[] = [
   { id: 'mesas', nome: 'Mesas' }, { id: 'cadeiras', nome: 'Cadeiras' }, { id: 'computadores', nome: 'Computadores' }, { id: 'armazenamento', nome: 'Armazenamento' }, { id: 'sofas', nome: 'Sofás' }, { id: 'decoracao', nome: 'Decoração' },
-  { id: 'plantas', nome: 'Plantas' }, { id: 'iluminacao', nome: 'Iluminação' }, { id: 'impressoras', nome: 'Impressoras' }, { id: 'equipamentos', nome: 'Equipamentos' }, { id: 'cafeteria', nome: 'Cafeteria' }, { id: 'quadros', nome: 'Quadros' }, { id: 'outros', nome: 'Outros' },
+  { id: 'plantas', nome: 'Plantas' }, { id: 'iluminacao', nome: 'Iluminação' }, { id: 'impressoras', nome: 'Impressoras' }, { id: 'equipamentos', nome: 'Equipamentos' }, { id: 'cafeteria', nome: 'Cafeteria' }, { id: 'quadros', nome: 'Quadros' }, { id: 'descanso', nome: 'Descanso' }, { id: 'outros', nome: 'Outros' },
 ];
 export const precoVenda = (d: ItemDef): number => Math.max(1, Math.floor(d.preco * 0.6));                // revenda: 60% do preço
-export const INTERACOES: Record<Interacao, string> = { computador: 'Usar computador', armario: 'Abrir', quadro: 'Abrir quadro', cafeteira: 'Usar cafeteira', impressora: 'Usar impressora', tv: 'Ligar/desligar', relogio: 'Ver horário', planta: 'Cuidar da planta', lixeira: 'Descartar', bebedouro: 'Beber água', assento: 'Assento' };
+export const INTERACOES: Record<Interacao, string> = { computador: 'Usar computador', armario: 'Abrir', quadro: 'Abrir quadro', cafeteira: 'Usar cafeteira', impressora: 'Usar impressora', tv: 'Ligar/desligar', relogio: 'Ver horário', planta: 'Cuidar da planta', lixeira: 'Descartar', frigobar: 'Abrir frigobar', bolsa: 'Abrir bolsa', colchonete: 'Ver colchonete', bebedouro: 'Beber água', assento: 'Assento' };

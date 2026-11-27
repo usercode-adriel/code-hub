@@ -6,7 +6,8 @@ export interface PedidoResposta {
   funcionario: Funcionario; mensagem: string; historico: { de: 'eu' | 'ela'; texto: string }[];
   contexto: { escritorio: string; empresa: string; hora: string; dia: number; equipe: string[] };
 }
-export interface Provedor { nome: string; responder(pedido: PedidoResposta): Promise<string> }
+export interface PedidoDialogo { pessoas: Funcionario[]; recentes: string[]; contexto: PedidoResposta['contexto'] }
+export interface Provedor { nome: string; responder(pedido: PedidoResposta): Promise<string>; dialogo?(pedido: PedidoDialogo): Promise<{ quem: string; texto: string }[]> }
 export class ErroProvedor extends Error { constructor(msg: string, readonly semIA = false) { super(msg); } }
 
 const token = (): string | null => { try { return localStorage.getItem('codeniac.token'); } catch { return null; } };
@@ -21,6 +22,13 @@ export const provedorServidor: Provedor = {
     const j = await r.json().catch(() => ({})) as { texto?: string; error?: string; semIA?: boolean };
     if (!r.ok || !j.texto) throw new ErroProvedor(j.error ?? `Erro ${r.status}`, Boolean(j.semIA));
     return j.texto;
+  },
+  async dialogo(p) {
+    const t = token(); if (!t) throw new ErroProvedor('Sem login no Hub.', true); let r: Response;
+    const corpo = { recentes: p.recentes.slice(-6), contexto: p.contexto, pessoas: p.pessoas.map((f) => ({ nome: f.nome, cargo: f.cargo, personalidade: f.tracos, defeitos: f.defeitos ?? [] })) };
+    try { r = await fetch('/api/cripcoin/conversa-equipe', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, body: JSON.stringify(corpo) }); } catch { throw new ErroProvedor('Sem conexão com o servidor.'); }
+    const j = await r.json().catch(() => ({})) as { falas?: { quem: string; texto: string }[]; error?: string; semIA?: boolean };
+    if (!r.ok || !j.falas) throw new ErroProvedor(j.error ?? `Erro ${r.status}`, Boolean(j.semIA)); return j.falas;
   },
 };
 let atual: Provedor = provedorServidor;

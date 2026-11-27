@@ -40,3 +40,41 @@ label { display:block; margin:7px 0 3px; color:var(--dim); } h1,h2,h3 { margin:6
 .chat-log { max-height:130px; overflow:auto; margin-bottom:5px; font-size:9px; } .chat-eu { color:var(--azul); margin:2px 0; } .chat-ela { color:var(--luz); margin:2px 0; }
 .cores { display:grid; grid-template-columns: repeat(6, 1fr); gap:4px; } .cores button { height:26px; padding:0; } .cores button.ativo { outline:3px solid var(--ouro); }
 @media (max-width: 760px) { .chat { left:10px; right:10px; width:auto; bottom:calc(46% + 8px); } }
+/* celular */
+.celular { width:min(340px, 96vw); height:min(660px, 92vh); background:#0d0a14; border:3px solid #000; border-radius:34px; padding:10px 10px 6px; display:flex; flex-direction:column; box-shadow:0 0 0 3px #3a2f58, 8px 8px 0 rgba(0,0,0,.5); }
+.cel-status { display:flex; justify-content:space-between; align-items:center; color:#fff; font-size:8px; padding:2px 10px 6px; } .cel-notch { width:70px; height:14px; background:#000; border-radius:0 0 10px 10px; }
+.cel-tela { flex:1; border-radius:22px; overflow:hidden; background:linear-gradient(160deg,#ff9ec4,#9b7ae0); position:relative; display:flex; flex-direction:column; }
+.cel-home { padding:18px 14px; color:#fff; text-shadow:1px 1px 0 #000; } .cel-relogio { font-size:30px; text-align:center; margin-top:16px; } .cel-dono { text-align:center; margin-bottom:24px; }
+.cel-apps { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; } .cel-app { background:none !important; border:none !important; box-shadow:none !important; color:#fff; font-size:7px; padding:2px; text-align:center; } .cel-app img { width:44px; height:44px; object-fit:contain; image-rendering:pixelated; display:block; margin:0 auto 3px; background:rgba(255,255,255,.18); border-radius:12px; padding:4px; }
+.cel-nav { display:flex; justify-content:center; gap:28px; padding-top:6px; } .cel-nav button { background:#2a2140; border-radius:50%; width:34px; height:34px; padding:0; }
+.cel-app-tela { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#fff; color:#1b1626; } .cel-app-tela .dim { color:#8a8a8a; }
+.foto { width:100%; aspect-ratio:1; image-rendering:pixelated; display:block; cursor:pointer; }
+.ig-barra { display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #ddd; } .ig-barra button { color:#fff; padding:2px 8px; } .ig-logo { font-size:12px; }
+.ig-corpo { flex:1; overflow:auto; } .ig-abas { display:flex; justify-content:space-around; border-top:1px solid #ddd; } .ig-abas button { background:none; border:none; box-shadow:none; color:#1b1626; font-size:16px; } .ig-abas button.on { color:#c13584; }
+.ig-post { border-bottom:1px solid #eee; padding-bottom:6px; } .ig-topo { display:flex; justify-content:space-between; align-items:center; padding:6px; cursor:pointer; }
+.ig-cabeca { display:flex; align-items:center; gap:6px; font-size:8px; } .ig-cabeca img { width:24px; height:24px; border-radius:50%; image-rendering:pixelated; }
+.ig-acoes { display:flex; gap:8px; align-items:center; padding:4px 6px; font-size:8px; } .ig-acoes button { background:none; border:none; box-shadow:none; color:#1b1626; font-size:16px; padding:0 2px; }
+.ig-leg, .ig-com { font-size:8px; padding:1px 6px; line-height:1.5; } .ig-com { color:#555; }
+.ig-perfil { display:flex; align-items:center; justify-content:space-around; padding:10px 6px; font-size:8px; text-align:center; } .ig-perfil img { width:56px; height:56px; border-radius:50%; image-rendering:pixelated; }
+.ig-bio { font-size:8px; padding:0 8px 8px; line-height:1.5; } .ig-grade { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; } .ig-linha { padding:6px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+.banco { background:#0f2a1c; color:#e9ffe9; padding:10px; overflow:auto; } .banco-topo { padding:6px 0 10px; } .banco-saldo { font-size:20px; color:#6fe39a; margin:4px 0; } .banco .dim { color:#9cc9a8; }
+.banco-cartao { background:linear-gradient(135deg,#2e9b4a,#14532d); border:2px solid #000; border-radius:10px; padding:12px; display:grid; gap:8px; font-size:8px; margin-bottom:10px; } .banco-linha { display:flex; justify-content:space-between; border-bottom:1px solid #1f4a33; padding:5px 0; font-size:8px; }
+/* frigobar e bolsa */
+.frig { display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; } .frig > img { width:200px; max-width:45%; image-rendering:pixelated; } .frig-lista { flex:1; min-width:220px; display:grid; grid-template-columns:repeat(auto-fill,minmax(78px,1fr)); gap:6px; }
+.slot { background:#120e1c; border:2px solid var(--borda); padding:4px; text-align:center; font-size:7px; cursor:pointer; } .slot img { width:40px; height:40px; object-fit:contain; image-rendering:pixelated; display:block; margin:0 auto 3px; } .slot:hover { border-color:var(--ouro); }
+/* ---------- mobile / toque ---------- */
+.lateral.recolhido { height:auto !important; bottom:auto; overflow:hidden; } .lateral.recolhido > :not(:first-child) { display:none; }
+button { touch-action:manipulation; }
+@media (max-width: 760px) {
+  html, body, #raiz { font-size:9px; }
+  .topo { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:5px 6px; gap:4px; } .topo::-webkit-scrollbar { display:none; }
+  .topo > * { flex:none; } .topo button { padding:8px 9px; min-height:34px; } .topo .nome { max-width:90px; }
+  .lateral { top:auto; bottom:0; left:0; right:0; width:auto; height:42%; border-right:0; border-top:3px solid var(--borda); }
+  .lateral .abas button { padding:9px 8px; } .pisos { grid-template-columns:repeat(5, 1fr); } .cores button { height:32px; }
+  .chat { left:6px; right:6px; width:auto; bottom:6px; } .lateral:not(.recolhido) ~ .chat { display:none; }
+  .lateral.recolhido { top:auto !important; bottom:0 !important; height:auto !important; } .lateral.recolhido ~ .chat { bottom:56px; }
+  .janela { width:100% !important; max-height:96vh; } .jan-corpo { padding:8px; } .veu { padding:4px; }
+  .so { height:86vh; } .so .icones { grid-template-columns:repeat(3, 64px); } .app { left:4px !important; top:4px !important; width:calc(100% - 8px) !important; max-height:calc(100% - 8px) !important; }
+  .avisos { bottom:auto; top:52px; } input, select, textarea { font-size:16px; }
+}
+@media (pointer: coarse) { .item button, .slot, .ico, .abas button { min-height:34px; } }

@@ -23,7 +23,7 @@ export interface EstadoEdicao { ferr: Ferramenta; itemId: string | null; rot: 0 
 export function TelaJogo({ jogo, sair }: { jogo: Jogo; sair: () => void }) {
   useJogo(jogo); const p = jogo.p;
   const [construcao, setConstrucao] = useState(false); const [painel, setPainel] = useState<Painel>(null); const [aberto, setAberto] = useState<string | null>(null); const [perfil, setPerfil] = useState<string | null>(null);
-  const [loja, setLoja] = useState(false); const [ed, setEd] = useState<EstadoEdicao>({ ferr: 'selecionar', itemId: null, rot: 0, piso: 'madeira', retangulo: true, sel: null, cor: 'azul' });
+  const [loja, setLoja] = useState(false); const [recolhido, setRecolhido] = useState(false); const [ed, setEd] = useState<EstadoEdicao>({ ferr: 'selecionar', itemId: null, rot: 0, piso: 'madeira', retangulo: true, sel: null, cor: 'azul' });
   const [grade, setGrade] = useState(true); const [colisao, setColisao] = useState(false); const [superf, setSuperf] = useState(false); const [confirma, setConfirma] = useState<null | { texto: string; ok: () => void }>(null);
   const mundoRef = useRef<Mundo | null>(null);
   const upEd = (q: Partial<EstadoEdicao>): void => setEd((e) => ({ ...e, ...q }));
@@ -42,8 +42,9 @@ export function TelaJogo({ jogo, sair }: { jogo: Jogo; sair: () => void }) {
   useEffect(() => { const sai = (): void => { jogo.salvar(); }; window.addEventListener('beforeunload', sai); return () => window.removeEventListener('beforeunload', sai); }, [jogo]);
 
   const ultimoPc = (id: string): boolean => item(p.objetos.find((o) => o.id === id)?.def ?? '')?.interacao === 'computador' && p.objetos.filter((o) => item(o.def)?.interacao === 'computador').length <= 1;
-  const guardarSel = (): void => { if (!ed.sel) return; if (ultimoPc(ed.sel)) { jogo.aviso('Mantenha ao menos um computador: é por ele que você acessa a Loja.', 'erro'); return; } const o = p.objetos.find((q) => q.id === ed.sel); guardarObjeto(p, ed.sel); jogo.aviso(`${item(o?.def ?? '')?.nome ?? 'Objeto'} guardado no inventário.`, 'ok'); jogo.mudou(); upEd({ sel: null }); };
-  const venderSel = (): void => { if (!ed.sel) return; if (ultimoPc(ed.sel)) { jogo.aviso('Mantenha ao menos um computador: é por ele que você acessa a Loja.', 'erro'); return; } const id = ed.sel; const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!d) return; setConfirma({ texto: `Vender ${d.nome} (e o que estiver em cima) por 60% do preço?`, ok: () => { jogo.resultado(venderObjeto(p, id)); upEd({ sel: null }); setConfirma(null); } }); };
+  const ehBolsa = (id: string): boolean => { const o = p.objetos.find((q) => q.id === id); if (item(o?.def ?? '')?.interacao !== 'bolsa') return false; jogo.aviso('A bolsa é da funcionária e fica na mesa dela (você pode movê-la pela mesa).', 'info'); return true; };
+  const guardarSel = (): void => { if (!ed.sel || ehBolsa(ed.sel)) return; if (ultimoPc(ed.sel)) { jogo.aviso('Mantenha ao menos um computador: é por ele que você acessa a Loja.', 'erro'); return; } const o = p.objetos.find((q) => q.id === ed.sel); guardarObjeto(p, ed.sel); jogo.aviso(`${item(o?.def ?? '')?.nome ?? 'Objeto'} guardado no inventário.`, 'ok'); jogo.mudou(); upEd({ sel: null }); };
+  const venderSel = (): void => { if (!ed.sel || ehBolsa(ed.sel)) return; if (ultimoPc(ed.sel)) { jogo.aviso('Mantenha ao menos um computador: é por ele que você acessa a Loja.', 'erro'); return; } const id = ed.sel; const o = p.objetos.find((q) => q.id === id); const d = o && item(o.def); if (!d) return; setConfirma({ texto: `Vender ${d.nome} (e o que estiver em cima) por 60% do preço?`, ok: () => { jogo.resultado(venderObjeto(p, id)); upEd({ sel: null }); setConfirma(null); } }); };
   const selObj = ed.sel ? p.objetos.find((o) => o.id === ed.sel) ?? null : null;
 
   return (
@@ -67,8 +68,8 @@ export function TelaJogo({ jogo, sair }: { jogo: Jogo; sair: () => void }) {
         <button onClick={() => mundoRef.current?.zoom(1.25)}>＋</button><button onClick={() => mundoRef.current?.zoom(0.8)}>－</button><button onClick={() => mundoRef.current?.enquadrar(p)}>⌂</button>
       </div>
       {construcao && (
-        <div className="lateral" data-testid="painel-construcao">
-          <h2>CONSTRUIR</h2>
+        <div className={`lateral ${recolhido ? 'recolhido' : ''}`} data-testid="painel-construcao">
+          <div className="linha" style={{ margin: 0 }}><h2 className="grow">CONSTRUIR</h2><button onClick={() => setRecolhido(!recolhido)} aria-label="Recolher painel" data-testid="recolher">{recolhido ? '▴' : '▾'}</button></div>
           <div className="abas">
             {([['selecionar', '🖐 Selecionar'], ['colocar', '📦 Colocar'], ['piso', '🟫 Piso'], ['parede', '🧱 Parede'], ['apagarParede', '⛏ Demolir'], ['porta', '🚪 Porta'], ['corParede', '🎨 Cor da parede']] as [Ferramenta, string][]).map(([k, n]) => (
               <button key={k} className={ed.ferr === k ? 'ativo' : ''} data-testid={`ferr-${k}`} onClick={() => upEd({ ferr: k, itemId: k === 'colocar' ? ed.itemId : null })}>{n}</button>))}
@@ -110,6 +111,7 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
   const ui = useRef<VistaUI>({ construcao: false, mostrarGrade: true, mostrarColisao: false, mostrarSuperficies: false, selecionado: null, fantasma: null, hover: null, area: null, funcSel: null });
   type Acao = { tipo: 'pan' | 'area' | 'mover' | 'escala' | null; sx: number; sy: number; cx: number; cy: number; movido: boolean; id?: string; x0?: number; y0?: number; alca?: string; ex0?: number; ey0?: number; centro?: number; base?: number; larg0?: number; alt0?: number; ultimoErro?: string };
   const acao = useRef<Acao>({ tipo: null, sx: 0, sy: 0, cx: 0, cy: 0, movido: false });
+  const dedos = useRef(new Map<number, { x: number; y: number }>()); const pinca = useRef<{ d0: number; z0: number; mundo: { x: number; y: number } } | null>(null);
 
   useEffect(() => {
     const cv = ref.current!; const m = new Mundo(cv); mundoRef.current = m; (window as unknown as { __mundo?: Mundo }).__mundo = m; m.ajustar(); m.enquadrar(jogo.p);
@@ -130,11 +132,17 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
   };
   const down = (e: React.PointerEvent): void => {
     const m = mundoRef.current!; const { sx, sy } = pos(e); const c = m.celula(sx, sy); const mp = m.paraMundo(sx, sy); const p = jogo.p; const pr = props.current; const a = acao.current;
-    ref.current!.setPointerCapture(e.pointerId); a.sx = sx; a.sy = sy; a.cx = m.cam.x; a.cy = m.cam.y; a.movido = false; a.x0 = c.x; a.y0 = c.y;
+    ref.current!.setPointerCapture(e.pointerId); dedos.current.set(e.pointerId, { x: sx, y: sy });
+    if (dedos.current.size === 2) {                                                                 // dois dedos: pinça (zoom) + arrastar o mapa; cancela o que estava fazendo
+      const [p1, p2] = [...dedos.current.values()]; const meio = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; pinca.current = { d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, z0: m.cam.zoom, mundo: m.paraMundo(meio.x, meio.y) };
+      a.tipo = null; ui.current.fantasma = null; ui.current.area = null; return;
+    }
+    a.sx = sx; a.sy = sy; a.cx = m.cam.x; a.cy = m.cam.y; a.movido = false; a.x0 = c.x; a.y0 = c.y;
     if (e.button === 1 || e.button === 2) { a.tipo = 'pan'; return; }
     if (!pr.construcao) {
+      const o = m.objetoEm(p, mp.x, mp.y); if (o && item(o.def)?.camada === 'sobre') { pr.usar(o); a.tipo = null; return; }      // itens da mesa (computador, bolsa) ganham do clique na personagem
       const f = m.funcionarioEm(p, mp.x, mp.y); if (f) { pr.perfil(f); a.tipo = null; return; }
-      const o = m.objetoEm(p, mp.x, mp.y); if (o) { pr.usar(o); a.tipo = null; return; }
+      if (o) { pr.usar(o); a.tipo = null; return; }
       const q = portaEm(p, c.x, c.y); if (q) { q.aberta = !q.aberta; jogo.emitir(); a.tipo = null; return; }
       a.tipo = 'pan'; return;
     }
@@ -146,7 +154,7 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
     }
     if (fe === 'selecionar') {
       const sel = pr.ed.sel ? p.objetos.find((o) => o.id === pr.ed.sel) : null;
-      if (sel) { const al = m.alcas(p, sel); const hit = al.find((h) => Math.hypot((h.x - mp.x) * 32 * m.cam.zoom, (h.y - mp.y) * 32 * m.cam.zoom) < 9);
+      if (sel) { const al = m.alcas(p, sel); const raio = e.pointerType === 'touch' ? 24 : 10; const hit = al.find((h) => Math.hypot((h.x - mp.x) * 32 * m.cam.zoom, (h.y - mp.y) * 32 * m.cam.zoom) < raio);
         if (hit) { const d = item(sel.def)!; const r = m.retDe(p, sel)!; const es = escalaIndividual(sel, d); Object.assign(a, { tipo: 'escala', id: sel.id, alca: hit.id, ex0: es.ex, ey0: es.ey, centro: r.left + r.w / 2, base: r.top + r.h, larg0: r.w, alt0: r.h }); return; } }
       const o = m.objetoEm(p, mp.x, mp.y); pr.upEd({ sel: o?.id ?? null }); if (o) { a.tipo = 'mover'; a.id = o.id; } else a.tipo = 'pan'; return;
     }
@@ -154,7 +162,12 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
     a.tipo = 'area'; ui.current.area = { x0: c.x, y0: c.y, x1: c.x, y1: c.y, cor: fe === 'apagarParede' ? 'rgba(255,80,80,0.4)' : fe === 'corParede' ? 'rgba(255,225,77,0.35)' : 'rgba(255,255,255,0.3)' };
   };
   const move = (e: React.PointerEvent): void => {
-    const m = mundoRef.current!; const { sx, sy } = pos(e); const c = m.celula(sx, sy); const mp = m.paraMundo(sx, sy); const a = acao.current; ui.current.hover = c;
+    const m = mundoRef.current!; const { sx, sy } = pos(e); const c = m.celula(sx, sy); const mp = m.paraMundo(sx, sy); const a = acao.current; if (e.pointerType !== 'touch') ui.current.hover = c;
+    if (dedos.current.has(e.pointerId)) dedos.current.set(e.pointerId, { x: sx, y: sy });
+    if (pinca.current && dedos.current.size >= 2) {
+      const [p1, p2] = [...dedos.current.values()]; const d = Math.hypot(p1.x - p2.x, p1.y - p2.y); const meio = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      m.cam.zoom = Math.max(0.5, Math.min(6, pinca.current.z0 * (d / pinca.current.d0))); const agora = m.paraMundo(meio.x, meio.y); m.cam.x += pinca.current.mundo.x - agora.x; m.cam.y += pinca.current.mundo.y - agora.y; return;
+    }
     if (a.tipo === 'pan') { const s = 32 * m.cam.zoom; if (Math.hypot(sx - a.sx, sy - a.sy) > 3) a.movido = true; m.cam.x = a.cx - (sx - a.sx) / s; m.cam.y = a.cy - (sy - a.sy) / s; return; }
     if (a.tipo === 'area' && ui.current.area) { ui.current.area = { ...ui.current.area, x1: c.x, y1: c.y }; return; }
     if (a.tipo === 'escala' && a.id) {
@@ -167,6 +180,7 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
     atualizarFantasma(mp.x, mp.y);
   };
   const up = (e: React.PointerEvent): void => {
+    dedos.current.delete(e.pointerId); if (pinca.current) { if (dedos.current.size < 2) pinca.current = null; acao.current.tipo = null; return; }
     const m = mundoRef.current!; const { sx, sy } = pos(e); const mp = m.paraMundo(sx, sy); const a = acao.current; const p = jogo.p; const pr = props.current; const v = ui.current;
     if (a.tipo === 'mover' && a.id && a.movido) { const o = p.objetos.find((q) => q.id === a.id); const d = o && item(o.def); if (o && d) { const al = alvoDe(p, d, mp.x, mp.y, o.rot, { ex: o.ex, ey: o.ey, alt: o.alt }, o.id); if (!al.v.ok) jogo.aviso(al.v.motivo, 'erro'); else { const r = mover(p, o.id, al.x, al.y, o.rot, al.extra); jogo.resultado({ ok: r.ok, motivo: r.ok ? 'Objeto movido.' : r.motivo }); } } }
     if (a.tipo === 'escala') { if (a.ultimoErro && !a.movido) jogo.aviso(a.ultimoErro, 'erro'); else if (a.movido) jogo.aviso('Tamanho atualizado.', 'ok'); }
@@ -180,5 +194,5 @@ function Canvas({ jogo, construcao, ed, upEd, grade, colisao, superf, mundoRef, 
     a.tipo = null; a.id = undefined; v.fantasma = null; atualizarFantasma(mp.x, mp.y);
     try { ref.current?.releasePointerCapture(e.pointerId); } catch { /* já liberado */ }
   };
-  return <canvas ref={ref} data-testid="canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={() => { ui.current.hover = null; ui.current.fantasma = null; }} onContextMenu={(e) => e.preventDefault()} />;
+  return <canvas ref={ref} data-testid="canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={() => { ui.current.hover = null; ui.current.fantasma = null; }} onPointerCancel={(e) => { dedos.current.delete(e.pointerId); pinca.current = null; acao.current.tipo = null; }} onContextMenu={(e) => e.preventDefault()} />;
 }

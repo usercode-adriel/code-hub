@@ -1,10 +1,10 @@
 // RENDERER 2D (canvas): vista de cima, grid real. Arte em 2x desenhada a 0,5 (tile lógico = 32 px). Câmera com zoom e pan.
 import { item } from '../dados/catalogo';
 import { celulasDe, ehParede, idx, portaEm, temPiso } from '../nucleo/mapa';
-import { alturaFace, ancora, apoioDe, escalaVisual, retSprite, RODAPE, spriteDe, tamanhoPegada, temFace, type Ret } from '../nucleo/superficie';
+import { alturaFace, ancora, apoioDe, escalaVisual, retSprite, RODAPE, spriteAtual, spriteDe, tamanhoPegada, temFace, type Ret } from '../nucleo/superficie';
 import type { Jogo } from '../nucleo/jogo';
 import type { ItemDef, ObjetoColocado, Projeto } from '../tipos';
-import { avatar, CORES_PAREDE, objeto, parede as spriteParede, paredeColorida, piso } from './arte';
+import { avatar, CORES_PAREDE, dormindo, objeto, parede as spriteParede, paredeColorida, piso } from './arte';
 import { estado, seca } from '../sistemas/objetos';
 import { desempenhoDe } from '../sistemas/funcionarios';
 
@@ -55,7 +55,7 @@ export class Mundo {
   }
   funcionarioEm(p: Projeto, mx: number, my: number): string | null {
     let melhor: string | null = null; let dm = 0.9;
-    for (const f of p.funcionarios) { if (f.status !== 'ativo' || f.estado === 'ausente') continue; const d = Math.hypot(f.x - mx, f.y - 0.2 - my); if (d < dm) { dm = d; melhor = f.id; } }
+    for (const f of p.funcionarios) { if (f.status !== 'ativo' || f.estado === 'ausente') continue; const d = f.estado === 'dormindo' && f.dormeEm ? (mx >= f.dormeEm.x - 0.1 && mx <= f.dormeEm.x + 1.1 && my >= f.dormeEm.y - 0.2 && my <= f.dormeEm.y + 3 ? 0.1 : 9) : Math.hypot(f.x - mx, f.y - 0.2 - my); if (d < dm) { dm = d; melhor = f.id; } }
     return melhor;
   }
 
@@ -78,15 +78,17 @@ export class Mundo {
       if (ehParede(p, x, y)) { const cp = CORES_PAREDE[p.coresParede?.[idx(p, x, y)] || p.corParede]?.cor ?? null; cena.push({ z: y + 1, f: () => this.parede(c, p, x, y, cp) }); }
       else { const q = portaEm(p, x, y); if (q) cena.push({ z: y + 1, f: () => this.porta(c, p, q.x, q.y, q.aberta) }); }
     }
-    const sentados = new Set(p.funcionarios.filter((f) => f.status === 'ativo' && f.estado !== 'ausente').map((f) => `${Math.floor(f.x)},${Math.floor(f.y)}`));
+    const sentados = new Set(p.funcionarios.filter((f) => f.status === 'ativo' && (f.estado === 'trabalhando' || f.estado === 'parado')).map((f) => `${Math.floor(f.x)},${Math.floor(f.y)}`));
+    const colchoesUsados = new Set(p.funcionarios.filter((f) => f.status === 'ativo' && f.estado === 'dormindo' && f.dormeEm?.colchao).map((f) => f.dormeEm!.colchao));
     for (const o of p.objetos) {
       const d = item(o.def); if (!d || d.camada === 'chao') continue;
       if (d.sentavel && sentados.has(`${o.x},${o.y}`)) continue;                                    // o sprite do funcionário já inclui a cadeira
+      if (colchoesUsados.has(o.id)) continue;                                                        // o sprite de quem dorme já inclui o colchonete
       const mesa = apoioDe(p, o); const md = mesa && item(mesa.def); const an = d.camada === 'sobre' ? ancora(p, o) : null;
       const zz = d.camada === 'parede' ? o.y + 1.02 : d.camada === 'sobre' ? (mesa && md ? mesa.y + tamanhoPegada(mesa, md).h + 0.01 + (an ? an.y * 0.0005 : 0) : o.y + 1) : o.y + tamanhoPegada(o, d).h;
       cena.push({ z: zz, f: () => this.objeto(c, p, o, d) });
     }
-    for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente') cena.push({ z: f.y + 0.52, f: () => this.funcionario(c, f, ui.funcSel === f.id) });
+    for (const f of p.funcionarios) if (f.status === 'ativo' && f.estado !== 'ausente') cena.push(f.estado === 'dormindo' ? { z: f.y + 1.5, f: () => this.dormindo(c, f, ui.funcSel === f.id) } : { z: f.y + 0.52, f: () => this.funcionario(c, f, ui.funcSel === f.id) });
     cena.sort((a, b) => a.z - b.z); for (const e of cena) e.f();
     // sobreposições do editor
     if (ui.construcao) this.sobreposicoes(c, p, ui);
@@ -119,7 +121,7 @@ export class Mundo {
     else if (!im) { c.fillStyle = '#8a5a3a'; c.fillRect(x * T2, y * T2 - 8, T2, T2 + 8); }
   }
   private objeto(c: CanvasRenderingContext2D, p: Projeto, o: ObjetoColocado, d: ItemDef): void {
-    const sp = spriteDe(d, o.rot); if (d.interacao === 'planta' && seca(o) && objeto('planta-seca')) sp.nome = 'planta-seca'; const im = objeto(sp.nome);
+    const sp = spriteAtual(o, d); if (d.interacao === 'planta' && seca(o) && objeto('planta-seca')) sp.nome = 'planta-seca'; const im = objeto(sp.nome);
     const r = retSprite(p, o, d); const L = r.left * T; const Tp = r.top * T; const W = r.w * T; const H = r.h * T;
     const ligada = d.interacao === 'tv' && !!estado(o, 'ligada', false);
     if (im) {
@@ -139,6 +141,16 @@ export class Mundo {
     if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(cx - sw / 2, by - sh, sw, sh); }
     this.seta(c, f, cx, by - sh);
     c.fillStyle = 'rgba(0,0,0,0.6)'; c.font = 'bold 7px monospace'; c.textAlign = 'center'; const nome = f.apelido || f.nome; const tw = c.measureText(nome).width + 4; c.fillRect(cx - tw / 2, by + 1, tw, 9); c.fillStyle = '#fff'; c.fillText(nome, cx, by + 8);
+  }
+  /** Dormindo no colchonete (fora do expediente): sprite deitado + "zzz" animado subindo. */
+  private dormindo(c: CanvasRenderingContext2D, f: ProjetoFunc, sel: boolean): void {
+    const im = dormindo(f.avatar); const cama = f.dormeEm; if (!cama) return; const w = im ? im.width / 2 : 34; const h = im ? im.height / 2 : 88;
+    const cx = (cama.x + 0.5) * T; const base = (cama.y + 3) * T; const x0 = Math.round(cx - w / 2); const y0 = Math.round(base - h);
+    if (im) c.drawImage(im, x0, y0, w, h); else { c.fillStyle = '#e88'; c.fillRect(x0, y0, w, h); }
+    if (sel) { c.strokeStyle = '#ffe14d'; c.lineWidth = 1.5; c.strokeRect(x0, y0, w, h); }
+    c.font = 'bold 9px monospace'; c.textAlign = 'left';
+    for (let i = 0; i < 3; i++) { const t = (this.tempo * 0.6 + i / 3) % 1; const zx = x0 + w * 0.62 + t * 12 + i * 2; const zy = y0 + 6 - t * 22; c.globalAlpha = 1 - t; c.font = `bold ${6 + Math.round(t * 6)}px monospace`; c.fillStyle = '#0d0a14'; c.fillText('Z', zx + 1, zy + 1); c.fillStyle = '#ffffff'; c.fillText('Z', zx, zy); }
+    c.globalAlpha = 1; c.font = 'bold 7px monospace'; c.textAlign = 'center'; const nome = f.apelido || f.nome; const tw = c.measureText(nome).width + 4; c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(cx - tw / 2, base + 1, tw, 9); c.fillStyle = '#fff'; c.fillText(nome, cx, base + 8);
   }
   /** Seta de desempenho sobre a cabeça: verde para cima (alto) ou vermelha para baixo (baixo); pixel art com contorno e leve vaivém. */
   private seta(c: CanvasRenderingContext2D, f: ProjetoFunc, cx: number, topo: number): void {
